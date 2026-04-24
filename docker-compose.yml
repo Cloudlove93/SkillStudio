@@ -1,0 +1,54 @@
+services:
+  educlaw-postgres:
+    image: postgres:16-alpine
+    container_name: educlaw-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-educlaw}
+      POSTGRES_USER: ${POSTGRES_USER:-educlaw}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-educlaw}
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - educlaw-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-educlaw} -d ${POSTGRES_DB:-educlaw}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  educlaw-server:
+    build:
+      context: .
+      dockerfile: educlaw-server/Dockerfile
+    image: educlaw-server:latest
+    environment:
+      - EDU_AGENT_DIR=${EDU_AGENT_DIR:-/data/EduAgent}
+      - OAH_BASE_URL=${OAH_BASE_URL:-http://10.11.20.89:8787}
+      - OAH_ROOT_PATH_LOCAL_PREFIX=${OAH_ROOT_PATH_LOCAL_PREFIX:-}
+      - OAH_ROOT_PATH_REMOTE_PREFIX=${OAH_ROOT_PATH_REMOTE_PREFIX:-}
+      - DATABASE_URL=${DATABASE_URL:-postgres://educlaw:educlaw@educlaw-postgres:5432/educlaw}
+      - JWT_SECRET=${JWT_SECRET:-educlaw-dev-secret-change-in-production}
+    volumes:
+      - educlaw-data:/data/EduAgent
+    depends_on:
+      educlaw-postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  educlaw-web:
+    build:
+      context: .
+      dockerfile: educlaw-web/Dockerfile
+    image: educlaw-web:latest
+    ports:
+      - "${WEB_PORT:-80}:80"
+    environment:
+      - API_UPSTREAM=http://educlaw-server:3000
+    depends_on:
+      - educlaw-server
+    restart: unless-stopped
+
+volumes:
+  educlaw-data:
+  educlaw-postgres-data:

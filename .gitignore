@@ -1,0 +1,32 @@
+./educlaw-server/data/agents.json
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+educlaw-server/dist/
+educlaw-server/public/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+*.tsbuildinfo
+
+# Claude
+.claude/
