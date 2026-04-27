@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import type { OpenAgentMessage } from '@openagent/core/types';
-import { BASE } from '../../api/client';
+import { API_BASE } from '../../api/client';
 import { useHomeChatStore } from '../../stores/home-chat';
 import { useHomeChatOahChat } from '../../hooks/useHomeChatOahChat';
 import { useHomeChatModels } from '../../hooks/useHomeChatModels';
@@ -69,7 +69,7 @@ export default function HomeChat({ sessionId }: HomeChatProps) {
 
     setLoadingSuggestions(true);
     try {
-      const response = await fetch(`${BASE}/api/chat/suggestions`, {
+      const response = await fetch(`${API_BASE}/api/chat/suggestions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: currentMessages, sessionId }),

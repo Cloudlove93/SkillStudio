@@ -3,7 +3,7 @@ import { BookOpen, Check, Loader2, GraduationCap } from 'lucide-react';
 import { getOpenAgentMessageText, toLegacyOpenAgentMessages } from '@openagent/core/messages';
 import type { OpenAgentMessage } from '@openagent/core/types';
 import { useT } from '../../i18n';
-import { apiPost, matchProfiles, BASE } from '../../api/client';
+import { apiPost, matchProfiles, API_BASE } from '../../api/client';
 import { useDiaryStore } from '../../stores/diary';
 import { useHomeChatStore } from '../../stores/home-chat';
 
@@ -16,7 +16,7 @@ export function useDiaryAction(sessionId: string, getMessages: () => OpenAgentMe
     if (diaryStatus === 'loading' || messages.length === 0) return;
     setDiaryStatus(sessionId, 'loading');
     try {
-      const res = await apiPost<{ ok: boolean; date: string }>(`${BASE}/api/chat/summarize-to-diary`, {
+      const res = await apiPost<{ ok: boolean; date: string }>(`${API_BASE}/api/chat/summarize-to-diary`, {
         messages: toLegacyOpenAgentMessages(messages).map((message) => ({
           role: message.role,
           content: message.content,

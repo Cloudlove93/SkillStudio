@@ -1,7 +1,7 @@
-import { apiFetchJson, apiPost, apiPatch, BASE } from './client';
+import { apiFetchJson, apiPost, apiPatch, API_BASE } from './client';
 
 export function agentApi(agentId: string) {
-  const prefix = `${BASE}/api/${agentId}`;
+  const prefix = `/api/${agentId}`;
 
   return {
     // Sessions

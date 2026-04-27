@@ -4,7 +4,7 @@ import { useInteractionQueueStore, type QuestionRequest } from '../stores/intera
 import { useTodoStore } from '../stores/todo';
 import { useAgentStore } from '../stores/agent';
 import { agentApi } from './oah';
-import { getToken, BASE } from './client';
+import { getToken, API_BASE } from './client';
 import { startPolling, stopPolling } from '../services/polling-transport';
 
 let eventSource: EventSource | null = null;
@@ -25,7 +25,7 @@ export function connectSSE() {
   if (eventSource) return;
 
   const token = getToken();
-  eventSource = new EventSource(`${BASE}/events${token ? `?token=${encodeURIComponent(token)}` : ''}`);
+  eventSource = new EventSource(`${API_BASE}/events${token ? `?token=${encodeURIComponent(token)}` : ''}`);
 
   // Only criterion: if readyState is not OPEN after grace period, fall back.
   // This avoids false positives from transient onerror events during connection.

@@ -1,41 +1,41 @@
 import type { AgentProfile, AgentConfig } from '@educlaw/shared';
 import type { AgentConfigWithOwner } from '../stores/agent';
-import { apiFetch, apiFetchJson, apiPost, apiPut, BASE } from './client';
+import { apiFetch, apiFetchJson, apiPost, apiPut, API_BASE } from './client';
 
 // Re-export for backwards compatibility
 export { apiFetch } from './client';
 import { getToken } from './client';
 
 export function listProfiles(): Promise<AgentProfile[]> {
-  return apiFetchJson(`${BASE}/profiles`);
+  return apiFetchJson(`${API_BASE}/profiles`);
 }
 
 export function listAgents(): Promise<AgentConfigWithOwner[]> {
-  return apiFetchJson(`${BASE}/agents`);
+  return apiFetchJson(`${API_BASE}/agents`);
 }
 
 export function createAgent(profileFileName: string, sharedSkills?: string[]): Promise<AgentConfig> {
-  return apiPost(`${BASE}/agents`, { profileFileName, sharedSkills });
+  return apiPost(`${API_BASE}/agents`, { profileFileName, sharedSkills });
 }
 
 export function removeAgent(id: string): Promise<{ ok: boolean }> {
-  return apiPost(`${BASE}/agents/${id}/delete`);
+  return apiPost(`${API_BASE}/agents/${id}/delete`);
 }
 
 export function startAgent(id: string): Promise<AgentConfig> {
-  return apiPost(`${BASE}/agents/${id}/start`);
+  return apiPost(`${API_BASE}/agents/${id}/start`);
 }
 
 export function stopAgent(id: string): Promise<AgentConfig> {
-  return apiPost(`${BASE}/agents/${id}/stop`);
+  return apiPost(`${API_BASE}/agents/${id}/stop`);
 }
 
 export function syncDb(agentId: string): Promise<void> {
-  return apiPost(`${BASE}/agents/${agentId}/sync-db`);
+  return apiPost(`${API_BASE}/agents/${agentId}/sync-db`);
 }
 
 export function updateAgentSettings(id: string, settings: { public?: boolean }): Promise<void> {
-  return apiPost(`${BASE}/agents/${id}/settings`, settings);
+  return apiPost(`${API_BASE}/agents/${id}/settings`, settings);
 }
 
 export interface FileEntry {
@@ -44,37 +44,37 @@ export interface FileEntry {
 }
 
 export function listFiles(agentId: string, dirPath = '.'): Promise<FileEntry[]> {
-  return apiFetchJson(`${BASE}/agents/${agentId}/files?path=${encodeURIComponent(dirPath)}`);
+  return apiFetchJson(`${API_BASE}/agents/${agentId}/files?path=${encodeURIComponent(dirPath)}`);
 }
 
 export function getFileRawUrl(agentId: string, filePath: string): string {
   const token = getToken();
-  return `${BASE}/agents/${agentId}/file-raw?path=${encodeURIComponent(filePath)}${token ? `&token=${encodeURIComponent(token)}` : ''}`;
+  return `${API_BASE}/agents/${agentId}/file-raw?path=${encodeURIComponent(filePath)}${token ? `&token=${encodeURIComponent(token)}` : ''}`;
 }
 
 export async function readFile(agentId: string, filePath: string): Promise<string> {
-  const data = await apiFetchJson<{ content: string }>(`${BASE}/agents/${agentId}/file-content?path=${encodeURIComponent(filePath)}`);
+  const data = await apiFetchJson<{ content: string }>(`${API_BASE}/agents/${agentId}/file-content?path=${encodeURIComponent(filePath)}`);
   return data.content;
 }
 
 export function writeFile(agentId: string, filePath: string, content: string): Promise<void> {
-  return apiPut(`${BASE}/agents/${agentId}/file-content?path=${encodeURIComponent(filePath)}`, { content });
+  return apiPut(`${API_BASE}/agents/${agentId}/file-content?path=${encodeURIComponent(filePath)}`, { content });
 }
 
 export function createFile(agentId: string, filePath: string): Promise<void> {
-  return apiPost(`${BASE}/agents/${agentId}/fs/create-file`, { path: filePath });
+  return apiPost(`${API_BASE}/agents/${agentId}/fs/create-file`, { path: filePath });
 }
 
 export function createDir(agentId: string, dirPath: string): Promise<void> {
-  return apiPost(`${BASE}/agents/${agentId}/fs/create-dir`, { path: dirPath });
+  return apiPost(`${API_BASE}/agents/${agentId}/fs/create-dir`, { path: dirPath });
 }
 
 export function renamePath(agentId: string, oldPath: string, newPath: string): Promise<void> {
-  return apiPost(`${BASE}/agents/${agentId}/fs/rename`, { oldPath, newPath });
+  return apiPost(`${API_BASE}/agents/${agentId}/fs/rename`, { oldPath, newPath });
 }
 
 export function deletePath(agentId: string, targetPath: string): Promise<void> {
-  return apiPost(`${BASE}/agents/${agentId}/fs/delete`, { path: targetPath });
+  return apiPost(`${API_BASE}/agents/${agentId}/fs/delete`, { path: targetPath });
 }
 
 export async function uploadFiles(agentId: string, dir: string, files: globalThis.File[]): Promise<void> {
@@ -83,7 +83,7 @@ export async function uploadFiles(agentId: string, dir: string, files: globalThi
   for (const f of files) {
     formData.append('files', f, f.name);
   }
-  const res = await apiFetch(`${BASE}/agents/${agentId}/fs/upload`, {
+  const res = await apiFetch(`${API_BASE}/agents/${agentId}/fs/upload`, {
     method: 'POST',
     body: formData,
     // Do NOT set Content-Type 閳?browser sets it with boundary automatically
@@ -113,7 +113,7 @@ export function uploadFilesWithPaths(
     }
 
     const xhr = new XMLHttpRequest();
-    xhr.open('POST', `${BASE}/agents/${agentId}/fs/upload`);
+    xhr.open('POST', `${API_BASE}/agents/${agentId}/fs/upload`);
     const token = getToken();
     if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
 
@@ -143,11 +143,11 @@ export function uploadFilesWithPaths(
 }
 
 export function listRuntimes(): Promise<string[]> {
-  return apiFetchJson(`${BASE}/runtimes`);
+  return apiFetchJson(`${API_BASE}/runtimes`);
 }
 
 export function listLLMModels(): Promise<{ name: string; modelName: string }[]> {
-  return apiFetchJson(`${BASE}/llm/models`);
+  return apiFetchJson(`${API_BASE}/llm/models`);
 }
 
 export interface SkillDetail {
@@ -166,15 +166,15 @@ export interface SkillSummary {
 }
 
 export function listSkillDetails(): Promise<SkillDetail[]> {
-  return apiFetchJson(`${BASE}/llm/skill-details`);
+  return apiFetchJson(`${API_BASE}/llm/skill-details`);
 }
 
 export function listSkillSummaries(): Promise<SkillSummary[]> {
-  return apiFetchJson(`${BASE}/llm/skill-summaries`);
+  return apiFetchJson(`${API_BASE}/llm/skill-summaries`);
 }
 
 export function getSkillDetail(dirName: string): Promise<SkillDetail> {
-  return apiFetchJson(`${BASE}/llm/skill-detail/${encodeURIComponent(dirName)}`);
+  return apiFetchJson(`${API_BASE}/llm/skill-detail/${encodeURIComponent(dirName)}`);
 }
 
 export interface ToolSummary {
@@ -185,11 +185,11 @@ export interface ToolSummary {
 }
 
 export function listToolSummaries(): Promise<ToolSummary[]> {
-  return apiFetchJson(`${BASE}/llm/tool-summaries`);
+  return apiFetchJson(`${API_BASE}/llm/tool-summaries`);
 }
 
 export function deleteUserTool(dirName: string): Promise<void> {
-  return apiPost(`${BASE}/llm/tools/user/${encodeURIComponent(dirName)}/delete`);
+  return apiPost(`${API_BASE}/llm/tools/user/${encodeURIComponent(dirName)}/delete`);
 }
 
 /**
@@ -210,7 +210,7 @@ export function uploadUserTool(
     }
 
     const xhr = new XMLHttpRequest();
-    xhr.open('POST', `${BASE}/llm/tools/user/upload`);
+    xhr.open('POST', `${API_BASE}/llm/tools/user/upload`);
     const token = getToken();
     if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
 
@@ -240,36 +240,36 @@ export function uploadUserTool(
 }
 
 export function listToolFiles(source: 'preset' | 'public' | 'user', dirName: string, dirPath = '.'): Promise<FileEntry[]> {
-  return apiFetchJson(`${BASE}/llm/tools/${source}/${encodeURIComponent(dirName)}/files?path=${encodeURIComponent(dirPath)}`);
+  return apiFetchJson(`${API_BASE}/llm/tools/${source}/${encodeURIComponent(dirName)}/files?path=${encodeURIComponent(dirPath)}`);
 }
 
 export async function readToolFile(source: 'preset' | 'public' | 'user', dirName: string, filePath: string): Promise<string> {
-  const data = await apiFetchJson<{ content: string }>(`${BASE}/llm/tools/${source}/${encodeURIComponent(dirName)}/file-content?path=${encodeURIComponent(filePath)}`);
+  const data = await apiFetchJson<{ content: string }>(`${API_BASE}/llm/tools/${source}/${encodeURIComponent(dirName)}/file-content?path=${encodeURIComponent(filePath)}`);
   return data.content;
 }
 
 // 閳光偓閳光偓閳光偓 User profile CRUD 閳光偓閳光偓閳光偓
 
 export function createUserProfile(profile: { name: string; description?: string; details?: string; agent_runtime?: string; agent_template?: string; tools?: string[]; skills?: string[]; subagents?: string[] }): Promise<{ fileName: string }> {
-  return apiPost(`${BASE}/profiles/user`, profile);
+  return apiPost(`${API_BASE}/profiles/user`, profile);
 }
 
 export function updateUserProfile(fileName: string, profile: { name?: string; description?: string; details?: string; agent_runtime?: string; agent_template?: string; tools?: string[]; skills?: string[]; subagents?: string[] }): Promise<void> {
-  return apiPut(`${BASE}/profiles/user/${encodeURIComponent(fileName)}`, profile);
+  return apiPut(`${API_BASE}/profiles/user/${encodeURIComponent(fileName)}`, profile);
 }
 
 export function deleteUserProfile(fileName: string): Promise<void> {
-  return apiPost(`${BASE}/profiles/user/${encodeURIComponent(fileName)}/delete`);
+  return apiPost(`${API_BASE}/profiles/user/${encodeURIComponent(fileName)}/delete`);
 }
 
 export function copyProfileToUser(sourceFileName: string): Promise<{ fileName: string }> {
-  return apiPost(`${BASE}/profiles/user/copy`, { sourceFileName });
+  return apiPost(`${API_BASE}/profiles/user/copy`, { sourceFileName });
 }
 
 // 閳光偓閳光偓閳光偓 Profile import / export 閳光偓閳光偓閳光偓
 
 export async function exportProfile(fileName: string): Promise<void> {
-  const res = await apiFetch(`${BASE}/profiles/user/${encodeURIComponent(fileName)}/export`);
+  const res = await apiFetch(`${API_BASE}/profiles/user/${encodeURIComponent(fileName)}/export`);
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
     throw new Error(body.error || `HTTP ${res.status}`);
@@ -298,7 +298,7 @@ export interface ImportResult {
 export async function importProfile(file: File): Promise<ImportResult> {
   const formData = new FormData();
   formData.append('file', file);
-  const res = await apiFetch(`${BASE}/profiles/user/import`, {
+  const res = await apiFetch(`${API_BASE}/profiles/user/import`, {
     method: 'POST',
     body: formData,
   });
@@ -312,56 +312,56 @@ export async function importProfile(file: File): Promise<ImportResult> {
 // 閳光偓閳光偓閳光偓 User skill CRUD 閳光偓閳光偓閳光偓
 
 export function createUserSkill(dirName: string, name: string, description: string, content: string): Promise<void> {
-  return apiPost(`${BASE}/llm/skills/user`, { dirName, name, description, content });
+  return apiPost(`${API_BASE}/llm/skills/user`, { dirName, name, description, content });
 }
 
 export function updateUserSkill(dirName: string, name: string, description: string, content: string): Promise<{ ok: boolean; dirName: string }> {
-  return apiPut(`${BASE}/llm/skills/user/${encodeURIComponent(dirName)}`, { name, description, content });
+  return apiPut(`${API_BASE}/llm/skills/user/${encodeURIComponent(dirName)}`, { name, description, content });
 }
 
 export function deleteUserSkill(dirName: string): Promise<void> {
-  return apiPost(`${BASE}/llm/skills/user/${encodeURIComponent(dirName)}/delete`);
+  return apiPost(`${API_BASE}/llm/skills/user/${encodeURIComponent(dirName)}/delete`);
 }
 
 // 閳光偓閳光偓閳光偓 Publish / Unpublish 閳光偓閳光偓閳光偓
 
 export function publishProfile(fileName: string): Promise<void> {
-  return apiPost(`${BASE}/profiles/user/${encodeURIComponent(fileName)}/publish`);
+  return apiPost(`${API_BASE}/profiles/user/${encodeURIComponent(fileName)}/publish`);
 }
 
 export function unpublishProfile(fileName: string): Promise<void> {
-  return apiPost(`${BASE}/profiles/user/${encodeURIComponent(fileName)}/unpublish`);
+  return apiPost(`${API_BASE}/profiles/user/${encodeURIComponent(fileName)}/unpublish`);
 }
 
 export function publishSkill(dirName: string): Promise<void> {
-  return apiPost(`${BASE}/llm/skills/user/${encodeURIComponent(dirName)}/publish`);
+  return apiPost(`${API_BASE}/llm/skills/user/${encodeURIComponent(dirName)}/publish`);
 }
 
 export function unpublishSkill(dirName: string): Promise<void> {
-  return apiPost(`${BASE}/llm/skills/user/${encodeURIComponent(dirName)}/unpublish`);
+  return apiPost(`${API_BASE}/llm/skills/user/${encodeURIComponent(dirName)}/unpublish`);
 }
 
 export function publishTool(dirName: string): Promise<void> {
-  return apiPost(`${BASE}/llm/tools/user/${encodeURIComponent(dirName)}/publish`);
+  return apiPost(`${API_BASE}/llm/tools/user/${encodeURIComponent(dirName)}/publish`);
 }
 
 export function unpublishTool(dirName: string): Promise<void> {
-  return apiPost(`${BASE}/llm/tools/user/${encodeURIComponent(dirName)}/unpublish`);
+  return apiPost(`${API_BASE}/llm/tools/user/${encodeURIComponent(dirName)}/unpublish`);
 }
 
 // 閳光偓閳光偓閳光偓 Skill file operations 閳光偓閳光偓閳光偓
 
 export function listSkillFiles(source: 'preset' | 'public' | 'user', dirName: string, dirPath = '.'): Promise<FileEntry[]> {
-  return apiFetchJson(`${BASE}/llm/skills/${source}/${encodeURIComponent(dirName)}/files?path=${encodeURIComponent(dirPath)}`);
+  return apiFetchJson(`${API_BASE}/llm/skills/${source}/${encodeURIComponent(dirName)}/files?path=${encodeURIComponent(dirPath)}`);
 }
 
 export async function readSkillFile(source: 'preset' | 'public' | 'user', dirName: string, filePath: string): Promise<string> {
-  const data = await apiFetchJson<{ content: string }>(`${BASE}/llm/skills/${source}/${encodeURIComponent(dirName)}/file-content?path=${encodeURIComponent(filePath)}`);
+  const data = await apiFetchJson<{ content: string }>(`${API_BASE}/llm/skills/${source}/${encodeURIComponent(dirName)}/file-content?path=${encodeURIComponent(filePath)}`);
   return data.content;
 }
 
 export function writeSkillFile(dirName: string, filePath: string, content: string): Promise<void> {
-  return apiPut(`${BASE}/llm/skills/user/${encodeURIComponent(dirName)}/file-content?path=${encodeURIComponent(filePath)}`, { content });
+  return apiPut(`${API_BASE}/llm/skills/user/${encodeURIComponent(dirName)}/file-content?path=${encodeURIComponent(filePath)}`, { content });
 }
 
 export async function uploadSkillFiles(dirName: string, dir: string, files: globalThis.File[]): Promise<void> {
@@ -370,7 +370,7 @@ export async function uploadSkillFiles(dirName: string, dir: string, files: glob
   for (const f of files) {
     formData.append('files', f, f.name);
   }
-  const res = await apiFetch(`${BASE}/llm/skills/user/${encodeURIComponent(dirName)}/fs/upload`, {
+  const res = await apiFetch(`${API_BASE}/llm/skills/user/${encodeURIComponent(dirName)}/fs/upload`, {
     method: 'POST',
     body: formData,
   });
@@ -381,19 +381,19 @@ export async function uploadSkillFiles(dirName: string, dir: string, files: glob
 }
 
 export function createSkillFile(dirName: string, filePath: string): Promise<void> {
-  return apiPost(`${BASE}/llm/skills/user/${encodeURIComponent(dirName)}/fs/create-file`, { path: filePath });
+  return apiPost(`${API_BASE}/llm/skills/user/${encodeURIComponent(dirName)}/fs/create-file`, { path: filePath });
 }
 
 export function createSkillDir(dirName: string, dirPath: string): Promise<void> {
-  return apiPost(`${BASE}/llm/skills/user/${encodeURIComponent(dirName)}/fs/create-dir`, { path: dirPath });
+  return apiPost(`${API_BASE}/llm/skills/user/${encodeURIComponent(dirName)}/fs/create-dir`, { path: dirPath });
 }
 
 export function deleteSkillPath(dirName: string, targetPath: string): Promise<void> {
-  return apiPost(`${BASE}/llm/skills/user/${encodeURIComponent(dirName)}/fs/delete`, { path: targetPath });
+  return apiPost(`${API_BASE}/llm/skills/user/${encodeURIComponent(dirName)}/fs/delete`, { path: targetPath });
 }
 
 export function renameSkillPath(dirName: string, oldPath: string, newPath: string): Promise<void> {
-  return apiPost(`${BASE}/llm/skills/user/${encodeURIComponent(dirName)}/fs/rename`, { oldPath, newPath });
+  return apiPost(`${API_BASE}/llm/skills/user/${encodeURIComponent(dirName)}/fs/rename`, { oldPath, newPath });
 }
 
 export interface GenerateProfileEvent {
@@ -418,7 +418,7 @@ export async function generateProfileFromFile(
     formData.append('sharedSkills', JSON.stringify(sharedSkills));
   }
 
-  const res = await apiFetch(`${BASE}/llm/generate-profile-from-file`, {
+  const res = await apiFetch(`${API_BASE}/llm/generate-profile-from-file`, {
     method: 'POST',
     body: formData,
     // Do NOT set Content-Type 閳?browser sets it with boundary automatically
@@ -472,7 +472,7 @@ export async function generateProfile(
   onEvent: (evt: GenerateProfileEvent) => void,
   sharedSkills?: string[],
 ): Promise<void> {
-  const res = await apiFetch(`${BASE}/llm/generate-profile`, {
+  const res = await apiFetch(`${API_BASE}/llm/generate-profile`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ instruction, model, sharedSkills }),
@@ -583,35 +583,35 @@ export interface OptimizationCreatedResult extends OptimizationRunView {
 export type OptimizationCreateResult = OptimizationCreatedResult | OptimizationSkippedResult;
 
 export function optimizeProfile(fileName: string, input: OptimizationRequestInput = {}): Promise<OptimizationCreateResult> {
-  return apiPost(`${BASE}/optimize/profile/${encodeURIComponent(fileName)}`, input);
+  return apiPost(`${API_BASE}/optimize/profile/${encodeURIComponent(fileName)}`, input);
 }
 
 export function optimizeSkill(dirName: string, input: OptimizationRequestInput = {}): Promise<OptimizationCreateResult> {
-  return apiPost(`${BASE}/optimize/skill/${encodeURIComponent(dirName)}`, input);
+  return apiPost(`${API_BASE}/optimize/skill/${encodeURIComponent(dirName)}`, input);
 }
 
 export function optimizeAgent(id: string, input: OptimizationRequestInput = {}): Promise<OptimizationCreateResult> {
-  return apiPost(`${BASE}/optimize/agent/${encodeURIComponent(id)}`, input);
+  return apiPost(`${API_BASE}/optimize/agent/${encodeURIComponent(id)}`, input);
 }
 
 export function listOptimizationRuns(): Promise<OptimizationRunView[]> {
-  return apiFetchJson(`${BASE}/optimize/runs`);
+  return apiFetchJson(`${API_BASE}/optimize/runs`);
 }
 
 export function getOptimizationRun(runId: string): Promise<OptimizationRunView> {
-  return apiFetchJson(`${BASE}/optimize/runs/${encodeURIComponent(runId)}`);
+  return apiFetchJson(`${API_BASE}/optimize/runs/${encodeURIComponent(runId)}`);
 }
 
 export function applyOptimizationRun(runId: string, suggestionKey?: string): Promise<OptimizationRunView> {
-  return apiPost(`${BASE}/optimize/runs/${encodeURIComponent(runId)}/apply`, suggestionKey ? { suggestionKey } : {});
+  return apiPost(`${API_BASE}/optimize/runs/${encodeURIComponent(runId)}/apply`, suggestionKey ? { suggestionKey } : {});
 }
 
 export function rejectOptimizationRun(runId: string, suggestionKey?: string): Promise<OptimizationRunView> {
-  return apiPost(`${BASE}/optimize/runs/${encodeURIComponent(runId)}/reject`, suggestionKey ? { suggestionKey } : {});
+  return apiPost(`${API_BASE}/optimize/runs/${encodeURIComponent(runId)}/reject`, suggestionKey ? { suggestionKey } : {});
 }
 
 export function deleteOptimizationRun(runId: string): Promise<{ ok: boolean }> {
-  return apiPost(`${BASE}/optimize/runs/${encodeURIComponent(runId)}/delete`);
+  return apiPost(`${API_BASE}/optimize/runs/${encodeURIComponent(runId)}/delete`);
 }
 
 
@@ -690,27 +690,27 @@ export interface ArenaRequestInput {
 }
 
 export function createArenaProfileRun(fileName: string, input: ArenaRequestInput): Promise<ArenaRunView> {
-  return apiPost(BASE + '/arena/profile/' + encodeURIComponent(fileName), input);
+  return apiPost(API_BASE + '/arena/profile/' + encodeURIComponent(fileName), input);
 }
 
 export function createArenaSkillRun(dirName: string, input: ArenaRequestInput): Promise<ArenaRunView> {
-  return apiPost(BASE + '/arena/skill/' + encodeURIComponent(dirName), input);
+  return apiPost(API_BASE + '/arena/skill/' + encodeURIComponent(dirName), input);
 }
 
 export function createArenaAgentRun(id: string, input: ArenaRequestInput): Promise<ArenaRunView> {
-  return apiPost(BASE + '/arena/agent/' + encodeURIComponent(id), input);
+  return apiPost(API_BASE + '/arena/agent/' + encodeURIComponent(id), input);
 }
 
 export function listArenaRuns(): Promise<ArenaRunView[]> {
-  return apiFetchJson(BASE + '/arena/runs');
+  return apiFetchJson(API_BASE + '/arena/runs');
 }
 
 export function getArenaRun(runId: string): Promise<ArenaRunView> {
-  return apiFetchJson(BASE + '/arena/runs/' + encodeURIComponent(runId));
+  return apiFetchJson(API_BASE + '/arena/runs/' + encodeURIComponent(runId));
 }
 
 export function deleteArenaRun(runId: string): Promise<{ ok: boolean }> {
-  return apiPost(BASE + '/arena/runs/' + encodeURIComponent(runId) + '/delete');
+  return apiPost(API_BASE + '/arena/runs/' + encodeURIComponent(runId) + '/delete');
 }
 
 
@@ -762,27 +762,27 @@ export type ArenaChatStreamEvent =
   | { event: 'stream_end'; data: { ok: boolean } };
 
 export function createArenaChatProfileSession(fileName: string, input: { model?: string } = {}): Promise<ArenaChatSessionView> {
-  return apiPost(BASE + '/arena/chat/profile/' + encodeURIComponent(fileName), input);
+  return apiPost(API_BASE + '/arena/chat/profile/' + encodeURIComponent(fileName), input);
 }
 
 export function createArenaChatSkillSession(dirName: string, input: { model?: string } = {}): Promise<ArenaChatSessionView> {
-  return apiPost(BASE + '/arena/chat/skill/' + encodeURIComponent(dirName), input);
+  return apiPost(API_BASE + '/arena/chat/skill/' + encodeURIComponent(dirName), input);
 }
 
 export function createArenaChatAgentSession(id: string, input: { model?: string } = {}): Promise<ArenaChatSessionView> {
-  return apiPost(BASE + '/arena/chat/agent/' + encodeURIComponent(id), input);
+  return apiPost(API_BASE + '/arena/chat/agent/' + encodeURIComponent(id), input);
 }
 
 export function listArenaChatSessions(): Promise<ArenaChatSession[]> {
-  return apiFetchJson(BASE + '/arena/chat/sessions');
+  return apiFetchJson(API_BASE + '/arena/chat/sessions');
 }
 
 export function getArenaChatSession(sessionId: string): Promise<ArenaChatSessionView> {
-  return apiFetchJson(BASE + '/arena/chat/sessions/' + encodeURIComponent(sessionId));
+  return apiFetchJson(API_BASE + '/arena/chat/sessions/' + encodeURIComponent(sessionId));
 }
 
 export function sendArenaChatMessage(sessionId: string, input: { content: string; model?: string }): Promise<ArenaChatSendResult> {
-  return apiPost(BASE + '/arena/chat/sessions/' + encodeURIComponent(sessionId) + '/messages', input);
+  return apiPost(API_BASE + '/arena/chat/sessions/' + encodeURIComponent(sessionId) + '/messages', input);
 }
 
 export async function sendArenaChatMessageStream(
@@ -790,7 +790,7 @@ export async function sendArenaChatMessageStream(
   input: { content: string; model?: string },
   onEvent: (event: ArenaChatStreamEvent) => void,
 ): Promise<void> {
-  const res = await apiFetch(BASE + '/arena/chat/sessions/' + encodeURIComponent(sessionId) + '/messages/stream', {
+  const res = await apiFetch(API_BASE + '/arena/chat/sessions/' + encodeURIComponent(sessionId) + '/messages/stream', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
@@ -836,10 +836,10 @@ export async function sendArenaChatMessageStream(
 }
 
 export function createArenaReportFromSession(sessionId: string, input: { model?: string } = {}): Promise<ArenaRunView> {
-  return apiPost(BASE + '/arena/chat/sessions/' + encodeURIComponent(sessionId) + '/report', input);
+  return apiPost(API_BASE + '/arena/chat/sessions/' + encodeURIComponent(sessionId) + '/report', input);
 }
 
 export function deleteArenaChatSession(sessionId: string): Promise<{ ok: boolean }> {
-  return apiPost(BASE + '/arena/chat/sessions/' + encodeURIComponent(sessionId) + '/delete');
+  return apiPost(API_BASE + '/arena/chat/sessions/' + encodeURIComponent(sessionId) + '/delete');
 }
 

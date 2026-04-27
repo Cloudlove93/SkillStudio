@@ -1,4 +1,4 @@
-import { BASE } from './client';
+import { API_BASE } from './client';
 
 export interface AuthResponse {
   token: string;
@@ -12,7 +12,7 @@ export interface AuthUser {
 }
 
 export async function login(username: string, password: string): Promise<AuthResponse> {
-  const res = await fetch(`${BASE}/api/auth/login`, {
+  const res = await fetch(`${API_BASE}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password }),
@@ -25,7 +25,7 @@ export async function login(username: string, password: string): Promise<AuthRes
 }
 
 export async function register(username: string, password: string): Promise<AuthResponse> {
-  const res = await fetch(`${BASE}/api/auth/register`, {
+  const res = await fetch(`${API_BASE}/api/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password }),
@@ -38,7 +38,7 @@ export async function register(username: string, password: string): Promise<Auth
 }
 
 export async function getMe(token: string): Promise<AuthUser> {
-  const res = await fetch(`${BASE}/api/auth/me`, {
+  const res = await fetch(`${API_BASE}/api/auth/me`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) {

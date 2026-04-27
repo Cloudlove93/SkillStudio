@@ -16,7 +16,7 @@ import TodoDock from './TodoDock';
 import FileViewer from '../editor/FileViewer';
 import AgentControls from './AgentControls';
 import { useT } from '../../i18n';
-import { apiPost, BASE } from '../../api/client';
+import { apiPost, API_BASE } from '../../api/client';
 import type { Todo } from '../../stores/todo';
 
 const emptyTodos: Todo[] = [];
@@ -147,7 +147,7 @@ function ChatArea({
     if (plainMessages.length === 0) return;
     setDiaryStatus(agentId, sessionId, 'loading');
     try {
-      const res = await apiPost<{ ok: boolean; date: string }>(`${BASE}/api/chat/summarize-to-diary`, { messages: plainMessages, sessionId });
+      const res = await apiPost<{ ok: boolean; date: string }>(`${API_BASE}/api/chat/summarize-to-diary`, { messages: plainMessages, sessionId });
       const diaryStore = useDiaryStore.getState();
       if (diaryStore.selectedDate !== res.date) useDiaryStore.setState({ selectedDate: res.date, autoSaveStatus: 'idle' });
       diaryStore.loadDiary(res.date);

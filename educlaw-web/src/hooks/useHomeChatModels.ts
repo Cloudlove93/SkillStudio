@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { apiFetchJson, BASE } from '../api/client';
+import { apiFetchJson, API_BASE } from '../api/client';
 
 export interface HomeChatModelOption {
   name: string;
@@ -13,7 +13,7 @@ export function useHomeChatModels() {
   useEffect(() => {
     let cancelled = false;
 
-    apiFetchJson<HomeChatModelOption[]>(`${BASE}/llm/models`)
+    apiFetchJson<HomeChatModelOption[]>(`${API_BASE}/llm/models`)
       .then((list) => {
         if (cancelled) return;
         setModels(list);

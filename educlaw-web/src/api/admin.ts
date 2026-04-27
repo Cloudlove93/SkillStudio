@@ -1,4 +1,4 @@
-import { apiFetchJson, BASE } from './client';
+import { apiFetchJson, API_BASE } from './client';
 
 export interface AdminUserOverview {
   id: string;
@@ -37,5 +37,5 @@ export interface AdminOverviewResponse {
 }
 
 export function fetchAdminOverview(): Promise<AdminOverviewResponse> {
-  return apiFetchJson<AdminOverviewResponse>(`${BASE}/admin/overview`);
+  return apiFetchJson<AdminOverviewResponse>(`/admin/overview`);
 }

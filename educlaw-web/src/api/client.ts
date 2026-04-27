@@ -7,29 +7,40 @@
  *   /ws-.../proxy/80
  */
 const BASE = (() => {
-  // 开发环境：vite proxy 处理，保持原有逻辑
-  if (import.meta.env.DEV) {
-    try {
-      const url = new URL(import.meta.url);
-      const match = url.pathname.match(/^(.*)\/assets\/[^/]+$/);
-      if (!match) return '';
-      return match[1].replace(/\/+$/, '');
-    } catch {
-      return '';
-    }
+  try {
+    const url = new URL(import.meta.url);
+    // Only derive base from production Vite output (/assets/<file>)
+    const match = url.pathname.match(/^(.*)\/assets\/[^/]+$/);
+    if (!match) return '';
+    // Remove trailing slash(es) so callers can write `${BASE}/foo`
+    return match[1].replace(/\/+$/, '');
+  } catch {
+    return '';
   }
-  // 生产环境：前后端分离部署，API 指向后端 3000 端口
-  if (typeof window !== 'undefined') {
-    try {
-      const { protocol, hostname, port } = window.location;
-      if (port === '3000') return '';
-      return `${protocol}//${hostname}:3000`;
-    } catch {
-      return '';
-    }
-  }
-  return '';
 })();
+
+// 生产环境：前后端分离部署，API 请求指向后端 3000 端口
+const API_BASE = (() => {
+  if (import.meta.env.DEV) return BASE;
+  try {
+    // Notebook 代理模式：/.../proxy/8080 → /.../proxy/3000
+    const proxyMatch = BASE.match(/^(.*\/proxy\/)8080$/);
+    if (proxyMatch) return proxyMatch[1] + '3000';
+    // 直接访问模式：前后端分离，指向 3000 端口
+    if (typeof window !== 'undefined') {
+      const { protocol, hostname, port } = window.location;
+      if (port && port !== '3000') return `${protocol}//${hostname}:3000`;
+    }
+    return BASE;
+  } catch {
+    return BASE;
+  }
+})();
+
+function resolveUrl(url: string): string {
+  if (url.startsWith('http')) return url;
+  return `${API_BASE}${url}`;
+}
 
 const TOKEN_KEY = 'educlaw-token';
 
@@ -113,12 +124,12 @@ export function apiPatch<T>(url: string, body?: unknown): Promise<T> {
   });
 }
 
-export { BASE };
+export { BASE, API_BASE };
 
 /** Match agent profiles against query text using BM25 */
 export function matchProfiles(text: string) {
   return apiPost<{ profiles: Array<{ fileName: string; name: string; description: string; details?: string; source?: string; score: number }> }>(
-    `${BASE}/profiles/match`,
+    `${API_BASE}/profiles/match`,
     { text },
   );
 }

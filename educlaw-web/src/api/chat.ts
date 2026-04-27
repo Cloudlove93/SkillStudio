@@ -4,30 +4,30 @@ import type {
   HomeChatSession,
   HomeChatUpdateSessionInput,
 } from '@educlaw/shared';
-import { apiFetch, apiFetchJson, apiPost, apiPatch, BASE } from './client';
+import { apiFetch, apiFetchJson, apiPost, apiPatch, API_BASE } from './client';
 
 export type ChatSession = HomeChatSession;
 export type ChatMessage = HomeChatMessage;
 
 export function fetchChatSessions(): Promise<ChatSession[]> {
-  return apiFetchJson(`${BASE}/api/chat/sessions`);
+  return apiFetchJson(`/api/chat/sessions`);
 }
 
 export function createChatSession(title: string, model: string): Promise<ChatSession> {
   const input: HomeChatCreateSessionInput = { title, model };
-  return apiPost(`${BASE}/api/chat/sessions`, input);
+  return apiPost(`/api/chat/sessions`, input);
 }
 
 export function deleteChatSession(id: string): Promise<{ ok: boolean }> {
-  return apiFetchJson(`${BASE}/api/chat/sessions/${id}`, { method: 'DELETE' });
+  return apiFetchJson(`/api/chat/sessions/${id}`, { method: 'DELETE' });
 }
 
 export function updateChatSession(id: string, updates: HomeChatUpdateSessionInput): Promise<{ ok: boolean }> {
-  return apiPatch(`${BASE}/api/chat/sessions/${id}`, updates);
+  return apiPatch(`/api/chat/sessions/${id}`, updates);
 }
 
 export function fetchChatMessages(sessionId: string): Promise<ChatMessage[]> {
-  return apiFetchJson(`${BASE}/api/chat/sessions/${sessionId}/messages`);
+  return apiFetchJson(`/api/chat/sessions/${sessionId}/messages`);
 }
 
 export interface HomeChatStreamEvent {
@@ -62,7 +62,7 @@ export async function streamChatMessage(
     onEvent?: (event: HomeChatStreamEvent) => void;
   },
 ): Promise<void> {
-  const response = await apiFetch(`${BASE}/api/chat/sessions/${sessionId}/stream`, {
+  const response = await apiFetch(`/api/chat/sessions/${sessionId}/stream`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -113,5 +113,5 @@ export async function streamChatMessage(
 }
 
 export function abortChatSession(sessionId: string): Promise<{ ok: boolean }> {
-  return apiPost(`${BASE}/api/chat/sessions/${sessionId}/abort`);
+  return apiPost(`/api/chat/sessions/${sessionId}/abort`);
 }
