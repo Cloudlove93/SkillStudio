@@ -523,20 +523,26 @@ function startResizeLeft(e: React.MouseEvent) {
   async function sendInteractiveMessage() {
     if (!token || !selectedPackageId || !interactiveInput.trim() || interactivePhase !== "idle") return;
     const currentPkgId = selectedPackageId;
-    const currentAdopted = interactiveAdopted;
-    const currentIssues = interactiveIssues;
     const userMsg = interactiveInput.trim();
     setInteractiveInput("");
 
-    // Read latest messages from localStorage to avoid stale closure after package switch
-    // Default to empty array — never trust interactiveMessages closure after a potential switch
+    // Read latest state from localStorage to avoid stale closure after package switch
+    // Default to empty — never trust closure-captured state after a potential switch
     let latestMessages: typeof interactiveMessages = [];
+    let latestAdopted: typeof interactiveAdopted = [];
+    let latestIssues: typeof interactiveIssues = [];
     const saved = localStorage.getItem(interactiveStorageKey(currentPkgId));
     if (saved) {
       try {
         const data = JSON.parse(saved);
         if (data.messages && Array.isArray(data.messages)) {
           latestMessages = data.messages;
+        }
+        if (data.adopted && Array.isArray(data.adopted)) {
+          latestAdopted = data.adopted;
+        }
+        if (data.issues && Array.isArray(data.issues)) {
+          latestIssues = data.issues;
         }
       } catch { /* ignore corrupt data */ }
     }
@@ -548,17 +554,17 @@ function startResizeLeft(e: React.MouseEvent) {
     startProgress("交互式优化", "专家正在思考...");
 
     // Save user message immediately so it's not lost if user switches packages
-    saveInteractiveState(currentPkgId, messagesWithUser, currentAdopted, currentIssues);
+    saveInteractiveState(currentPkgId, messagesWithUser, latestAdopted, latestIssues);
 
     try {
-      const result = await liteApi.chatOptimize(token, currentPkgId, messagesWithUser, currentAdopted);
+      const result = await liteApi.chatOptimize(token, currentPkgId, messagesWithUser, latestAdopted);
 
       // Build final messages with assistant reply using known array (not prev from state)
       const finalMessages = [...messagesWithUser, { role: "assistant", content: result.reply }];
-      const finalAdopted = result.newAdoptions.length > 0 ? [...currentAdopted, ...result.newAdoptions] : currentAdopted;
+      const finalAdopted = result.newAdoptions.length > 0 ? [...latestAdopted, ...result.newAdoptions] : latestAdopted;
 
       // Always save to localStorage for the original package
-      saveInteractiveState(currentPkgId, finalMessages, finalAdopted, currentIssues);
+      saveInteractiveState(currentPkgId, finalMessages, finalAdopted, latestIssues);
 
       // Only update UI if user is still on the same package
       if (selectedPackageIdRef.current === currentPkgId) {
@@ -571,7 +577,7 @@ function startResizeLeft(e: React.MouseEvent) {
     } catch (error) {
       const message = error instanceof Error ? error.message : "对话失败";
       const errorMessages = [...messagesWithUser, { role: "assistant", content: `❌ 对话失败：${message}` }];
-      saveInteractiveState(currentPkgId, errorMessages, currentAdopted, currentIssues);
+      saveInteractiveState(currentPkgId, errorMessages, latestAdopted, latestIssues);
       if (selectedPackageIdRef.current === currentPkgId) {
         setInteractiveMessages(errorMessages);
       }
