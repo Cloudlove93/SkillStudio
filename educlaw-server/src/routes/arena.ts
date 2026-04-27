@@ -12,7 +12,7 @@ import {
   streamMessage,
 } from "../services/arena-service.js";
 
-const router = Router();
+const router: import("express").Router = Router();
 
 router.get("/threads", requireAuth, async (req, res) => {
   const packageId = String(req.query.packageId || "");

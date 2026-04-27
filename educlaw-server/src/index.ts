@@ -6,6 +6,7 @@ import { initDb } from "./services/db.js";
 import authRoutes from "./routes/auth.js";
 import packageRoutes from "./routes/packages.js";
 import arenaRoutes from "./routes/arena.js";
+import compatRoutes from "./routes/compat.js";
 
 const app = express();
 app.use(cors({ origin: config.appOrigin, credentials: false }));
@@ -19,6 +20,7 @@ app.get("/healthz", (_req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/packages", packageRoutes);
 app.use("/api/arena", arenaRoutes);
+app.use(compatRoutes);
 
 app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   res.status(500).json({ error: err instanceof Error ? err.message : "Internal server error" });

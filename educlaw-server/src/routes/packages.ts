@@ -12,10 +12,18 @@ import {
   importPackageZip,
   listPackages,
   listVersions,
+  compareVersions,
+  updateVersionNote,
 } from "../services/package-service.js";
 import { optimizePackage } from "../services/optimization-service.js";
+import {
+  diagnosePackage,
+  chatOptimize,
+  applyInteractiveChanges,
+  type AdoptedChange,
+} from "../services/interactive-optimization-service.js";
 
-const router = Router();
+const router: import("express").Router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
 router.get("/", requireAuth, async (req, res) => {
@@ -28,6 +36,7 @@ router.post("/generate", requireAuth, async (req, res) => {
       (req as AuthedRequest).userId || "",
       String(req.body?.instruction || ""),
       typeof req.body?.model === "string" ? req.body.model : undefined,
+      Array.isArray(req.body?.documents) ? req.body.documents : undefined,
     );
     res.json(pkg);
   } catch (error) {
@@ -44,6 +53,7 @@ router.post("/generate/stream", requireAuth, async (req: Request, res: Response)
       (req as AuthedRequest).userId || "",
       String(req.body?.instruction || ""),
       typeof req.body?.model === "string" ? req.body.model : undefined,
+      Array.isArray(req.body?.documents) ? req.body.documents : undefined,
       (preview) => writeSseEvent(res, "preview", preview),
     );
     writeSseEvent(res, "phase", { label: "保存智能体包与初始版本" });
@@ -126,6 +136,81 @@ router.post("/:packageId/optimize/stream", requireAuth, async (req: Request, res
     writeSseEvent(res, "error", { error: error instanceof Error ? error.message : "优化失败" });
   } finally {
     res.end();
+  }
+});
+
+router.post("/:packageId/optimize/diagnose", requireAuth, async (req, res) => {
+  try {
+    const result = await diagnosePackage(
+      (req as AuthedRequest).userId || "",
+      one(req.params.packageId),
+      String(req.body?.threadId || ""),
+      typeof req.body?.model === "string" ? req.body.model : undefined,
+    );
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "诊断失败" });
+  }
+});
+
+router.post("/:packageId/optimize/chat", requireAuth, async (req, res) => {
+  try {
+    const result = await chatOptimize(
+      (req as AuthedRequest).userId || "",
+      one(req.params.packageId),
+      {
+        messages: Array.isArray(req.body?.messages) ? req.body.messages : [],
+        adoptedChanges: Array.isArray(req.body?.adoptedChanges) ? req.body.adoptedChanges : [],
+      },
+      typeof req.body?.model === "string" ? req.body.model : undefined,
+    );
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "对话失败" });
+  }
+});
+
+router.post("/:packageId/optimize/apply", requireAuth, async (req, res) => {
+  try {
+    const result = await applyInteractiveChanges(
+      (req as AuthedRequest).userId || "",
+      one(req.params.packageId),
+      Array.isArray(req.body?.changes) ? (req.body.changes as AdoptedChange[]) : [],
+      typeof req.body?.model === "string" ? req.body.model : undefined,
+      typeof req.body?.note === "string" ? req.body.note : undefined,
+    );
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "应用修改失败" });
+  }
+});
+
+router.post("/:packageId/versions/compare", requireAuth, async (req, res) => {
+  try {
+    const result = await compareVersions(
+      (req as AuthedRequest).userId || "",
+      one(req.params.packageId),
+      String(req.body?.baseVersionId || ""),
+      String(req.body?.targetVersionId || ""),
+      typeof req.body?.model === "string" ? req.body.model : undefined,
+    );
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "版本对比失败" });
+  }
+});
+
+router.post("/:packageId/versions/:versionId/note", requireAuth, async (req, res) => {
+  try {
+    const result = await updateVersionNote(
+      (req as AuthedRequest).userId || "",
+      one(req.params.packageId),
+      one(req.params.versionId),
+      typeof req.body?.note === "string" ? req.body.note : "",
+    );
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "更新备注失败" });
   }
 });
 

@@ -35,8 +35,13 @@ export async function initDb() {
       version_number integer not null,
       source text not null,
       snapshot_json text not null,
+      note text not null default '',
       created_at text not null
     )
+  `);
+
+  await pool.query(`
+    alter table agent_package_versions add column if not exists note text not null default ''
   `);
 
   await pool.query(`
@@ -60,6 +65,36 @@ export async function initDb() {
       role text not null,
       content text not null,
       created_at text not null
+    )
+  `);
+
+  await pool.query(`
+    create table if not exists arena_runs (
+      id text primary key,
+      session_id text not null,
+      package_id text not null,
+      target_kind text not null default 'profile',
+      target_ref text not null,
+      model text,
+      status text not null default 'completed',
+      report_json text not null default '{}',
+      created_at text not null,
+      updated_at text not null
+    )
+  `);
+
+  await pool.query(`
+    create table if not exists optimization_runs (
+      id text primary key,
+      package_id text not null,
+      thread_id text not null,
+      target_kind text not null default 'profile',
+      target_ref text not null,
+      model text,
+      status text not null default 'pending',
+      result_json text not null default '{}',
+      created_at text not null,
+      updated_at text not null
     )
   `);
 }

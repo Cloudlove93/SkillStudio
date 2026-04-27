@@ -3,7 +3,7 @@ import type { AuthedRequest } from "../types.js";
 import { getUserById, loginUser, registerUser } from "../services/auth-service.js";
 import { requireAuth } from "../middleware/auth.js";
 
-const router = Router();
+const router: import("express").Router = Router();
 
 router.post("/register", async (req, res) => {
   try {

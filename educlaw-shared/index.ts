@@ -48,7 +48,8 @@ export interface PackageVersion {
   packageId: string;
   versionNumber: number;
   createdAt: string;
-  source: "generated" | "imported" | "optimized" | "manual";
+  source: "generated" | "imported" | "optimized" | "manual" | "interactive";
+  note: string;
   snapshot: AgentPackageSnapshot;
 }
 

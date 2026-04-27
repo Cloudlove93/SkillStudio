@@ -3,6 +3,7 @@ import type {
   ArenaChatResult,
   ArenaMessage,
   ArenaReport,
+  ArenaReportSide,
   ArenaThread,
   ArenaThreadDetail,
 } from "@educlaw/shared";
@@ -58,7 +59,7 @@ function selectRelevantSkills(snapshot: AgentPackageSnapshot, prompt: string) {
     .sort((a, b) => b.score - a.score)
     .filter((item) => item.score > 0)
     .slice(0, 3)
-    .map((item) => item.skill);
+    .map((item: { skill: typeof snapshot.skills[0] }) => item.skill);
 }
 
 function buildHistory(messages: ArenaMessage[], side: ArenaStreamSide) {
@@ -309,31 +310,66 @@ export async function generateReport(userId: string, threadId: string, model?: s
     throw new Error("Run at least one Arena turn before generating a report");
   }
 
-  const report = await generateJson<ArenaReport>({
+  const rawReport = await generateJson<Partial<ArenaReport>>({
     model,
     systemPrompt: [
-      "You are an arena evaluator.",
-      "Return JSON only.",
-      "Evaluate baseline vs enhanced using the rubric markdown.",
-      "Each side should include summary, total, and dimensions.",
+      "你是一位 Arena 评估专家。",
+      "只返回 JSON 格式。",
+      "根据 rubric.md 的评分标准，对基础模型和增强模型进行评估对比。",
+      "每一边都必须包含 summary、total 和 dimensions。",
     ].join("\n"),
     userPrompt: [
       "[rubric.md]",
       pkg.snapshot.rubricMd,
       "",
-      "[user question]",
+      "[用户问题]",
       latestUser.content,
       "",
-      "[baseline answer]",
+      "[基础模型回答]",
       latestBaseline.content,
       "",
-      "[enhanced answer]",
+      "[增强模型回答]",
       latestEnhanced.content,
       "",
-      "Return JSON with keys: threadId, baseline, enhanced, recommendation, winningSide",
+      "返回包含以下字段的 JSON：threadId、baseline、enhanced、recommendation、winningSide",
+      "",
+      "每一边（baseline 和 enhanced）必须包含：",
+      "- summary：简要评估总结",
+      "- total：总分（数字）",
+      "- dimensions：评分维度数组，每个维度包含：",
+      "  - key：维度标识符（如 'accuracy'、'completeness'）",
+      "  - name：维度显示名称",
+      "  - score：得分（数字）",
+      "  - maxScore：满分（数字，通常为 10 或 20）",
+      "  - reason：得分的简要说明",
     ].join("\n"),
     temperature: 0.2,
   });
 
-  return { ...report, threadId };
+  // Normalize with defaults to prevent frontend crashes
+  const normalizeSide = (side?: Partial<ArenaReportSide>): ArenaReportSide => ({
+    summary: side?.summary || "",
+    total: typeof side?.total === "number" ? side.total : 0,
+    dimensions: Array.isArray(side?.dimensions)
+      ? (side.dimensions as unknown[]).map((d) => ({
+          key: String((d as Record<string, unknown>).key || ""),
+          name: String((d as Record<string, unknown>).name || ""),
+          score: typeof (d as Record<string, unknown>).score === "number" ? (d as Record<string, unknown>).score as number : 0,
+          maxScore: typeof (d as Record<string, unknown>).maxScore === "number" ? (d as Record<string, unknown>).maxScore as number : 10,
+          reason: String((d as Record<string, unknown>).reason || ""),
+        }))
+      : [],
+  });
+
+  const report: ArenaReport = {
+    threadId,
+    baseline: normalizeSide(rawReport.baseline),
+    enhanced: normalizeSide(rawReport.enhanced),
+    recommendation: rawReport.recommendation || "",
+    winningSide: ["baseline", "enhanced", "tie"].includes(rawReport.winningSide as string)
+      ? (rawReport.winningSide as "baseline" | "enhanced" | "tie")
+      : "tie",
+  };
+
+  return report;
 }

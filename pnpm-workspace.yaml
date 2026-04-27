@@ -1,5 +1,5 @@
 packages:
-  - openagent
   - educlaw-shared
   - educlaw-server
   - educlaw-web
+  - openagent

@@ -27,6 +27,7 @@ export interface DbRowPackageVersion {
   version_number: number;
   source: string;
   snapshot_json: string;
+  note: string;
   created_at: string;
 }
 

@@ -1,48 +1,9 @@
 import type { AgentPackageSnapshot, OptimizationIssue, OptimizationResult } from "@educlaw/shared";
 import { generateJson } from "./llm-service.js";
 import { applyOptimizedSnapshot, getPackage, listVersions } from "./package-service.js";
-import { generateReport, getThreadDetail } from "./arena-service.js";
-
-interface ExpertFinding {
-  issues: OptimizationIssue[];
-}
-
-interface MergeOutput {
-  issues: OptimizationIssue[];
-  snapshot: AgentPackageSnapshot;
-}
+import { getThreadDetail } from "./arena-service.js";
 
 type ProgressCallback = (label: string) => Promise<void> | void;
-
-async function runExpert(
-  expert: OptimizationIssue["expert"],
-  payload: { agentMd: string; rubricMd: string; transcript: string; skills: string },
-  model?: string,
-) {
-  return generateJson<ExpertFinding>({
-    model,
-    systemPrompt: [
-      "You are a package optimization expert.",
-      `Your role is: ${expert}.`,
-      "Return JSON only with key issues.",
-      "Each issue should include expert, target, targetId, title, reason, evidence.",
-    ].join("\n"),
-    userPrompt: [
-      "[agent.md]",
-      payload.agentMd,
-      "",
-      "[rubric.md]",
-      payload.rubricMd,
-      "",
-      "[skills]",
-      payload.skills,
-      "",
-      "[arena transcript]",
-      payload.transcript,
-    ].join("\n"),
-    temperature: 0.2,
-  });
-}
 
 export async function optimizePackage(
   userId: string,
@@ -51,57 +12,115 @@ export async function optimizePackage(
   model?: string,
   onProgress?: ProgressCallback,
 ): Promise<OptimizationResult> {
-  await onProgress?.("\u8bfb\u53d6\u667a\u80fd\u4f53\u5305\u4e0e\u5bf9\u8bdd\u8f68\u8ff9");
+  await onProgress?.("读取智能体包与对话轨迹");
   const pkg = await getPackage(userId, packageId);
   const detail = await getThreadDetail(userId, threadId);
   if (detail.thread.packageId !== packageId) {
-    throw new Error("\u5f53\u524d Arena \u5bf9\u8bdd\u4e0d\u5c5e\u4e8e\u8fd9\u4e2a\u667a\u80fd\u4f53\u5305");
+    throw new Error("当前 Arena 对话不属于这个智能体包");
   }
 
-  await onProgress?.("\u751f\u6210\u5f53\u524d\u8bc4\u4f30\u62a5\u544a");
-  const report = await generateReport(userId, threadId, model);
-  const transcript = detail.messages.map((message) => `${message.side}/${message.role}: ${message.content}`).join("\n\n");
-  const skillBundle = pkg.snapshot.skills.map((skill) => `## ${skill.dirName}\n${skill.skillMd}`).join("\n\n");
+  await onProgress?.("分析并生成优化方案");
+  const transcript = detail.messages
+    .map((message) => `${message.side}/${message.role}: ${message.content}`)
+    .join("\n\n");
 
-  await onProgress?.("\u6267\u884c\u89d2\u8272\u4e13\u5bb6\u5206\u6790");
-  const persona = await runExpert("persona", { agentMd: pkg.snapshot.agentMd, rubricMd: pkg.snapshot.rubricMd, transcript, skills: skillBundle }, model);
-  await onProgress?.("\u6267\u884c\u6280\u80fd\u4e13\u5bb6\u5206\u6790");
-  const skill = await runExpert("skill", { agentMd: pkg.snapshot.agentMd, rubricMd: pkg.snapshot.rubricMd, transcript, skills: skillBundle }, model);
-  await onProgress?.("\u6267\u884c\u8bc4\u4f30\u4e13\u5bb6\u5206\u6790");
-  const rubric = await runExpert("rubric", { agentMd: pkg.snapshot.agentMd, rubricMd: pkg.snapshot.rubricMd, transcript, skills: skillBundle }, model);
+  const skillBundle = pkg.snapshot.skills
+    .map((skill) => `## ${skill.dirName}\n${skill.skillMd}`)
+    .join("\n\n");
 
-  await onProgress?.("\u5408\u5e76\u4e13\u5bb6\u5efa\u8bae\u5e76\u751f\u6210\u65b0\u7248\u672c");
-  const merged = await generateJson<MergeOutput>({
+  const prompt = [
+    "你是一个智能体包优化专家。请分析以下智能体包和 Arena 对话轨迹，生成优化后的新版本。",
+    "",
+    "## 当前智能体包",
+    "",
+    "### agent.md",
+    "```markdown",
+    pkg.snapshot.agentMd,
+    "```",
+    "",
+    "### rubric.md",
+    "```markdown",
+    pkg.snapshot.rubricMd,
+    "```",
+    "",
+    "### skills",
+    "```markdown",
+    skillBundle || "（暂无技能）",
+    "```",
+    "",
+    "## Arena 对话轨迹",
+    transcript.slice(0, 10000),
+    "",
+    "## 任务",
+    "1. 分析当前智能体包存在的问题（从 persona、skill、rubric 三个角度）",
+    "2. 生成优化后的完整包内容",
+    "3. 返回 JSON，格式如下：",
+    "",
+    "```json",
+    "{",
+    '  "issues": [',
+    "    {",
+    '      "expert": "persona|skill|rubric",',
+    '      "target": "agent|rubric|skill",',
+    '      "targetId": "skill-dir-name or empty string",',
+    '      "title": "问题标题",',
+    '      "reason": "详细原因",',
+    '      "evidence": "支撑证据"',
+    "    }",
+    "  ],",
+    '  "snapshot": {',
+    '    "agentMd": "优化后的 agent.md",',
+    '    "rubricMd": "优化后的 rubric.md",',
+    '    "skills": [',
+    "      {",
+    '        "name": "技能名称",',
+    '        "dirName": "目录名",',
+    '        "skillMd": "优化后的 skill.md",',
+    '        "version": "1.0.0"',
+    "      }",
+    "    ]",
+    "  }",
+    "}",
+    "```",
+    "",
+    "注意：",
+    "1. 保持原有结构，只修改需要优化的地方",
+    "2. skills 数组必须包含所有原始技能（优化后的版本）",
+    "3. 最多返回 8 个最重要的问题",
+  ].join("\n");
+
+  const merged = await generateJson<{
+    issues: OptimizationIssue[];
+    snapshot: AgentPackageSnapshot;
+  }>({
     model,
-    systemPrompt: [
-      "You are the merge expert in a Trace2Skill-lite pipeline.",
-      "Return JSON only.",
-      "Merge expert findings and produce a full updated package snapshot.",
-      "Keep the result reusable and modular.",
-    ].join("\n"),
-    userPrompt: [
-      "[current snapshot]",
-      JSON.stringify(pkg.snapshot, null, 2),
-      "",
-      "[arena report]",
-      JSON.stringify(report, null, 2),
-      "",
-      "[persona expert]",
-      JSON.stringify(persona, null, 2),
-      "",
-      "[skill expert]",
-      JSON.stringify(skill, null, 2),
-      "",
-      "[rubric expert]",
-      JSON.stringify(rubric, null, 2),
-      "",
-      "Return JSON with keys issues and snapshot.",
-    ].join("\n"),
-    temperature: 0.25,
+    systemPrompt:
+      "你是智能体包优化专家。分析给定的智能体包和 Arena 对话轨迹，生成优化后的新版本。只返回 JSON，不要其他内容。",
+    userPrompt: prompt,
+    temperature: 0.3,
   });
 
-  await onProgress?.("\u4fdd\u5b58\u4f18\u5316\u540e\u7684\u65b0\u7248\u672c");
-  await applyOptimizedSnapshot(userId, packageId, merged.snapshot, "optimized");
+  await onProgress?.("保存优化后的新版本");
+
+  // Normalize snapshot to guard against partial LLM output
+  const normalizedSnapshot: AgentPackageSnapshot = {
+    name: merged.snapshot?.name || pkg.snapshot.name,
+    description: merged.snapshot?.description || pkg.snapshot.description,
+    versionLabel: merged.snapshot?.versionLabel || pkg.snapshot.versionLabel,
+    agentMd: typeof merged.snapshot?.agentMd === "string" ? merged.snapshot.agentMd : pkg.snapshot.agentMd,
+    rubricMd: typeof merged.snapshot?.rubricMd === "string" ? merged.snapshot.rubricMd : pkg.snapshot.rubricMd,
+    skills: Array.isArray(merged.snapshot?.skills)
+      ? merged.snapshot.skills.map((s: any, idx: number) => ({
+          id: s?.id || ``,
+          dirName: s?.dirName || pkg.snapshot.skills[idx]?.dirName || `skill-${idx}`,
+          name: s?.name || pkg.snapshot.skills[idx]?.name || `技能${idx + 1}`,
+          description: s?.description || pkg.snapshot.skills[idx]?.description || "",
+          skillMd: typeof s?.skillMd === "string" ? s.skillMd : (pkg.snapshot.skills[idx]?.skillMd || ""),
+        }))
+      : pkg.snapshot.skills,
+  };
+
+  await applyOptimizedSnapshot(userId, packageId, normalizedSnapshot, "optimized");
   const versions = await listVersions(userId, packageId);
   const latest = versions[0]!;
 
