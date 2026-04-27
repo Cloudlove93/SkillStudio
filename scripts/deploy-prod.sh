@@ -7,8 +7,8 @@ set -Eeuo pipefail
 # as a production Node process, and serves the frontend through nginx.
 #
 # Usage:
-#   LLM_API_KEY=... bash scripts/deploy-prod.sh
-#   APP_HOST=your.domain.com LLM_API_KEY=... bash scripts/deploy-prod.sh
+#   bash scripts/deploy-prod.sh
+#   APP_HOST=your.domain.com bash scripts/deploy-prod.sh
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_NAME="${APP_NAME:-educlaw-arena}"
@@ -43,7 +43,7 @@ has_systemd() {
 
 require_root() {
   if [[ "${EUID}" -ne 0 ]]; then
-    die "Run as root. Example: LLM_API_KEY=... bash scripts/deploy-prod.sh"
+    die "Run as root. Example: bash scripts/deploy-prod.sh"
   fi
 }
 
@@ -408,8 +408,8 @@ main() {
   LLM_MODEL="${LLM_MODEL:-$(read_env_value LLM_MODEL "Kimi-K2.6")}"
   LLM_BASELINE_MODEL="${LLM_BASELINE_MODEL:-$(read_env_value LLM_BASELINE_MODEL "$LLM_MODEL")}"
 
-  if [[ -z "$LLM_API_KEY" || "$LLM_API_KEY" == "your-llm-api-key" ]]; then
-    die "Set LLM_API_KEY before deploying. Example: LLM_API_KEY=xxxx bash scripts/deploy-prod.sh"
+  if [[ -z "$LLM_API_KEY" || "$LLM_API_KEY" == "your-llm-api-key" || "$LLM_API_KEY" == "换成你新的可用key" ]]; then
+    die "Set LLM_API_KEY in .env before deploying, or pass it once as an environment variable."
   fi
 
   install_system_packages
