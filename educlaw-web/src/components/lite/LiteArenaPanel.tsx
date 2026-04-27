@@ -879,25 +879,38 @@ function startResizeLeft(e: React.MouseEvent) {
             </div>
             <div className="flex-1 overflow-auto p-6">
               {centerPreview.type === "report" ? (
-                <div className="max-w-3xl mx-auto space-y-5">
-                  {/* Header */}
-                  <div className="flex items-center gap-3">
-                    <div className="text-lg font-bold">📊 评估报告</div>
-                    <div className="text-sm text-muted-foreground">{formatWinner(centerPreview.report.winningSide)} ｜ {centerPreview.report.recommendation}</div>
+                <div className="max-w-3xl mx-auto space-y-6">
+                  {/* Title */}
+                  <div className="text-xl font-bold">📊 评估报告</div>
+
+                  {/* Result & Recommendation */}
+                  <div className="rounded-[20px] border border-border/70 bg-muted/50 p-4 space-y-3">
+                    <div>
+                      <span className="text-sm font-semibold">🏆 结果：</span>
+                      <span className="text-sm">{formatWinner(centerPreview.report.winningSide)}</span>
+                    </div>
+                    <div>
+                      <span className="text-sm font-semibold">💡 建议：</span>
+                      <span className="text-sm text-muted-foreground">{centerPreview.report.recommendation}</span>
+                    </div>
                   </div>
+
                   {/* Score cards */}
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="rounded-[20px] border border-border/70 bg-muted/50 p-4 text-center">
+                    <div className="rounded-[20px] border border-border/70 bg-muted/50 p-4 text-center space-y-1">
                       <div className="text-sm text-muted-foreground">基础模型</div>
                       <div className="text-3xl font-bold">{centerPreview.report.baseline.total}</div>
-                      <div className="text-xs text-muted-foreground mt-1 leading-relaxed">{centerPreview.report.baseline.summary}</div>
+                      <div className="text-[10px] text-muted-foreground uppercase tracking-wider">评语</div>
+                      <div className="text-xs text-muted-foreground leading-relaxed">{centerPreview.report.baseline.summary}</div>
                     </div>
-                    <div className="rounded-[20px] border border-border/70 bg-muted/50 p-4 text-center">
+                    <div className="rounded-[20px] border border-border/70 bg-muted/50 p-4 text-center space-y-1">
                       <div className="text-sm text-muted-foreground">{selectedPackage?.name || "智能体"}</div>
                       <div className="text-3xl font-bold">{centerPreview.report.enhanced.total}</div>
-                      <div className="text-xs text-muted-foreground mt-1 leading-relaxed">{centerPreview.report.enhanced.summary}</div>
+                      <div className="text-[10px] text-muted-foreground uppercase tracking-wider">评语</div>
+                      <div className="text-xs text-muted-foreground leading-relaxed">{centerPreview.report.enhanced.summary}</div>
                     </div>
                   </div>
+
                   {/* Dimensions table */}
                   <div className="overflow-hidden rounded-[20px] border border-border/70">
                     <table className="w-full text-sm">
