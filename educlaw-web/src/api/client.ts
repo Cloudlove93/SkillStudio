@@ -7,16 +7,28 @@
  *   /ws-.../proxy/80
  */
 const BASE = (() => {
-  try {
-    const url = new URL(import.meta.url);
-    // Only derive base from production Vite output (/assets/<file>)
-    const match = url.pathname.match(/^(.*)\/assets\/[^/]+$/);
-    if (!match) return '';
-    // Remove trailing slash(es) so callers can write `${BASE}/foo`
-    return match[1].replace(/\/+$/, '');
-  } catch {
-    return '';
+  // 开发环境：vite proxy 处理，保持原有逻辑
+  if (import.meta.env.DEV) {
+    try {
+      const url = new URL(import.meta.url);
+      const match = url.pathname.match(/^(.*)\/assets\/[^/]+$/);
+      if (!match) return '';
+      return match[1].replace(/\/+$/, '');
+    } catch {
+      return '';
+    }
   }
+  // 生产环境：前后端分离部署，API 指向后端 3000 端口
+  if (typeof window !== 'undefined') {
+    try {
+      const { protocol, hostname, port } = window.location;
+      if (port === '3000') return '';
+      return `${protocol}//${hostname}:3000`;
+    } catch {
+      return '';
+    }
+  }
+  return '';
 })();
 
 const TOKEN_KEY = 'educlaw-token';
