@@ -493,6 +493,7 @@ function startResizeLeft(e: React.MouseEvent) {
       stepTimers.forEach((id) => window.clearTimeout(id));
       saveInteractiveState(currentPkgId, [{ role: "assistant", content: result.welcomeMessage }], [], result.issues);
       if (selectedPackageIdRef.current === currentPkgId) {
+        setInteractiveMode(true);
         setInteractiveIssues(result.issues);
         setInteractiveMessages([{ role: "assistant", content: result.welcomeMessage }]);
       }
@@ -502,6 +503,7 @@ function startResizeLeft(e: React.MouseEvent) {
       const message = error instanceof Error ? error.message : "诊断失败";
       saveInteractiveState(currentPkgId, [{ role: "assistant", content: `❌ 诊断失败：${message}` }], [], []);
       if (selectedPackageIdRef.current === currentPkgId) {
+        setInteractiveMode(true);
         setInteractiveMessages([{ role: "assistant", content: `❌ 诊断失败：${message}` }]);
       }
       failProgress(message);
