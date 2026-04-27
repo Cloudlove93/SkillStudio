@@ -1,29 +1,11 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { ArrowRight, ShieldCheck, Sparkles, Users } from 'lucide-react';
+import { ShieldCheck, Sparkles, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuthStore } from '../stores/auth';
 import { BASE } from '../api/client';
 import { useT } from '../i18n';
-
-const PRESET_ACCOUNTS = [
-  { username: 'user1',  password: 'educlaw123' },
-  { username: 'user2',  password: 'educlaw123' },
-  { username: 'user3',  password: 'educlaw123' },
-  { username: 'user4',  password: 'educlaw123' },
-  { username: 'user5',  password: 'educlaw123' },
-  { username: 'user6',  password: 'educlaw123' },
-  { username: 'user7',  password: 'educlaw123' },
-  { username: 'user8',  password: 'educlaw123' },
-  { username: 'user9',  password: 'educlaw123' },
-  { username: 'user10', password: 'educlaw123' },
-  { username: 'user11', password: 'educlaw123' },
-  { username: 'user12', password: 'educlaw123' },
-  { username: 'user13', password: 'educlaw123' },
-  { username: 'user14', password: 'educlaw123' },
-  { username: 'user15', password: 'educlaw123' },
-];
 
 export default function LoginPage() {
   const t = useT();
@@ -170,26 +152,7 @@ export default function LoginPage() {
               </Button>
             </form>
 
-            <div className="rounded-[16px] border border-border bg-muted px-4 py-4 text-sm leading-6 text-muted-foreground">
-              <div className="font-medium text-foreground mb-2">预置账号（点击快速填充）</div>
-              <div className="grid grid-cols-3 gap-2">
-                {PRESET_ACCOUNTS.map((acc) => (
-                  <button
-                    key={acc.username}
-                    type="button"
-                    onClick={() => {
-                      setUsername(acc.username);
-                      setPassword(acc.password);
-                      setError('');
-                    }}
-                    className="rounded-lg border border-border/70 bg-card px-2 py-1.5 text-xs text-center hover:border-primary/40 hover:bg-primary/5 transition-colors cursor-pointer"
-                  >
-                    {acc.username}
-                  </button>
-                ))}
-              </div>
-              <div className="mt-2 text-xs">密码统一为：<span className="font-mono text-foreground">educlaw123</span></div>
-            </div>
+
           </div>
         </section>
       </div>
