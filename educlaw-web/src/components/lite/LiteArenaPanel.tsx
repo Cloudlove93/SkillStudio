@@ -529,7 +529,8 @@ function startResizeLeft(e: React.MouseEvent) {
     setInteractiveInput("");
 
     // Read latest messages from localStorage to avoid stale closure after package switch
-    let latestMessages = interactiveMessages;
+    // Default to empty array — never trust interactiveMessages closure after a potential switch
+    let latestMessages: typeof interactiveMessages = [];
     const saved = localStorage.getItem(interactiveStorageKey(currentPkgId));
     if (saved) {
       try {
