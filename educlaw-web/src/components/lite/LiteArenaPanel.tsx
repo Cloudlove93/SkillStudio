@@ -112,9 +112,15 @@ export default function LiteArenaPanel() {
   const interactiveStorageKey = (packageId: string) => `interactive-opt-${packageId}`;
 
   useEffect(() => {
-    // Always close interactive mode and preview when switching packages
+    // Always reset all package-scoped UI states when switching packages
     setInteractiveMode(false);
     setCenterPreview(null);
+    setInteractiveInput("");
+    setInteractivePhase("idle");
+    setProgress(null);
+    setStatus("");
+    setGeneratePreviews([]);
+    setSideStreaming({ baseline: false, enhanced: false });
 
     if (!selectedPackageId) {
       setHasSavedSession(false);
@@ -224,8 +230,20 @@ export default function LiteArenaPanel() {
     const list = await liteApi.listPackages(token);
     setPackages(list);
     const nextId = preferredPackageId || selectedPackageId || list[0]?.id || "";
-    if (nextId) await openPackage(nextId, list);
-    else { setSelectedPackageId(""); setSelectedPackage(null); setThread(null); setThreadDetail(null); setVersions([]); setReport(null); setOptimization(null); setSideStreaming({ baseline: false, enhanced: false }); }
+    if (nextId) {
+      if (nextId !== selectedPackageId) {
+        await openPackage(nextId, list);
+      } else {
+        // Same package: just refresh the package list metadata, don't reset UI states
+        const detail = await liteApi.getPackage(token, nextId);
+        const versionList = await liteApi.listVersions(token, nextId);
+        setSelectedPackage(detail);
+        setVersions(versionList);
+        setPackages((prev) => prev.map((item) => item.id === nextId ? { ...item, name: detail.name, description: detail.description, versionNumber: detail.versionNumber, updatedAt: detail.updatedAt } : item));
+      }
+    } else {
+      setSelectedPackageId(""); setSelectedPackage(null); setThread(null); setThreadDetail(null); setVersions([]); setReport(null); setOptimization(null); setSideStreaming({ baseline: false, enhanced: false });
+    }
   }
 
   async function openPackage(packageId: string, snapshotList?: AgentPackageSummary[]) {
@@ -413,6 +431,10 @@ function startResizeLeft(e: React.MouseEvent) {
     if (!token || !selectedPackageId) return;
     if (!window.confirm("确定要删除当前智能体包吗？")) return;
     await liteApi.deletePackage(token, selectedPackageId);
+    // Clean up package-scoped localStorage data
+    localStorage.removeItem(interactiveStorageKey(selectedPackageId));
+    localStorage.removeItem(optimizationStorageKey(selectedPackageId));
+    localStorage.removeItem(compareStorageKey(selectedPackageId));
     await refreshPackages();
   }
 
@@ -435,10 +457,12 @@ function startResizeLeft(e: React.MouseEvent) {
           setInteractiveMessages(data.messages);
           setInteractiveAdopted(data.adopted || []);
           setInteractiveIssues(data.issues || []);
+          setHasSavedSession(true);
           return; // Resume from saved session, no need to re-diagnose
         }
       } catch { /* ignore */ }
     }
+    setHasSavedSession(false);
     // Fresh start: run diagnosis with simulated progress steps
     setInteractivePhase("diagnosing");
     setInteractiveMessages([]);
@@ -501,6 +525,7 @@ function startResizeLeft(e: React.MouseEvent) {
       // Clear saved interactive session
       localStorage.removeItem(interactiveStorageKey(selectedPackageId));
       setInteractiveMode(false);
+      setHasSavedSession(false);
       setOptimization(null);
       setInteractiveMessages([]);
       setInteractiveIssues([]);
