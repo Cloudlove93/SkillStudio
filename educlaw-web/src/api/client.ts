@@ -65,7 +65,7 @@ export function apiFetch(url: string, init?: RequestInit): Promise<Response> {
   if (!headers.has('x-request-id')) {
     headers.set('x-request-id', createRequestId());
   }
-  return fetch(url, { ...init, headers });
+  return fetch(resolveUrl(url), { ...init, headers });
 }
 
 async function readResponseError(res: Response): Promise<string> {

@@ -89,7 +89,7 @@ export default function LiteWorkspace() {
     setGeneratePreviews([]);
     try {
       let createdId = "";
-      await liteApi.generatePackageStream(token, instruction.trim(), model || undefined, (event) => {
+      await liteApi.generatePackageStream(token, instruction.trim(), model || undefined, [], (event) => {
         if (event.event === "phase") { pushProgress(event.data.label); setStatus(event.data.label); }
         if (event.event === "preview") { setGeneratePreviews((prev) => [...prev, event.data]); }
         if (event.event === "done") createdId = event.data.id;

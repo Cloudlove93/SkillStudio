@@ -9,6 +9,7 @@ import type {
   PackageVersion,
   UserSummary,
 } from "@educlaw/shared";
+import { API_BASE } from "./client";
 
 export interface DiagnosisIssue {
   id: string;
@@ -133,7 +134,7 @@ export type OptimizeStreamEvent =
   | { event: "stream_end"; data: { ok: boolean } };
 
 async function request<T>(path: string, init: RequestInit = {}, token?: string): Promise<T> {
-  const response = await fetch(`/api${path}`, {
+  const response = await fetch(`${API_BASE}/api${path}`, {
     ...init,
     headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(init.headers || {}) },
   });
@@ -142,7 +143,7 @@ async function request<T>(path: string, init: RequestInit = {}, token?: string):
 }
 
 async function streamRequest<TEvent>(path: string, init: RequestInit, token: string, onEvent: (event: TEvent) => void): Promise<void> {
-  const response = await fetch(`/api${path}`, { ...init, headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(init.headers || {}) } });
+  const response = await fetch(`${API_BASE}/api${path}`, { ...init, headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(init.headers || {}) } });
   if (!response.ok) { const body = await response.json().catch(() => ({ error: `HTTP ${response.status}` })); throw new Error(body.error || `HTTP ${response.status}`); }
   const reader = response.body?.getReader(); if (!reader) throw new Error("Stream not available");
   const decoder = new TextDecoder(); let buffer = "";
@@ -179,7 +180,7 @@ export const liteApi = {
     streamRequest<OptimizeStreamEvent>(`/packages/${packageId}/optimize/stream`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ threadId, model }) }, token, onEvent),
   async importPackage(token: string, file: File): Promise<AgentPackageDetail> {
     const formData = new FormData(); formData.append("file", file, file.name);
-    const response = await fetch(`/api/packages/import`, { method: "POST", body: formData, headers: token ? { Authorization: `Bearer ${token}` } : undefined });
+    const response = await fetch(`${API_BASE}/api/packages/import`, { method: "POST", body: formData, headers: token ? { Authorization: `Bearer ${token}` } : undefined });
     if (!response.ok) { const body = await response.json().catch(() => ({ error: `HTTP ${response.status}` })); throw new Error(body.error || `HTTP ${response.status}`); }
     return response.json();
   },
@@ -194,7 +195,7 @@ export const liteApi = {
   updateVersionNote: (token: string, packageId: string, versionId: string, note: string) =>
     request<PackageVersion>(`/packages/${packageId}/versions/${versionId}/note`, { method: "POST", body: JSON.stringify({ note }) }, token),
   async exportPackage(token: string, packageId: string): Promise<void> {
-    const response = await fetch(`/api/packages/${packageId}/export`, { headers: token ? { Authorization: `Bearer ${token}` } : undefined });
+    const response = await fetch(`${API_BASE}/api/packages/${packageId}/export`, { headers: token ? { Authorization: `Bearer ${token}` } : undefined });
     if (!response.ok) { const body = await response.json().catch(() => ({ error: `HTTP ${response.status}` })); throw new Error(body.error || `HTTP ${response.status}`); }
     const blob = await response.blob(); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = `${packageId}.zip`; document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
   },
