@@ -265,6 +265,21 @@ install_backend() {
   fi
 }
 
+wait_for_backend() {
+  log "Waiting for backend health check"
+  for _ in $(seq 1 30); do
+    if curl -fsS "http://127.0.0.1:${PORT}/healthz" >/dev/null 2>&1; then
+      return
+    fi
+    sleep 1
+  done
+
+  if [[ -f "$BACKEND_LOG" ]]; then
+    tail -n 120 "$BACKEND_LOG" >&2 || true
+  fi
+  die "Backend health check failed"
+}
+
 start_or_reload_nginx() {
   nginx -t
 
@@ -341,12 +356,7 @@ verify_deploy() {
     tmux has-session -t "$SERVICE_NAME"
   fi
 
-  if ! curl -fsS "http://127.0.0.1:${PORT}/healthz" >/dev/null; then
-    if [[ -f "$BACKEND_LOG" ]]; then
-      tail -n 80 "$BACKEND_LOG" >&2 || true
-    fi
-    die "Backend health check failed"
-  fi
+  wait_for_backend
 
   curl -fsSI "http://127.0.0.1/" >/dev/null
 
