@@ -3,15 +3,15 @@ services:
     image: postgres:16-alpine
     container_name: educlaw-postgres
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-educlaw}
-      POSTGRES_USER: ${POSTGRES_USER:-educlaw}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-educlaw}
+      POSTGRES_DB: ${POSTGRES_DB:-educlawlite}
+      POSTGRES_USER: ${POSTGRES_USER:-educlawlite}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-educlawlite}
     ports:
-      - "${POSTGRES_PORT:-5433}:5432"
+      - "${POSTGRES_PORT:-5435}:5432"
     volumes:
       - educlaw-postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-educlaw} -d ${POSTGRES_DB:-educlaw}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-educlawlite} -d ${POSTGRES_DB:-educlawlite}"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -23,14 +23,16 @@ services:
       dockerfile: educlaw-server/Dockerfile
     image: educlaw-server:latest
     environment:
-      - EDU_AGENT_DIR=${EDU_AGENT_DIR:-/data/EduAgent}
-      - OAH_BASE_URL=${OAH_BASE_URL:-http://10.11.20.89:8787}
-      - OAH_ROOT_PATH_LOCAL_PREFIX=${OAH_ROOT_PATH_LOCAL_PREFIX:-}
-      - OAH_ROOT_PATH_REMOTE_PREFIX=${OAH_ROOT_PATH_REMOTE_PREFIX:-}
-      - DATABASE_URL=${DATABASE_URL:-postgres://educlaw:educlaw@educlaw-postgres:5432/educlaw}
-      - JWT_SECRET=${JWT_SECRET:-educlaw-dev-secret-change-in-production}
-    volumes:
-      - educlaw-data:/data/EduAgent
+      - DATABASE_URL=${DATABASE_URL:-postgres://educlawlite:educlawlite@educlaw-postgres:5432/educlawlite}
+      - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
+      - LLM_BASE_URL=${LLM_BASE_URL}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_MODEL=${LLM_MODEL}
+      - LLM_BASELINE_MODEL=${LLM_BASELINE_MODEL}
+      - APP_ORIGIN=${APP_ORIGIN:-http://localhost}
+      - PORT=3000
+    ports:
+      - "${SERVER_PORT:-3000}:3000"
     depends_on:
       educlaw-postgres:
         condition: service_healthy
@@ -50,5 +52,4 @@ services:
     restart: unless-stopped
 
 volumes:
-  educlaw-data:
   educlaw-postgres-data:

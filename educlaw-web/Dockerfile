@@ -11,10 +11,12 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY educlaw-shared/package.json educlaw-shared/package.json
 COPY educlaw-server/package.json educlaw-server/package.json
 COPY educlaw-web/package.json educlaw-web/package.json
+COPY openagent/package.json openagent/package.json
 
 RUN pnpm install --frozen-lockfile
 
 COPY educlaw-shared ./educlaw-shared
+COPY openagent ./openagent
 COPY educlaw-web ./educlaw-web
 
 RUN pnpm --filter @educlaw/shared build
