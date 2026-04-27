@@ -5,13 +5,8 @@ import { requireAuth } from "../middleware/auth.js";
 
 const router: import("express").Router = Router();
 
-router.post("/register", async (req, res) => {
-  try {
-    const result = await registerUser(String(req.body?.username || ""), String(req.body?.password || ""));
-    res.json(result);
-  } catch (error) {
-    res.status(400).json({ error: error instanceof Error ? error.message : "注册失败" });
-  }
+router.post("/register", async (_req, res) => {
+  res.status(403).json({ error: "注册已关闭，请使用预置账号登录" });
 });
 
 router.post("/login", async (req, res) => {

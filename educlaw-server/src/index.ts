@@ -3,6 +3,7 @@ import cors from "cors";
 import compression from "compression";
 import { config } from "./config.js";
 import { initDb } from "./services/db.js";
+import { seedUsers } from "./services/auth-service.js";
 import authRoutes from "./routes/auth.js";
 import packageRoutes from "./routes/packages.js";
 import arenaRoutes from "./routes/arena.js";
@@ -27,6 +28,7 @@ app.use((err: unknown, _req: express.Request, res: express.Response, _next: expr
 });
 
 await initDb();
+await seedUsers();
 app.listen(config.port, () => {
   console.log(`EduClaw Lite server listening on :${config.port}`);
 });

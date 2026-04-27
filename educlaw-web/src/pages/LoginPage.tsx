@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { ArrowRight, ShieldCheck, Sparkles, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -7,16 +7,31 @@ import { useAuthStore } from '../stores/auth';
 import { BASE } from '../api/client';
 import { useT } from '../i18n';
 
+const PRESET_ACCOUNTS = [
+  { username: 'user1',  password: 'educlaw123' },
+  { username: 'user2',  password: 'educlaw123' },
+  { username: 'user3',  password: 'educlaw123' },
+  { username: 'user4',  password: 'educlaw123' },
+  { username: 'user5',  password: 'educlaw123' },
+  { username: 'user6',  password: 'educlaw123' },
+  { username: 'user7',  password: 'educlaw123' },
+  { username: 'user8',  password: 'educlaw123' },
+  { username: 'user9',  password: 'educlaw123' },
+  { username: 'user10', password: 'educlaw123' },
+  { username: 'user11', password: 'educlaw123' },
+  { username: 'user12', password: 'educlaw123' },
+  { username: 'user13', password: 'educlaw123' },
+  { username: 'user14', password: 'educlaw123' },
+  { username: 'user15', password: 'educlaw123' },
+];
+
 export default function LoginPage() {
   const t = useT();
   const navigate = useNavigate();
   const login = useAuthStore((s) => s.login);
-  const register = useAuthStore((s) => s.register);
 
-  const [isRegister, setIsRegister] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -32,18 +47,10 @@ export default function LoginPage() {
       setError(t('auth.passwordLength'));
       return;
     }
-    if (isRegister && password !== confirmPassword) {
-      setError(t('auth.passwordMismatch'));
-      return;
-    }
 
     setLoading(true);
     try {
-      if (isRegister) {
-        await register(username, password);
-      } else {
-        await login(username, password);
-      }
+      await login(username, password);
       navigate('/', { replace: true });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : t('auth.unknownError'));
@@ -51,10 +58,6 @@ export default function LoginPage() {
       setLoading(false);
     }
   }
-
-  const subtitle = isRegister ? t('auth.registerSubtitle') : t('auth.loginSubtitle');
-  const helperText = isRegister ? t('auth.registerHint') : t('auth.loginHint');
-  const detailText = isRegister ? t('auth.infoAccount') : t('auth.infoWorkspace');
 
   const highlights = [
     { icon: Sparkles, text: t('auth.infoWorkspace') },
@@ -83,9 +86,9 @@ export default function LoginPage() {
 
             <div className="mt-16 max-w-xl">
               <h1 className="text-[32px] leading-10 font-semibold tracking-[-0.04em] text-foreground">
-                {subtitle}
+                {t('auth.loginSubtitle')}
               </h1>
-              <p className="mt-4 text-base leading-7 text-muted-foreground">{helperText}</p>
+              <p className="mt-4 text-base leading-7 text-muted-foreground">{t('auth.loginHint')}</p>
             </div>
           </div>
 
@@ -118,36 +121,9 @@ export default function LoginPage() {
                 {t('auth.accountAccess')}
               </div>
               <h2 className="mt-2 text-[28px] leading-9 font-semibold tracking-[-0.03em] text-foreground">
-                {subtitle}
+                {t('auth.loginSubtitle')}
               </h2>
-              <p className="mt-3 text-sm leading-6 text-muted-foreground">{helperText}</p>
-            </div>
-
-            <div className="inline-flex w-fit rounded-full border border-border bg-muted p-1">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsRegister(false);
-                  setError('');
-                }}
-                className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-                  !isRegister ? 'bg-card text-foreground shadow-[var(--shadow-sm)]' : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                {t('auth.login')}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsRegister(true);
-                  setError('');
-                }}
-                className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-                  isRegister ? 'bg-card text-foreground shadow-[var(--shadow-sm)]' : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                {t('auth.register')}
-              </button>
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">{t('auth.loginHint')}</p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -177,29 +153,11 @@ export default function LoginPage() {
                     placeholder={t('auth.passwordPlaceholder')}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    autoComplete={isRegister ? 'new-password' : 'current-password'}
+                    autoComplete="current-password"
                     className="border-0 bg-transparent shadow-none focus-visible:ring-0"
                   />
                 </div>
               </div>
-
-              {isRegister && (
-                <div className="animate-fade-in-up space-y-2">
-                  <label htmlFor="auth-confirm-password" className="text-sm font-medium text-foreground">{t('auth.confirmPasswordPlaceholder')}</label>
-                  <div className="input-glow rounded-[12px] border border-border bg-card p-1">
-                    <Input
-                      id="auth-confirm-password"
-                      name="confirmPassword"
-                      type="password"
-                      placeholder={t('auth.confirmPasswordPlaceholder')}
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      autoComplete="new-password"
-                      className="border-0 bg-transparent shadow-none focus-visible:ring-0"
-                    />
-                  </div>
-                </div>
-              )}
 
               {error && (
                 <div className="rounded-[12px] border border-[rgba(240,45,45,0.14)] bg-[rgba(240,45,45,0.08)] px-4 py-3 text-sm text-destructive animate-fade-in">
@@ -208,27 +166,29 @@ export default function LoginPage() {
               )}
 
               <Button type="submit" disabled={loading} className="h-10 w-full rounded-[10px] text-sm">
-                {loading ? (isRegister ? t('auth.registering') : t('auth.loggingIn')) : (isRegister ? t('auth.register') : t('auth.login'))}
+                {loading ? t('auth.loggingIn') : t('auth.login')}
               </Button>
             </form>
 
             <div className="rounded-[16px] border border-border bg-muted px-4 py-4 text-sm leading-6 text-muted-foreground">
-              {detailText}
-            </div>
-
-            <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-              <span>{isRegister ? t('auth.hasAccount') : t('auth.noAccount')}</span>
-              <button
-                type="button"
-                className="inline-flex items-center gap-1 font-medium text-primary"
-                onClick={() => {
-                  setIsRegister(!isRegister);
-                  setError('');
-                }}
-              >
-                {isRegister ? t('auth.login') : t('auth.register')}
-                <ArrowRight className="size-3.5" />
-              </button>
+              <div className="font-medium text-foreground mb-2">预置账号（点击快速填充）</div>
+              <div className="grid grid-cols-3 gap-2">
+                {PRESET_ACCOUNTS.map((acc) => (
+                  <button
+                    key={acc.username}
+                    type="button"
+                    onClick={() => {
+                      setUsername(acc.username);
+                      setPassword(acc.password);
+                      setError('');
+                    }}
+                    className="rounded-lg border border-border/70 bg-card px-2 py-1.5 text-xs text-center hover:border-primary/40 hover:bg-primary/5 transition-colors cursor-pointer"
+                  >
+                    {acc.username}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-2 text-xs">密码统一为：<span className="font-mono text-foreground">educlaw123</span></div>
             </div>
           </div>
         </section>
@@ -236,6 +196,3 @@ export default function LoginPage() {
     </div>
   );
 }
-
-
-
