@@ -38,7 +38,7 @@ interface UIStore {
 export const useUIStore = create<UIStore>((set, get) => ({
   sidebarOpen: false,
   mainView: null,
-  deepStudyTab: 'gallery',
+  deepStudyTab: 'arena',
   fileExplorerExpanded: false,
   openFilePath: null,
   pendingProfileFileName: null,
