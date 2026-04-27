@@ -147,10 +147,19 @@ export default function LiteArenaPanel() {
     if (saved) {
       try {
         const data = JSON.parse(saved);
-        if (data.messages && Array.isArray(data.messages) && data.messages.length > 0) {
-          setInteractiveMessages(data.messages);
-          setInteractiveAdopted(data.adopted || []);
-          setInteractiveIssues(data.issues || []);
+        const validMessages = (data.messages || []).filter(
+          (m: any) => m && typeof m === "object" && typeof m.role === "string" && typeof m.content === "string"
+        );
+        const validAdopted = (data.adopted || []).filter(
+          (a: any) => a && typeof a === "object" && typeof a.id === "string"
+        );
+        const validIssues = (data.issues || []).filter(
+          (i: any) => i && typeof i === "object" && typeof i.id === "string"
+        );
+        if (validMessages.length > 0) {
+          setInteractiveMessages(validMessages);
+          setInteractiveAdopted(validAdopted);
+          setInteractiveIssues(validIssues);
           setHasSavedSession(true);
           setInteractiveMode(true); // auto-resume interactive panel if session exists
           return;
@@ -469,10 +478,19 @@ function startResizeLeft(e: React.MouseEvent) {
     if (saved) {
       try {
         const data = JSON.parse(saved);
-        if (data.messages && Array.isArray(data.messages) && data.messages.length > 0) {
-          setInteractiveMessages(data.messages);
-          setInteractiveAdopted(data.adopted || []);
-          setInteractiveIssues(data.issues || []);
+        const validMessages = (data.messages || []).filter(
+          (m: any) => m && typeof m === "object" && typeof m.role === "string" && typeof m.content === "string"
+        );
+        const validAdopted = (data.adopted || []).filter(
+          (a: any) => a && typeof a === "object" && typeof a.id === "string"
+        );
+        const validIssues = (data.issues || []).filter(
+          (i: any) => i && typeof i === "object" && typeof i.id === "string"
+        );
+        if (validMessages.length > 0) {
+          setInteractiveMessages(validMessages);
+          setInteractiveAdopted(validAdopted);
+          setInteractiveIssues(validIssues);
           setHasSavedSession(true);
           return; // Resume from saved session, no need to re-diagnose
         }
@@ -536,13 +554,19 @@ function startResizeLeft(e: React.MouseEvent) {
       try {
         const data = JSON.parse(saved);
         if (data.messages && Array.isArray(data.messages)) {
-          latestMessages = data.messages;
+          latestMessages = data.messages.filter(
+            (m: any) => m && typeof m === "object" && typeof m.role === "string" && typeof m.content === "string"
+          );
         }
         if (data.adopted && Array.isArray(data.adopted)) {
-          latestAdopted = data.adopted;
+          latestAdopted = data.adopted.filter(
+            (a: any) => a && typeof a === "object" && typeof a.id === "string"
+          );
         }
         if (data.issues && Array.isArray(data.issues)) {
-          latestIssues = data.issues;
+          latestIssues = data.issues.filter(
+            (i: any) => i && typeof i === "object" && typeof i.id === "string"
+          );
         }
       } catch { /* ignore corrupt data */ }
     }
