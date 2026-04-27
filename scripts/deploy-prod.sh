@@ -2,13 +2,13 @@
 set -Eeuo pipefail
 
 # EduClaw Arena standard production deploy script.
-# Target: a normal Ubuntu/Debian server without Docker.
+# Target: Ubuntu/Debian without Docker.
 # It keeps the arena frontend intact, builds static assets, runs the backend
-# with systemd, and serves the frontend through nginx with API reverse proxying.
+# as a production Node process, and serves the frontend through nginx.
 #
 # Usage:
-#   sudo APP_HOST=your.domain.com LLM_API_KEY=... bash scripts/deploy-prod.sh
-#   sudo APP_HOST=1.2.3.4 LLM_API_KEY=... bash scripts/deploy-prod.sh
+#   LLM_API_KEY=... bash scripts/deploy-prod.sh
+#   APP_HOST=your.domain.com LLM_API_KEY=... bash scripts/deploy-prod.sh
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_NAME="${APP_NAME:-educlaw-arena}"
@@ -21,7 +21,11 @@ DB_USER="${POSTGRES_USER:-educlawlite}"
 WEB_ROOT="$PROJECT_DIR/educlaw-web/dist"
 NGINX_SITE="/etc/nginx/sites-available/$APP_NAME"
 NGINX_ENABLED="/etc/nginx/sites-enabled/$APP_NAME"
-RUNNER="$PROJECT_DIR/.deploy/run-server.sh"
+DEPLOY_DIR="$PROJECT_DIR/.deploy"
+RUNNER="$DEPLOY_DIR/run-server.sh"
+TMUX_RUNNER="$DEPLOY_DIR/tmux-server.sh"
+BACKEND_LOG="$DEPLOY_DIR/server.log"
+BACKEND_MODE=""
 
 log() {
   printf '\n[%s] %s\n' "$APP_NAME" "$*"
@@ -32,9 +36,13 @@ die() {
   exit 1
 }
 
+has_systemd() {
+  [[ "$(ps -p 1 -o comm= 2>/dev/null || true)" == "systemd" ]] && command -v systemctl >/dev/null 2>&1
+}
+
 require_root() {
   if [[ "${EUID}" -ne 0 ]]; then
-    die "Run as root: sudo APP_HOST=your.domain.com LLM_API_KEY=... bash scripts/deploy-prod.sh"
+    die "Run as root. Example: LLM_API_KEY=... bash scripts/deploy-prod.sh"
   fi
 }
 
@@ -82,11 +90,11 @@ detect_app_host() {
 install_system_packages() {
   log "Installing system packages"
   if [[ ! -f /etc/debian_version ]]; then
-    die "This script targets Ubuntu/Debian. For other Linux distributions, install Node.js 20, PostgreSQL, nginx, and pnpm manually."
+    die "This script targets Ubuntu/Debian. For other Linux distributions, install Node.js 20, PostgreSQL, nginx, pnpm, and tmux manually."
   fi
 
   apt-get update
-  apt-get install -y ca-certificates curl gnupg git nginx postgresql postgresql-contrib openssl
+  apt-get install -y ca-certificates curl gnupg git nginx postgresql postgresql-contrib openssl tmux
 
   local current_major="0"
   if command -v node >/dev/null 2>&1; then
@@ -103,9 +111,29 @@ install_system_packages() {
   corepack prepare "pnpm@${PNPM_VERSION}" --activate
 }
 
+start_postgresql() {
+  log "Starting PostgreSQL"
+  if has_systemd; then
+    systemctl enable --now postgresql
+    return
+  fi
+
+  if command -v service >/dev/null 2>&1; then
+    service postgresql start && return
+  fi
+
+  if command -v pg_ctlcluster >/dev/null 2>&1; then
+    pg_ctlcluster 16 main start 2>/dev/null && return
+    pg_ctlcluster 15 main start 2>/dev/null && return
+    pg_ctlcluster 14 main start 2>/dev/null && return
+  fi
+
+  die "Could not start PostgreSQL. Start it manually, then rerun this script."
+}
+
 configure_database() {
+  start_postgresql
   log "Configuring PostgreSQL"
-  systemctl enable --now postgresql
 
   local db_password_escaped
   db_password_escaped="$(sql_escape "$DB_PASSWORD")"
@@ -166,11 +194,10 @@ find_server_entry() {
   printf '%s' "$entry"
 }
 
-install_systemd_service() {
+write_backend_runner() {
   local server_entry="$1"
-  log "Installing systemd service: $SERVICE_NAME"
+  mkdir -p "$DEPLOY_DIR"
 
-  mkdir -p "$(dirname "$RUNNER")"
   cat > "$RUNNER" <<RUNEOF
 #!/usr/bin/env bash
 set -Eeuo pipefail
@@ -181,7 +208,10 @@ set +a
 exec node "$server_entry"
 RUNEOF
   chmod 0750 "$RUNNER"
+}
 
+install_systemd_backend() {
+  log "Installing systemd backend service: $SERVICE_NAME"
   cat > "/etc/systemd/system/${SERVICE_NAME}.service" <<SERVICEEOF
 [Unit]
 Description=EduClaw Arena backend
@@ -205,6 +235,55 @@ SERVICEEOF
   systemctl daemon-reload
   systemctl enable --now "$SERVICE_NAME"
   systemctl restart "$SERVICE_NAME"
+  BACKEND_MODE="systemd"
+}
+
+install_tmux_backend() {
+  log "Starting backend with tmux because systemd is unavailable"
+  command -v tmux >/dev/null 2>&1 || die "tmux is required when systemd is unavailable"
+
+  cat > "$TMUX_RUNNER" <<TMUXEOF
+#!/usr/bin/env bash
+exec "$RUNNER" >> "$BACKEND_LOG" 2>&1
+TMUXEOF
+  chmod 0750 "$TMUX_RUNNER"
+
+  tmux kill-session -t "$SERVICE_NAME" 2>/dev/null || true
+  : > "$BACKEND_LOG"
+  tmux new-session -d -s "$SERVICE_NAME" "$TMUX_RUNNER"
+  BACKEND_MODE="tmux"
+}
+
+install_backend() {
+  local server_entry="$1"
+  write_backend_runner "$server_entry"
+
+  if has_systemd; then
+    install_systemd_backend
+  else
+    install_tmux_backend
+  fi
+}
+
+start_or_reload_nginx() {
+  nginx -t
+
+  if has_systemd; then
+    systemctl enable --now nginx
+    systemctl reload nginx
+    return
+  fi
+
+  if pgrep -x nginx >/dev/null 2>&1; then
+    nginx -s reload
+    return
+  fi
+
+  if command -v service >/dev/null 2>&1; then
+    service nginx start && return
+  fi
+
+  nginx
 }
 
 install_nginx_site() {
@@ -250,21 +329,36 @@ NGINXEOF
     rm -f /etc/nginx/sites-enabled/default
   fi
 
-  nginx -t
-  systemctl enable --now nginx
-  systemctl reload nginx
+  start_or_reload_nginx
 }
 
 verify_deploy() {
   log "Verifying deployment"
-  systemctl --no-pager --full status "$SERVICE_NAME" | sed -n '1,18p'
-  curl -fsS "http://127.0.0.1:${PORT}/healthz" >/dev/null
+
+  if [[ "$BACKEND_MODE" == "systemd" ]]; then
+    systemctl --no-pager --full status "$SERVICE_NAME" | sed -n '1,18p'
+  else
+    tmux has-session -t "$SERVICE_NAME"
+  fi
+
+  if ! curl -fsS "http://127.0.0.1:${PORT}/healthz" >/dev/null; then
+    if [[ -f "$BACKEND_LOG" ]]; then
+      tail -n 80 "$BACKEND_LOG" >&2 || true
+    fi
+    die "Backend health check failed"
+  fi
+
   curl -fsSI "http://127.0.0.1/" >/dev/null
 
   printf '\n[%s] Deployment complete\n' "$APP_NAME"
   printf '  URL:      %s\n' "$APP_ORIGIN"
   printf '  Backend:  http://127.0.0.1:%s/healthz\n' "$PORT"
-  printf '  Logs:     journalctl -u %s -f\n' "$SERVICE_NAME"
+  if [[ "$BACKEND_MODE" == "systemd" ]]; then
+    printf '  Logs:     journalctl -u %s -f\n' "$SERVICE_NAME"
+  else
+    printf '  Logs:     tail -f %s\n' "$BACKEND_LOG"
+    printf '  Session:  tmux attach -t %s\n' "$SERVICE_NAME"
+  fi
 }
 
 main() {
@@ -272,7 +366,7 @@ main() {
   cd "$PROJECT_DIR"
 
   APP_HOST="$(detect_app_host)"
-  [[ -n "$APP_HOST" ]] || die "Set APP_HOST, for example: sudo APP_HOST=1.2.3.4 LLM_API_KEY=... bash scripts/deploy-prod.sh"
+  [[ -n "$APP_HOST" ]] || die "Set APP_HOST or APP_ORIGIN, or make sure hostname -I returns an address."
 
   DB_PASSWORD="${POSTGRES_PASSWORD:-$(read_env_value POSTGRES_PASSWORD "")}"
   [[ -n "$DB_PASSWORD" ]] || DB_PASSWORD="$(openssl rand -hex 16)"
@@ -289,7 +383,7 @@ main() {
   LLM_BASELINE_MODEL="${LLM_BASELINE_MODEL:-$(read_env_value LLM_BASELINE_MODEL "$LLM_MODEL")}"
 
   if [[ -z "$LLM_API_KEY" || "$LLM_API_KEY" == "your-llm-api-key" ]]; then
-    die "Set LLM_API_KEY before deploying. Example: sudo APP_HOST=${APP_HOST} LLM_API_KEY=xxxx bash scripts/deploy-prod.sh"
+    die "Set LLM_API_KEY before deploying. Example: LLM_API_KEY=xxxx bash scripts/deploy-prod.sh"
   fi
 
   install_system_packages
@@ -299,7 +393,7 @@ main() {
 
   local server_entry
   server_entry="$(find_server_entry)"
-  install_systemd_service "$server_entry"
+  install_backend "$server_entry"
   install_nginx_site
   verify_deploy
 }
