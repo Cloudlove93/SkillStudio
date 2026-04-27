@@ -1,65 +1,77 @@
-# EduClaw Arena 版 - 远程服务器部署文档
+# EduClaw Arena 版 - 生产部署完整流程
 
-## 环境要求
+## 一、环境准备
 
-- Ubuntu / CentOS（本文档以 Ubuntu 为例）
-- Node.js 20+、pnpm、npm
-- PostgreSQL 16（可复用已有数据库，端口 5435）
-- 外网可访问的服务器 IP
+远程服务器需要：
+- Ubuntu 20.04+（或其他 Linux）
+- Node.js 20+、`pnpm`、`npm`
+- PostgreSQL 16（已有数据库服务，端口 5435）
+- 服务器外网 IP 或内网 IP
 
-## 1. 克隆代码
+检查是否已安装：
+```bash
+node --version    # 需 >= 20
+pnpm --version    # 需 >= 9
+npm --version
+```
+
+没装的话：
+```bash
+curl -fsSL https://get.pnpm.io/install.sh | sh -
+source ~/.bashrc
+```
+
+---
+
+## 二、克隆代码
 
 ```bash
-cd /your/project/path
+cd /inspire/qb-ilm/project/ai4education/zhouaimin-p-zhouaimin/lzx
 git clone -b arena https://github.com/EduClaw-InnoSpark/EduClaw.git EduClaw-arena
 cd EduClaw-arena
 ```
 
-## 2. 配置环境变量
+---
+
+## 三、配置环境变量
 
 ```bash
 cp .env.example .env
 vim .env
 ```
 
-至少修改以下几项：
+**必须修改的项：**
 
-| 变量 | 说明 | 示例 |
-|------|------|------|
-| `DATABASE_URL` | PostgreSQL 连接串 | `postgres://educlawlite:密码@127.0.0.1:5435/educlawlite` |
-| `LLM_BASE_URL` | LLM API 地址 | `https://your-api.com/v1` |
-| `LLM_API_KEY` | LLM API Key | `sk-xxxxxxxx` |
-| `LLM_MODEL` | 模型名称 | `Kimi-K2.6` |
-| `JWT_SECRET` | JWT 签名密钥 | 任意长随机字符串 |
-| `APP_ORIGIN` | 前端访问地址 | `http://服务器IP` |
-
-## 3. 安装依赖并构建
-
-```bash
-pnpm install
-
-# 构建共享模块
-cd educlaw-shared && pnpm build && cd ..
-
-# 构建后端
-cd educlaw-server && pnpm build && cd ..
-
-# 构建前端
-cd educlaw-web && pnpm build && cd ..
+```
+DATABASE_URL=postgres://educlawlite:你的数据库密码@127.0.0.1:5435/educlawlite
+LLM_BASE_URL=https://你的LLM地址/v1
+LLM_API_KEY=你的API密钥
+LLM_MODEL=Kimi-K2.6
+JWT_SECRET=随便一个长随机字符串（至少32位）
+APP_ORIGIN=http://你的服务器IP
 ```
 
-## 4. 启动后端（tmux 后台运行）
+---
+
+## 四、一键构建
+
+```bash
+bash scripts/deploy-prod.sh
+```
+
+这个脚本会自动完成：
+1. `pnpm install` 安装依赖
+2. 构建 `educlaw-shared`
+3. 构建 `educlaw-server`
+4. 构建 `educlaw-web`
+
+---
+
+## 五、启动后端
 
 ```bash
 cd educlaw-server
-
 tmux new-session -d -s educlaw-server "node dist/index.js"
-```
-
-查看日志：
-```bash
-tmux attach -t educlaw-server
-# 分离 tmux：按 Ctrl+B 然后 D
 ```
 
 验证后端是否启动：
@@ -68,15 +80,17 @@ curl http://localhost:3000/healthz
 # 应返回 {"ok":true,"service":"educlaw-lite-server"}
 ```
 
-## 5. 启动前端（serve 托管静态文件）
+---
+
+## 六、启动前端
 
 ```bash
 cd educlaw-web/dist
 
-# 安装 serve（首次）
+# 首次安装 serve
 npm install -g serve
 
-# 后台启动，80 端口，支持 SPA 路由回退
+# 启动前端（80端口，支持SPA路由）
 nohup serve -l 80 --single > /tmp/educlaw-web.log 2>&1 &
 ```
 
@@ -86,9 +100,29 @@ curl -s http://localhost/ | head -1
 # 应返回 <!doctype html>
 ```
 
-## 6. 浏览器访问
+---
 
-在服务器上查看 IP：
+## 七、放行防火墙（关键！）
+
+如果浏览器访问不了，大概率是防火墙没开 80 端口：
+
+```bash
+# Ubuntu
+ufw allow 80/tcp
+ufw allow 3000/tcp
+ufw reload
+
+# 或 CentOS
+firewall-cmd --permanent --add-port=80/tcp
+firewall-cmd --permanent --add-port=3000/tcp
+firewall-cmd --reload
+```
+
+---
+
+## 八、浏览器访问
+
+查看服务器 IP：
 ```bash
 hostname -I
 ```
@@ -98,18 +132,18 @@ hostname -I
 http://服务器IP
 ```
 
-## 7. 预置账号
-
-部署完成后，15 个预置账号会自动创建：
-
+登录用预置账号：
 - 用户名：`user1` ~ `user15`
 - 密码统一为：`educlaw123`
 
-## 常用运维命令
+---
+
+## 常用运维
 
 ```bash
 # 查看后端日志
 tmux attach -t educlaw-server
+# 分离：Ctrl+B 然后 D
 
 # 停止后端
 tmux kill-session -t educlaw-server
@@ -118,26 +152,10 @@ tmux kill-session -t educlaw-server
 pkill -f "serve -l 80"
 
 # 重启前端
-cd /your/project/path/EduClaw-arena/educlaw-web/dist
+cd educlaw-web/dist
 nohup serve -l 80 --single > /tmp/educlaw-web.log 2>&1 &
 
-# 查看前端日志
-cat /tmp/educlaw-web.log
-```
-
-## 更新代码
-
-```bash
-cd /your/project/path/EduClaw-arena
+# 更新代码后重新部署
 git pull origin arena
 bash scripts/deploy-prod.sh
 ```
-
-## 故障排查
-
-| 问题 | 解决 |
-|------|------|
-| 后端启动失败 | 检查 `.env` 中的 `DATABASE_URL` 和 `LLM_API_KEY` |
-| 前端 404 | 确认 `serve` 是在 `educlaw-web/dist` 目录下启动的 |
-| 登录后空白 | 刷新页面，清除浏览器缓存 |
-| LLM 调用失败 | 检查 `LLM_BASE_URL` 和 `LLM_API_KEY` 是否正确 |
