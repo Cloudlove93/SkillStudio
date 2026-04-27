@@ -528,8 +528,20 @@ function startResizeLeft(e: React.MouseEvent) {
     const userMsg = interactiveInput.trim();
     setInteractiveInput("");
 
+    // Read latest messages from localStorage to avoid stale closure after package switch
+    let latestMessages = interactiveMessages;
+    const saved = localStorage.getItem(interactiveStorageKey(currentPkgId));
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        if (data.messages && Array.isArray(data.messages)) {
+          latestMessages = data.messages;
+        }
+      } catch { /* ignore corrupt data */ }
+    }
+
     // Build new messages with user message and update UI immediately
-    const messagesWithUser = [...interactiveMessages, { role: "user", content: userMsg }];
+    const messagesWithUser = [...latestMessages, { role: "user", content: userMsg }];
     setInteractiveMessages(messagesWithUser);
     setInteractivePhase("chatting");
     startProgress("交互式优化", "专家正在思考...");
