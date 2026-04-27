@@ -69,7 +69,11 @@ export default function LiteArenaPanel() {
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
 
   // Center preview mode (view file in main panel)
-  const [centerPreview, setCenterPreview] = useState<{ type: "agent" | "rubric" | "skill" | "diff"; name: string; content: string } | null>(null);
+  const [centerPreview, setCenterPreview] = useState<
+    | { type: "agent" | "rubric" | "skill" | "diff"; name: string; content: string }
+    | { type: "report"; name: string; report: ArenaReport }
+    | null
+  >(null);
   const [hasSavedSession, setHasSavedSession] = useState(false);
 
   // Version compare state
@@ -857,11 +861,61 @@ function startResizeLeft(e: React.MouseEvent) {
               </div>
             </div>
             <div className="flex-1 overflow-auto p-6">
-              <div className="max-w-3xl mx-auto">
-                <div className="rounded-[20px] border border-border/70 bg-muted/50 p-5 text-sm">
-                  <MarkdownContent content={centerPreview.content} />
+              {centerPreview.type === "report" ? (
+                <div className="max-w-3xl mx-auto space-y-5">
+                  {/* Header */}
+                  <div className="flex items-center gap-3">
+                    <div className="text-lg font-bold">📊 评估报告</div>
+                    <div className="text-sm text-muted-foreground">{formatWinner(centerPreview.report.winningSide)} ｜ {centerPreview.report.recommendation}</div>
+                  </div>
+                  {/* Score cards */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-[20px] border border-border/70 bg-muted/50 p-4 text-center">
+                      <div className="text-sm text-muted-foreground">基础模型</div>
+                      <div className="text-3xl font-bold">{centerPreview.report.baseline.total}</div>
+                      <div className="text-xs text-muted-foreground mt-1 leading-relaxed">{centerPreview.report.baseline.summary}</div>
+                    </div>
+                    <div className="rounded-[20px] border border-border/70 bg-muted/50 p-4 text-center">
+                      <div className="text-sm text-muted-foreground">{selectedPackage?.name || "智能体"}</div>
+                      <div className="text-3xl font-bold">{centerPreview.report.enhanced.total}</div>
+                      <div className="text-xs text-muted-foreground mt-1 leading-relaxed">{centerPreview.report.enhanced.summary}</div>
+                    </div>
+                  </div>
+                  {/* Dimensions table */}
+                  <div className="overflow-hidden rounded-[20px] border border-border/70">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted/80">
+                        <tr>
+                          <th className="px-3 py-2 text-left font-medium">维度</th>
+                          <th className="px-3 py-2 text-left font-medium">基础模型</th>
+                          <th className="px-3 py-2 text-left font-medium">{selectedPackage?.name || "智能体"}</th>
+                          <th className="px-3 py-2 text-left font-medium">差距</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {centerPreview.report.baseline.dimensions.map((d, i) => {
+                          const e = centerPreview.report.enhanced.dimensions[i];
+                          const diff = (e?.score ?? 0) - d.score;
+                          return (
+                            <tr key={d.key} className="border-t border-border">
+                              <td className="px-3 py-2">{d.name}</td>
+                              <td className="px-3 py-2">{d.score}/{d.maxScore}</td>
+                              <td className="px-3 py-2">{e?.score ?? 0}/{e?.maxScore ?? d.maxScore}</td>
+                              <td className={`px-3 py-2 font-medium ${diff > 0 ? "text-emerald-600" : diff < 0 ? "text-red-500" : "text-muted-foreground"}`}>{diff > 0 ? `+${diff}` : diff}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="max-w-3xl mx-auto">
+                  <div className="rounded-[20px] border border-border/70 bg-muted/50 p-5 text-sm">
+                    <MarkdownContent content={centerPreview.content} />
+                  </div>
+                </div>
+              )}
             </div>
           </>
         ) : (
@@ -1129,7 +1183,7 @@ function startResizeLeft(e: React.MouseEvent) {
                     <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">评估报告</div>
                     <div className="flex items-center gap-2">
                       <button onClick={() => void handleReport()} className="text-[10px] text-primary hover:underline">↻ 重新生成</button>
-                      <button onClick={() => setCenterPreview({ type: "diff", name: "评估报告", content: buildReportMarkdown(report) })} className="text-[10px] text-primary hover:underline">👁 在中间打开</button>
+                      <button onClick={() => setCenterPreview({ type: "report", name: "评估报告", report })} className="text-[10px] text-primary hover:underline">👁 在中间打开</button>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
