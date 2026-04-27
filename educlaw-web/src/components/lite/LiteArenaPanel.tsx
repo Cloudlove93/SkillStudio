@@ -69,6 +69,8 @@ export default function LiteArenaPanel() {
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
   const selectedPackageIdRef = useRef(selectedPackageId);
   useEffect(() => { selectedPackageIdRef.current = selectedPackageId; }, [selectedPackageId]);
+  const threadRef = useRef(thread);
+  useEffect(() => { threadRef.current = thread; }, [thread]);
 
   // Center preview mode (view file in main panel)
   const [centerPreview, setCenterPreview] = useState<
@@ -125,8 +127,6 @@ export default function LiteArenaPanel() {
   }
 
   useEffect(() => {
-    // Always reset all package-scoped UI states when switching packages
-    setInteractiveMode(false);
     setCenterPreview(null);
     setInteractiveInput("");
     setInteractivePhase("idle");
@@ -136,6 +136,7 @@ export default function LiteArenaPanel() {
     setSideStreaming({ baseline: false, enhanced: false });
 
     if (!selectedPackageId) {
+      setInteractiveMode(false);
       setHasSavedSession(false);
       setInteractiveMessages([]);
       setInteractiveAdopted([]);
@@ -151,11 +152,13 @@ export default function LiteArenaPanel() {
           setInteractiveAdopted(data.adopted || []);
           setInteractiveIssues(data.issues || []);
           setHasSavedSession(true);
+          setInteractiveMode(true); // auto-resume interactive panel if session exists
           return;
         }
       } catch { /* ignore corrupt data */ }
     }
-    // No saved session for this package: clear all interactive state
+    // No saved session for this package: close interactive panel
+    setInteractiveMode(false);
     setHasSavedSession(false);
     setInteractiveMessages([]);
     setInteractiveAdopted([]);
@@ -391,15 +394,16 @@ function startResizeLeft(e: React.MouseEvent) {
 
   async function handleReport() {
     if (!token || !thread?.id) return;
+    const currentThreadId = thread.id;
     startProgress("生成评估报告", "正在生成报告..."); setStatus("正在生成报告...");
     try {
       let nextReport: ArenaReport | null = null;
-      await liteApi.generateReportStream(token, thread.id, undefined, (event) => {
+      await liteApi.generateReportStream(token, currentThreadId, undefined, (event) => {
         if (event.event === "phase") { pushProgress(event.data.label); setStatus(event.data.label); }
         if (event.event === "done") nextReport = event.data;
         if (event.event === "error") throw new Error(event.data.error || "评估失败");
       });
-      if (nextReport) {
+      if (nextReport && threadRef.current?.id === currentThreadId) {
         setReport(nextReport);
         // 只有用户没有在交互式优化中时才自动切换到报告
         if (!interactiveMode) setDetailTab("report");
@@ -560,21 +564,25 @@ function startResizeLeft(e: React.MouseEvent) {
 
   async function saveInteractiveChanges() {
     if (!token || !selectedPackageId || interactiveAdopted.length === 0) return;
+    const currentPkgId = selectedPackageId;
+    const currentAdopted = interactiveAdopted;
     const note = window.prompt("请输入新版本备注（可选）：");
     if (note === null) return; // cancelled
     startProgress("保存修改", "正在应用修改并生成新版本...");
     try {
-      const result = await liteApi.applyInteractiveChanges(token, selectedPackageId, interactiveAdopted, note);
-      await refreshPackages(selectedPackageId);
+      const result = await liteApi.applyInteractiveChanges(token, currentPkgId, currentAdopted, note);
+      await refreshPackages(currentPkgId);
       // Clear saved interactive session
-      localStorage.removeItem(interactiveStorageKey(selectedPackageId));
-      setInteractiveMode(false);
-      setHasSavedSession(false);
-      setOptimization(null);
-      setInteractiveMessages([]);
-      setInteractiveIssues([]);
-      setInteractiveAdopted([]);
-      setDetailTab("versions");
+      localStorage.removeItem(interactiveStorageKey(currentPkgId));
+      if (selectedPackageIdRef.current === currentPkgId) {
+        setInteractiveMode(false);
+        setHasSavedSession(false);
+        setOptimization(null);
+        setInteractiveMessages([]);
+        setInteractiveIssues([]);
+        setInteractiveAdopted([]);
+        setDetailTab("versions");
+      }
       finishProgress(`已保存为新版本 v${result.versionNumber}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "保存失败";
