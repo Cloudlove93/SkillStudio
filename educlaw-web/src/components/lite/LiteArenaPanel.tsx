@@ -67,6 +67,8 @@ export default function LiteArenaPanel() {
   const [interactivePhase, setInteractivePhase] = useState<"idle" | "diagnosing" | "chatting">("idle");
   const [interactiveInput, setInteractiveInput] = useState("");
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
+  const selectedPackageIdRef = useRef(selectedPackageId);
+  useEffect(() => { selectedPackageIdRef.current = selectedPackageId; }, [selectedPackageId]);
 
   // Center preview mode (view file in main panel)
   const [centerPreview, setCenterPreview] = useState<
@@ -411,18 +413,21 @@ function startResizeLeft(e: React.MouseEvent) {
 
   async function handleOptimize() {
     if (!token || !thread?.id || !selectedPackageId) return;
+    const currentPkgId = selectedPackageId;
     startProgress("执行优化", "正在运行专家优化..."); setStatus("正在优化...");
     try {
       let result: OptimizationResult | null = null;
-      await liteApi.optimizePackageStream(token, selectedPackageId, thread.id, undefined, (event) => {
+      await liteApi.optimizePackageStream(token, currentPkgId, thread.id, undefined, (event) => {
         if (event.event === "phase") { pushProgress(event.data.label); setStatus(event.data.label); }
         if (event.event === "done") result = event.data;
         if (event.event === "error") throw new Error(event.data.error || "优化失败");
       });
       if (result) {
-        await refreshPackages(selectedPackageId);
-        setOptimization(result);
-        if (selectedPackageId) saveOptimizationState(selectedPackageId, result);
+        await refreshPackages(currentPkgId);
+        saveOptimizationState(currentPkgId, result);
+        if (selectedPackageIdRef.current === currentPkgId) {
+          setOptimization(result);
+        }
       }
       finishProgress("优化完成"); setStatus("优化完成");
     } catch (error) {
@@ -482,56 +487,74 @@ function startResizeLeft(e: React.MouseEvent) {
     try {
       const result = await liteApi.diagnosePackage(token, currentPkgId, thread.id);
       stepTimers.forEach((id) => window.clearTimeout(id));
-      setInteractiveIssues(result.issues);
-      setInteractiveMessages([{ role: "assistant", content: result.welcomeMessage }]);
       saveInteractiveState(currentPkgId, [{ role: "assistant", content: result.welcomeMessage }], [], result.issues);
+      if (selectedPackageIdRef.current === currentPkgId) {
+        setInteractiveIssues(result.issues);
+        setInteractiveMessages([{ role: "assistant", content: result.welcomeMessage }]);
+      }
       finishProgress(`分析完成，发现 ${result.issues.length} 个问题`);
     } catch (error) {
       stepTimers.forEach((id) => window.clearTimeout(id));
       const message = error instanceof Error ? error.message : "诊断失败";
-      setInteractiveMessages([{ role: "assistant", content: `❌ 诊断失败：${message}` }]);
       saveInteractiveState(currentPkgId, [{ role: "assistant", content: `❌ 诊断失败：${message}` }], [], []);
+      if (selectedPackageIdRef.current === currentPkgId) {
+        setInteractiveMessages([{ role: "assistant", content: `❌ 诊断失败：${message}` }]);
+      }
       failProgress(message);
     } finally {
-      setInteractivePhase("idle");
+      if (selectedPackageIdRef.current === currentPkgId) {
+        setInteractivePhase("idle");
+      }
     }
   }
 
   async function sendInteractiveMessage() {
     if (!token || !selectedPackageId || !interactiveInput.trim() || interactivePhase !== "idle") return;
+    const currentPkgId = selectedPackageId;
+    const currentAdopted = interactiveAdopted;
+    const currentIssues = interactiveIssues;
     const userMsg = interactiveInput.trim();
     setInteractiveInput("");
-    const newMessages = [...interactiveMessages, { role: "user", content: userMsg }];
-    setInteractiveMessages(newMessages);
+
+    // Build new messages with user message and update UI immediately
+    const messagesWithUser = [...interactiveMessages, { role: "user", content: userMsg }];
+    setInteractiveMessages(messagesWithUser);
     setInteractivePhase("chatting");
     startProgress("交互式优化", "专家正在思考...");
-    const currentPkgId = selectedPackageId;
+
+    // Save user message immediately so it's not lost if user switches packages
+    saveInteractiveState(currentPkgId, messagesWithUser, currentAdopted, currentIssues);
+
     try {
-      const result = await liteApi.chatOptimize(token, currentPkgId, newMessages, interactiveAdopted);
-      setInteractiveMessages((prev) => {
-        const next = [...prev, { role: "assistant", content: result.reply }];
+      const result = await liteApi.chatOptimize(token, currentPkgId, messagesWithUser, currentAdopted);
+
+      // Build final messages with assistant reply using known array (not prev from state)
+      const finalMessages = [...messagesWithUser, { role: "assistant", content: result.reply }];
+      const finalAdopted = result.newAdoptions.length > 0 ? [...currentAdopted, ...result.newAdoptions] : currentAdopted;
+
+      // Always save to localStorage for the original package
+      saveInteractiveState(currentPkgId, finalMessages, finalAdopted, currentIssues);
+
+      // Only update UI if user is still on the same package
+      if (selectedPackageIdRef.current === currentPkgId) {
+        setInteractiveMessages(finalMessages);
         if (result.newAdoptions.length > 0) {
-          setInteractiveAdopted((prevAdopted) => {
-            const nextAdopted = [...prevAdopted, ...result.newAdoptions];
-            saveInteractiveState(currentPkgId, next, nextAdopted, interactiveIssues);
-            return nextAdopted;
-          });
-        } else {
-          saveInteractiveState(currentPkgId, next, interactiveAdopted, interactiveIssues);
+          setInteractiveAdopted(finalAdopted);
         }
-        return next;
-      });
+      }
       finishProgress("专家已回复");
     } catch (error) {
       const message = error instanceof Error ? error.message : "对话失败";
-      setInteractiveMessages((prev) => {
-        const next = [...prev, { role: "assistant", content: `❌ 对话失败：${message}` }];
-        saveInteractiveState(currentPkgId, next, interactiveAdopted, interactiveIssues);
-        return next;
-      });
+      const errorMessages = [...messagesWithUser, { role: "assistant", content: `❌ 对话失败：${message}` }];
+      saveInteractiveState(currentPkgId, errorMessages, currentAdopted, currentIssues);
+      if (selectedPackageIdRef.current === currentPkgId) {
+        setInteractiveMessages(errorMessages);
+      }
       failProgress(message);
     } finally {
-      setInteractivePhase("idle");
+      if (selectedPackageIdRef.current === currentPkgId) {
+        setInteractivePhase("idle");
+      }
     }
   }
 
@@ -1139,11 +1162,17 @@ function startResizeLeft(e: React.MouseEvent) {
                           const currentPkgId = selectedPackageId;
                           liteApi.compareVersions(token, currentPkgId, compareBaseId, compareTargetId)
                             .then((res) => {
-                              setCompareResult(res);
                               saveCompareState(currentPkgId, res, compareBaseId, compareTargetId);
+                              if (selectedPackageIdRef.current === currentPkgId) {
+                                setCompareResult(res);
+                              }
                             })
                             .catch((err) => { alert(err.message || "对比失败"); })
-                            .finally(() => { setCompareLoading(false); });
+                            .finally(() => {
+                              if (selectedPackageIdRef.current === currentPkgId) {
+                                setCompareLoading(false);
+                              }
+                            });
                         }}
                       >
                         {compareLoading ? "对比中..." : "对比"}
