@@ -104,6 +104,7 @@ export type PackageGeneratePreview = { type: string; name: string; content: stri
 export type PackageGenerateStreamEvent =
   | { event: "phase"; data: { label: string } }
   | { event: "preview"; data: PackageGeneratePreview }
+  | { event: "ping"; data: Record<string, never> }
   | { event: "done"; data: AgentPackageDetail }
   | { event: "error"; data: { error: string } }
   | { event: "stream_end"; data: { ok: boolean } };
@@ -126,6 +127,7 @@ export type ReportStreamEvent =
 
 export type OptimizeStreamEvent =
   | { event: "phase"; data: { label: string } }
+  | { event: "ping"; data: Record<string, never> }
   | { event: "done"; data: OptimizationResult }
   | { event: "error"; data: { error: string } }
   | { event: "stream_end"; data: { ok: boolean } };

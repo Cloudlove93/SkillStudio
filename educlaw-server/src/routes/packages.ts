@@ -46,6 +46,9 @@ router.post("/generate", requireAuth, async (req, res) => {
 
 router.post("/generate/stream", requireAuth, async (req: Request, res: Response) => {
   initSse(res);
+  const heartbeat = setInterval(() => {
+    try { writeSseEvent(res, "ping", {}); } catch { /* ignore */ }
+  }, 5000);
   try {
     writeSseEvent(res, "phase", { label: "整理需求并准备生成提示词" });
     writeSseEvent(res, "phase", { label: "调用模型生成 agent.md 与 skill.md" });
@@ -62,6 +65,7 @@ router.post("/generate/stream", requireAuth, async (req: Request, res: Response)
   } catch (error) {
     writeSseEvent(res, "error", { error: error instanceof Error ? error.message : "生成智能体包失败" });
   } finally {
+    clearInterval(heartbeat);
     res.end();
   }
 });
@@ -122,6 +126,9 @@ router.post("/:packageId/optimize", requireAuth, async (req, res) => {
 
 router.post("/:packageId/optimize/stream", requireAuth, async (req: Request, res: Response) => {
   initSse(res);
+  const heartbeat = setInterval(() => {
+    try { writeSseEvent(res, "ping", {}); } catch { /* ignore */ }
+  }, 5000);
   try {
     const result = await optimizePackage(
       (req as AuthedRequest).userId || "",
@@ -135,6 +142,7 @@ router.post("/:packageId/optimize/stream", requireAuth, async (req: Request, res
   } catch (error) {
     writeSseEvent(res, "error", { error: error instanceof Error ? error.message : "优化失败" });
   } finally {
+    clearInterval(heartbeat);
     res.end();
   }
 });
