@@ -115,6 +115,13 @@ export default function LiteArenaPanel() {
   // Persist / restore interactive optimization state per package
   const interactiveStorageKey = (packageId: string) => `interactive-opt-${packageId}`;
 
+  function saveInteractiveState(packageId: string, messages: typeof interactiveMessages, adopted: typeof interactiveAdopted, issues: typeof interactiveIssues) {
+    localStorage.setItem(
+      interactiveStorageKey(packageId),
+      JSON.stringify({ messages, adopted, issues }),
+    );
+  }
+
   useEffect(() => {
     // Always reset all package-scoped UI states when switching packages
     setInteractiveMode(false);
@@ -169,10 +176,7 @@ export default function LiteArenaPanel() {
     }
   }, [selectedPackageId]);
 
-  useEffect(() => {
-    if (!selectedPackageId || !optimization) return;
-    localStorage.setItem(optimizationStorageKey(selectedPackageId), JSON.stringify(optimization));
-  }, [optimization, selectedPackageId]);
+
 
   // Persist / restore version compare state per package
   const compareStorageKey = (packageId: string) => `arena-compare-${packageId}`;
@@ -203,25 +207,20 @@ export default function LiteArenaPanel() {
     }
   }, [selectedPackageId]);
 
-  useEffect(() => {
-    if (!selectedPackageId) return;
-    localStorage.setItem(
-      compareStorageKey(selectedPackageId),
-      JSON.stringify({ result: compareResult, baseId: compareBaseId, targetId: compareTargetId }),
-    );
-  }, [compareResult, compareBaseId, compareTargetId, selectedPackageId]);
 
-  useEffect(() => {
-    if (!selectedPackageId) return;
+
+  // optimization save helper
+  function saveOptimizationState(packageId: string, opt: OptimizationResult) {
+    localStorage.setItem(optimizationStorageKey(packageId), JSON.stringify(opt));
+  }
+
+  // compare save helper
+  function saveCompareState(packageId: string, result: VersionCompareResult | null, baseId: string, targetId: string) {
     localStorage.setItem(
-      interactiveStorageKey(selectedPackageId),
-      JSON.stringify({
-        messages: interactiveMessages,
-        adopted: interactiveAdopted,
-        issues: interactiveIssues,
-      }),
+      compareStorageKey(packageId),
+      JSON.stringify({ result, baseId, targetId }),
     );
-  }, [interactiveMessages, interactiveAdopted, interactiveIssues, selectedPackageId]);
+  }
 
   function startProgress(title: string, phase: string) { setProgress({ title, phase, steps: [phase], startedAt: Date.now(), active: true, isError: false }); }
   function pushProgress(label: string) { setProgress((prev) => prev ? { ...prev, phase: label, steps: prev.steps[prev.steps.length - 1] === label ? prev.steps : [...prev.steps, label] } : { title: "当前进度", phase: label, steps: [label], startedAt: Date.now(), active: true, isError: false }); }
@@ -423,6 +422,7 @@ function startResizeLeft(e: React.MouseEvent) {
       if (result) {
         await refreshPackages(selectedPackageId);
         setOptimization(result);
+        if (selectedPackageId) saveOptimizationState(selectedPackageId, result);
       }
       finishProgress("优化完成"); setStatus("优化完成");
     } catch (error) {
@@ -478,16 +478,19 @@ function startResizeLeft(e: React.MouseEvent) {
     stepTimers.push(window.setTimeout(() => pushProgress("正在分析 Arena 对话轨迹..."), 1800));
     stepTimers.push(window.setTimeout(() => pushProgress("正在识别潜在优化问题..."), 4000));
     stepTimers.push(window.setTimeout(() => pushProgress("正在生成优化建议..."), 7000));
+    const currentPkgId = selectedPackageId;
     try {
-      const result = await liteApi.diagnosePackage(token, selectedPackageId, thread.id);
+      const result = await liteApi.diagnosePackage(token, currentPkgId, thread.id);
       stepTimers.forEach((id) => window.clearTimeout(id));
       setInteractiveIssues(result.issues);
       setInteractiveMessages([{ role: "assistant", content: result.welcomeMessage }]);
+      saveInteractiveState(currentPkgId, [{ role: "assistant", content: result.welcomeMessage }], [], result.issues);
       finishProgress(`分析完成，发现 ${result.issues.length} 个问题`);
     } catch (error) {
       stepTimers.forEach((id) => window.clearTimeout(id));
       const message = error instanceof Error ? error.message : "诊断失败";
       setInteractiveMessages([{ role: "assistant", content: `❌ 诊断失败：${message}` }]);
+      saveInteractiveState(currentPkgId, [{ role: "assistant", content: `❌ 诊断失败：${message}` }], [], []);
       failProgress(message);
     } finally {
       setInteractivePhase("idle");
@@ -502,16 +505,30 @@ function startResizeLeft(e: React.MouseEvent) {
     setInteractiveMessages(newMessages);
     setInteractivePhase("chatting");
     startProgress("交互式优化", "专家正在思考...");
+    const currentPkgId = selectedPackageId;
     try {
-      const result = await liteApi.chatOptimize(token, selectedPackageId, newMessages, interactiveAdopted);
-      setInteractiveMessages((prev) => [...prev, { role: "assistant", content: result.reply }]);
-      if (result.newAdoptions.length > 0) {
-        setInteractiveAdopted((prev) => [...prev, ...result.newAdoptions]);
-      }
+      const result = await liteApi.chatOptimize(token, currentPkgId, newMessages, interactiveAdopted);
+      setInteractiveMessages((prev) => {
+        const next = [...prev, { role: "assistant", content: result.reply }];
+        if (result.newAdoptions.length > 0) {
+          setInteractiveAdopted((prevAdopted) => {
+            const nextAdopted = [...prevAdopted, ...result.newAdoptions];
+            saveInteractiveState(currentPkgId, next, nextAdopted, interactiveIssues);
+            return nextAdopted;
+          });
+        } else {
+          saveInteractiveState(currentPkgId, next, interactiveAdopted, interactiveIssues);
+        }
+        return next;
+      });
       finishProgress("专家已回复");
     } catch (error) {
       const message = error instanceof Error ? error.message : "对话失败";
-      setInteractiveMessages((prev) => [...prev, { role: "assistant", content: `❌ 对话失败：${message}` }]);
+      setInteractiveMessages((prev) => {
+        const next = [...prev, { role: "assistant", content: `❌ 对话失败：${message}` }];
+        saveInteractiveState(currentPkgId, next, interactiveAdopted, interactiveIssues);
+        return next;
+      });
       failProgress(message);
     } finally {
       setInteractivePhase("idle");
@@ -1106,8 +1123,12 @@ function startResizeLeft(e: React.MouseEvent) {
                         onClick={() => {
                           if (!token || !selectedPackageId || !compareBaseId || !compareTargetId) return;
                           setCompareLoading(true);
-                          liteApi.compareVersions(token, selectedPackageId, compareBaseId, compareTargetId)
-                            .then((res) => { setCompareResult(res); })
+                          const currentPkgId = selectedPackageId;
+                          liteApi.compareVersions(token, currentPkgId, compareBaseId, compareTargetId)
+                            .then((res) => {
+                              setCompareResult(res);
+                              saveCompareState(currentPkgId, res, compareBaseId, compareTargetId);
+                            })
                             .catch((err) => { alert(err.message || "对比失败"); })
                             .finally(() => { setCompareLoading(false); });
                         }}
