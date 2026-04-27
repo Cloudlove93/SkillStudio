@@ -112,21 +112,12 @@ export default function LiteArenaPanel() {
   const interactiveStorageKey = (packageId: string) => `interactive-opt-${packageId}`;
 
   useEffect(() => {
-    // Clean up stale interactive sessions for other packages
-    try {
-      const keysToRemove: string[] = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key?.startsWith("interactive-opt-") && key !== interactiveStorageKey(selectedPackageId || "")) {
-          keysToRemove.push(key);
-        }
-      }
-      keysToRemove.forEach((k) => localStorage.removeItem(k));
-    } catch { /* ignore */ }
+    // Always close interactive mode and preview when switching packages
+    setInteractiveMode(false);
+    setCenterPreview(null);
 
     if (!selectedPackageId) {
       setHasSavedSession(false);
-      setInteractiveMode(false);
       setInteractiveMessages([]);
       setInteractiveAdopted([]);
       setInteractiveIssues([]);
@@ -147,17 +138,68 @@ export default function LiteArenaPanel() {
     }
     // No saved session for this package: clear all interactive state
     setHasSavedSession(false);
-    setInteractiveMode(false);
     setInteractiveMessages([]);
     setInteractiveAdopted([]);
     setInteractiveIssues([]);
   }, [selectedPackageId]);
 
+  // Persist / restore optimization result per package
+  const optimizationStorageKey = (packageId: string) => `arena-optimization-${packageId}`;
+
   useEffect(() => {
-    setCompareResult(null);
-    setCompareBaseId("");
-    setCompareTargetId("");
+    if (!selectedPackageId) {
+      setOptimization(null);
+      return;
+    }
+    const saved = localStorage.getItem(optimizationStorageKey(selectedPackageId));
+    if (saved) {
+      try { setOptimization(JSON.parse(saved)); } catch { setOptimization(null); }
+    } else {
+      setOptimization(null);
+    }
   }, [selectedPackageId]);
+
+  useEffect(() => {
+    if (!selectedPackageId || !optimization) return;
+    localStorage.setItem(optimizationStorageKey(selectedPackageId), JSON.stringify(optimization));
+  }, [optimization, selectedPackageId]);
+
+  // Persist / restore version compare state per package
+  const compareStorageKey = (packageId: string) => `arena-compare-${packageId}`;
+
+  useEffect(() => {
+    if (!selectedPackageId) {
+      setCompareResult(null);
+      setCompareBaseId("");
+      setCompareTargetId("");
+      return;
+    }
+    const saved = localStorage.getItem(compareStorageKey(selectedPackageId));
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        setCompareResult(data.result || null);
+        setCompareBaseId(data.baseId || "");
+        setCompareTargetId(data.targetId || "");
+      } catch {
+        setCompareResult(null);
+        setCompareBaseId("");
+        setCompareTargetId("");
+      }
+    } else {
+      setCompareResult(null);
+      setCompareBaseId("");
+      setCompareTargetId("");
+    }
+  }, [selectedPackageId]);
+
+  useEffect(() => {
+    if (!selectedPackageId) return;
+    localStorage.setItem(
+      compareStorageKey(selectedPackageId),
+      JSON.stringify({ result: compareResult, baseId: compareBaseId, targetId: compareTargetId }),
+    );
+  }, [compareResult, compareBaseId, compareTargetId, selectedPackageId]);
 
   useEffect(() => {
     if (!selectedPackageId) return;
