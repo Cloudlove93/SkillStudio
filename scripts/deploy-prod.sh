@@ -19,6 +19,7 @@ PORT="${PORT:-3000}"
 DB_NAME="${POSTGRES_DB:-educlawlite}"
 DB_USER="${POSTGRES_USER:-educlawlite}"
 WEB_ROOT="$PROJECT_DIR/educlaw-web/dist"
+WEB_DEPLOY_ROOT="${WEB_DEPLOY_ROOT:-/var/www/$APP_NAME}"
 NGINX_SITE="/etc/nginx/sites-available/$APP_NAME"
 NGINX_ENABLED="/etc/nginx/sites-enabled/$APP_NAME"
 DEPLOY_DIR="$PROJECT_DIR/.deploy"
@@ -94,7 +95,7 @@ install_system_packages() {
   fi
 
   apt-get update
-  apt-get install -y ca-certificates curl gnupg git nginx postgresql postgresql-contrib openssl tmux
+  apt-get install -y ca-certificates curl gnupg git nginx postgresql postgresql-contrib openssl tmux rsync
 
   local current_major="0"
   if command -v node >/dev/null 2>&1; then
@@ -183,6 +184,18 @@ build_project() {
   if [[ ! -d "$WEB_ROOT" ]]; then
     die "Frontend build output not found: $WEB_ROOT"
   fi
+}
+
+publish_frontend() {
+  log "Publishing frontend assets to $WEB_DEPLOY_ROOT"
+  mkdir -p "$WEB_DEPLOY_ROOT"
+  rsync -a --delete "$WEB_ROOT/" "$WEB_DEPLOY_ROOT/"
+
+  if id www-data >/dev/null 2>&1; then
+    chown -R www-data:www-data "$WEB_DEPLOY_ROOT"
+  fi
+  find "$WEB_DEPLOY_ROOT" -type d -exec chmod 0755 {} +
+  find "$WEB_DEPLOY_ROOT" -type f -exec chmod 0644 {} +
 }
 
 find_server_entry() {
@@ -308,7 +321,7 @@ server {
     listen 80;
     server_name ${APP_HOST};
 
-    root ${WEB_ROOT};
+    root ${WEB_DEPLOY_ROOT};
     index index.html;
 
     client_max_body_size 100m;
@@ -358,7 +371,10 @@ verify_deploy() {
 
   wait_for_backend
 
-  curl -fsSI "http://127.0.0.1/" >/dev/null
+  if ! curl -fsSI -H "Host: ${APP_HOST}" "http://127.0.0.1/" >/dev/null; then
+    tail -n 80 /var/log/nginx/error.log >&2 || true
+    die "Frontend check failed"
+  fi
 
   printf '\n[%s] Deployment complete\n' "$APP_NAME"
   printf '  URL:      %s\n' "$APP_ORIGIN"
@@ -400,6 +416,7 @@ main() {
   configure_database
   write_env_file
   build_project
+  publish_frontend
 
   local server_entry
   server_entry="$(find_server_entry)"
