@@ -262,7 +262,10 @@ export default function LiteArenaPanel() {
     const threads = await liteApi.listThreads(token, packageId);
     const activeThread = threads[0] || await liteApi.createThread(token, packageId);
     const activeDetail = await liteApi.getThread(token, activeThread.id);
-    setSelectedPackage(detail); setVersions(versionList); setThread(activeThread); setThreadDetail(activeDetail); setReport(null); setOptimization(null); setDetailTab("agent"); setSideStreaming({ baseline: false, enhanced: false });
+    // Guard against race: user may have switched to another package while we were loading
+    if (selectedPackageIdRef.current === packageId) {
+      setSelectedPackage(detail); setVersions(versionList); setThread(activeThread); setThreadDetail(activeDetail); setReport(null); setOptimization(null); setDetailTab("agent"); setSideStreaming({ baseline: false, enhanced: false });
+    }
     if (!snapshotList) setPackages((prev) => prev.map((item) => item.id === packageId ? { ...item, name: detail.name, description: detail.description, versionNumber: detail.versionNumber, updatedAt: detail.updatedAt } : item));
   }
 
