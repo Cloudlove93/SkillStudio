@@ -494,20 +494,23 @@ function startResizeLeft(e: React.MouseEvent) {
     try {
       const result = await liteApi.diagnosePackage(token, currentPkgId, thread.id);
       stepTimers.forEach((id) => window.clearTimeout(id));
-      saveInteractiveState(currentPkgId, [{ role: "assistant", content: result.welcomeMessage }], [], result.issues);
+      const welcomeMsg = { role: "assistant", content: result.welcomeMessage };
+      saveInteractiveState(currentPkgId, [welcomeMsg], [], result.issues);
       if (selectedPackageIdRef.current === currentPkgId) {
         setInteractiveMode(true);
         setInteractiveIssues(result.issues);
-        setInteractiveMessages([{ role: "assistant", content: result.welcomeMessage }]);
+        // Only set welcome message if UI is empty (user may have switched back and restored a longer session)
+        setInteractiveMessages((prev) => prev.length === 0 ? [welcomeMsg] : prev);
       }
       finishProgress(`分析完成，发现 ${result.issues.length} 个问题`);
     } catch (error) {
       stepTimers.forEach((id) => window.clearTimeout(id));
       const message = error instanceof Error ? error.message : "诊断失败";
-      saveInteractiveState(currentPkgId, [{ role: "assistant", content: `❌ 诊断失败：${message}` }], [], []);
+      const errorMsg = { role: "assistant", content: `❌ 诊断失败：${message}` };
+      saveInteractiveState(currentPkgId, [errorMsg], [], []);
       if (selectedPackageIdRef.current === currentPkgId) {
         setInteractiveMode(true);
-        setInteractiveMessages([{ role: "assistant", content: `❌ 诊断失败：${message}` }]);
+        setInteractiveMessages((prev) => prev.length === 0 ? [errorMsg] : prev);
       }
       failProgress(message);
     } finally {
