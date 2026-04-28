@@ -20,6 +20,18 @@ function buildMessages(input: ChatRequestInput): ChatMessage[] {
   ];
 }
 
+function logLlmRequestStart(kind: string, messages: ChatMessage[], model: string, stream: boolean) {
+  console.log("[llm] request start", {
+    kind,
+    model,
+    stream,
+    timeoutMs: config.llmTimeoutMs,
+    messageCount: messages.length,
+    totalChars: messages.reduce((sum, message) => sum + message.content.length, 0),
+    baseUrl: config.llmBaseUrl,
+  });
+}
+
 function createAbortSignal(timeoutMs: number): AbortSignal {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -33,6 +45,10 @@ async function createChatResponse(input: ChatRequestInput, stream: boolean): Pro
     throw new Error("尚未配置 LLM_API_KEY");
   }
 
+  const messages = buildMessages(input);
+  const model = input.model || config.llmModel;
+  logLlmRequestStart("prompt", messages, model, stream);
+
   let response: Response;
   try {
     response = await fetch(`${config.llmBaseUrl}/chat/completions`, {
@@ -42,19 +58,22 @@ async function createChatResponse(input: ChatRequestInput, stream: boolean): Pro
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: input.model || config.llmModel,
+        model,
         temperature: input.temperature ?? 0.3,
-        messages: buildMessages(input),
+        messages,
         stream,
       }),
       signal: createAbortSignal(config.llmTimeoutMs),
     });
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
+      console.error("[llm] request timeout", { kind: "prompt", model, timeoutMs: config.llmTimeoutMs });
       throw new Error(`模型请求超时：超过 ${Math.round(config.llmTimeoutMs / 1000)} 秒未返回`);
     }
     throw error;
   }
+
+  console.log("[llm] response received", { kind: "prompt", model, status: response.status, ok: response.ok });
 
   if (!response.ok) {
     const text = await response.text();
@@ -69,6 +88,9 @@ async function createChatResponseMessages(messages: ChatMessage[], model?: strin
     throw new Error("尚未配置 LLM_API_KEY");
   }
 
+  const resolvedModel = model || config.llmModel;
+  logLlmRequestStart("messages", messages, resolvedModel, stream);
+
   let response: Response;
   try {
     response = await fetch(`${config.llmBaseUrl}/chat/completions`, {
@@ -78,7 +100,7 @@ async function createChatResponseMessages(messages: ChatMessage[], model?: strin
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: model || config.llmModel,
+        model: resolvedModel,
         temperature: temperature ?? 0.5,
         messages,
         stream,
@@ -87,10 +109,13 @@ async function createChatResponseMessages(messages: ChatMessage[], model?: strin
     });
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
+      console.error("[llm] request timeout", { kind: "messages", model: resolvedModel, timeoutMs: config.llmTimeoutMs });
       throw new Error(`模型请求超时：超过 ${Math.round(config.llmTimeoutMs / 1000)} 秒未返回`);
     }
     throw error;
   }
+
+  console.log("[llm] response received", { kind: "messages", model: resolvedModel, status: response.status, ok: response.ok });
 
   if (!response.ok) {
     const text = await response.text();
