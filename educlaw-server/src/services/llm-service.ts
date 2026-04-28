@@ -11,6 +11,7 @@ interface ChatRequestInput {
   userPrompt: string;
   model?: string;
   temperature?: number;
+  maxTokens?: number;
 }
 
 function buildMessages(input: ChatRequestInput): ChatMessage[] {
@@ -20,11 +21,18 @@ function buildMessages(input: ChatRequestInput): ChatMessage[] {
   ];
 }
 
-function logLlmRequestStart(kind: string, messages: ChatMessage[], model: string, stream: boolean) {
+function logLlmRequestStart(
+  kind: string,
+  messages: ChatMessage[],
+  model: string,
+  stream: boolean,
+  maxTokens?: number,
+) {
   console.log("[llm] request start", {
     kind,
     model,
     stream,
+    maxTokens,
     timeoutMs: config.llmTimeoutMs,
     messageCount: messages.length,
     totalChars: messages.reduce((sum, message) => sum + message.content.length, 0),
@@ -47,7 +55,7 @@ async function createChatResponse(input: ChatRequestInput, stream: boolean): Pro
 
   const messages = buildMessages(input);
   const model = input.model || config.llmModel;
-  logLlmRequestStart("prompt", messages, model, stream);
+  logLlmRequestStart("prompt", messages, model, stream, input.maxTokens);
 
   let response: Response;
   try {
@@ -62,6 +70,7 @@ async function createChatResponse(input: ChatRequestInput, stream: boolean): Pro
         temperature: input.temperature ?? 0.3,
         messages,
         stream,
+        ...(input.maxTokens ? { max_tokens: input.maxTokens } : {}),
       }),
       signal: createAbortSignal(config.llmTimeoutMs),
     });
@@ -126,8 +135,18 @@ async function createChatResponseMessages(messages: ChatMessage[], model?: strin
 }
 
 async function readChatText(response: Response): Promise<string> {
-  const json = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
-  return json.choices?.[0]?.message?.content?.trim() || "";
+  const json = await response.json() as {
+    choices?: Array<{
+      finish_reason?: string;
+      message?: { content?: string | null; reasoning_content?: string | null };
+    }>;
+  };
+  const choice = json.choices?.[0];
+  const content = choice?.message?.content?.trim() || "";
+  if (!content && choice?.finish_reason === "length") {
+    throw new Error("模型输出达到长度限制但没有返回正文，请减少生成内容或提高 max_tokens");
+  }
+  return content;
 }
 
 export async function generateText(input: ChatRequestInput) {

@@ -23,6 +23,26 @@ interface PackageGenerationResult {
   }>;
 }
 
+interface PackageBaseGenerationResult {
+  name: string;
+  description: string;
+  agentMd: string;
+  rubricMd: string;
+  skills: Array<{
+    dirName: string;
+    name: string;
+    description: string;
+  }>;
+}
+
+interface SkillGenerationResult {
+  skillMd: string;
+}
+
+const MAX_BASE_DOCUMENT_CHARS = 12_000;
+const MAX_SKILL_DOCUMENT_CHARS = 8_000;
+const MAX_GENERATED_SKILLS = 2;
+
 function ensureSkillIds(snapshot: AgentPackageSnapshot): AgentPackageSnapshot {
   const skills = Array.isArray(snapshot.skills) ? snapshot.skills : [];
   return {
@@ -39,6 +59,73 @@ function slugify(value: string) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "") || `skill-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function buildDocumentContext(
+  documents?: Array<{ name: string; content: string }>,
+  maxChars = MAX_BASE_DOCUMENT_CHARS,
+): string {
+  if (!documents || documents.length === 0) return "";
+
+  const parts = ["", "Uploaded documents:"];
+  let remaining = maxChars;
+
+  for (let index = 0; index < documents.length; index += 1) {
+    const document = documents[index];
+    const name = String(document?.name || `Document ${index + 1}`);
+    const content = String(document?.content || "");
+
+    if (remaining <= 0) {
+      parts.push(`[Document ${index + 1}: ${name}]\n[内容已因长度限制省略]`);
+      continue;
+    }
+
+    const chunk = content.slice(0, remaining);
+    remaining -= chunk.length;
+    const truncated = chunk.length < content.length ? "\n[内容已截断以控制单次模型请求长度]" : "";
+    parts.push(`[Document ${index + 1}: ${name}]\n${chunk}${truncated}`);
+  }
+
+  return parts.join("\n");
+}
+
+function normalizeSkillMetadata(skills: PackageBaseGenerationResult["skills"]) {
+  const used = new Set<string>();
+  return skills.slice(0, MAX_GENERATED_SKILLS).map((skill, index) => {
+    const baseDirName = slugify(skill.dirName || skill.name || `skill-${index + 1}`);
+    let dirName = baseDirName;
+    let suffix = 2;
+    while (used.has(dirName)) {
+      dirName = `${baseDirName}-${suffix}`;
+      suffix += 1;
+    }
+    used.add(dirName);
+
+    return {
+      dirName,
+      name: (skill.name || `技能 ${index + 1}`).trim(),
+      description: sanitizeSkillDescription(skill.description),
+    };
+  });
+}
+
+function sanitizeSkillDescription(description: string | undefined): string {
+  return (
+    (description || "用于处理该智能体的核心任务")
+      .replace(/\s+/g, " ")
+      .replace(/[<>]/g, "")
+      .trim()
+      .slice(0, 180) || "用于处理该智能体的核心任务"
+  );
+}
+
+function normalizeSkillMdFrontmatter(skillMd: string, dirName: string, description: string): string {
+  const trimmed = skillMd.trim();
+  const safeDescription = sanitizeSkillDescription(description);
+  const frontmatter = `---\nname: ${dirName}\ndescription: ${safeDescription}\n---`;
+  const match = trimmed.match(/^---\s*\n[\s\S]*?\n---\s*\n?/);
+  const body = match ? trimmed.slice(match[0].length).trimStart() : trimmed;
+  return `${frontmatter}\n\n${body}`.trim();
 }
 
 function normalizeSnapshot(input: PackageGenerationResult): AgentPackageSnapshot {
@@ -60,61 +147,45 @@ function normalizeSnapshot(input: PackageGenerationResult): AgentPackageSnapshot
 
 /* ── Claude Skill / Agent Skill 标准校验 ── */
 
-function getOutputSchemaPrompt(): string {
+function getBaseOutputSchemaPrompt(): string {
   return [
     "## 输出 JSON 结构",
     "返回以下结构的 JSON：",
     "- name: 智能体名称",
     "- description: 智能体一句话描述",
-    "- agentMd: 完整的 agent.md 内容",
-    "- rubricMd: 完整的 rubric.md 内容",
-    "- skills: 技能数组，每个技能包含：",
-    "  - dirName: 目录名，小写英文 kebab-case（如 grammar-check）",
+    "- agentMd: 完整但精炼的 agent.md 内容",
+    "- rubricMd: 3-5 个评分维度的 rubric.md 内容",
+    "- skills: 1-2 个核心技能的元数据数组，每个技能包含：",
+    "  - dirName: 目录名，小写英文 kebab-case",
     "  - name: 技能显示名称",
-    "  - description: 技能一句话描述（说明做什么、何时使用）",
-    "  - skillMd: 完整的 SKILL.md 内容",
+    "  - description: 一句话说明该 skill 做什么，以及什么时候使用",
     "",
     "要求：",
-    "1. dirName 必须是小写英文 kebab-case",
-    "2. skillMd 内的 YAML frontmatter 中的 name 必须与 dirName 保持一致",
+    "1. 只返回 JSON，不要 Markdown 代码块",
+    "2. skills 最多 2 个，选择最能支撑该智能体工作的核心技能",
+    "3. 不要在本步骤生成 skillMd，skillMd 会在后续步骤单独生成",
   ].join("\n");
 }
 
-function getSkillTemplatePrompt(): string {
+function getCompactSkillTemplatePrompt(): string {
   return [
-    "## SKILL.md 模板标准",
-    "每个 skillMd 必须是完整的 SKILL.md 文件，格式如下：",
-    "",
-    "```markdown",
+    "返回 JSON：{ \"skillMd\": \"...\" }",
+    "skillMd 必须是完整 SKILL.md，包含：",
     "---",
-    "name: <kebab-case 名称，必须与 dirName 一致>",
-    "description: <一句话说明该 skill 做什么，以及什么时候应该使用>",
+    "name: <dirName>",
+    "description: <一句话说明该 skill 做什么，以及什么时候使用>",
     "---",
-    "",
     "# <Skill 显示名称>",
-    "",
     "## Instructions",
-    "<具体执行步骤、输入处理逻辑、决策规则>",
-    "",
     "## Workflow",
-    "<标准操作流程，分步骤说明>",
-    "",
     "## Output Format",
-    "<输出格式要求、必须包含的字段、示例结构>",
-    "",
     "## Examples",
-    "<至少一个完整示例，展示输入和期望输出>",
-    "",
     "## Common Issues",
-    "<常见错误、边界情况、排错建议>",
-    "```",
     "",
-    "约束：",
-    "- YAML frontmatter 只放轻量路由信息（name + description）",
-    "- 具体的执行步骤、示例、排错信息必须放在正文中",
-    "- frontmatter 中的 name 必须是小写英文 kebab-case",
-    "- description 必须说明触发场景（什么时候调用这个 skill）",
-    "- 正文必须包含 Instructions、Workflow、Output Format、Examples、Common Issues 五个部分",
+    "要求：",
+    "- 内容要精炼，每个章节 2-5 条即可",
+    "- frontmatter name 必须等于 dirName",
+    "- 只返回 JSON，不要 Markdown 代码块",
   ].join("\n");
 }
 
@@ -187,6 +258,31 @@ function validateSkillMdStandard(skillMd: string, dirName: string): string[] {
   }
 
   return errors;
+}
+
+function validateBaseGenerationResult(generated: PackageBaseGenerationResult): void {
+  const errors: string[] = [];
+
+  if (!generated.name?.trim()) errors.push("缺少智能体 name");
+  if (!generated.description?.trim()) errors.push("缺少智能体 description");
+  if (!generated.agentMd?.trim()) errors.push("缺少 agentMd");
+  if (!generated.rubricMd?.trim()) errors.push("缺少 rubricMd");
+
+  if (!Array.isArray(generated.skills) || generated.skills.length === 0) {
+    errors.push("skills 必须为非空数组");
+  } else {
+    for (let index = 0; index < Math.min(generated.skills.length, MAX_GENERATED_SKILLS); index += 1) {
+      const skill = generated.skills[index];
+      const prefix = `skills[${index}]`;
+      if (!skill.dirName?.trim()) errors.push(`${prefix} 缺少 dirName`);
+      if (!skill.name?.trim()) errors.push(`${prefix} 缺少 name`);
+      if (!skill.description?.trim()) errors.push(`${prefix} 缺少 description`);
+    }
+  }
+
+  if (errors.length > 0) {
+    throw new Error(`生成基础结构校验失败：\n${errors.map((e) => "- " + e).join("\n")}`);
+  }
 }
 
 function validateGenerationResult(generated: PackageGenerationResult): void {
@@ -368,28 +464,28 @@ export async function generatePackage(
   documents?: Array<{ name: string; content: string }>,
   onPreview?: (preview: { type: string; name: string; content: string }) => void,
 ) {
-  const docParts = documents && documents.length > 0
-    ? [
-        "",
-        "Uploaded documents:",
-        ...documents.map((d, i) => `[Document ${i + 1}: ${d.name}]\n${d.content.slice(0, 8000)}`),
-      ].join("\n")
-    : "";
-
+  const startedAt = Date.now();
+  const docParts = buildDocumentContext(documents, MAX_BASE_DOCUMENT_CHARS);
+  const skillDocParts = buildDocumentContext(documents, MAX_SKILL_DOCUMENT_CHARS);
   const hasInstruction = instruction.trim().length > 0;
 
-  const generated = await generateJson<PackageGenerationResult>({
+  console.log("[packages.generate] base start", {
+    userId,
+    instructionLength: instruction.length,
+    documentCount: documents?.length || 0,
+    documentChars: documents?.reduce((sum, doc) => sum + String(doc?.content || "").length, 0) || 0,
+    model,
+  });
+
+  const base = await generateJson<PackageBaseGenerationResult>({
     model,
     systemPrompt: [
       "You are an agent-package generation assistant.",
       "Return JSON only.",
-      "Generate one reusable prompt package with agent markdown, rubric markdown, and modular skills.",
+      "Generate the compact base structure of one reusable prompt package.",
       "Prefer Chinese content when the user instruction is Chinese.",
       "When documents are provided without explicit instructions, deeply analyze the documents to extract domain knowledge, workflows, and rules, then build the agent and skills entirely from the document content.",
-      "",
-      "Each generated skill must follow the Claude Skill / Agent Skill SKILL.md standard.",
-      "- YAML frontmatter at the top of every SKILL.md should only contain lightweight routing info (name, description).",
-      "- All detailed execution steps, examples, and troubleshooting must go into the SKILL.md body, not the frontmatter.",
+      "Do not generate full SKILL.md content in this step.",
     ].join("\n"),
     userPrompt: hasInstruction
       ? [
@@ -397,38 +493,99 @@ export async function generatePackage(
           instruction,
           docParts,
           "",
-          getOutputSchemaPrompt(),
-          "",
-          getSkillTemplatePrompt(),
+          getBaseOutputSchemaPrompt(),
           "",
           "The agentMd should define role, workflow, boundaries, and output style.",
-          "The rubricMd should define 3-6 scoring dimensions.",
+          "The rubricMd should define 3-5 scoring dimensions.",
         ].join("\n")
       : [
-          "Analyze the following documents and create a complete prompt package based entirely on their content.",
-          "Infer the agent's role, workflow, skills, and evaluation criteria directly from the document content.",
+          "Analyze the following documents and create a compact prompt package base based entirely on their content.",
+          "Infer the agent's role, workflow, core skills, and evaluation criteria directly from the document content.",
           docParts,
           "",
-          getOutputSchemaPrompt(),
-          "",
-          getSkillTemplatePrompt(),
+          getBaseOutputSchemaPrompt(),
           "",
           "The agentMd should define role, workflow, boundaries, and output style.",
-          "The rubricMd should define 3-6 scoring dimensions.",
+          "The rubricMd should define 3-5 scoring dimensions.",
         ].join("\n"),
     temperature: 0.4,
+    maxTokens: 2400,
+  }, 0);
+
+  validateBaseGenerationResult(base);
+  const skillMetas = normalizeSkillMetadata(base.skills);
+  console.log("[packages.generate] base done", {
+    durationMs: Date.now() - startedAt,
+    skillCount: skillMetas.length,
   });
+
+  onPreview?.({ type: "agent", name: "agent.md", content: base.agentMd.trim().slice(0, 1200) });
+  onPreview?.({ type: "rubric", name: "rubric.md", content: base.rubricMd.trim().slice(0, 800) });
+
+  const skills: PackageGenerationResult["skills"] = [];
+  for (let index = 0; index < skillMetas.length; index += 1) {
+    const skillMeta = skillMetas[index];
+    const skillStartedAt = Date.now();
+    console.log("[packages.generate] skill start", {
+      index: index + 1,
+      total: skillMetas.length,
+      dirName: skillMeta.dirName,
+      model,
+    });
+
+    const skillResult = await generateJson<SkillGenerationResult>({
+      model,
+      systemPrompt: [
+        "You are a concise SKILL.md author.",
+        "Return JSON only.",
+        "Prefer Chinese content when the source content is Chinese.",
+        "Generate only the requested SKILL.md content; do not regenerate agent.md or rubric.md.",
+      ].join("\n"),
+      userPrompt: [
+        "Create one compact SKILL.md for this package.",
+        "",
+        `Package name: ${base.name}`,
+        `Package description: ${base.description}`,
+        "",
+        "agent.md 摘要：",
+        base.agentMd.slice(0, 1800),
+        "",
+        "rubric.md 摘要：",
+        base.rubricMd.slice(0, 1200),
+        skillDocParts,
+        "",
+        "Skill metadata:",
+        JSON.stringify(skillMeta),
+        "",
+        getCompactSkillTemplatePrompt(),
+      ].join("\n"),
+      temperature: 0.35,
+      maxTokens: 1800,
+    }, 0);
+
+    const skillMd = normalizeSkillMdFrontmatter(skillResult.skillMd || "", skillMeta.dirName, skillMeta.description);
+    const skill = { ...skillMeta, skillMd };
+    skills.push(skill);
+    onPreview?.({ type: "skill", name: skill.name, content: skill.skillMd.slice(0, 800) });
+    console.log("[packages.generate] skill done", {
+      index: index + 1,
+      dirName: skill.dirName,
+      durationMs: Date.now() - skillStartedAt,
+    });
+  }
+
+  const generated: PackageGenerationResult = {
+    name: base.name,
+    description: base.description,
+    agentMd: base.agentMd,
+    rubricMd: base.rubricMd,
+    skills,
+  };
 
   validateGenerationResult(generated);
 
   const snapshot = normalizeSnapshot(generated);
-
-  onPreview?.({ type: "agent", name: "agent.md", content: snapshot.agentMd.slice(0, 1200) });
-  onPreview?.({ type: "rubric", name: "rubric.md", content: snapshot.rubricMd.slice(0, 800) });
-  for (const skill of snapshot.skills) {
-    onPreview?.({ type: "skill", name: skill.name, content: skill.skillMd.slice(0, 800) });
-  }
-
+  console.log("[packages.generate] validate done", { durationMs: Date.now() - startedAt });
   return createPackageWithSnapshot(userId, snapshot, "generated");
 }
 
