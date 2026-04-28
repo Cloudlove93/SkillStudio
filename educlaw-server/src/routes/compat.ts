@@ -82,13 +82,31 @@ router.get("/profiles", requireAuth, async (req, res) => {
 });
 router.get("/agents", requireAuth, async (_req, res) => ok(res, []));
 router.get("/api/chat/sessions", requireAuth, async (_req, res) => ok(res, []));
-router.get("/api/events", (_req, res) => {
+function writeCompatEventStream(_req: Request, res: Response) {
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
   res.write("data: {\"type\":\"connected\"}\n\n");
   setTimeout(() => res.end(), 1000);
-});
+}
+router.get("/api/events", writeCompatEventStream);
+router.get("/events", writeCompatEventStream);
+
+router.get("/api/sidebar-groups", requireAuth, async (_req, res) => ok(res, []));
+router.post("/api/sidebar-groups", requireAuth, async (req, res) => ok(res, {
+  id: newId(),
+  user_id: pickUserId(req),
+  name: String(req.body?.name || "新分组"),
+  icon: String(req.body?.icon || "folder"),
+  sort_order: 0,
+  created_at: new Date().toISOString(),
+  items: [],
+}));
+router.patch("/api/sidebar-groups/:id", requireAuth, async (_req, res) => ok(res, { ok: true }));
+router.delete("/api/sidebar-groups/:id", requireAuth, async (_req, res) => ok(res, { ok: true }));
+router.post("/api/sidebar-groups/:groupId/items", requireAuth, async (_req, res) => ok(res, { ok: true }));
+router.delete("/api/sidebar-groups/:groupId/items/:itemId/:itemType", requireAuth, async (_req, res) => ok(res, { ok: true }));
+router.post("/api/sidebar-groups/move-item", requireAuth, async (_req, res) => ok(res, { ok: true }));
 
 /* ─── Agents (stub) ─── */
 

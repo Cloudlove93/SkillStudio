@@ -335,6 +335,16 @@ server {
         proxy_set_header X-Forwarded-Proto \$scheme;
     }
 
+    location ~ ^/.*/proxy/[0-9]+/healthz$ {
+        rewrite ^/.*/proxy/[0-9]+/healthz$ /healthz break;
+        proxy_pass http://127.0.0.1:${PORT};
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
     location ~ ^/(api|auth|packages|arena|optimize|profiles|agents|runtimes|llm|events|admin)(/|$) {
         proxy_pass http://127.0.0.1:${PORT};
         proxy_http_version 1.1;
@@ -344,6 +354,22 @@ server {
         proxy_set_header X-Forwarded-Proto \$scheme;
         proxy_buffering off;
         proxy_read_timeout 3600;
+    }
+
+    location ~ ^/.*/proxy/[0-9]+/(api|auth|packages|arena|optimize|profiles|agents|runtimes|llm|events|admin)(/|$) {
+        rewrite ^/.*/proxy/[0-9]+/(.*)$ /\$1 break;
+        proxy_pass http://127.0.0.1:${PORT};
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_buffering off;
+        proxy_read_timeout 3600;
+    }
+
+    location ~ ^/.*/proxy/[0-9]+/(.*)$ {
+        try_files /\$1 /index.html;
     }
 
     location / {

@@ -19,22 +19,11 @@ const BASE = (() => {
   }
 })();
 
-// 生产环境：前后端分离部署，API 请求指向后端 3000 端口
+// Production runs behind the same nginx origin; keep API calls under the app base.
 const API_BASE = (() => {
-  if (import.meta.env.DEV) return BASE;
-  try {
-    // Notebook 代理模式：/.../proxy/8080 → /.../proxy/3000
-    const proxyMatch = BASE.match(/^(.*\/proxy\/)8080$/);
-    if (proxyMatch) return proxyMatch[1] + '3000';
-    // 直接访问模式：前后端分离，指向 3000 端口
-    if (typeof window !== 'undefined') {
-      const { protocol, hostname, port } = window.location;
-      if (port && port !== '3000') return `${protocol}//${hostname}:3000`;
-    }
-    return BASE;
-  } catch {
-    return BASE;
-  }
+  const configured = import.meta.env.VITE_API_BASE;
+  if (configured) return configured.replace(/\/+$/, '');
+  return BASE;
 })();
 
 function resolveUrl(url: string): string {
