@@ -509,7 +509,7 @@ export async function generatePackage(
           "The rubricMd should define 3-5 scoring dimensions.",
         ].join("\n"),
     temperature: 0.4,
-    maxTokens: 2400,
+    maxTokens: 6000,
   }, 0);
 
   validateBaseGenerationResult(base);
@@ -560,7 +560,7 @@ export async function generatePackage(
         getCompactSkillTemplatePrompt(),
       ].join("\n"),
       temperature: 0.35,
-      maxTokens: 1800,
+      maxTokens: 4000,
     }, 0);
 
     const skillMd = normalizeSkillMdFrontmatter(skillResult.skillMd || "", skillMeta.dirName, skillMeta.description);
