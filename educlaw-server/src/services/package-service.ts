@@ -158,7 +158,7 @@ function getBaseOutputSchemaPrompt(): string {
     "- skills: 1-2 个核心技能的元数据数组，每个技能包含：",
     "  - dirName: 目录名，小写英文 kebab-case",
     "  - name: 技能显示名称",
-    "  - description: 一句话说明该 skill 做什么，以及什么时候使用",
+    "  - description: 一句话说明该 skill 做什么，以及什么时候使用（必须包含'当/如果/用于/遇到/针对'等触发词）",
     "",
     "要求：",
     "1. 只返回 JSON，不要 Markdown 代码块",
@@ -173,7 +173,7 @@ function getCompactSkillTemplatePrompt(): string {
     "skillMd 必须是完整 SKILL.md，包含：",
     "---",
     "name: <dirName>",
-    "description: <一句话说明该 skill 做什么，以及什么时候使用>",
+    "description: <一句话说明该 skill 做什么，以及什么时候使用，必须包含触发词如'当/如果/用于/遇到/针对'>",
     "---",
     "# <Skill 显示名称>",
     "## Instructions",
@@ -240,7 +240,7 @@ function validateSkillMdStandard(skillMd: string, dirName: string): string[] {
   }
 
   // 8. 检查 description 是否说明了触发场景
-  if (fmDescription && !/(当|如果|用于|适合|场景|触发|调用|需要|时|情况)/.test(fmDescription)) {
+  if (fmDescription && !/(当|如果|用于|适合|场景|触发|调用|需要|时|情况|在|针对|遇到|面对|出现|用户|输入|请求|问题|任务|则|就|便)/.test(fmDescription)) {
     errors.push("frontmatter description 应说明 skill 的触发场景（什么时候使用）");
   }
 
