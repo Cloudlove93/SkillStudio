@@ -349,6 +349,10 @@ server {
         proxy_set_header X-Forwarded-Proto \$scheme;
     }
 
+    location ~ ^(.*/proxy/[0-9]+)$ {
+        return 302 \$1/;
+    }
+
     location ~ ^/(api|auth|packages|arena|optimize|profiles|agents|runtimes|llm|events|admin)(/|$) {
         proxy_pass http://127.0.0.1:${PORT};
         proxy_http_version 1.1;
