@@ -47,7 +47,9 @@ router.post("/generate", requireAuth, async (req, res) => {
 router.post("/generate/stream", requireAuth, async (req: Request, res: Response) => {
   initSse(res);
   const startedAt = Date.now();
-  const documents = Array.isArray(req.body?.documents) ? req.body.documents : undefined;
+  const documents: Array<{ name: string; content: string }> | undefined = Array.isArray(req.body?.documents)
+    ? req.body.documents
+    : undefined;
   console.log("[packages.generate.stream] start", {
     userId: (req as AuthedRequest).userId || "",
     instructionLength: String(req.body?.instruction || "").length,
