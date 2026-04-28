@@ -12,7 +12,7 @@ import compatRoutes from "./routes/compat.js";
 const app = express();
 app.use(cors({ origin: true, credentials: false }));
 app.use(compression());
-app.use(express.json({ limit: "8mb" }));
+app.use(express.json({ limit: config.bodyLimit }));
 
 app.get("/healthz", (_req, res) => {
   res.json({ ok: true, service: "educlaw-lite-server" });

@@ -32,6 +32,7 @@ function readNumber(name: string, fallback: number): number {
 
 export const config = {
   port: readNumber("PORT", 3000),
+  bodyLimit: process.env.BODY_LIMIT || "100mb",
   databaseUrl: process.env.DATABASE_URL || "postgres://educlawlite:educlawlite@127.0.0.1:5435/educlawlite",
   jwtSecret: process.env.JWT_SECRET || "educlaw-lite-dev-secret",
   appOrigin: process.env.APP_ORIGIN || "http://localhost:4173",
