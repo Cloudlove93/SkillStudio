@@ -46,6 +46,15 @@ router.post("/generate", requireAuth, async (req, res) => {
 
 router.post("/generate/stream", requireAuth, async (req: Request, res: Response) => {
   initSse(res);
+  const startedAt = Date.now();
+  const documents = Array.isArray(req.body?.documents) ? req.body.documents : undefined;
+  console.log("[packages.generate.stream] start", {
+    userId: (req as AuthedRequest).userId || "",
+    instructionLength: String(req.body?.instruction || "").length,
+    documentCount: documents?.length || 0,
+    documentChars: documents?.reduce((sum, doc) => sum + String(doc?.content || "").length, 0) || 0,
+    model: typeof req.body?.model === "string" ? req.body.model : undefined,
+  });
   const heartbeat = setInterval(() => {
     try { writeSseEvent(res, "ping", {}); } catch { /* ignore */ }
   }, 5000);
@@ -56,14 +65,18 @@ router.post("/generate/stream", requireAuth, async (req: Request, res: Response)
       (req as AuthedRequest).userId || "",
       String(req.body?.instruction || ""),
       typeof req.body?.model === "string" ? req.body.model : undefined,
-      Array.isArray(req.body?.documents) ? req.body.documents : undefined,
+      documents,
       (preview) => writeSseEvent(res, "preview", preview),
     );
     writeSseEvent(res, "phase", { label: "保存智能体包与初始版本" });
     writeSseEvent(res, "done", pkg);
     writeSseEvent(res, "stream_end", { ok: true });
+    console.log("[packages.generate.stream] done", { packageId: pkg.id, durationMs: Date.now() - startedAt });
   } catch (error) {
-    writeSseEvent(res, "error", { error: error instanceof Error ? error.message : "生成智能体包失败" });
+    const message = error instanceof Error ? error.message : "生成智能体包失败";
+    console.error("[packages.generate.stream] error", { durationMs: Date.now() - startedAt, error: message });
+    writeSseEvent(res, "error", { error: message });
+    writeSseEvent(res, "stream_end", { ok: false });
   } finally {
     clearInterval(heartbeat);
     res.end();
