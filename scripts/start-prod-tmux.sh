@@ -67,6 +67,21 @@ ensure_tmux_session() {
   fi
 }
 
+deploy_frontend() {
+  local web_dist="$PROJECT_DIR/educlaw-web/dist"
+
+  [[ -f "$web_dist/index.html" ]] || die "Built web app not found. Run: pnpm --filter educlaw-web build"
+
+  case "$WEB_DEPLOY_ROOT" in
+    /var/www/*) ;;
+    *) die "Refusing to clear unexpected WEB_DEPLOY_ROOT: $WEB_DEPLOY_ROOT" ;;
+  esac
+
+  sudo mkdir -p "$WEB_DEPLOY_ROOT"
+  sudo find "$WEB_DEPLOY_ROOT" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+  sudo cp -a "$web_dist"/. "$WEB_DEPLOY_ROOT"/
+}
+
 start_backend_in_tmux() {
   local server_entry="$1"
 
@@ -192,6 +207,9 @@ main() {
   log "Starting backend in tmux session ${TMUX_SESSION}, window ${TMUX_WINDOW}"
   ensure_tmux_session
   start_backend_in_tmux "$(find_server_entry)"
+
+  log "Deploying frontend"
+  deploy_frontend
 
   log "Configuring nginx"
   write_nginx_site
