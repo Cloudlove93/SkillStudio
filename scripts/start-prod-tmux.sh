@@ -127,7 +127,14 @@ server {
         proxy_read_timeout 3600;
     }
 
+    location = /index.html {
+        add_header Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate" always;
+        expires -1;
+        try_files /index.html =404;
+    }
+
     location / {
+        add_header Cache-Control "no-cache" always;
         try_files \$uri \$uri/ /index.html;
     }
 }
