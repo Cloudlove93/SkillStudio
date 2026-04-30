@@ -6,6 +6,7 @@ ENV_FILE="${ENV_FILE:-$PROJECT_DIR/.env}"
 PROMPT="${PROMPT:-Reply with exactly: EduClaw API OK}"
 TIMEOUT_MS="${TIMEOUT_MS:-30000}"
 MAX_TOKENS="${MAX_TOKENS:-64}"
+STREAM="${STREAM:-false}"
 
 read_env_value() {
   local key="$1"
@@ -58,6 +59,7 @@ if [[ -z "$LLM_MODEL" ]]; then
 fi
 
 export LLM_BASE_URL LLM_API_KEY LLM_MODEL PROMPT TIMEOUT_MS MAX_TOKENS
+export STREAM
 
 echo "Testing LLM API"
 echo "  env:     $ENV_FILE"
@@ -65,6 +67,7 @@ echo "  base:    $LLM_BASE_URL"
 echo "  model:   $LLM_MODEL"
 echo "  key:     $(mask_key "$LLM_API_KEY")"
 echo "  timeout: ${TIMEOUT_MS}ms"
+echo "  stream:  $STREAM"
 echo
 
 node <<'NODE'
@@ -74,6 +77,7 @@ const apiKey = String(process.env.LLM_API_KEY || "");
 const prompt = String(process.env.PROMPT || "Reply with exactly: EduClaw API OK");
 const timeoutMs = Number(process.env.TIMEOUT_MS || 30000);
 const maxTokens = Number(process.env.MAX_TOKENS || 64);
+const stream = /^(1|true|yes|on)$/i.test(String(process.env.STREAM || "false"));
 
 const controller = new AbortController();
 const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -81,7 +85,7 @@ const timer = setTimeout(() => controller.abort(), timeoutMs);
 const body = {
   model,
   messages: [{ role: "user", content: prompt }],
-  stream: false,
+  stream,
   max_tokens: Number.isFinite(maxTokens) ? maxTokens : 64,
 };
 
@@ -114,10 +118,10 @@ try {
   });
   clearTimeout(timer);
 
-  const text = await response.text();
   console.log(`HTTP ${response.status} ${response.statusText}`);
 
   if (!response.ok) {
+    const text = await response.text();
     console.error("\nRequest failed.");
     const hint = hintForStatus(response.status, text);
     if (hint) console.error(`Hint: ${hint}`);
@@ -126,6 +130,43 @@ try {
     process.exit(1);
   }
 
+  if (stream && response.headers.get("content-type")?.includes("text/event-stream") && response.body) {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let content = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const parts = buffer.split("\n\n");
+      buffer = parts.pop() || "";
+      for (const part of parts) {
+        for (const line of part.split("\n")) {
+          if (!line.startsWith("data: ")) continue;
+          const payload = line.slice(6).trim();
+          if (!payload || payload === "[DONE]") continue;
+          try {
+            const json = JSON.parse(payload);
+            const delta = json.choices?.[0]?.delta?.content;
+            if (typeof delta === "string") content += delta;
+          } catch {
+            // ignore malformed diagnostic chunks
+          }
+        }
+      }
+    }
+    if (!content) {
+      console.error("\nStream completed but produced no content.");
+      process.exit(1);
+    }
+    console.log("\nOK: stream returned content.");
+    console.log("\nContent:");
+    console.log(content.trim());
+    process.exit(0);
+  }
+
+  const text = await response.text();
   let json;
   try {
     json = JSON.parse(text);
