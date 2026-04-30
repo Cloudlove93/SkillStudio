@@ -172,6 +172,9 @@ LLM_BASE_URL=${LLM_BASE_URL}
 LLM_API_KEY=${LLM_API_KEY}
 LLM_MODEL=${LLM_MODEL}
 LLM_BASELINE_MODEL=${LLM_BASELINE_MODEL}
+SEED_USERS=${SEED_USERS}
+SEED_USER_NAMES=${SEED_USER_NAMES}
+SEED_USER_PASSWORD=${SEED_USER_PASSWORD}
 ENVEOF
 }
 
@@ -432,15 +435,26 @@ main() {
   [[ -n "$DB_PASSWORD" ]] || DB_PASSWORD="$(openssl rand -hex 16)"
 
   JWT_SECRET="${JWT_SECRET:-$(read_env_value JWT_SECRET "")}"
-  if [[ -z "$JWT_SECRET" || "$JWT_SECRET" == "change-me" || "$JWT_SECRET" == "change-this-to-a-random-long-string" ]]; then
+  if [[ -z "$JWT_SECRET" || "$JWT_SECRET" == "change-me" || "$JWT_SECRET" == "change-me-in-production" || "$JWT_SECRET" == "change-this-to-a-random-long-string" ]]; then
     JWT_SECRET="$(openssl rand -hex 32)"
   fi
 
   APP_ORIGIN="${APP_ORIGIN:-$(read_env_value APP_ORIGIN "http://${APP_HOST}")}"
-  LLM_BASE_URL="${LLM_BASE_URL:-$(read_env_value LLM_BASE_URL "https://go8jao85pkcbchaakho5ce5chdk8ogkb.openapi-qb.sii.edu.cn/v1")}"
+  SEED_USERS="${SEED_USERS:-$(read_env_value SEED_USERS "false")}"
+  case "${SEED_USERS,,}" in
+    1|true|yes|on) SEED_USERS=true ;;
+    *) SEED_USERS=false ;;
+  esac
+  SEED_USER_NAMES="${SEED_USER_NAMES:-$(read_env_value SEED_USER_NAMES "user1,user2,user3,user4,user5")}"
+  SEED_USER_PASSWORD="${SEED_USER_PASSWORD:-$(read_env_value SEED_USER_PASSWORD "")}"
+  LLM_BASE_URL="${LLM_BASE_URL:-$(read_env_value LLM_BASE_URL "https://api.moonshot.ai/v1")}"
   LLM_API_KEY="${LLM_API_KEY:-$(read_env_value LLM_API_KEY "")}"
-  LLM_MODEL="${LLM_MODEL:-$(read_env_value LLM_MODEL "Kimi-K2.6")}"
+  LLM_MODEL="${LLM_MODEL:-$(read_env_value LLM_MODEL "kimi-k2.6")}"
   LLM_BASELINE_MODEL="${LLM_BASELINE_MODEL:-$(read_env_value LLM_BASELINE_MODEL "$LLM_MODEL")}"
+
+  if [[ "$SEED_USERS" == "true" && ( -z "$SEED_USER_PASSWORD" || "$SEED_USER_PASSWORD" == "educlaw123" || ${#SEED_USER_PASSWORD} -lt 12 ) ]]; then
+    die "Set SEED_USER_PASSWORD to a strong value before enabling seeded users in production."
+  fi
 
   if [[ -z "$LLM_API_KEY" || "$LLM_API_KEY" == "your-llm-api-key" || "$LLM_API_KEY" == "换成你新的可用key" ]]; then
     die "Set LLM_API_KEY in .env before deploying, or pass it once as an environment variable."

@@ -7,7 +7,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-educlawlite}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-educlawlite}
     ports:
-      - "${POSTGRES_PORT:-5435}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5435}:5432"
     volumes:
       - educlaw-postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -23,16 +23,19 @@ services:
       dockerfile: educlaw-server/Dockerfile
     image: educlaw-server:latest
     environment:
-      - DATABASE_URL=${DATABASE_URL:-postgres://educlawlite:educlawlite@educlaw-postgres:5432/educlawlite}
+      - DATABASE_URL=postgres://${POSTGRES_USER:-educlawlite}:${POSTGRES_PASSWORD:-educlawlite}@educlaw-postgres:5432/${POSTGRES_DB:-educlawlite}
       - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
       - LLM_BASE_URL=${LLM_BASE_URL}
       - LLM_API_KEY=${LLM_API_KEY}
       - LLM_MODEL=${LLM_MODEL}
       - LLM_BASELINE_MODEL=${LLM_BASELINE_MODEL}
       - APP_ORIGIN=${APP_ORIGIN:-http://localhost}
+      - SEED_USERS=${SEED_USERS:-false}
+      - SEED_USER_NAMES=${SEED_USER_NAMES:-}
+      - SEED_USER_PASSWORD=${SEED_USER_PASSWORD:-}
       - PORT=3000
     ports:
-      - "${SERVER_PORT:-3000}:3000"
+      - "127.0.0.1:${SERVER_PORT:-3000}:3000"
     depends_on:
       educlaw-postgres:
         condition: service_healthy

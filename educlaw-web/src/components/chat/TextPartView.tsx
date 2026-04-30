@@ -3,7 +3,6 @@ import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
-import rehypeRaw from 'rehype-raw';
 import 'katex/dist/katex.min.css';
 import { Copy, Check } from 'lucide-react';
 import CodeBlock from '../editor/CodeBlock';
@@ -47,7 +46,7 @@ function CopyButton({ text }: { text: string }) {
 }
 
 const remarkPlugins = [remarkGfm, remarkMath];
-const rehypePlugins = [rehypeKatex, rehypeRaw];
+const rehypePlugins = [rehypeKatex];
 
 const markdownComponents: Components = {
   pre({ children, ...props }) {

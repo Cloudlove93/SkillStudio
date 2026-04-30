@@ -60,16 +60,14 @@ export function verifyToken(token: string): { sub: string } {
   return jwt.verify(token, config.jwtSecret) as { sub: string };
 }
 
-const SEED_USERS = [
-  "user1", "user2", "user3", "user4", "user5",
-  "user6", "user7", "user8", "user9", "user10",
-  "user11", "user12", "user13", "user14", "user15",
-];
-const SEED_PASSWORD = "educlaw123";
-
 export async function seedUsers() {
-  const hash = await bcrypt.hash(SEED_PASSWORD, 10);
-  for (const username of SEED_USERS) {
+  if (!config.seedUsers) return;
+  if (config.isProduction && (config.seedUserPassword === "educlaw123" || config.seedUserPassword.length < 12)) {
+    throw new Error("SEED_USER_PASSWORD must be changed before enabling seeded users in production");
+  }
+
+  const hash = await bcrypt.hash(config.seedUserPassword, 10);
+  for (const username of config.seedUserNames) {
     const exists = await query<DbRowUser>("select * from users where username = $1", [username]);
     if (!exists.rows[0]) {
       const row: DbRowUser = {

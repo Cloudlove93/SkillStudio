@@ -2,7 +2,6 @@ import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { X, Save, RotateCw, Code, Eye } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import rehypeRaw from 'rehype-raw';
 import { Button } from '@/components/ui/button';
 import { readFile, writeFile, getFileRawUrl } from '../../api/manager';
 import CodeBlock from './CodeBlock';
@@ -287,7 +286,7 @@ export default function FileViewer({
           key={previewUrl}
           src={previewUrl}
           className="flex-1 border-none bg-white"
-          sandbox="allow-scripts allow-same-origin"
+          sandbox=""
           title="HTML Preview"
         />
       )}
@@ -298,7 +297,6 @@ export default function FileViewer({
           <div className="mx-auto max-w-3xl prose dark:prose-invert prose-sm prose-headings:font-semibold prose-h1:text-2xl prose-h1:border-b prose-h1:border-border prose-h1:pb-2 prose-h2:text-xl prose-h3:text-lg prose-p:leading-relaxed prose-li:leading-relaxed prose-pre:p-0 prose-pre:bg-transparent prose-img:rounded-lg prose-hr:border-border">
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
-              rehypePlugins={[rehypeRaw]}
               components={{
                 code({ className, children, ...props }) {
                   const match = /language-(\w+)/.exec(className || '');

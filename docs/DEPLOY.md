@@ -44,11 +44,21 @@ vim .env
 
 ```
 DATABASE_URL=postgres://educlawlite:你的数据库密码@127.0.0.1:5435/educlawlite
-LLM_BASE_URL=https://你的LLM地址/v1
+LLM_BASE_URL=https://api.moonshot.ai/v1
 LLM_API_KEY=你的API密钥
-LLM_MODEL=Kimi-K2.6
+LLM_MODEL=kimi-k2.6
+LLM_BASELINE_MODEL=kimi-k2.6
 JWT_SECRET=随便一个长随机字符串（至少32位）
 APP_ORIGIN=http://你的服务器IP
+SEED_USERS=false
+```
+
+如果需要预置登录账号，请显式开启并设置强密码：
+
+```
+SEED_USERS=true
+SEED_USER_NAMES=user1,user2,user3,user4,user5
+SEED_USER_PASSWORD=换成至少12位的强密码
 ```
 
 ---
@@ -109,7 +119,6 @@ curl -s http://localhost/ | head -1
 ```bash
 # Ubuntu
 ufw allow 80/tcp
-ufw allow 3000/tcp
 ufw reload
 
 # 或 CentOS
@@ -132,9 +141,7 @@ hostname -I
 http://服务器IP
 ```
 
-登录用预置账号：
-- 用户名：`user1` ~ `user15`
-- 密码统一为：`educlaw123`
+如果启用了预置账号，登录用户名和密码以 `.env` 中的 `SEED_USER_NAMES` / `SEED_USER_PASSWORD` 为准。公网环境不要使用默认密码。
 
 ---
 

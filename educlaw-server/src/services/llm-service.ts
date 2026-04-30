@@ -48,6 +48,33 @@ function createAbortSignal(timeoutMs: number): AbortSignal {
   return signal;
 }
 
+function usesKimiK26(model: string): boolean {
+  return model.toLowerCase() === "kimi-k2.6";
+}
+
+function buildChatCompletionBody(
+  model: string,
+  messages: ChatMessage[],
+  stream: boolean,
+  temperature?: number,
+  maxTokens?: number,
+) {
+  const body: Record<string, unknown> = {
+    model,
+    messages,
+    stream,
+    ...(maxTokens ? { max_tokens: maxTokens } : {}),
+  };
+
+  if (usesKimiK26(model)) {
+    body.thinking = { type: "disabled" };
+    return body;
+  }
+
+  body.temperature = temperature ?? 0.3;
+  return body;
+}
+
 async function createChatResponse(input: ChatRequestInput, stream: boolean): Promise<Response> {
   if (!config.llmApiKey) {
     throw new Error("尚未配置 LLM_API_KEY");
@@ -65,13 +92,7 @@ async function createChatResponse(input: ChatRequestInput, stream: boolean): Pro
         Authorization: `Bearer ${config.llmApiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        model,
-        temperature: input.temperature ?? 0.3,
-        messages,
-        stream,
-        ...(input.maxTokens ? { max_tokens: input.maxTokens } : {}),
-      }),
+      body: JSON.stringify(buildChatCompletionBody(model, messages, stream, input.temperature, input.maxTokens)),
       signal: createAbortSignal(config.llmTimeoutMs),
     });
   } catch (error) {
@@ -108,12 +129,7 @@ async function createChatResponseMessages(messages: ChatMessage[], model?: strin
         Authorization: `Bearer ${config.llmApiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        model: resolvedModel,
-        temperature: temperature ?? 0.5,
-        messages,
-        stream,
-      }),
+      body: JSON.stringify(buildChatCompletionBody(resolvedModel, messages, stream, temperature)),
       signal: createAbortSignal(config.llmTimeoutMs),
     });
   } catch (error) {

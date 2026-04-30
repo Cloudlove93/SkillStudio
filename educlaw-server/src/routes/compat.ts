@@ -110,19 +110,20 @@ router.post("/api/sidebar-groups/move-item", requireAuth, async (_req, res) => o
 
 /* ─── Agents (stub) ─── */
 
-router.post("/agents", (_req, res) => ok(res, { id: newId(), name: "stub", profileFileName: "", status: "stopped" }));
-router.post("/agents/:id/delete", (_req, res) => ok(res, { ok: true }));
-router.post("/agents/:id/start", (req, res) => ok(res, { id: String(req.params.id), status: "running" }));
-router.post("/agents/:id/sync-db", (_req, res) => ok(res, { ok: true }));
-router.post("/agents/:id/settings", (_req, res) => ok(res, { ok: true }));
-router.get("/agents/:id/files", (_req, res) => ok(res, []));
-router.get("/agents/:id/file-content", (_req, res) => ok(res, { content: "" }));
-router.put("/agents/:id/file-content", (_req, res) => ok(res, { ok: true }));
-router.post("/agents/:id/fs/create-file", (_req, res) => ok(res, { ok: true }));
-router.post("/agents/:id/fs/create-dir", (_req, res) => ok(res, { ok: true }));
-router.post("/agents/:id/fs/rename", (_req, res) => ok(res, { ok: true }));
-router.post("/agents/:id/fs/delete", (_req, res) => ok(res, { ok: true }));
-router.post("/agents/:id/fs/upload", (_req, res) => ok(res, { ok: true }));
+router.post("/agents", requireAuth, (_req, res) => ok(res, { id: newId(), name: "stub", profileFileName: "", status: "stopped" }));
+router.post("/agents/:id/delete", requireAuth, (_req, res) => ok(res, { ok: true }));
+router.post("/agents/:id/start", requireAuth, (req, res) => ok(res, { id: String(req.params.id), status: "running" }));
+router.post("/agents/:id/stop", requireAuth, (req, res) => ok(res, { id: String(req.params.id), status: "stopped" }));
+router.post("/agents/:id/sync-db", requireAuth, (_req, res) => ok(res, { ok: true }));
+router.post("/agents/:id/settings", requireAuth, (_req, res) => ok(res, { ok: true }));
+router.get("/agents/:id/files", requireAuth, (_req, res) => ok(res, []));
+router.get("/agents/:id/file-content", requireAuth, (_req, res) => ok(res, { content: "" }));
+router.put("/agents/:id/file-content", requireAuth, (_req, res) => ok(res, { ok: true }));
+router.post("/agents/:id/fs/create-file", requireAuth, (_req, res) => ok(res, { ok: true }));
+router.post("/agents/:id/fs/create-dir", requireAuth, (_req, res) => ok(res, { ok: true }));
+router.post("/agents/:id/fs/rename", requireAuth, (_req, res) => ok(res, { ok: true }));
+router.post("/agents/:id/fs/delete", requireAuth, (_req, res) => ok(res, { ok: true }));
+router.post("/agents/:id/fs/upload", requireAuth, (_req, res) => ok(res, { ok: true }));
 
 /* ─── Profiles ─── */
 
@@ -182,7 +183,7 @@ router.get("/profiles/user/:fileName/export", requireAuth, async (req, res) => {
 });
 
 import multer from "multer";
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: config.uploadLimitBytes } });
 
 router.post("/profiles/user/import", requireAuth, upload.single("file"), async (req, res) => {
   try {

@@ -10,7 +10,17 @@ import arenaRoutes from "./routes/arena.js";
 import compatRoutes from "./routes/compat.js";
 
 const app = express();
-app.use(cors({ origin: true, credentials: false }));
+const allowedOrigins = new Set(config.appOrigins);
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.has("*") || allowedOrigins.has(origin)) {
+      callback(null, true);
+      return;
+    }
+    callback(null, false);
+  },
+  credentials: false,
+}));
 app.use(compression());
 app.use(express.json({ limit: config.bodyLimit }));
 

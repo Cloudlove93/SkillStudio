@@ -30,15 +30,58 @@ function readNumber(name: string, fallback: number): number {
   return Number.isFinite(value) ? value : fallback;
 }
 
+function readBoolean(name: string, fallback: boolean): boolean {
+  const raw = process.env[name];
+  if (raw == null || raw === "") return fallback;
+  return ["1", "true", "yes", "on"].includes(raw.toLowerCase());
+}
+
+function readList(name: string, fallback: string[]): string[] {
+  const raw = process.env[name];
+  const value = raw == null || raw.trim() === "" ? fallback.join(",") : raw;
+  return value.split(",").map((item) => item.trim()).filter(Boolean);
+}
+
+function assertProductionConfig(name: string, value: string, invalidValues: string[] = []) {
+  if (process.env.NODE_ENV !== "production") return;
+  if (!value || invalidValues.includes(value) || value.length < 32) {
+    throw new Error(`${name} must be set to a strong production value`);
+  }
+}
+
+const isProduction = process.env.NODE_ENV === "production";
+const jwtSecret = process.env.JWT_SECRET || "educlaw-lite-dev-secret";
+const llmApiKey = process.env.LLM_API_KEY || "";
+
+assertProductionConfig("JWT_SECRET", jwtSecret, [
+  "change-me",
+  "change-me-in-production",
+  "change-this-to-a-random-long-string",
+  "educlaw-lite-dev-secret",
+]);
+if (isProduction && (!llmApiKey || llmApiKey === "your-llm-api-key" || llmApiKey === "换成你新的可用key")) {
+  throw new Error("LLM_API_KEY must be set before starting production");
+}
+
 export const config = {
+  isProduction,
   port: readNumber("PORT", 3000),
   bodyLimit: process.env.BODY_LIMIT || "100mb",
   llmTimeoutMs: readNumber("LLM_TIMEOUT_MS", 300_000),
   databaseUrl: process.env.DATABASE_URL || "postgres://educlawlite:educlawlite@127.0.0.1:5435/educlawlite",
-  jwtSecret: process.env.JWT_SECRET || "educlaw-lite-dev-secret",
+  jwtSecret,
   appOrigin: process.env.APP_ORIGIN || "http://localhost:4173",
+  appOrigins: readList("APP_ORIGIN", ["http://localhost:4173"]),
+  seedUsers: readBoolean("SEED_USERS", !isProduction),
+  seedUserNames: readList("SEED_USER_NAMES", [
+    "user1", "user2", "user3", "user4", "user5",
+    "user6", "user7", "user8", "user9", "user10",
+    "user11", "user12", "user13", "user14", "user15",
+  ]),
+  seedUserPassword: process.env.SEED_USER_PASSWORD || "educlaw123",
+  uploadLimitBytes: readNumber("UPLOAD_LIMIT_MB", 25) * 1024 * 1024,
   llmBaseUrl: (process.env.LLM_BASE_URL || "https://api.openai.com/v1").replace(/\/+$/, ""),
-  llmApiKey: process.env.LLM_API_KEY || "",
+  llmApiKey,
   llmModel: process.env.LLM_MODEL || "gpt-4.1-mini",
   llmBaselineModel: process.env.LLM_BASELINE_MODEL || ""
 };

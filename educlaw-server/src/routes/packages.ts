@@ -1,6 +1,7 @@
 import multer from "multer";
 import { Router, type Request, type Response } from "express";
 import type { AuthedRequest } from "../types.js";
+import { config } from "../config.js";
 import { requireAuth } from "../middleware/auth.js";
 import { one } from "../utils/http.js";
 import { initSse, writeSseEvent } from "../utils/sse.js";
@@ -24,7 +25,7 @@ import {
 } from "../services/interactive-optimization-service.js";
 
 const router: import("express").Router = Router();
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: config.uploadLimitBytes } });
 
 router.get("/", requireAuth, async (req, res) => {
   res.json(await listPackages((req as AuthedRequest).userId || ""));

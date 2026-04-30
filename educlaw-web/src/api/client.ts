@@ -28,6 +28,7 @@ const API_BASE = (() => {
 
 function resolveUrl(url: string): string {
   if (url.startsWith('http')) return url;
+  if (API_BASE && (url === API_BASE || url.startsWith(`${API_BASE}/`))) return url;
   return `${API_BASE}${url}`;
 }
 
