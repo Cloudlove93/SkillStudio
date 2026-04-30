@@ -102,9 +102,11 @@ export interface VersionCompareResult {
 }
 
 export type PackageGeneratePreview = { type: string; name: string; content: string };
+export type PackageGeneratePreviewDelta = { type: string; name: string; delta: string };
 export type PackageGenerateStreamEvent =
   | { event: "phase"; data: { label: string } }
   | { event: "preview"; data: PackageGeneratePreview }
+  | { event: "preview_delta"; data: PackageGeneratePreviewDelta }
   | { event: "ping"; data: Record<string, never> }
   | { event: "done"; data: AgentPackageDetail }
   | { event: "error"; data: { error: string } }

@@ -6,7 +6,7 @@ import type {
   PackageSkill,
   PackageVersion,
 } from "@educlaw/shared";
-import { generateChat, generateJson, generateText } from "./llm-service.js";
+import { generateChat, generateJson, generateText, streamText } from "./llm-service.js";
 import { newId, query } from "./db.js";
 import type { DbRowPackage, DbRowPackageVersion } from "../types.js";
 
@@ -31,6 +31,18 @@ interface PackageBaseGenerationResult {
     name: string;
     description: string;
   }>;
+}
+
+interface PackageGeneratePreview {
+  type: string;
+  name: string;
+  content: string;
+}
+
+interface PackageGeneratePreviewDelta {
+  type: string;
+  name: string;
+  delta: string;
 }
 
 const MAX_BASE_DOCUMENT_CHARS = 12_000;
@@ -117,6 +129,18 @@ function stripMarkdownFence(value: string): string {
   const trimmed = value.trim();
   const match = trimmed.match(/^```(?:markdown|md)?\s*\n([\s\S]*?)\n```\s*$/i);
   return (match ? match[1] : trimmed).trim();
+}
+
+async function collectStreamedText(
+  input: Parameters<typeof generateText>[0],
+  onDelta?: (delta: string) => void,
+): Promise<string> {
+  let content = "";
+  for await (const delta of streamText(input)) {
+    content += delta;
+    onDelta?.(delta);
+  }
+  return content;
 }
 
 function normalizeSkillMdFrontmatter(skillMd: string, dirName: string, description: string): string {
@@ -458,7 +482,8 @@ export async function generatePackage(
   instruction: string,
   model?: string,
   documents?: Array<{ name: string; content: string }>,
-  onPreview?: (preview: { type: string; name: string; content: string }) => void,
+  onPreview?: (preview: PackageGeneratePreview) => void,
+  onPreviewDelta?: (delta: PackageGeneratePreviewDelta) => void,
 ) {
   const startedAt = Date.now();
   const docParts = buildDocumentContext(documents, MAX_BASE_DOCUMENT_CHARS);
@@ -509,7 +534,7 @@ export async function generatePackage(
     skillCount: skillMetas.length,
   });
 
-  const agentMd = stripMarkdownFence(await generateText({
+  const agentMd = stripMarkdownFence(await collectStreamedText({
     model,
     systemPrompt: [
       "You are an expert agent.md author.",
@@ -534,9 +559,9 @@ export async function generatePackage(
     ].join("\n"),
     temperature: 0.35,
     maxTokens: 3500,
-  }));
+  }, (delta) => onPreviewDelta?.({ type: "agent", name: "agent.md", delta })));
 
-  const rubricMd = stripMarkdownFence(await generateText({
+  const rubricMd = stripMarkdownFence(await collectStreamedText({
     model,
     systemPrompt: [
       "You are an evaluation rubric author.",
@@ -557,7 +582,7 @@ export async function generatePackage(
     ].join("\n"),
     temperature: 0.25,
     maxTokens: 2000,
-  }));
+  }, (delta) => onPreviewDelta?.({ type: "rubric", name: "rubric.md", delta })));
 
   onPreview?.({ type: "agent", name: "agent.md", content: agentMd.trim().slice(0, 1200) });
   onPreview?.({ type: "rubric", name: "rubric.md", content: rubricMd.trim().slice(0, 800) });
@@ -573,7 +598,7 @@ export async function generatePackage(
       model,
     });
 
-    const skillMdRaw = await generateText({
+    const skillMdRaw = await collectStreamedText({
       model,
       systemPrompt: [
         "You are a concise SKILL.md author.",
@@ -602,7 +627,7 @@ export async function generatePackage(
       ].join("\n"),
       temperature: 0.35,
       maxTokens: 4000,
-    });
+    }, (delta) => onPreviewDelta?.({ type: "skill", name: skillMeta.name, delta }));
 
     const skillMd = normalizeSkillMdFrontmatter(skillMdRaw || "", skillMeta.dirName, skillMeta.description);
     const skill = { ...skillMeta, skillMd };

@@ -10,6 +10,26 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 
+export type PackagePreview = { type: string; name: string; content: string };
+export type PackagePreviewDelta = { type: string; name: string; delta: string };
+
+export function upsertPackagePreview(previews: PackagePreview[], preview: PackagePreview): PackagePreview[] {
+  const index = previews.findIndex((item) => item.type === preview.type && item.name === preview.name);
+  if (index < 0) return [...previews, preview];
+  const next = [...previews];
+  next[index] = preview;
+  return next;
+}
+
+export function appendPackagePreviewDelta(previews: PackagePreview[], delta: PackagePreviewDelta): PackagePreview[] {
+  const index = previews.findIndex((item) => item.type === delta.type && item.name === delta.name);
+  if (index < 0) return [...previews, { type: delta.type, name: delta.name, content: delta.delta }];
+  const next = [...previews];
+  const current = next[index]!;
+  next[index] = { ...current, content: `${current.content}${delta.delta}` };
+  return next;
+}
+
 const markdownComponents: Components = {
   table: ({ children }) => (
     <div className="my-2 not-prose overflow-x-auto">
@@ -96,7 +116,7 @@ export function VersionDiffView({ result }: { result: VersionCompareResult }) {
   );
 }
 
-export function PackagePreviewCard({ previews }: { previews: Array<{ type: string; name: string; content: string }> }) {
+export function PackagePreviewCard({ previews }: { previews: PackagePreview[] }) {
   if (!previews.length) return null;
   return (
     <div className="mx-5 mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
@@ -106,7 +126,7 @@ export function PackagePreviewCard({ previews }: { previews: Array<{ type: strin
             <span className="inline-flex size-6 items-center justify-center rounded-lg bg-primary/10 text-primary text-[10px]">{p.type[0]?.toUpperCase()}</span>
             {p.name}
           </div>
-          <div className="mt-2 line-clamp-4 text-xs leading-5 text-muted-foreground">{p.content}</div>
+          <div className="mt-2 max-h-36 overflow-y-auto whitespace-pre-wrap break-words text-xs leading-5 text-muted-foreground">{p.content}</div>
         </div>
       ))}
     </div>

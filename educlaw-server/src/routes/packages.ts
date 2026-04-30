@@ -70,6 +70,7 @@ router.post("/generate/stream", requireAuth, async (req: Request, res: Response)
       typeof req.body?.model === "string" ? req.body.model : undefined,
       documents,
       (preview) => writeSseEvent(res, "preview", preview),
+      (delta) => writeSseEvent(res, "preview_delta", delta),
     );
     writeSseEvent(res, "phase", { label: "保存智能体包与初始版本" });
     writeSseEvent(res, "done", pkg);

@@ -12,7 +12,15 @@ import type {
 } from "@educlaw/shared";
 import { useAuthStore } from "../stores/auth";
 import { liteApi } from "../api/lite-api";
-import { ConversationBoard, MarkdownContent, OptimizationDiffView, PackagePreviewCard } from "../components/lite/lite-rendering";
+import {
+  appendPackagePreviewDelta,
+  ConversationBoard,
+  MarkdownContent,
+  OptimizationDiffView,
+  PackagePreviewCard,
+  upsertPackagePreview,
+  type PackagePreview,
+} from "../components/lite/lite-rendering";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -44,7 +52,7 @@ export default function LiteWorkspace() {
   const [input, setInput] = useState("");
   const [, setStatus] = useState("");
   const [progress, setProgress] = useState<ProgressState | null>(null);
-  const [generatePreviews, setGeneratePreviews] = useState<Array<{ type: string; name: string; content: string }>>([]);
+  const [generatePreviews, setGeneratePreviews] = useState<PackagePreview[]>([]);
   const [sideStreaming, setSideStreaming] = useState({ baseline: false, enhanced: false });
   const [nowMs, setNowMs] = useState(Date.now());
   const fileRef = useRef<HTMLInputElement | null>(null);
@@ -91,7 +99,8 @@ export default function LiteWorkspace() {
       let createdId = "";
       await liteApi.generatePackageStream(token, instruction.trim(), model || undefined, [], (event) => {
         if (event.event === "phase") { pushProgress(event.data.label); setStatus(event.data.label); }
-        if (event.event === "preview") { setGeneratePreviews((prev) => [...prev, event.data]); }
+        if (event.event === "preview_delta") { setGeneratePreviews((prev) => appendPackagePreviewDelta(prev, event.data)); }
+        if (event.event === "preview") { setGeneratePreviews((prev) => upsertPackagePreview(prev, event.data)); }
         if (event.event === "done") createdId = event.data.id;
         if (event.event === "error") throw new Error(event.data.error || "生成失败");
       });

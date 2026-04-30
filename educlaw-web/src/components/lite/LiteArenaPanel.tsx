@@ -14,7 +14,16 @@ import type { DiagnosisIssue, AdoptedChange, VersionCompareResult, LineDiff } fr
 import { computeLineDiff } from "../../api/lite-api";
 import { useAuthStore } from "../../stores/auth";
 import { liteApi } from "../../api/lite-api";
-import { ConversationBoard, MarkdownContent, OptimizationDiffView, PackagePreviewCard, VersionDiffView } from "./lite-rendering";
+import {
+  appendPackagePreviewDelta,
+  ConversationBoard,
+  MarkdownContent,
+  OptimizationDiffView,
+  PackagePreviewCard,
+  upsertPackagePreview,
+  VersionDiffView,
+  type PackagePreview,
+} from "./lite-rendering";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -48,7 +57,7 @@ export default function LiteArenaPanel() {
   const [input, setInput] = useState("");
   const [status, setStatus] = useState("");
   const [progress, setProgress] = useState<ProgressState | null>(null);
-  const [generatePreviews, setGeneratePreviews] = useState<Array<{ type: string; name: string; content: string }>>([]);
+  const [generatePreviews, setGeneratePreviews] = useState<PackagePreview[]>([]);
   const [sideStreaming, setSideStreaming] = useState({ baseline: false, enhanced: false });
   const [nowMs, setNowMs] = useState(Date.now());
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -330,7 +339,8 @@ function startResizeLeft(e: React.MouseEvent) {
       let createdId = "";
       await liteApi.generatePackageStream(token, instruction.trim(), undefined, documents, (event) => {
         if (event.event === "phase") { pushProgress(event.data.label); setStatus(event.data.label); }
-        if (event.event === "preview") { setGeneratePreviews((prev) => [...prev, event.data]); }
+        if (event.event === "preview_delta") { setGeneratePreviews((prev) => appendPackagePreviewDelta(prev, event.data)); }
+        if (event.event === "preview") { setGeneratePreviews((prev) => upsertPackagePreview(prev, event.data)); }
         if (event.event === "done") createdId = event.data.id;
         if (event.event === "error") throw new Error(event.data.error || "生成失败");
       });
