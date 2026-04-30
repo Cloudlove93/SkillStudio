@@ -80,6 +80,9 @@ deploy_frontend() {
   sudo mkdir -p "$WEB_DEPLOY_ROOT"
   sudo find "$WEB_DEPLOY_ROOT" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
   sudo cp -a "$web_dist"/. "$WEB_DEPLOY_ROOT"/
+  sudo find "$WEB_DEPLOY_ROOT" -type d -exec chmod 0755 {} +
+  sudo find "$WEB_DEPLOY_ROOT" -type f -exec chmod 0644 {} +
+  sudo test -f "$WEB_DEPLOY_ROOT/index.html" || die "Frontend deploy failed: index.html missing in $WEB_DEPLOY_ROOT"
 }
 
 start_backend_in_tmux() {
@@ -180,7 +183,13 @@ verify() {
   printf '\n'
   curl -fsS "http://127.0.0.1/healthz"
   printf '\n'
-  curl -fsSI "http://127.0.0.1/" >/dev/null
+  if ! curl -fsSI "http://127.0.0.1/" >/dev/null; then
+    printf '\n[educlaw-tmux] Frontend health check failed. Deployed files:\n' >&2
+    sudo ls -la "$WEB_DEPLOY_ROOT" >&2 || true
+    printf '\n[educlaw-tmux] nginx sites enabled:\n' >&2
+    sudo ls -la /etc/nginx/sites-enabled >&2 || true
+    die "Frontend health check failed"
+  fi
 
   log "Done"
   printf 'URL:   %s\n' "$APP_ORIGIN"
