@@ -301,48 +301,57 @@ export default function LiteArenaPanel() {
   function failProgress(label: string) { setProgress((prev) => prev ? { ...prev, active: false, isError: true, phase: label, steps: prev.steps[prev.steps.length - 1] === label ? prev.steps : [...prev.steps, label] } : null); }
   function formatElapsed(ms: number) { const total = Math.max(0, Math.floor(ms / 1000)); return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`; }
 
+  function clearWorkspaceState() {
+    selectedPackageIdRef.current = "";
+    setSelectedPackageId("");
+    setSelectedPackage(null);
+    setThread(null);
+    setThreadDetail(null);
+    setVersions([]);
+    setReport(null);
+    setOptimization(null);
+    setCompareResult(null);
+    setCompareBaseId("");
+    setCompareTargetId("");
+    setSelectedSkillId("");
+    setCenterPreview(null);
+    setInteractiveMode(false);
+    setInteractiveMessages([]);
+    setInteractiveAdopted([]);
+    setInteractiveIssues([]);
+    setInput("");
+    setSideStreaming({ baseline: false, enhanced: false });
+  }
+
   async function refreshPackages(preferredPackageId?: string) {
     if (!token) return;
     const list = await liteApi.listPackages(token);
     setPackages(list);
+    const currentPackageId = selectedPackageIdRef.current || selectedPackageId;
     const preferredExists = preferredPackageId && list.some((item) => item.id === preferredPackageId);
-    const selectedExists = selectedPackageId && list.some((item) => item.id === selectedPackageId);
-    const nextId = (preferredExists && preferredPackageId) || (selectedExists && selectedPackageId) || list[0]?.id || "";
+    const selectedExists = currentPackageId && list.some((item) => item.id === currentPackageId);
+    const nextId = (preferredExists && preferredPackageId) || (selectedExists && currentPackageId) || list[0]?.id || "";
     if (nextId) {
-      if (nextId !== selectedPackageId) {
+      if (nextId !== currentPackageId) {
         await openPackage(nextId, list);
       } else {
         // Same package: just refresh the package list metadata, don't reset UI states
         const detail = await liteApi.getPackage(token, nextId);
         const versionList = await liteApi.listVersions(token, nextId);
-        setSelectedPackage(detail);
-        setVersions(versionList);
-        setPackages((prev) => prev.map((item) => item.id === nextId ? { ...item, name: detail.name, description: detail.description, versionNumber: detail.versionNumber, updatedAt: detail.updatedAt } : item));
+        if (selectedPackageIdRef.current === nextId) {
+          setSelectedPackage(detail);
+          setVersions(versionList);
+          setPackages((prev) => prev.map((item) => item.id === nextId ? { ...item, name: detail.name, description: detail.description, versionNumber: detail.versionNumber, updatedAt: detail.updatedAt } : item));
+        }
       }
     } else {
-      setSelectedPackageId("");
-      setSelectedPackage(null);
-      setThread(null);
-      setThreadDetail(null);
-      setVersions([]);
-      setReport(null);
-      setOptimization(null);
-      setCompareResult(null);
-      setCompareBaseId("");
-      setCompareTargetId("");
-      setSelectedSkillId("");
-      setCenterPreview(null);
-      setInteractiveMode(false);
-      setInteractiveMessages([]);
-      setInteractiveAdopted([]);
-      setInteractiveIssues([]);
-      setInput("");
-      setSideStreaming({ baseline: false, enhanced: false });
+      clearWorkspaceState();
     }
   }
 
   async function openPackage(packageId: string, snapshotList?: AgentPackageSummary[]) {
     if (!token || !packageId) return;
+    selectedPackageIdRef.current = packageId;
     setSelectedPackageId(packageId);
     const detail = await liteApi.getPackage(token, packageId);
     const versionList = await liteApi.listVersions(token, packageId);
@@ -542,13 +551,24 @@ function startResizeLeft(e: React.MouseEvent) {
   }
 
   async function handleDelete() {
-    if (!token || !selectedPackageId) return;
+    const deletingId = selectedPackageIdRef.current || selectedPackageId;
+    if (!token || !deletingId) return;
     if (!window.confirm("确定要删除当前智能体吗？")) return;
-    await liteApi.deletePackage(token, selectedPackageId);
+    clearWorkspaceState();
+    setPackages((prev) => prev.filter((item) => item.id !== deletingId));
+    try {
+      await liteApi.deletePackage(token, deletingId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "删除失败";
+      failProgress(message);
+      setStatus(message);
+      await refreshPackages(deletingId);
+      return;
+    }
     // Clean up package-scoped localStorage data
-    localStorage.removeItem(interactiveStorageKey(selectedPackageId));
-    localStorage.removeItem(optimizationStorageKey(selectedPackageId));
-    localStorage.removeItem(compareStorageKey(selectedPackageId));
+    localStorage.removeItem(interactiveStorageKey(deletingId));
+    localStorage.removeItem(optimizationStorageKey(deletingId));
+    localStorage.removeItem(compareStorageKey(deletingId));
     await refreshPackages();
   }
 
