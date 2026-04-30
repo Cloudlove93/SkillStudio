@@ -6,7 +6,7 @@ import type {
   PackageSkill,
   PackageVersion,
 } from "@educlaw/shared";
-import { generateChat, generateJson } from "./llm-service.js";
+import { generateChat, generateJson, generateText } from "./llm-service.js";
 import { newId, query } from "./db.js";
 import type { DbRowPackage, DbRowPackageVersion } from "../types.js";
 
@@ -26,17 +26,11 @@ interface PackageGenerationResult {
 interface PackageBaseGenerationResult {
   name: string;
   description: string;
-  agentMd: string;
-  rubricMd: string;
   skills: Array<{
     dirName: string;
     name: string;
     description: string;
   }>;
-}
-
-interface SkillGenerationResult {
-  skillMd: string;
 }
 
 const MAX_BASE_DOCUMENT_CHARS = 12_000;
@@ -119,8 +113,14 @@ function sanitizeSkillDescription(description: string | undefined): string {
   );
 }
 
+function stripMarkdownFence(value: string): string {
+  const trimmed = value.trim();
+  const match = trimmed.match(/^```(?:markdown|md)?\s*\n([\s\S]*?)\n```\s*$/i);
+  return (match ? match[1] : trimmed).trim();
+}
+
 function normalizeSkillMdFrontmatter(skillMd: string, dirName: string, description: string): string {
-  const trimmed = skillMd.trim();
+  const trimmed = stripMarkdownFence(skillMd);
   const safeDescription = sanitizeSkillDescription(description);
   const frontmatter = `---\nname: ${dirName}\ndescription: ${safeDescription}\n---`;
   const match = trimmed.match(/^---\s*\n[\s\S]*?\n---\s*\n?/);
@@ -153,8 +153,6 @@ function getBaseOutputSchemaPrompt(): string {
     "返回以下结构的 JSON：",
     "- name: 智能体名称",
     "- description: 智能体一句话描述",
-    "- agentMd: 完整但精炼的 agent.md 内容",
-    "- rubricMd: 3-5 个评分维度的 rubric.md 内容",
     "- skills: 1-2 个核心技能的元数据数组，每个技能包含：",
     "  - dirName: 目录名，小写英文 kebab-case",
     "  - name: 技能显示名称",
@@ -163,14 +161,14 @@ function getBaseOutputSchemaPrompt(): string {
     "要求：",
     "1. 只返回 JSON，不要 Markdown 代码块",
     "2. skills 最多 2 个，选择最能支撑该智能体工作的核心技能",
-    "3. 不要在本步骤生成 skillMd，skillMd 会在后续步骤单独生成",
+    "3. 不要在本步骤生成 agentMd、rubricMd 或 skillMd，大段 Markdown 会在后续步骤单独生成",
   ].join("\n");
 }
 
 function getCompactSkillTemplatePrompt(): string {
   return [
-    "返回 JSON：{ \"skillMd\": \"...\" }",
-    "skillMd 必须是完整 SKILL.md，包含：",
+    "返回完整 SKILL.md 的 Markdown 文本，不要 JSON，不要 Markdown 代码块。",
+    "SKILL.md 必须包含：",
     "---",
     "name: <dirName>",
     "description: <一句话说明该 skill 做什么，以及什么时候使用，必须包含触发词如'当/如果/用于/遇到/针对'>",
@@ -185,7 +183,7 @@ function getCompactSkillTemplatePrompt(): string {
     "要求：",
     "- 内容要精炼，每个章节 2-5 条即可",
     "- frontmatter name 必须等于 dirName",
-    "- 只返回 JSON，不要 Markdown 代码块",
+    "- 只返回 SKILL.md 文件内容本身，不要解释",
   ].join("\n");
 }
 
@@ -265,8 +263,6 @@ function validateBaseGenerationResult(generated: PackageBaseGenerationResult): v
 
   if (!generated.name?.trim()) errors.push("缺少智能体 name");
   if (!generated.description?.trim()) errors.push("缺少智能体 description");
-  if (!generated.agentMd?.trim()) errors.push("缺少 agentMd");
-  if (!generated.rubricMd?.trim()) errors.push("缺少 rubricMd");
 
   if (!Array.isArray(generated.skills) || generated.skills.length === 0) {
     errors.push("skills 必须为非空数组");
@@ -482,10 +478,10 @@ export async function generatePackage(
     systemPrompt: [
       "You are an agent-package generation assistant.",
       "Return JSON only.",
-      "Generate the compact base structure of one reusable prompt package.",
+      "Generate only compact metadata for one reusable prompt package.",
       "Prefer Chinese content when the user instruction is Chinese.",
       "When documents are provided without explicit instructions, deeply analyze the documents to extract domain knowledge, workflows, and rules, then build the agent and skills entirely from the document content.",
-      "Do not generate full SKILL.md content in this step.",
+      "Do not generate agent.md, rubric.md, or full SKILL.md content in this step.",
     ].join("\n"),
     userPrompt: hasInstruction
       ? [
@@ -494,9 +490,6 @@ export async function generatePackage(
           docParts,
           "",
           getBaseOutputSchemaPrompt(),
-          "",
-          "The agentMd should define role, workflow, boundaries, and output style.",
-          "The rubricMd should define 3-5 scoring dimensions.",
         ].join("\n")
       : [
           "Analyze the following documents and create a compact prompt package base based entirely on their content.",
@@ -504,12 +497,9 @@ export async function generatePackage(
           docParts,
           "",
           getBaseOutputSchemaPrompt(),
-          "",
-          "The agentMd should define role, workflow, boundaries, and output style.",
-          "The rubricMd should define 3-5 scoring dimensions.",
         ].join("\n"),
     temperature: 0.4,
-    maxTokens: 6000,
+    maxTokens: 2000,
   }, 0);
 
   validateBaseGenerationResult(base);
@@ -519,8 +509,58 @@ export async function generatePackage(
     skillCount: skillMetas.length,
   });
 
-  onPreview?.({ type: "agent", name: "agent.md", content: base.agentMd.trim().slice(0, 1200) });
-  onPreview?.({ type: "rubric", name: "rubric.md", content: base.rubricMd.trim().slice(0, 800) });
+  const agentMd = stripMarkdownFence(await generateText({
+    model,
+    systemPrompt: [
+      "You are an expert agent.md author.",
+      "Return plain Markdown only.",
+      "Do not wrap the answer in Markdown fences.",
+      "Prefer Chinese content when the source content is Chinese.",
+    ].join("\n"),
+    userPrompt: [
+      "Create a complete but concise agent.md for this package.",
+      "",
+      `Package name: ${base.name}`,
+      `Package description: ${base.description}`,
+      "",
+      "Core skills metadata:",
+      JSON.stringify(skillMetas, null, 2),
+      "",
+      hasInstruction ? "User instruction:" : "Source documents:",
+      hasInstruction ? instruction : docParts,
+      "",
+      "The agent.md should define role, workflow, boundaries, and output style.",
+      "Return only the Markdown file content.",
+    ].join("\n"),
+    temperature: 0.35,
+    maxTokens: 3500,
+  }));
+
+  const rubricMd = stripMarkdownFence(await generateText({
+    model,
+    systemPrompt: [
+      "You are an evaluation rubric author.",
+      "Return plain Markdown only.",
+      "Do not wrap the answer in Markdown fences.",
+      "Prefer Chinese content when the source content is Chinese.",
+    ].join("\n"),
+    userPrompt: [
+      "Create a rubric.md for this package with 3-5 scoring dimensions.",
+      "",
+      `Package name: ${base.name}`,
+      `Package description: ${base.description}`,
+      "",
+      "agent.md 摘要：",
+      agentMd.slice(0, 1800),
+      "",
+      "Return only the Markdown file content.",
+    ].join("\n"),
+    temperature: 0.25,
+    maxTokens: 2000,
+  }));
+
+  onPreview?.({ type: "agent", name: "agent.md", content: agentMd.trim().slice(0, 1200) });
+  onPreview?.({ type: "rubric", name: "rubric.md", content: rubricMd.trim().slice(0, 800) });
 
   const skills: PackageGenerationResult["skills"] = [];
   for (let index = 0; index < skillMetas.length; index += 1) {
@@ -533,11 +573,12 @@ export async function generatePackage(
       model,
     });
 
-    const skillResult = await generateJson<SkillGenerationResult>({
+    const skillMdRaw = await generateText({
       model,
       systemPrompt: [
         "You are a concise SKILL.md author.",
-        "Return JSON only.",
+        "Return plain Markdown only.",
+        "Do not wrap the answer in Markdown fences.",
         "Prefer Chinese content when the source content is Chinese.",
         "Generate only the requested SKILL.md content; do not regenerate agent.md or rubric.md.",
       ].join("\n"),
@@ -548,10 +589,10 @@ export async function generatePackage(
         `Package description: ${base.description}`,
         "",
         "agent.md 摘要：",
-        base.agentMd.slice(0, 1800),
+        agentMd.slice(0, 1800),
         "",
         "rubric.md 摘要：",
-        base.rubricMd.slice(0, 1200),
+        rubricMd.slice(0, 1200),
         skillDocParts,
         "",
         "Skill metadata:",
@@ -561,9 +602,9 @@ export async function generatePackage(
       ].join("\n"),
       temperature: 0.35,
       maxTokens: 4000,
-    }, 0);
+    });
 
-    const skillMd = normalizeSkillMdFrontmatter(skillResult.skillMd || "", skillMeta.dirName, skillMeta.description);
+    const skillMd = normalizeSkillMdFrontmatter(skillMdRaw || "", skillMeta.dirName, skillMeta.description);
     const skill = { ...skillMeta, skillMd };
     skills.push(skill);
     onPreview?.({ type: "skill", name: skill.name, content: skill.skillMd.slice(0, 800) });
@@ -577,8 +618,8 @@ export async function generatePackage(
   const generated: PackageGenerationResult = {
     name: base.name,
     description: base.description,
-    agentMd: base.agentMd,
-    rubricMd: base.rubricMd,
+    agentMd,
+    rubricMd,
     skills,
   };
 
