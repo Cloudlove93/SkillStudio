@@ -9,7 +9,6 @@ import type {
 import { generateChat, generateJson, generateText, streamText } from "./llm-service.js";
 import { newId, query } from "./db.js";
 import type { DbRowPackage, DbRowPackageVersion } from "../types.js";
-import { parseJsonObject } from "../utils/json.js";
 
 interface PackageGenerationResult {
   name: string;
@@ -229,76 +228,27 @@ function createFallbackBase(
   };
 }
 
-function parseBaseMetadataText(
-  raw: string,
+function normalizeBaseMetadataJson(
+  parsed: Partial<PackageBaseGenerationResult>,
   fallback: PackageBaseGenerationResult,
 ): PackageBaseGenerationResult {
-  const text = stripMarkdownFence(raw);
-  let name = "";
-  let description = "";
-  const skills: PackageBaseGenerationResult["skills"] = [];
-
-  for (const rawLine of text.split(/\r?\n/)) {
-    const line = rawLine.replace(/^[-*\d.)\s]+/, "").trim();
-    if (!line) continue;
-
-    const nameMatch = line.match(/^(?:NAME|Name|名称|智能体名称)\s*[:：]\s*(.+)$/);
-    if (nameMatch) {
-      name = nameMatch[1]!.trim();
-      continue;
-    }
-
-    const descriptionMatch = line.match(/^(?:DESCRIPTION|Description|描述|一句话描述)\s*[:：]\s*(.+)$/);
-    if (descriptionMatch) {
-      description = descriptionMatch[1]!.trim();
-      continue;
-    }
-
-    const skillMatch = line.match(/^(?:SKILL|Skill|技能)\s*\d*\s*[:：]\s*(.+)$/);
-    if (skillMatch) {
-      const rawSkill = skillMatch[1]!.trim();
-      const parts = rawSkill.split("|").map((part) => part.trim()).filter(Boolean);
-      if (parts.length >= 3) {
-        skills.push({ dirName: parts[0]!, name: parts[1]!, description: parts.slice(2).join(" | ") });
-      } else if (parts.length === 2) {
-        skills.push({ dirName: slugify(parts[0]!), name: parts[0]!, description: parts[1]! });
-      } else if (rawSkill) {
-        skills.push({ dirName: slugify(rawSkill), name: rawSkill, description: `用于当用户需要${rawSkill}时提供支持。` });
-      }
-    }
-  }
-
   return {
-    name: name || fallback.name,
-    description: description || fallback.description,
-    skills: skills.length > 0 ? skills : fallback.skills,
+    name: typeof parsed.name === "string" && parsed.name.trim() ? parsed.name : fallback.name,
+    description: typeof parsed.description === "string" && parsed.description.trim() ? parsed.description : fallback.description,
+    skills: Array.isArray(parsed.skills) && parsed.skills.length > 0
+      ? parsed.skills.map((skill, index) => ({
+          dirName: typeof skill?.dirName === "string" ? skill.dirName : `skill-${index + 1}`,
+          name: typeof skill?.name === "string" ? skill.name : `技能 ${index + 1}`,
+          description: typeof skill?.description === "string" ? skill.description : `用于当用户需要技能 ${index + 1} 时提供支持。`,
+        }))
+      : fallback.skills,
   };
 }
 
-function parseBaseMetadataJsonOrFallback(
-  raw: string,
-  fallback: PackageBaseGenerationResult,
-): PackageBaseGenerationResult {
-  try {
-    const parsed = parseJsonObject<Partial<PackageBaseGenerationResult>>(raw);
-    return {
-      name: typeof parsed.name === "string" && parsed.name.trim() ? parsed.name : fallback.name,
-      description: typeof parsed.description === "string" && parsed.description.trim() ? parsed.description : fallback.description,
-      skills: Array.isArray(parsed.skills) && parsed.skills.length > 0
-        ? parsed.skills.map((skill, index) => ({
-            dirName: typeof skill?.dirName === "string" ? skill.dirName : `skill-${index + 1}`,
-            name: typeof skill?.name === "string" ? skill.name : `技能 ${index + 1}`,
-            description: typeof skill?.description === "string" ? skill.description : `用于当用户需要技能 ${index + 1} 时提供支持。`,
-          }))
-        : fallback.skills,
-    };
-  } catch (error) {
-    console.warn("[packages.generate] base metadata JSON parse failed; using text/fallback parser", {
-      error: error instanceof Error ? error.message : String(error),
-      preview: raw.slice(0, 500),
-    });
-    return parseBaseMetadataText(raw, fallback);
-  }
+function buildSnapshotJson(snapshot: AgentPackageSnapshot): string {
+  const json = JSON.stringify(snapshot, null, 2);
+  JSON.parse(json);
+  return json;
 }
 
 function getCompactSkillTemplatePrompt(): string {
@@ -611,36 +561,44 @@ export async function generatePackage(
   });
 
   const fallbackBase = createFallbackBase(instruction, documents);
-  const baseRaw = await generateText({
-    model,
-    systemPrompt: [
-      "You are an agent-package generation assistant.",
-      "Return strict JSON only.",
-      "Generate only compact metadata for one reusable prompt package.",
-      "Prefer Chinese content when the user instruction is Chinese.",
-      "When documents are provided without explicit instructions, deeply analyze the documents to extract domain knowledge, workflows, and rules, then build the agent and skills entirely from the document content.",
-      "Do not generate agent.md, rubric.md, or full SKILL.md content in this step.",
-      "Do not include long Markdown content in JSON fields.",
-    ].join("\n"),
-    userPrompt: hasInstruction
-      ? [
-          "Create a prompt package from this instruction:",
-          instruction,
-          docParts,
-          "",
-          getBaseOutputSchemaPrompt(),
-        ].join("\n")
-      : [
-          "Analyze the following documents and create a compact prompt package base based entirely on their content.",
-          "Infer the agent's role, workflow, core skills, and evaluation criteria directly from the document content.",
-          docParts,
-          "",
-          getBaseOutputSchemaPrompt(),
-        ].join("\n"),
-    temperature: 0.4,
-    maxTokens: 2000,
-  });
-  const base = parseBaseMetadataJsonOrFallback(baseRaw, fallbackBase);
+  let base: PackageBaseGenerationResult;
+  try {
+    const baseJson = await generateJson<Partial<PackageBaseGenerationResult>>({
+      model,
+      systemPrompt: [
+        "You are an agent-package generation assistant.",
+        "Return strict JSON only.",
+        "Generate only compact metadata for one reusable prompt package.",
+        "Prefer Chinese content when the user instruction is Chinese.",
+        "When documents are provided without explicit instructions, deeply analyze the documents to extract domain knowledge, workflows, and rules, then build the agent and skills entirely from the document content.",
+        "Do not generate agent.md, rubric.md, or full SKILL.md content in this step.",
+        "Do not include long Markdown content in JSON fields.",
+      ].join("\n"),
+      userPrompt: hasInstruction
+        ? [
+            "Create a prompt package from this instruction:",
+            instruction,
+            docParts,
+            "",
+            getBaseOutputSchemaPrompt(),
+          ].join("\n")
+        : [
+            "Analyze the following documents and create a compact prompt package base based entirely on their content.",
+            "Infer the agent's role, workflow, core skills, and evaluation criteria directly from the document content.",
+            docParts,
+            "",
+            getBaseOutputSchemaPrompt(),
+          ].join("\n"),
+      temperature: 0.4,
+      maxTokens: 2000,
+    });
+    base = normalizeBaseMetadataJson(baseJson, fallbackBase);
+  } catch (error) {
+    console.warn("[packages.generate] base metadata JSON failed; using structured backend fallback", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    base = fallbackBase;
+  }
 
   validateBaseGenerationResult(base);
   const skillMetas = normalizeSkillMetadata(base.skills);
@@ -766,6 +724,7 @@ export async function generatePackage(
   validateGenerationResult(generated);
 
   const snapshot = normalizeSnapshot(generated);
+  onPreview?.({ type: "json", name: "snapshot.json", content: buildSnapshotJson(snapshot).slice(0, 4000) });
   console.log("[packages.generate] validate done", { durationMs: Date.now() - startedAt });
   return createPackageWithSnapshot(userId, snapshot, "generated");
 }
@@ -825,20 +784,11 @@ export async function importPackageZip(userId: string, zipBuffer: Buffer) {
   const zip = new AdmZip(zipBuffer);
   const entries = zip.getEntries();
   const manifestEntry = entries.find((entry: IZipEntry) => entry.entryName.endsWith("manifest.json"));
+  const snapshotEntry = entries.find((entry: IZipEntry) => entry.entryName.endsWith("snapshot.json"));
   const agentEntry = entries.find((entry: IZipEntry) => entry.entryName.endsWith("agent.md"));
   const rubricEntry = entries.find((entry: IZipEntry) => entry.entryName.endsWith("rubric.md"));
   const versionsEntry = entries.find((entry: IZipEntry) => entry.entryName.endsWith("versions.json"));
 
-  if (!manifestEntry || !agentEntry) {
-    throw new Error("导入的 ZIP 文件中缺少 manifest.json 或 agent.md");
-  }
-
-  const manifest = JSON.parse(zip.readAsText(manifestEntry, "utf8")) as {
-    name?: string;
-    description?: string;
-  };
-
-  // 如果存在 versions.json，恢复完整版本历史
   if (versionsEntry) {
     try {
       const versions = JSON.parse(zip.readAsText(versionsEntry, "utf8")) as Array<{
@@ -851,9 +801,34 @@ export async function importPackageZip(userId: string, zipBuffer: Buffer) {
         return importPackageWithVersions(userId, versions);
       }
     } catch {
+      // fallback to snapshot or normal import
+    }
+  }
+
+  if (snapshotEntry) {
+    try {
+      const snapshot = JSON.parse(zip.readAsText(snapshotEntry, "utf8")) as AgentPackageSnapshot;
+      if (snapshot?.agentMd && Array.isArray(snapshot.skills)) {
+        return createPackageWithSnapshot(userId, {
+          ...snapshot,
+          name: snapshot.name?.trim() || "导入的智能体包",
+          description: snapshot.description?.trim() || "导入的智能体包",
+          versionLabel: snapshot.versionLabel || "v1",
+        }, "imported");
+      }
+    } catch {
       // fallback to normal import
     }
   }
+
+  if (!manifestEntry || !agentEntry) {
+    throw new Error("导入的 ZIP 文件中缺少 snapshot.json，或缺少 manifest.json / agent.md");
+  }
+
+  const manifest = JSON.parse(zip.readAsText(manifestEntry, "utf8")) as {
+    name?: string;
+    description?: string;
+  };
 
   // 普通导入（兼容旧格式或没有版本历史的 ZIP）
   const skillEntries = entries.filter((entry: IZipEntry) => /skills\/[^/]+\/SKILL\.md$/.test(entry.entryName));
@@ -898,6 +873,7 @@ export async function exportPackageZip(userId: string, packageId: string) {
     hasVersionHistory: versions.length > 1,
     exportedAt: new Date().toISOString(),
   }, null, 2)));
+  zip.addFile("snapshot.json", Buffer.from(buildSnapshotJson(pkg.snapshot)));
 
   zip.addFile("agent.md", Buffer.from(pkg.snapshot.agentMd));
   zip.addFile("rubric.md", Buffer.from(pkg.snapshot.rubricMd));
