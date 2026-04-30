@@ -51,6 +51,16 @@ find_server_entry() {
   printf '%s' "$entry"
 }
 
+ensure_server_dependencies() {
+  if node -e "require.resolve('express', { paths: ['$PROJECT_DIR/educlaw-server'] })" >/dev/null 2>&1; then
+    return
+  fi
+
+  require_command pnpm
+  log "Installing workspace dependencies because educlaw-server cannot resolve express"
+  pnpm install --frozen-lockfile
+}
+
 ensure_tmux_session() {
   if ! tmux has-session -t "$TMUX_SESSION" 2>/dev/null; then
     tmux new-session -d -s "$TMUX_SESSION" -n bash
@@ -76,8 +86,10 @@ set +a
 echo "[educlaw-tmux] starting backend at \$(date)"
 echo "[educlaw-tmux] entry: $server_entry"
 echo "[educlaw-tmux] port: \${PORT:-3000}"
+set +e
 node "$server_entry"
 status=\$?
+set -e
 echo
 echo "[educlaw-tmux] backend exited with status \$status at \$(date)"
 echo "[educlaw-tmux] press Enter to keep this shell, or Ctrl+B D to detach"
@@ -164,6 +176,8 @@ main() {
   log "Setting .env"
   upsert_env_value PORT "$PORT"
   upsert_env_value APP_ORIGIN "$APP_ORIGIN"
+
+  ensure_server_dependencies
 
   log "Stopping systemd backend if present"
   sudo systemctl disable --now "$SERVICE_NAME" >/dev/null 2>&1 || true
