@@ -61,6 +61,7 @@ export default function LiteWorkspace() {
 
   const messages = threadDetail?.messages || [];
   const selectedSkill = selectedPackage?.snapshot.skills.find((s) => s.id === selectedSkillId) || selectedPackage?.snapshot.skills[0] || null;
+  const showGeneratePreviews = progress?.active && progress.title === "生成智能体";
 
   useEffect(() => { const timer = window.setInterval(() => setNowMs(Date.now()), 1000); return () => window.clearInterval(timer); }, []);
   useEffect(() => { if (selectedPackage?.snapshot.skills.length) setSelectedSkillId((c) => c || selectedPackage.snapshot.skills[0]!.id); else setSelectedSkillId(""); }, [selectedPackage]);
@@ -129,9 +130,11 @@ export default function LiteWorkspace() {
       });
       if (createdId) { setInstruction(""); await refreshPackages(createdId); }
       const doneLabel = createdName ? `生成完成：${createdName}` : "生成完成，已打开新智能体";
+      setGeneratePreviews([]);
       finishProgress(doneLabel); setStatus(doneLabel);
     } catch (error) {
       const message = error instanceof Error ? error.message : "生成失败";
+      setGeneratePreviews([]);
       failProgress(message); setStatus(message);
     }
   }
@@ -359,7 +362,7 @@ export default function LiteWorkspace() {
               </div>
             )}
 
-            <PackagePreviewCard previews={generatePreviews} />
+            <PackagePreviewCard previews={showGeneratePreviews ? generatePreviews : []} />
 
             <div className="flex-1 overflow-auto">
               <ConversationBoard messages={messages} sideStreaming={sideStreaming} />

@@ -127,6 +127,7 @@ export default function LiteArenaPanel() {
 
   const messages = threadDetail?.messages || [];
   const selectedSkill = selectedPackage?.snapshot.skills.find((s) => (s.id || s.dirName) === selectedSkillId) || selectedPackage?.snapshot.skills[0] || null;
+  const showGeneratePreviews = progress?.active && progress.title === "生成智能体";
   const sidebarStyle = { "--sidebar-width": `${leftWidth}px` } as CSSProperties;
   const detailStyle = { "--detail-width": `${rightWidth}px` } as CSSProperties;
 
@@ -435,9 +436,11 @@ function startResizeLeft(e: React.MouseEvent) {
         await refreshPackages(createdId);
       }
       const doneLabel = createdName ? `生成完成：${createdName}` : "生成完成，已打开新智能体";
+      setGeneratePreviews([]);
       finishProgress(doneLabel); setStatus(doneLabel);
     } catch (error) {
       const message = error instanceof Error ? error.message : "生成失败";
+      setGeneratePreviews([]);
       failProgress(message); setStatus(message);
     }
   }
@@ -1189,7 +1192,7 @@ function startResizeLeft(e: React.MouseEvent) {
               </div>
             )}
 
-            <PackagePreviewCard previews={generatePreviews} />
+            <PackagePreviewCard previews={showGeneratePreviews ? generatePreviews : []} />
 
             <div className="flex-1 overflow-auto">
               <ConversationBoard messages={messages} sideStreaming={sideStreaming} packageName={selectedPackage?.name} />
