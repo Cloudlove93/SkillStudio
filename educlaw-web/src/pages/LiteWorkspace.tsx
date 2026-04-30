@@ -93,24 +93,24 @@ export default function LiteWorkspace() {
 
   async function handleGenerate() {
     if (!instruction.trim() || !token) return;
-    startProgress("生成智能体包", "正在生成智能体包..."); setStatus("正在生成...");
+    startProgress("生成智能体", "正在生成智能体..."); setStatus("正在生成智能体...");
     setGeneratePreviews([]);
     try {
       let createdId = "";
+      let createdName = "";
       await liteApi.generatePackageStream(token, instruction.trim(), model || undefined, [], (event) => {
         if (event.event === "phase") { pushProgress(event.data.label); setStatus(event.data.label); }
         if (event.event === "preview_delta") { setGeneratePreviews((prev) => appendPackagePreviewDelta(prev, event.data)); }
         if (event.event === "preview") { setGeneratePreviews((prev) => upsertPackagePreview(prev, event.data)); }
-        if (event.event === "done") createdId = event.data.id;
+        if (event.event === "done") { createdId = event.data.id; createdName = event.data.name; }
         if (event.event === "error") throw new Error(event.data.error || "生成失败");
       });
       if (createdId) { setInstruction(""); await refreshPackages(createdId); }
-      finishProgress("智能体包生成完成"); setStatus("生成完成");
+      const doneLabel = createdName ? `生成完成：${createdName}` : "生成完成，已打开新智能体";
+      finishProgress(doneLabel); setStatus(doneLabel);
     } catch (error) {
       const message = error instanceof Error ? error.message : "生成失败";
       failProgress(message); setStatus(message);
-    } finally {
-      setGeneratePreviews([]);
     }
   }
 
@@ -263,7 +263,7 @@ export default function LiteWorkspace() {
               <div className="space-y-4 p-4">
                 {/* Generate */}
                 <div className="space-y-2">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">生成智能体包</div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">生成智能体</div>
                   <Textarea value={instruction} onChange={(e) => setInstruction(e.target.value)} placeholder="描述你想生成的智能体，例如：班级管理助手、作文批改导师..." rows={4} className="resize-none rounded-[16px] border-border/70 bg-card/80" />
                   <div className="flex gap-2">
                     <Input value={model} onChange={(e) => setModel(e.target.value)} placeholder="覆盖模型（可选）" className="h-9 text-xs rounded-[12px] border-border/70 bg-card/80" />

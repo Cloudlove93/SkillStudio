@@ -41,7 +41,7 @@ router.post("/generate", requireAuth, async (req, res) => {
     );
     res.json(pkg);
   } catch (error) {
-    res.status(400).json({ error: error instanceof Error ? error.message : "生成智能体包失败" });
+    res.status(400).json({ error: error instanceof Error ? error.message : "生成智能体失败" });
   }
 });
 
@@ -62,8 +62,8 @@ router.post("/generate/stream", requireAuth, async (req: Request, res: Response)
     try { writeSseEvent(res, "ping", {}); } catch { /* ignore */ }
   }, 5000);
   try {
-    writeSseEvent(res, "phase", { label: "整理需求并准备生成提示词" });
-    writeSseEvent(res, "phase", { label: "调用模型生成 agent.md 与 skill.md" });
+    writeSseEvent(res, "phase", { label: "整理需求，准备生成智能体" });
+    writeSseEvent(res, "phase", { label: "调用模型生成智能体内容" });
     const pkg = await generatePackage(
       (req as AuthedRequest).userId || "",
       String(req.body?.instruction || ""),
@@ -72,12 +72,12 @@ router.post("/generate/stream", requireAuth, async (req: Request, res: Response)
       (preview) => writeSseEvent(res, "preview", preview),
       (delta) => writeSseEvent(res, "preview_delta", delta),
     );
-    writeSseEvent(res, "phase", { label: "保存智能体包与初始版本" });
+    writeSseEvent(res, "phase", { label: "保存智能体与初始版本" });
     writeSseEvent(res, "done", pkg);
     writeSseEvent(res, "stream_end", { ok: true });
     console.log("[packages.generate.stream] done", { packageId: pkg.id, durationMs: Date.now() - startedAt });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "生成智能体包失败";
+    const message = error instanceof Error ? error.message : "生成智能体失败";
     console.error("[packages.generate.stream] error", { durationMs: Date.now() - startedAt, error: message });
     writeSseEvent(res, "error", { error: message });
     writeSseEvent(res, "stream_end", { ok: false });

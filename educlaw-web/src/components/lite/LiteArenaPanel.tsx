@@ -96,6 +96,7 @@ export default function LiteArenaPanel() {
   const [documents, setDocuments] = useState<Array<{ name: string; content: string }>>([]);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const docFileRef = useRef<HTMLInputElement | null>(null);
+  const preserveGenerateProgressRef = useRef(false);
 
   // Interactive optimization state
   const [interactiveMode, setInteractiveMode] = useState(false);
@@ -181,12 +182,16 @@ export default function LiteArenaPanel() {
   }
 
   useEffect(() => {
+    const preserveGenerateProgress = preserveGenerateProgressRef.current;
+    preserveGenerateProgressRef.current = false;
     setCenterPreview(null);
     setInteractiveInput("");
     setInteractivePhase("idle");
-    setProgress(null);
-    setStatus("");
-    setGeneratePreviews([]);
+    if (!preserveGenerateProgress) {
+      setProgress(null);
+      setStatus("");
+      setGeneratePreviews([]);
+    }
     setSideStreaming({ baseline: false, enhanced: false });
 
     if (!selectedPackageId) {
@@ -383,24 +388,29 @@ function startResizeLeft(e: React.MouseEvent) {
 
   async function handleGenerate() {
     if ((!instruction.trim() && documents.length === 0) || !token) return;
-    startProgress("生成智能体包", "正在生成智能体包..."); setStatus("正在生成...");
+    startProgress("生成智能体", "正在生成智能体..."); setStatus("正在生成智能体...");
     setGeneratePreviews([]);
     try {
       let createdId = "";
+      let createdName = "";
       await liteApi.generatePackageStream(token, instruction.trim(), undefined, documents, (event) => {
         if (event.event === "phase") { pushProgress(event.data.label); setStatus(event.data.label); }
         if (event.event === "preview_delta") { setGeneratePreviews((prev) => appendPackagePreviewDelta(prev, event.data)); }
         if (event.event === "preview") { setGeneratePreviews((prev) => upsertPackagePreview(prev, event.data)); }
-        if (event.event === "done") createdId = event.data.id;
+        if (event.event === "done") { createdId = event.data.id; createdName = event.data.name; }
         if (event.event === "error") throw new Error(event.data.error || "生成失败");
       });
-      if (createdId) { setInstruction(""); setDocuments([]); await refreshPackages(createdId); }
-      finishProgress("智能体包生成完成"); setStatus("生成完成");
+      if (createdId) {
+        preserveGenerateProgressRef.current = true;
+        setInstruction("");
+        setDocuments([]);
+        await refreshPackages(createdId);
+      }
+      const doneLabel = createdName ? `生成完成：${createdName}` : "生成完成，已打开新智能体";
+      finishProgress(doneLabel); setStatus(doneLabel);
     } catch (error) {
       const message = error instanceof Error ? error.message : "生成失败";
       failProgress(message); setStatus(message);
-    } finally {
-      setGeneratePreviews([]);
     }
   }
 
