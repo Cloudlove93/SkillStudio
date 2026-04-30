@@ -173,20 +173,98 @@ function normalizeSnapshot(input: PackageGenerationResult): AgentPackageSnapshot
 
 function getBaseOutputSchemaPrompt(): string {
   return [
-    "## 输出 JSON 结构",
-    "返回以下结构的 JSON：",
-    "- name: 智能体名称",
-    "- description: 智能体一句话描述",
-    "- skills: 1-2 个核心技能的元数据数组，每个技能包含：",
-    "  - dirName: 目录名，小写英文 kebab-case",
-    "  - name: 技能显示名称",
-    "  - description: 一句话说明该 skill 做什么，以及什么时候使用（必须包含'当/如果/用于/遇到/针对'等触发词）",
+    "## 输出格式",
+    "返回普通文本，不要 JSON，不要 Markdown 代码块。",
+    "严格使用下面的行格式：",
+    "NAME: <智能体名称>",
+    "DESCRIPTION: <智能体一句话描述>",
+    "SKILL: <kebab-case-dir-name> | <技能显示名称> | <一句话说明该 skill 做什么，以及什么时候使用>",
+    "SKILL: <kebab-case-dir-name> | <技能显示名称> | <一句话说明该 skill 做什么，以及什么时候使用>",
     "",
     "要求：",
-    "1. 只返回 JSON，不要 Markdown 代码块",
-    "2. skills 最多 2 个，选择最能支撑该智能体工作的核心技能",
-    "3. 不要在本步骤生成 agentMd、rubricMd 或 skillMd，大段 Markdown 会在后续步骤单独生成",
+    "1. skills 最多 2 个，选择最能支撑该智能体工作的核心技能",
+    "2. dir-name 必须是小写英文 kebab-case",
+    "3. description 必须包含'当/如果/用于/遇到/针对'等触发词",
+    "4. 不要在本步骤生成 agent.md、rubric.md 或 SKILL.md",
   ].join("\n");
+}
+
+function createFallbackBase(
+  instruction: string,
+  documents?: Array<{ name: string; content: string }>,
+): PackageBaseGenerationResult {
+  const firstDocumentName = documents?.[0]?.name?.replace(/\.[^.]+$/, "").trim();
+  const source = instruction.trim() || documents?.map((document) => document.content).join("\n").trim() || "";
+  const compact = source.replace(/\s+/g, " ").slice(0, 28).trim();
+  const name = firstDocumentName || (compact ? `${compact}助手` : "智能体助手");
+  const description = compact
+    ? `用于根据“${compact}”相关需求完成分析、生成与答疑任务。`
+    : "用于根据用户需求和上传资料完成分析、生成与答疑任务。";
+
+  return {
+    name,
+    description,
+    skills: [
+      {
+        dirName: "core-task",
+        name: "核心任务处理",
+        description: "用于当用户提出核心任务时，分析需求并生成结构化、高质量的回答。",
+      },
+      {
+        dirName: documents?.length ? "document-grounding" : "quality-review",
+        name: documents?.length ? "资料理解与引用" : "质量检查",
+        description: documents?.length
+          ? "用于遇到上传资料时，提取关键信息并基于资料完成回答。"
+          : "用于在输出前检查内容的准确性、完整性和表达质量。",
+      },
+    ],
+  };
+}
+
+function parseBaseMetadataText(
+  raw: string,
+  fallback: PackageBaseGenerationResult,
+): PackageBaseGenerationResult {
+  const text = stripMarkdownFence(raw);
+  let name = "";
+  let description = "";
+  const skills: PackageBaseGenerationResult["skills"] = [];
+
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.replace(/^[-*\d.)\s]+/, "").trim();
+    if (!line) continue;
+
+    const nameMatch = line.match(/^(?:NAME|Name|名称|智能体名称)\s*[:：]\s*(.+)$/);
+    if (nameMatch) {
+      name = nameMatch[1]!.trim();
+      continue;
+    }
+
+    const descriptionMatch = line.match(/^(?:DESCRIPTION|Description|描述|一句话描述)\s*[:：]\s*(.+)$/);
+    if (descriptionMatch) {
+      description = descriptionMatch[1]!.trim();
+      continue;
+    }
+
+    const skillMatch = line.match(/^(?:SKILL|Skill|技能)\s*\d*\s*[:：]\s*(.+)$/);
+    if (skillMatch) {
+      const rawSkill = skillMatch[1]!.trim();
+      const parts = rawSkill.split("|").map((part) => part.trim()).filter(Boolean);
+      if (parts.length >= 3) {
+        skills.push({ dirName: parts[0]!, name: parts[1]!, description: parts.slice(2).join(" | ") });
+      } else if (parts.length === 2) {
+        skills.push({ dirName: slugify(parts[0]!), name: parts[0]!, description: parts[1]! });
+      } else if (rawSkill) {
+        skills.push({ dirName: slugify(rawSkill), name: rawSkill, description: `用于当用户需要${rawSkill}时提供支持。` });
+      }
+    }
+  }
+
+  return {
+    name: name || fallback.name,
+    description: description || fallback.description,
+    skills: skills.length > 0 ? skills : fallback.skills,
+  };
 }
 
 function getCompactSkillTemplatePrompt(): string {
@@ -498,15 +576,17 @@ export async function generatePackage(
     model,
   });
 
-  const base = await generateJson<PackageBaseGenerationResult>({
+  const fallbackBase = createFallbackBase(instruction, documents);
+  const baseRaw = await generateText({
     model,
     systemPrompt: [
       "You are an agent-package generation assistant.",
-      "Return JSON only.",
+      "Return plain text only.",
       "Generate only compact metadata for one reusable prompt package.",
       "Prefer Chinese content when the user instruction is Chinese.",
       "When documents are provided without explicit instructions, deeply analyze the documents to extract domain knowledge, workflows, and rules, then build the agent and skills entirely from the document content.",
       "Do not generate agent.md, rubric.md, or full SKILL.md content in this step.",
+      "Never return JSON.",
     ].join("\n"),
     userPrompt: hasInstruction
       ? [
@@ -525,7 +605,8 @@ export async function generatePackage(
         ].join("\n"),
     temperature: 0.4,
     maxTokens: 2000,
-  }, 0);
+  });
+  const base = parseBaseMetadataText(baseRaw, fallbackBase);
 
   validateBaseGenerationResult(base);
   const skillMetas = normalizeSkillMetadata(base.skills);
