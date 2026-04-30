@@ -1,3 +1,5 @@
+import { jsonrepair } from "jsonrepair";
+
 export function extractFirstJsonObject(raw: string): string | null {
   const start = raw.indexOf("{");
   if (start < 0) return null;
@@ -25,5 +27,9 @@ export function extractFirstJsonObject(raw: string): string | null {
 
 export function parseJsonObject<T>(raw: string): T {
   const candidate = extractFirstJsonObject(raw) || raw;
-  return JSON.parse(candidate) as T;
+  try {
+    return JSON.parse(candidate) as T;
+  } catch (error) {
+    return JSON.parse(jsonrepair(candidate)) as T;
+  }
 }

@@ -9,6 +9,7 @@ import type {
 import { generateChat, generateJson, generateText, streamText } from "./llm-service.js";
 import { newId, query } from "./db.js";
 import type { DbRowPackage, DbRowPackageVersion } from "../types.js";
+import { parseJsonObject } from "../utils/json.js";
 
 interface PackageGenerationResult {
   name: string;
@@ -173,19 +174,26 @@ function normalizeSnapshot(input: PackageGenerationResult): AgentPackageSnapshot
 
 function getBaseOutputSchemaPrompt(): string {
   return [
-    "## 输出格式",
-    "返回普通文本，不要 JSON，不要 Markdown 代码块。",
-    "严格使用下面的行格式：",
-    "NAME: <智能体名称>",
-    "DESCRIPTION: <智能体一句话描述>",
-    "SKILL: <kebab-case-dir-name> | <技能显示名称> | <一句话说明该 skill 做什么，以及什么时候使用>",
-    "SKILL: <kebab-case-dir-name> | <技能显示名称> | <一句话说明该 skill 做什么，以及什么时候使用>",
+    "## 输出 JSON 结构",
+    "返回一个严格 JSON 对象，不要 Markdown 代码块，不要解释。",
+    "{",
+    "  \"name\": \"智能体名称\",",
+    "  \"description\": \"智能体一句话描述\",",
+    "  \"skills\": [",
+    "    {",
+    "      \"dirName\": \"kebab-case-dir-name\",",
+    "      \"name\": \"技能显示名称\",",
+    "      \"description\": \"一句话说明该 skill 做什么，以及什么时候使用\"",
+    "    }",
+    "  ]",
+    "}",
     "",
     "要求：",
-    "1. skills 最多 2 个，选择最能支撑该智能体工作的核心技能",
-    "2. dir-name 必须是小写英文 kebab-case",
-    "3. description 必须包含'当/如果/用于/遇到/针对'等触发词",
-    "4. 不要在本步骤生成 agent.md、rubric.md 或 SKILL.md",
+    "1. JSON 只包含 name、description、skills",
+    "2. skills 最多 2 个，选择最能支撑该智能体工作的核心技能",
+    "3. dirName 必须是小写英文 kebab-case",
+    "4. description 必须包含'当/如果/用于/遇到/针对'等触发词",
+    "5. 不要在本步骤生成 agent.md、rubric.md 或 SKILL.md",
   ].join("\n");
 }
 
@@ -265,6 +273,32 @@ function parseBaseMetadataText(
     description: description || fallback.description,
     skills: skills.length > 0 ? skills : fallback.skills,
   };
+}
+
+function parseBaseMetadataJsonOrFallback(
+  raw: string,
+  fallback: PackageBaseGenerationResult,
+): PackageBaseGenerationResult {
+  try {
+    const parsed = parseJsonObject<Partial<PackageBaseGenerationResult>>(raw);
+    return {
+      name: typeof parsed.name === "string" && parsed.name.trim() ? parsed.name : fallback.name,
+      description: typeof parsed.description === "string" && parsed.description.trim() ? parsed.description : fallback.description,
+      skills: Array.isArray(parsed.skills) && parsed.skills.length > 0
+        ? parsed.skills.map((skill, index) => ({
+            dirName: typeof skill?.dirName === "string" ? skill.dirName : `skill-${index + 1}`,
+            name: typeof skill?.name === "string" ? skill.name : `技能 ${index + 1}`,
+            description: typeof skill?.description === "string" ? skill.description : `用于当用户需要技能 ${index + 1} 时提供支持。`,
+          }))
+        : fallback.skills,
+    };
+  } catch (error) {
+    console.warn("[packages.generate] base metadata JSON parse failed; using text/fallback parser", {
+      error: error instanceof Error ? error.message : String(error),
+      preview: raw.slice(0, 500),
+    });
+    return parseBaseMetadataText(raw, fallback);
+  }
 }
 
 function getCompactSkillTemplatePrompt(): string {
@@ -581,12 +615,12 @@ export async function generatePackage(
     model,
     systemPrompt: [
       "You are an agent-package generation assistant.",
-      "Return plain text only.",
+      "Return strict JSON only.",
       "Generate only compact metadata for one reusable prompt package.",
       "Prefer Chinese content when the user instruction is Chinese.",
       "When documents are provided without explicit instructions, deeply analyze the documents to extract domain knowledge, workflows, and rules, then build the agent and skills entirely from the document content.",
       "Do not generate agent.md, rubric.md, or full SKILL.md content in this step.",
-      "Never return JSON.",
+      "Do not include long Markdown content in JSON fields.",
     ].join("\n"),
     userPrompt: hasInstruction
       ? [
@@ -606,7 +640,7 @@ export async function generatePackage(
     temperature: 0.4,
     maxTokens: 2000,
   });
-  const base = parseBaseMetadataText(baseRaw, fallbackBase);
+  const base = parseBaseMetadataJsonOrFallback(baseRaw, fallbackBase);
 
   validateBaseGenerationResult(base);
   const skillMetas = normalizeSkillMetadata(base.skills);
