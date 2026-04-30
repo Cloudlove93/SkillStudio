@@ -14,11 +14,34 @@ interface ChatRequestInput {
   maxTokens?: number;
 }
 
+const STRICT_JSON_CONTRACT = [
+  "Strict JSON output contract:",
+  "1. Return exactly one JSON object and nothing else.",
+  "2. Do not wrap the JSON in Markdown fences.",
+  "3. Do not include comments, explanatory text, or trailing commas.",
+  "4. Use double quotes for every key and string value.",
+  "5. Inside string values, escape newlines as \\n, quotes as \\\", and backslashes as \\\\.",
+  "6. Never place raw multi-line Markdown directly inside JSON strings.",
+].join("\n");
+
 function buildMessages(input: ChatRequestInput): ChatMessage[] {
   return [
     { role: "system", content: input.systemPrompt },
     { role: "user", content: input.userPrompt },
   ];
+}
+
+function withStrictJsonContract(input: ChatRequestInput): ChatRequestInput {
+  return {
+    ...input,
+    systemPrompt: [STRICT_JSON_CONTRACT, input.systemPrompt].join("\n\n"),
+    userPrompt: [
+      input.userPrompt,
+      "",
+      "Before sending the final answer, validate mentally that it is accepted by JSON.parse.",
+      STRICT_JSON_CONTRACT,
+    ].join("\n"),
+  };
 }
 
 function logLlmRequestStart(
@@ -263,10 +286,22 @@ export async function* streamChat(messages: ChatMessage[], model?: string, tempe
 
 export async function generateJson<T>(input: ChatRequestInput, retries = 1): Promise<T> {
   let lastError: Error | undefined;
+  const jsonInput = withStrictJsonContract(input);
   for (let attempt = 0; attempt <= retries; attempt++) {
+    let raw = "";
     try {
-      const raw = await generateText(input);
-      return parseJsonObject<T>(raw);
+      raw = await generateText(jsonInput);
+      try {
+        return parseJsonObject<T>(raw);
+      } catch (parseError) {
+        console.warn("[llm] invalid json output", {
+          model: jsonInput.model || config.llmModel,
+          attempt: attempt + 1,
+          error: parseError instanceof Error ? parseError.message : String(parseError),
+          preview: raw.slice(0, 500),
+        });
+        return await repairJsonOutput<T>(jsonInput, raw, parseError);
+      }
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
       if (attempt < retries) {
@@ -275,9 +310,44 @@ export async function generateJson<T>(input: ChatRequestInput, retries = 1): Pro
       }
     }
   }
-  throw lastError || new Error("JSON 生成失败");
+  throw new Error(`JSON 生成失败：${lastError?.message || "模型未返回可解析的 JSON"}`);
 }
 
 export function resolveBaselineModel(preferred?: string) {
   return preferred || config.llmBaselineModel || config.llmModel;
+}
+
+async function repairJsonOutput<T>(
+  input: ChatRequestInput,
+  raw: string,
+  parseError: unknown,
+): Promise<T> {
+  const repaired = await generateText({
+    model: input.model,
+    temperature: 0,
+    maxTokens: input.maxTokens,
+    systemPrompt: [
+      "You repair invalid JSON.",
+      "Return one strict JSON object only.",
+      "Do not add Markdown fences, comments, or explanation.",
+      "Preserve the original keys and content.",
+      "Escape all newlines, quotes, and backslashes inside string values.",
+      STRICT_JSON_CONTRACT,
+    ].join("\n"),
+    userPrompt: [
+      "The following model output was expected to be JSON, but JSON.parse failed.",
+      `Parse error: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
+      "",
+      "Repair it into strict JSON:",
+      raw,
+    ].join("\n"),
+  });
+
+  try {
+    return parseJsonObject<T>(repaired);
+  } catch (repairError) {
+    throw new Error(
+      `模型返回的 JSON 格式无效，自动修复也失败：${repairError instanceof Error ? repairError.message : String(repairError)}`,
+    );
+  }
 }
