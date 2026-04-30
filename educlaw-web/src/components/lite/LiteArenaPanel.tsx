@@ -38,6 +38,30 @@ import {
 type DetailTab = "agent" | "rubric" | "skills" | "versions" | "report" | "optimization" | "diff";
 type ProgressState = { title: string; phase: string; steps: string[]; startedAt: number; active: boolean; isError: boolean };
 
+const DOCX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+function isDocxFile(file: File): boolean {
+  return file.name.toLowerCase().endsWith(".docx") || file.type === DOCX_MIME_TYPE;
+}
+
+async function readTextDocument(file: File): Promise<{ name: string; content: string }> {
+  if (isDocxFile(file)) {
+    const mammoth = await import("mammoth");
+    const result = await mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() });
+    const warnings = result.messages?.map((message) => message.message).filter(Boolean) || [];
+    const warningText = warnings.length ? `\n\n[Word 解析提示]\n${warnings.map((message) => `- ${message}`).join("\n")}` : "";
+    return {
+      name: file.name,
+      content: `${result.value.trim()}${warningText}`.trim() || "[Word 文档没有提取到可用文本]",
+    };
+  }
+
+  return {
+    name: file.name,
+    content: await file.text(),
+  };
+}
+
 
 
 export default function LiteArenaPanel() {
@@ -322,13 +346,18 @@ function startResizeLeft(e: React.MouseEvent) {
   async function handleDocFiles(fileList: FileList | null) {
     if (!fileList) return;
     const files = Array.from(fileList);
-    const read = (file: File) => new Promise<{ name: string; content: string }>((resolve) => {
-      const reader = new FileReader();
-      reader.onload = (e) => resolve({ name: file.name, content: String(e.target?.result || "") });
-      reader.readAsText(file);
-    });
-    const results = await Promise.all(files.map(read));
-    setDocuments((prev) => [...prev, ...results]);
+    const results: Array<{ name: string; content: string }> = [];
+    for (const file of files) {
+      try {
+        results.push(await readTextDocument(file));
+      } catch (error) {
+        setStatus(`${file.name} 读取失败：${error instanceof Error ? error.message : "不支持的文档格式"}`);
+      }
+    }
+    if (results.length > 0) {
+      setDocuments((prev) => [...prev, ...results]);
+      setStatus(`已添加 ${results.length} 个文档`);
+    }
   }
 
   async function handleGenerate() {
@@ -777,7 +806,7 @@ function startResizeLeft(e: React.MouseEvent) {
               <div className="flex flex-wrap gap-2">
                 <Button size="sm" className="flex-1 min-w-[4rem] rounded-[12px]" onClick={() => void handleGenerate()} disabled={!instruction.trim() && documents.length === 0}><Sparkles className="mr-1.5 size-3.5" />生成</Button>
                 <Button size="sm" variant="outline" className="flex-1 min-w-[4rem] rounded-[12px]" onClick={() => docFileRef.current?.click()}><FileText className="mr-1.5 size-3.5" />文档</Button>
-                <input ref={docFileRef} type="file" multiple accept=".txt,.md,.csv,.json,.yaml,.yml,.js,.ts,.py,.html,.css" hidden onChange={(e) => void handleDocFiles(e.target.files)} />
+                <input ref={docFileRef} type="file" multiple accept=".txt,.md,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.csv,.json,.yaml,.yml,.js,.ts,.py,.html,.css" hidden onChange={(e) => { void handleDocFiles(e.target.files); e.currentTarget.value = ""; }} />
                 <Button size="sm" variant="outline" className="flex-1 min-w-[4rem] rounded-[12px]" onClick={() => fileRef.current?.click()}><Upload className="mr-1.5 size-3.5" />导入</Button>
                 <input ref={fileRef} type="file" accept=".zip" hidden onChange={(e) => { const file = e.target.files?.[0]; if (file) void handleImport(file); }} />
               </div>
