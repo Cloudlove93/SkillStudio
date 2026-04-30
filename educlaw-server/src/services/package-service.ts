@@ -136,9 +136,21 @@ async function collectStreamedText(
   onDelta?: (delta: string) => void,
 ): Promise<string> {
   let content = "";
-  for await (const delta of streamText(input)) {
-    content += delta;
-    onDelta?.(delta);
+  try {
+    for await (const delta of streamText(input)) {
+      content += delta;
+      onDelta?.(delta);
+    }
+  } catch (error) {
+    if (content.trim().length === 0) {
+      console.warn("[packages.generate] streaming failed before content; retrying without stream", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      const fallbackText = await generateText(input);
+      onDelta?.(fallbackText);
+      return fallbackText;
+    }
+    throw new Error(`模型流式响应中断：${error instanceof Error ? error.message : String(error)}`);
   }
   return content;
 }

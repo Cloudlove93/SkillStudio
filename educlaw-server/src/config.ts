@@ -83,5 +83,6 @@ export const config = {
   llmBaseUrl: (process.env.LLM_BASE_URL || "https://api.openai.com/v1").replace(/\/+$/, ""),
   llmApiKey,
   llmModel: process.env.LLM_MODEL || "gpt-4.1-mini",
+  llmNetworkRetries: readNumber("LLM_NETWORK_RETRIES", 2),
   llmBaselineModel: process.env.LLM_BASELINE_MODEL || ""
 };

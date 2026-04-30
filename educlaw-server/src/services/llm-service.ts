@@ -71,6 +71,79 @@ function createAbortSignal(timeoutMs: number): AbortSignal {
   return signal;
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function getErrorCause(error: unknown): { message?: string; code?: string } {
+  const cause = error instanceof Error ? error.cause : undefined;
+  if (cause && typeof cause === "object") {
+    const record = cause as { message?: unknown; code?: unknown };
+    return {
+      message: typeof record.message === "string" ? record.message : undefined,
+      code: typeof record.code === "string" ? record.code : undefined,
+    };
+  }
+  return {};
+}
+
+function describeFetchFailure(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  const cause = getErrorCause(error);
+  const detail = [cause.code, cause.message].filter(Boolean).join(" ");
+  return detail ? `${message} (${detail})` : message;
+}
+
+function shouldRetryFetchFailure(error: unknown): boolean {
+  if (error instanceof Error && error.name === "AbortError") return false;
+  const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  const cause = getErrorCause(error);
+  const code = cause.code || "";
+  return (
+    message.includes("fetch failed") ||
+    message.includes("network") ||
+    ["ECONNRESET", "ETIMEDOUT", "ECONNREFUSED", "EAI_AGAIN", "ENOTFOUND", "UND_ERR_CONNECT_TIMEOUT", "UND_ERR_SOCKET"].includes(code)
+  );
+}
+
+async function fetchWithNetworkRetry(
+  url: string,
+  init: RequestInit,
+  context: { kind: string; model: string; stream: boolean },
+): Promise<Response> {
+  const retries = Math.max(0, config.llmNetworkRetries);
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      return await fetch(url, init);
+    } catch (error) {
+      lastError = error;
+      if (error instanceof Error && error.name === "AbortError") {
+        console.error("[llm] request timeout", {
+          ...context,
+          timeoutMs: config.llmTimeoutMs,
+        });
+        throw new Error(`模型请求超时：超过 ${Math.round(config.llmTimeoutMs / 1000)} 秒未返回`);
+      }
+
+      const retryable = shouldRetryFetchFailure(error);
+      console.warn("[llm] network request failed", {
+        ...context,
+        attempt: attempt + 1,
+        retries,
+        retryable,
+        error: describeFetchFailure(error),
+      });
+
+      if (!retryable || attempt >= retries) break;
+      await sleep(750 * (attempt + 1));
+    }
+  }
+
+  throw new Error(`模型网络请求失败：${describeFetchFailure(lastError)}。请稍后重试，或在服务器运行 scripts/test-llm-api.sh 检查 LLM_BASE_URL / LLM_MODEL / 网络连通性。`);
+}
+
 function usesKimiK26(model: string): boolean {
   return model.toLowerCase() === "kimi-k2.6";
 }
@@ -107,9 +180,9 @@ async function createChatResponse(input: ChatRequestInput, stream: boolean): Pro
   const model = input.model || config.llmModel;
   logLlmRequestStart("prompt", messages, model, stream, input.maxTokens);
 
-  let response: Response;
-  try {
-    response = await fetch(`${config.llmBaseUrl}/chat/completions`, {
+  const response = await fetchWithNetworkRetry(
+    `${config.llmBaseUrl}/chat/completions`,
+    {
       method: "POST",
       headers: {
         Authorization: `Bearer ${config.llmApiKey}`,
@@ -117,14 +190,9 @@ async function createChatResponse(input: ChatRequestInput, stream: boolean): Pro
       },
       body: JSON.stringify(buildChatCompletionBody(model, messages, stream, input.temperature, input.maxTokens)),
       signal: createAbortSignal(config.llmTimeoutMs),
-    });
-  } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
-      console.error("[llm] request timeout", { kind: "prompt", model, timeoutMs: config.llmTimeoutMs });
-      throw new Error(`模型请求超时：超过 ${Math.round(config.llmTimeoutMs / 1000)} 秒未返回`);
-    }
-    throw error;
-  }
+    },
+    { kind: "prompt", model, stream },
+  );
 
   console.log("[llm] response received", { kind: "prompt", model, status: response.status, ok: response.ok });
 
@@ -144,9 +212,9 @@ async function createChatResponseMessages(messages: ChatMessage[], model?: strin
   const resolvedModel = model || config.llmModel;
   logLlmRequestStart("messages", messages, resolvedModel, stream);
 
-  let response: Response;
-  try {
-    response = await fetch(`${config.llmBaseUrl}/chat/completions`, {
+  const response = await fetchWithNetworkRetry(
+    `${config.llmBaseUrl}/chat/completions`,
+    {
       method: "POST",
       headers: {
         Authorization: `Bearer ${config.llmApiKey}`,
@@ -154,14 +222,9 @@ async function createChatResponseMessages(messages: ChatMessage[], model?: strin
       },
       body: JSON.stringify(buildChatCompletionBody(resolvedModel, messages, stream, temperature)),
       signal: createAbortSignal(config.llmTimeoutMs),
-    });
-  } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
-      console.error("[llm] request timeout", { kind: "messages", model: resolvedModel, timeoutMs: config.llmTimeoutMs });
-      throw new Error(`模型请求超时：超过 ${Math.round(config.llmTimeoutMs / 1000)} 秒未返回`);
-    }
-    throw error;
-  }
+    },
+    { kind: "messages", model: resolvedModel, stream },
+  );
 
   console.log("[llm] response received", { kind: "messages", model: resolvedModel, status: response.status, ok: response.ok });
 
