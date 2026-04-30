@@ -62,7 +62,7 @@ const markdownComponents: Components = {
 
 export function MarkdownContent({ content }: { content: string }) {
   return (
-    <div className="prose prose-sm max-w-none dark:prose-invert">
+    <div className="prose prose-sm max-w-none min-w-0 break-words [overflow-wrap:anywhere] dark:prose-invert">
       <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} components={markdownComponents}>
         {content}
       </ReactMarkdown>
@@ -119,14 +119,14 @@ export function VersionDiffView({ result }: { result: VersionCompareResult }) {
 export function PackagePreviewCard({ previews }: { previews: PackagePreview[] }) {
   if (!previews.length) return null;
   return (
-    <div className="mx-5 mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+    <div className="mx-3 mt-3 grid gap-2 sm:mx-5 md:grid-cols-2 xl:grid-cols-3">
       {previews.map((p, i) => (
-        <div key={`${p.name}-${i}`} className="rounded-[20px] border border-border/70 bg-card/80 px-4 py-3 shadow-[var(--shadow-sm)]">
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+        <div key={`${p.name}-${i}`} className="min-w-0 rounded-[20px] border border-border/70 bg-card/80 px-4 py-3 shadow-[var(--shadow-sm)]">
+          <div className="flex min-w-0 items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
             <span className="inline-flex size-6 items-center justify-center rounded-lg bg-primary/10 text-primary text-[10px]">{p.type[0]?.toUpperCase()}</span>
-            {p.name}
+            <span className="truncate">{p.name}</span>
           </div>
-          <div className="mt-2 max-h-36 overflow-y-auto whitespace-pre-wrap break-words text-xs leading-5 text-muted-foreground">{p.content}</div>
+          <div className="mt-2 max-h-36 overflow-y-auto whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-xs leading-5 text-muted-foreground">{p.content}</div>
         </div>
       ))}
     </div>
@@ -150,7 +150,7 @@ export function ConversationBoard({ messages, sideStreaming, packageName }: { me
   }
 
   return (
-    <div ref={scrollRef} className="flex h-full flex-col gap-4 overflow-y-auto px-5 py-4">
+    <div ref={scrollRef} className="flex h-full flex-col gap-4 overflow-y-auto px-3 py-4 sm:px-5">
       {sharedMessages.map((shared, idx) => {
         const baselineMsgs = messages.filter((m) => m.side === "baseline" && m.role === "assistant");
         const enhancedMsgs = messages.filter((m) => m.side === "enhanced" && m.role === "assistant");
@@ -161,13 +161,13 @@ export function ConversationBoard({ messages, sideStreaming, packageName }: { me
         return (
           <div key={shared.id} className="space-y-3">
             <div className="flex justify-end">
-              <div className="max-w-[80%] rounded-[20px] rounded-tr-md bg-primary px-4 py-3 text-sm text-primary-foreground shadow-[var(--shadow-sm)]">
+              <div className="max-w-[92%] rounded-[20px] rounded-tr-md bg-primary px-4 py-3 text-sm text-primary-foreground shadow-[var(--shadow-sm)] sm:max-w-[80%]">
                 {shared.content}
               </div>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
-              <div className={`rounded-[20px] border px-4 py-3 shadow-[var(--shadow-sm)] ${sideStreaming.baseline && isLatest ? "border-cyan-500/20 bg-cyan-500/5" : "border-border/70 bg-card/80"}`}>
-                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              <div className={`min-w-0 rounded-[20px] border px-4 py-3 shadow-[var(--shadow-sm)] ${sideStreaming.baseline && isLatest ? "border-cyan-500/20 bg-cyan-500/5" : "border-border/70 bg-card/80"}`}>
+                <div className="flex min-w-0 items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                   <span className="inline-flex size-6 items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-500 text-[10px]">B</span>
                   基础模型
                   {sideStreaming.baseline && isLatest && <Loader2 className="ml-auto size-3 animate-spin text-cyan-500" />}
@@ -176,8 +176,8 @@ export function ConversationBoard({ messages, sideStreaming, packageName }: { me
                   {(baselineMsg?.content || "") ? <MarkdownContent content={baselineMsg.content} /> : <span className="text-muted-foreground/50">等待生成...</span>}
                 </div>
               </div>
-              <div className={`rounded-[20px] border px-4 py-3 shadow-[var(--shadow-sm)] ${sideStreaming.enhanced && isLatest ? "border-primary/20 bg-primary/5" : "border-border/70 bg-card/80"}`}>
-                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              <div className={`min-w-0 rounded-[20px] border px-4 py-3 shadow-[var(--shadow-sm)] ${sideStreaming.enhanced && isLatest ? "border-primary/20 bg-primary/5" : "border-border/70 bg-card/80"}`}>
+                <div className="flex min-w-0 items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                   <span className="inline-flex size-6 items-center justify-center rounded-lg bg-primary/10 text-primary text-[10px]">E</span>
                   {packageName || "智能体"}
                   {sideStreaming.enhanced && isLatest && <Loader2 className="ml-auto size-3 animate-spin text-primary" />}

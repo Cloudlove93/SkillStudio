@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { type CSSProperties, useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import type {
   AgentPackageDetail,
@@ -39,6 +39,10 @@ type DetailTab = "agent" | "rubric" | "skills" | "versions" | "report" | "optimi
 type ProgressState = { title: string; phase: string; steps: string[]; startedAt: number; active: boolean; isError: boolean };
 
 const DOCX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+function prefersWideLayout(): boolean {
+  return typeof window === "undefined" || window.matchMedia("(min-width: 1024px)").matches;
+}
 
 function isDocxFile(file: File): boolean {
   return file.name.toLowerCase().endsWith(".docx") || file.type === DOCX_MIME_TYPE;
@@ -84,8 +88,9 @@ export default function LiteArenaPanel() {
   const [generatePreviews, setGeneratePreviews] = useState<PackagePreview[]>([]);
   const [sideStreaming, setSideStreaming] = useState({ baseline: false, enhanced: false });
   const [nowMs, setNowMs] = useState(Date.now());
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [rightSidebarOpen, setRightSidebarOpen] = useState(true);
+  const [isWideLayout, setIsWideLayout] = useState(prefersWideLayout);
+  const [sidebarOpen, setSidebarOpen] = useState(prefersWideLayout);
+  const [rightSidebarOpen, setRightSidebarOpen] = useState(prefersWideLayout);
   const [leftWidth, setLeftWidth] = useState(400);
   const [rightWidth, setRightWidth] = useState(450);
   const [documents, setDocuments] = useState<Array<{ name: string; content: string }>>([]);
@@ -121,8 +126,24 @@ export default function LiteArenaPanel() {
 
   const messages = threadDetail?.messages || [];
   const selectedSkill = selectedPackage?.snapshot.skills.find((s) => (s.id || s.dirName) === selectedSkillId) || selectedPackage?.snapshot.skills[0] || null;
+  const sidebarStyle = { "--sidebar-width": `${leftWidth}px` } as CSSProperties;
+  const detailStyle = { "--detail-width": `${rightWidth}px` } as CSSProperties;
 
   useEffect(() => { const timer = window.setInterval(() => setNowMs(Date.now()), 1000); return () => window.clearInterval(timer); }, []);
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 1024px)");
+    const syncLayout = () => {
+      const wide = media.matches;
+      setIsWideLayout(wide);
+      if (!wide) {
+        setSidebarOpen(false);
+        setRightSidebarOpen(false);
+      }
+    };
+    syncLayout();
+    media.addEventListener("change", syncLayout);
+    return () => media.removeEventListener("change", syncLayout);
+  }, []);
   useEffect(() => { if (selectedPackage?.snapshot.skills.length) setSelectedSkillId((c) => c || selectedPackage.snapshot.skills[0]!.id); else setSelectedSkillId(""); }, [selectedPackage]);
   useEffect(() => {
     if (chatScrollRef.current) {
@@ -769,11 +790,22 @@ function startResizeLeft(e: React.MouseEvent) {
   function formatTarget(value: OptimizationResult["issues"][number]["target"]) { return value === "agent" ? "agent.md" : value === "skill" ? "技能文件" : "rubric.md"; }
 
   return (
-    <div className="flex h-full w-full overflow-hidden">
+    <div className="relative flex h-full min-h-0 w-full overflow-hidden">
+      {!isWideLayout && (sidebarOpen || rightSidebarOpen) && (
+        <button
+          type="button"
+          aria-label="关闭面板"
+          className="absolute inset-0 z-20 bg-background/60 backdrop-blur-sm lg:hidden"
+          onClick={() => {
+            setSidebarOpen(false);
+            setRightSidebarOpen(false);
+          }}
+        />
+      )}
       {/* Sidebar */}
       {sidebarOpen ? (
       <>
-      <aside style={{ width: leftWidth }} className="flex flex-col border-r border-border/70 bg-card/40">
+      <aside style={sidebarStyle} className="absolute inset-y-0 left-0 z-30 flex w-[min(22rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] flex-col border-r border-border/70 bg-card/95 shadow-xl backdrop-blur lg:relative lg:z-auto lg:w-[var(--sidebar-width)] lg:max-w-none lg:bg-card/40 lg:shadow-none lg:backdrop-blur-0">
         <div className="flex h-12 shrink-0 items-center justify-end border-b border-border/70 px-3">
           <button
             onClick={() => setSidebarOpen(false)}
@@ -831,12 +863,12 @@ function startResizeLeft(e: React.MouseEvent) {
         </ScrollArea>
       </aside>
       <div
-        className="w-1 hover:w-1.5 cursor-col-resize bg-border/30 hover:bg-primary/30 transition-all shrink-0"
+        className="hidden w-1 shrink-0 cursor-col-resize bg-border/30 transition-all hover:w-1.5 hover:bg-primary/30 lg:block"
         onMouseDown={startResizeLeft}
       />
       </>
       ) : (
-      <div className="flex w-8 flex-col items-center border-r border-border/70 bg-card/40 py-3">
+      <div className="absolute left-2 top-2 z-10 flex h-9 w-9 flex-col items-center justify-center rounded-xl border border-border/70 bg-card/90 shadow-sm backdrop-blur lg:relative lg:inset-y-0 lg:left-auto lg:top-auto lg:z-auto lg:h-auto lg:w-8 lg:justify-start lg:rounded-none lg:border-y-0 lg:border-l-0 lg:border-r lg:bg-card/40 lg:py-3 lg:shadow-none lg:backdrop-blur-0">
         <button
           onClick={() => setSidebarOpen(true)}
           className="flex size-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
@@ -851,12 +883,12 @@ function startResizeLeft(e: React.MouseEvent) {
       <main className="flex min-w-0 flex-1 flex-col bg-card/20">
         {interactiveMode ? (
           <>
-            <div className="flex h-12 shrink-0 items-center justify-between border-b border-border/70 bg-card/40 px-5">
-              <div className="flex items-center gap-3">
+            <div className="flex min-h-12 shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border/70 bg-card/40 px-14 py-2 lg:px-5">
+              <div className="flex min-w-0 items-center gap-3">
                 <div className="text-sm font-semibold">💬 交互式优化</div>
-                <div className="text-xs text-muted-foreground">与专家对话逐步优化智能体包</div>
+                <div className="hidden text-xs text-muted-foreground sm:block">与专家对话逐步优化智能体包</div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center justify-end gap-2">
                 {interactiveAdopted.length > 0 && (
                   <span className="text-[10px] text-muted-foreground">{interactiveAdopted.length} 项已采纳</span>
                 )}
@@ -882,10 +914,10 @@ function startResizeLeft(e: React.MouseEvent) {
                 )}
               </div>
             </div>
-            <div ref={chatScrollRef} className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
+            <div ref={chatScrollRef} className="flex-1 space-y-5 overflow-y-auto px-3 py-4 sm:px-6">
               {interactiveMessages.map((m, i) => (
                 <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                  <div className="max-w-[50%]">
+                  <div className="max-w-[88%] sm:max-w-[70%] lg:max-w-[50%]">
                     <div className="text-[10px] font-medium text-muted-foreground mb-1">
                       {m.role === "user" ? "你" : "🎓 优化专家"}
                     </div>
@@ -901,7 +933,7 @@ function startResizeLeft(e: React.MouseEvent) {
               ))}
               {interactivePhase !== "idle" && (
                 <div className="flex justify-start">
-                  <div className="w-full max-w-[90%]">
+                  <div className="w-full max-w-[94%] sm:max-w-[90%]">
                     <div className="text-xs font-medium text-muted-foreground mb-1.5 pl-1">🎓 优化专家</div>
                     {interactivePhase === "diagnosing" ? (
                       <div className="rounded-2xl px-5 py-4 text-sm bg-muted/70 border border-border/60 rounded-tl-sm shadow-sm">
@@ -980,25 +1012,25 @@ function startResizeLeft(e: React.MouseEvent) {
                 </div>
               </div>
             )}
-            <div className="border-t border-border/70 bg-card/40 p-4 shrink-0">
-              <div className="flex gap-3">
+            <div className="shrink-0 border-t border-border/70 bg-card/40 p-3 sm:p-4">
+              <div className="flex flex-col gap-3 sm:flex-row">
                 <Textarea value={interactiveInput} onChange={(e) => setInteractiveInput(e.target.value)} placeholder="输入消息与专家对话..." rows={2} className="min-h-[56px] resize-none rounded-[14px] border-border/70 bg-card/80" onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void sendInteractiveMessage(); } }} />
-                <Button className="self-end h-10 px-5 rounded-[12px]" onClick={() => void sendInteractiveMessage()} disabled={interactivePhase !== "idle" || !interactiveInput.trim()}><Send className="mr-1.5 size-4" />发送</Button>
+                <Button className="h-10 w-full rounded-[12px] px-5 sm:w-auto sm:self-end" onClick={() => void sendInteractiveMessage()} disabled={interactivePhase !== "idle" || !interactiveInput.trim()}><Send className="mr-1.5 size-4" />发送</Button>
               </div>
             </div>
           </>
         ) : centerPreview ? (
           <>
-            <div className="flex h-12 shrink-0 items-center justify-between border-b border-border/70 bg-card/40 px-5">
-              <div className="flex items-center gap-3">
-                <div className="text-sm font-semibold">👁 {centerPreview.name}</div>
-                <div className="text-xs text-muted-foreground">中间栏预览</div>
+            <div className="flex min-h-12 shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border/70 bg-card/40 px-14 py-2 lg:px-5">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="truncate text-sm font-semibold">👁 {centerPreview.name}</div>
+                <div className="hidden text-xs text-muted-foreground sm:block">中间栏预览</div>
               </div>
               <div className="flex items-center gap-2">
                 <Button size="sm" variant="outline" className="rounded-[12px]" onClick={() => setCenterPreview(null)}>返回工作台</Button>
               </div>
             </div>
-            <div className="flex-1 overflow-auto p-6">
+            <div className="flex-1 overflow-auto p-3 sm:p-6">
               {centerPreview.type === "report" ? (
                 <div className="max-w-3xl mx-auto space-y-6">
                   {/* Title */}
@@ -1017,7 +1049,7 @@ function startResizeLeft(e: React.MouseEvent) {
                   </div>
 
                   {/* Score cards */}
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div className="rounded-[20px] border border-border/70 bg-muted/50 p-4 text-center space-y-1">
                       <div className="text-sm text-muted-foreground">基础模型</div>
                       <div className="text-3xl font-bold">{centerPreview.report.baseline.total}</div>
@@ -1033,8 +1065,8 @@ function startResizeLeft(e: React.MouseEvent) {
                   </div>
 
                   {/* Dimensions table */}
-                  <div className="overflow-hidden rounded-[20px] border border-border/70">
-                    <table className="w-full text-sm">
+                  <div className="overflow-x-auto rounded-[20px] border border-border/70">
+                    <table className="min-w-[640px] w-full text-sm">
                       <thead className="bg-muted/80">
                         <tr>
                           <th className="px-3 py-2 text-left font-medium">维度</th>
@@ -1071,12 +1103,12 @@ function startResizeLeft(e: React.MouseEvent) {
           </>
         ) : (
           <>
-            <div className="flex h-12 shrink-0 items-center justify-between border-b border-border/70 bg-card/40 px-5">
-              <div className="flex items-center gap-3">
-                <div className="text-sm font-semibold">{selectedPackage?.name || "工作台"}</div>
-                <div className="text-xs text-muted-foreground">输入问题，测试智能体效果</div>
+            <div className="flex min-h-12 shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border/70 bg-card/40 px-14 py-2 lg:px-5">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="truncate text-sm font-semibold">{selectedPackage?.name || "工作台"}</div>
+                <div className="hidden text-xs text-muted-foreground sm:block">输入问题，测试智能体效果</div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center justify-end gap-2">
                 <Button size="sm" variant="outline" className="rounded-[12px]" onClick={() => void handleReport()} disabled={!threadDetail || threadDetail.messages.length === 0}><BarChart3 className="mr-1.5 size-3.5" />评估报告</Button>
                 <Button size="sm" variant="outline" className="rounded-[12px]" onClick={() => void startInteractive()} disabled={!thread}>
                   💬 交互式优化
@@ -1114,10 +1146,10 @@ function startResizeLeft(e: React.MouseEvent) {
               <ConversationBoard messages={messages} sideStreaming={sideStreaming} packageName={selectedPackage?.name} />
             </div>
 
-            <div className="border-t border-border/70 bg-card/40 p-4">
-              <div className="flex gap-3">
+            <div className="border-t border-border/70 bg-card/40 p-3 sm:p-4">
+              <div className="flex flex-col gap-3 sm:flex-row">
                 <Textarea value={input} onChange={(e) => setInput(e.target.value)} placeholder={`输入问题，测试 ${selectedPackage?.name || "智能体"} 效果...`} rows={2} className="min-h-[60px] resize-none rounded-[14px] border-border/70 bg-card/80" />
-                <Button className="self-end h-10 px-5 rounded-[12px]" onClick={() => void handleSend()} disabled={!selectedPackage || !thread || sideStreaming.baseline || sideStreaming.enhanced}><Send className="mr-1.5 size-4" />发送</Button>
+                <Button className="h-10 w-full rounded-[12px] px-5 sm:w-auto sm:self-end" onClick={() => void handleSend()} disabled={!selectedPackage || !thread || sideStreaming.baseline || sideStreaming.enhanced}><Send className="mr-1.5 size-4" />发送</Button>
               </div>
             </div>
           </>
@@ -1128,13 +1160,13 @@ function startResizeLeft(e: React.MouseEvent) {
       {rightSidebarOpen ? (
       <>
       <div
-        className="w-1 hover:w-1.5 cursor-col-resize bg-border/30 hover:bg-primary/30 transition-all shrink-0"
+        className="hidden w-1 shrink-0 cursor-col-resize bg-border/30 transition-all hover:w-1.5 hover:bg-primary/30 lg:block"
         onMouseDown={startResizeRight}
       />
-      <aside style={{ width: rightWidth }} className="flex flex-col border-l border-border/70 bg-card/40">
-        <div className="flex h-12 shrink-0 items-center justify-between border-b border-border/70 px-4">
-          <div className="text-sm font-semibold">{selectedPackage?.name || "未选择"}</div>
-          <div className="flex items-center gap-1">
+      <aside style={detailStyle} className="absolute inset-y-0 right-0 z-30 flex w-[min(24rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] flex-col border-l border-border/70 bg-card/95 shadow-xl backdrop-blur lg:relative lg:z-auto lg:w-[var(--detail-width)] lg:max-w-none lg:bg-card/40 lg:shadow-none lg:backdrop-blur-0">
+        <div className="flex min-h-12 shrink-0 items-center justify-between gap-2 border-b border-border/70 px-3 py-2 sm:px-4">
+          <div className="min-w-0 truncate text-sm font-semibold">{selectedPackage?.name || "未选择"}</div>
+          <div className="flex shrink-0 items-center gap-1">
             <Button size="sm" variant="outline" className="h-7 text-xs rounded-[8px]" onClick={() => void handleExport()} disabled={!selectedPackageId}>导出</Button>
             <Button size="icon" variant="ghost" className="size-7 rounded-[10px] text-destructive hover:text-destructive" onClick={() => void handleDelete()} disabled={!selectedPackageId}><Trash2 className="size-3.5" /></Button>
             <button
@@ -1166,7 +1198,7 @@ function startResizeLeft(e: React.MouseEvent) {
           ))}
         </div>
         <div className="flex-1 min-h-0 overflow-y-auto">
-          <div className="p-4 space-y-4">
+          <div className="space-y-4 p-3 sm:p-4">
               {!selectedPackage && <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">请选择一个智能体包</div>}
 
               {selectedPackage && detailTab === "agent" && (
@@ -1227,9 +1259,9 @@ function startResizeLeft(e: React.MouseEvent) {
 
                   {/* Compare controls */}
                   {versions.length >= 2 && !compareResult && (
-                    <div className="flex items-center gap-2 text-[10px]">
+                    <div className="flex flex-wrap items-center gap-2 text-[10px]">
                       <select
-                        className="rounded-lg border border-border/70 bg-muted/50 px-2 py-1 text-xs"
+                        className="min-w-0 flex-1 rounded-lg border border-border/70 bg-muted/50 px-2 py-1 text-xs"
                         value={compareBaseId}
                         onChange={(e) => setCompareBaseId(e.target.value)}
                       >
@@ -1240,7 +1272,7 @@ function startResizeLeft(e: React.MouseEvent) {
                       </select>
                       <span className="text-muted-foreground">→</span>
                       <select
-                        className="rounded-lg border border-border/70 bg-muted/50 px-2 py-1 text-xs"
+                        className="min-w-0 flex-1 rounded-lg border border-border/70 bg-muted/50 px-2 py-1 text-xs"
                         value={compareTargetId}
                         onChange={(e) => setCompareTargetId(e.target.value)}
                       >
@@ -1347,7 +1379,7 @@ function startResizeLeft(e: React.MouseEvent) {
                       <button onClick={() => setCenterPreview({ type: "report", name: "评估报告", report })} className="text-[10px] text-primary hover:underline">👁 在中间打开</button>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <div className="rounded-[20px] border border-border/70 bg-muted/50 p-3 text-center">
                       <div className="text-xs text-muted-foreground">基础模型</div>
                       <div className="text-2xl font-bold">{report.baseline.total}</div>
@@ -1363,8 +1395,8 @@ function startResizeLeft(e: React.MouseEvent) {
                     <div><strong>结果：</strong>{formatWinner(report.winningSide)}</div>
                     <div className="mt-1"><strong>建议：</strong>{report.recommendation}</div>
                   </div>
-                  <div className="overflow-hidden rounded-[20px] border border-border/70">
-                    <table className="w-full text-xs">
+                  <div className="overflow-x-auto rounded-[20px] border border-border/70">
+                    <table className="min-w-[420px] w-full text-xs">
                       <thead className="bg-muted/80"><tr><th className="px-2 py-1.5 text-left">维度</th><th className="px-2 py-1.5 text-left">基准</th><th className="px-2 py-1.5 text-left">增强</th></tr></thead>
                       <tbody>
                         {report.baseline.dimensions.map((d, i) => {
@@ -1415,7 +1447,7 @@ function startResizeLeft(e: React.MouseEvent) {
       </aside>
       </>
       ) : (
-      <div className="flex w-8 flex-col items-center border-l border-border/70 bg-card/40 py-3">
+      <div className="absolute right-2 top-2 z-10 flex h-9 w-9 flex-col items-center justify-center rounded-xl border border-border/70 bg-card/90 shadow-sm backdrop-blur lg:relative lg:inset-y-0 lg:right-auto lg:top-auto lg:z-auto lg:h-auto lg:w-8 lg:justify-start lg:rounded-none lg:border-y-0 lg:border-r-0 lg:border-l lg:bg-card/40 lg:py-3 lg:shadow-none lg:backdrop-blur-0">
         <button
           onClick={() => setRightSidebarOpen(true)}
           className="flex size-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
