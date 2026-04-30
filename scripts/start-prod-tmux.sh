@@ -1,0 +1,154 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+APP_HOST="${APP_HOST:-1.15.87.91}"
+APP_ORIGIN="${APP_ORIGIN:-http://${APP_HOST}}"
+PORT="${PORT:-3000}"
+TMUX_SESSION="${TMUX_SESSION:-1}"
+TMUX_WINDOW="${TMUX_WINDOW:-educlaw-server}"
+SERVICE_NAME="${SERVICE_NAME:-educlaw-server}"
+WEB_DEPLOY_ROOT="${WEB_DEPLOY_ROOT:-/var/www/educlaw-arena}"
+NGINX_SITE="${NGINX_SITE:-/etc/nginx/sites-available/educlaw-arena}"
+NGINX_ENABLED="${NGINX_ENABLED:-/etc/nginx/sites-enabled/educlaw-arena}"
+
+log() {
+  printf '\n[educlaw-tmux] %s\n' "$*"
+}
+
+die() {
+  printf '\n[educlaw-tmux] ERROR: %s\n' "$*" >&2
+  exit 1
+}
+
+require_command() {
+  command -v "$1" >/dev/null 2>&1 || die "Missing command: $1"
+}
+
+upsert_env_value() {
+  local key="$1"
+  local value="$2"
+  local env_file="$PROJECT_DIR/.env"
+
+  if [[ ! -f "$env_file" ]]; then
+    cp "$PROJECT_DIR/.env.example" "$env_file"
+  fi
+
+  if grep -q "^${key}=" "$env_file"; then
+    sed -i "s#^${key}=.*#${key}=${value}#" "$env_file"
+  else
+    printf '%s=%s\n' "$key" "$value" >> "$env_file"
+  fi
+}
+
+find_server_entry() {
+  local entry
+  entry="$(find "$PROJECT_DIR/educlaw-server/dist" -type f -path '*/src/index.js' | head -n1)"
+  [[ -n "$entry" ]] || die "Built server entry not found. Run: pnpm --filter educlaw-server build"
+  printf '%s' "$entry"
+}
+
+ensure_tmux_session() {
+  if ! tmux has-session -t "$TMUX_SESSION" 2>/dev/null; then
+    tmux new-session -d -s "$TMUX_SESSION" -n bash
+  fi
+}
+
+start_backend_in_tmux() {
+  local server_entry="$1"
+
+  if tmux list-windows -t "$TMUX_SESSION" -F '#W' | grep -Fxq "$TMUX_WINDOW"; then
+    tmux send-keys -t "${TMUX_SESSION}:${TMUX_WINDOW}" C-c
+  else
+    tmux new-window -t "$TMUX_SESSION" -n "$TMUX_WINDOW"
+  fi
+
+  tmux send-keys -t "${TMUX_SESSION}:${TMUX_WINDOW}" "cd '$PROJECT_DIR'" C-m
+  tmux send-keys -t "${TMUX_SESSION}:${TMUX_WINDOW}" "export NODE_ENV=production" C-m
+  tmux send-keys -t "${TMUX_SESSION}:${TMUX_WINDOW}" "set -a; source '$PROJECT_DIR/.env'; set +a" C-m
+  tmux send-keys -t "${TMUX_SESSION}:${TMUX_WINDOW}" "exec node '$server_entry'" C-m
+}
+
+write_nginx_site() {
+  sudo tee "$NGINX_SITE" >/dev/null <<EOF
+server {
+    listen 80 default_server;
+    server_name ${APP_HOST} localhost 127.0.0.1 _;
+
+    root ${WEB_DEPLOY_ROOT};
+    index index.html;
+
+    client_max_body_size 100m;
+
+    location = /healthz {
+        proxy_pass http://127.0.0.1:${PORT}/healthz;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+    }
+
+    location ~ ^/(api|auth|packages|arena|optimize|profiles|agents|runtimes|llm|events|admin)(/|$) {
+        proxy_pass http://127.0.0.1:${PORT};
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_buffering off;
+        proxy_read_timeout 3600;
+    }
+
+    location / {
+        try_files \$uri \$uri/ /index.html;
+    }
+}
+EOF
+
+  sudo ln -sf "$NGINX_SITE" "$NGINX_ENABLED"
+  sudo rm -f /etc/nginx/sites-enabled/default
+  sudo nginx -t
+  sudo systemctl reload nginx
+}
+
+verify() {
+  log "Waiting for backend"
+  for _ in $(seq 1 20); do
+    if curl -fsS "http://127.0.0.1:${PORT}/healthz" >/dev/null 2>&1; then
+      break
+    fi
+    sleep 1
+  done
+
+  curl -fsS "http://127.0.0.1:${PORT}/healthz"
+  printf '\n'
+  curl -fsS "http://127.0.0.1/healthz"
+  printf '\n'
+  curl -fsSI "http://127.0.0.1/" >/dev/null
+
+  log "Done"
+  printf 'URL:   %s\n' "$APP_ORIGIN"
+  printf 'tmux:  tmux attach -t %s\n' "$TMUX_SESSION"
+}
+
+main() {
+  require_command tmux
+  require_command node
+  require_command curl
+  require_command nginx
+
+  cd "$PROJECT_DIR"
+
+  log "Setting .env"
+  upsert_env_value PORT "$PORT"
+  upsert_env_value APP_ORIGIN "$APP_ORIGIN"
+
+  log "Stopping systemd backend if present"
+  sudo systemctl disable --now "$SERVICE_NAME" >/dev/null 2>&1 || true
+
+  log "Starting backend in tmux session ${TMUX_SESSION}, window ${TMUX_WINDOW}"
+  ensure_tmux_session
+  start_backend_in_tmux "$(find_server_entry)"
+
+  log "Configuring nginx"
+  write_nginx_site
+
+  verify
+}
+
+main "$@"
