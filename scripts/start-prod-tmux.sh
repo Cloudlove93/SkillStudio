@@ -11,6 +11,9 @@ SERVICE_NAME="${SERVICE_NAME:-educlaw-server}"
 WEB_DEPLOY_ROOT="${WEB_DEPLOY_ROOT:-/var/www/educlaw-arena}"
 NGINX_SITE="${NGINX_SITE:-/etc/nginx/sites-available/educlaw-arena}"
 NGINX_ENABLED="${NGINX_ENABLED:-/etc/nginx/sites-enabled/educlaw-arena}"
+DEPLOY_DIR="$PROJECT_DIR/.deploy"
+BACKEND_LOG="$DEPLOY_DIR/tmux-server.log"
+TMUX_RUNNER="$DEPLOY_DIR/tmux-run-server.sh"
 
 log() {
   printf '\n[educlaw-tmux] %s\n' "$*"
@@ -58,15 +61,33 @@ start_backend_in_tmux() {
   local server_entry="$1"
 
   if tmux list-windows -t "$TMUX_SESSION" -F '#W' | grep -Fxq "$TMUX_WINDOW"; then
-    tmux send-keys -t "${TMUX_SESSION}:${TMUX_WINDOW}" C-c
-  else
-    tmux new-window -t "$TMUX_SESSION" -n "$TMUX_WINDOW"
+    tmux kill-window -t "${TMUX_SESSION}:${TMUX_WINDOW}"
   fi
 
-  tmux send-keys -t "${TMUX_SESSION}:${TMUX_WINDOW}" "cd '$PROJECT_DIR'" C-m
-  tmux send-keys -t "${TMUX_SESSION}:${TMUX_WINDOW}" "export NODE_ENV=production" C-m
-  tmux send-keys -t "${TMUX_SESSION}:${TMUX_WINDOW}" "set -a; source '$PROJECT_DIR/.env'; set +a" C-m
-  tmux send-keys -t "${TMUX_SESSION}:${TMUX_WINDOW}" "exec node '$server_entry'" C-m
+  mkdir -p "$DEPLOY_DIR"
+  cat > "$TMUX_RUNNER" <<RUNEOF
+#!/usr/bin/env bash
+set -Eeuo pipefail
+cd "$PROJECT_DIR"
+export NODE_ENV=production
+set -a
+source "$PROJECT_DIR/.env"
+set +a
+echo "[educlaw-tmux] starting backend at \$(date)"
+echo "[educlaw-tmux] entry: $server_entry"
+echo "[educlaw-tmux] port: \${PORT:-3000}"
+node "$server_entry"
+status=\$?
+echo
+echo "[educlaw-tmux] backend exited with status \$status at \$(date)"
+echo "[educlaw-tmux] press Enter to keep this shell, or Ctrl+B D to detach"
+read -r _ || true
+exec bash
+RUNEOF
+  chmod 0750 "$TMUX_RUNNER"
+  : > "$BACKEND_LOG"
+
+  tmux new-window -t "$TMUX_SESSION" -n "$TMUX_WINDOW" "bash '$TMUX_RUNNER' 2>&1 | tee -a '$BACKEND_LOG'"
 }
 
 write_nginx_site() {
@@ -114,6 +135,12 @@ verify() {
     fi
     sleep 1
   done
+
+  if ! curl -fsS "http://127.0.0.1:${PORT}/healthz" >/dev/null 2>&1; then
+    printf '\n[educlaw-tmux] Backend did not become healthy. Recent backend log:\n' >&2
+    tail -n 120 "$BACKEND_LOG" >&2 || true
+    die "Backend health check failed"
+  fi
 
   curl -fsS "http://127.0.0.1:${PORT}/healthz"
   printf '\n'
