@@ -103,7 +103,7 @@ router.get("/:packageId", requireAuth, async (req, res) => {
   try {
     res.json(await getPackage((req as AuthedRequest).userId || "", one(req.params.packageId)));
   } catch (error) {
-    res.status(404).json({ error: error instanceof Error ? error.message : "找不到智能体包" });
+    res.status(404).json({ error: error instanceof Error ? error.message : "找不到智能体" });
   }
 });
 

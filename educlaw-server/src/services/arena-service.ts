@@ -75,8 +75,8 @@ function buildHistory(messages: ArenaMessage[], side: ArenaStreamSide) {
 function buildEnhancedPrompt(snapshot: AgentPackageSnapshot, prompt: string) {
   const skills = selectRelevantSkills(snapshot, prompt);
   return [
-    "你是一个基于可复用 Markdown 智能体包工作的增强助手。",
-    "请严格遵循智能体包中的设定，同时保持回答自然流畅。",
+    "你是一个基于可复用 Markdown 智能体工作的增强助手。",
+    "请严格遵循智能体中的设定，同时保持回答自然流畅。",
     "",
     "[agent.md]",
     snapshot.agentMd,

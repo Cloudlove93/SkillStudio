@@ -74,9 +74,21 @@ export default function LiteWorkspace() {
     if (!token) return;
     const list = await liteApi.listPackages(token);
     setPackages(list);
-    const nextId = preferredPackageId || selectedPackageId || list[0]?.id || "";
+    const preferredExists = preferredPackageId && list.some((item) => item.id === preferredPackageId);
+    const selectedExists = selectedPackageId && list.some((item) => item.id === selectedPackageId);
+    const nextId = (preferredExists && preferredPackageId) || (selectedExists && selectedPackageId) || list[0]?.id || "";
     if (nextId) await openPackage(nextId, list);
-    else { setSelectedPackageId(""); setSelectedPackage(null); setThread(null); setThreadDetail(null); setVersions([]); setReport(null); setOptimization(null); setSideStreaming({ baseline: false, enhanced: false }); }
+    else {
+      setSelectedPackageId("");
+      setSelectedPackage(null);
+      setThread(null);
+      setThreadDetail(null);
+      setVersions([]);
+      setReport(null);
+      setOptimization(null);
+      setInput("");
+      setSideStreaming({ baseline: false, enhanced: false });
+    }
   }
 
   async function openPackage(packageId: string, snapshotList?: AgentPackageSummary[]) {
@@ -213,7 +225,7 @@ export default function LiteWorkspace() {
 
   async function handleDelete() {
     if (!token || !selectedPackageId) return;
-    if (!window.confirm("确定要删除当前智能体包吗？")) return;
+    if (!window.confirm("确定要删除当前智能体吗？")) return;
     await liteApi.deletePackage(token, selectedPackageId);
     await refreshPackages();
   }
@@ -257,7 +269,7 @@ export default function LiteWorkspace() {
           <aside className="flex w-80 flex-col border-r border-border bg-card/60">
             <div className="flex items-center gap-3 border-b border-border px-5 py-4">
               <div className="flex size-9 items-center justify-center rounded-xl bg-primary text-white font-bold text-sm">E</div>
-              <div className="font-semibold tracking-tight text-sm">智能体包</div>
+              <div className="font-semibold tracking-tight text-sm">智能体</div>
             </div>
             <ScrollArea className="flex-1">
               <div className="space-y-4 p-4">
@@ -288,7 +300,7 @@ export default function LiteWorkspace() {
                         </div>
                       </button>
                     ))}
-                    {packages.length === 0 && <div className="rounded-xl border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">暂无智能体包</div>}
+                    {packages.length === 0 && <div className="rounded-xl border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">暂无智能体</div>}
                   </div>
                 </div>
               </div>
@@ -367,7 +379,7 @@ export default function LiteWorkspace() {
                   ))}
                 </div>
 
-                {!selectedPackage && <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">请选择一个智能体包</div>}
+                {!selectedPackage && <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">请选择一个智能体</div>}
 
                 {selectedPackage && detailTab === "agent" && (
                   <div className="space-y-2">

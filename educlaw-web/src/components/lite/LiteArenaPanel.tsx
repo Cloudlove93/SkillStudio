@@ -305,7 +305,9 @@ export default function LiteArenaPanel() {
     if (!token) return;
     const list = await liteApi.listPackages(token);
     setPackages(list);
-    const nextId = preferredPackageId || selectedPackageId || list[0]?.id || "";
+    const preferredExists = preferredPackageId && list.some((item) => item.id === preferredPackageId);
+    const selectedExists = selectedPackageId && list.some((item) => item.id === selectedPackageId);
+    const nextId = (preferredExists && preferredPackageId) || (selectedExists && selectedPackageId) || list[0]?.id || "";
     if (nextId) {
       if (nextId !== selectedPackageId) {
         await openPackage(nextId, list);
@@ -318,7 +320,24 @@ export default function LiteArenaPanel() {
         setPackages((prev) => prev.map((item) => item.id === nextId ? { ...item, name: detail.name, description: detail.description, versionNumber: detail.versionNumber, updatedAt: detail.updatedAt } : item));
       }
     } else {
-      setSelectedPackageId(""); setSelectedPackage(null); setThread(null); setThreadDetail(null); setVersions([]); setReport(null); setOptimization(null); setSideStreaming({ baseline: false, enhanced: false });
+      setSelectedPackageId("");
+      setSelectedPackage(null);
+      setThread(null);
+      setThreadDetail(null);
+      setVersions([]);
+      setReport(null);
+      setOptimization(null);
+      setCompareResult(null);
+      setCompareBaseId("");
+      setCompareTargetId("");
+      setSelectedSkillId("");
+      setCenterPreview(null);
+      setInteractiveMode(false);
+      setInteractiveMessages([]);
+      setInteractiveAdopted([]);
+      setInteractiveIssues([]);
+      setInput("");
+      setSideStreaming({ baseline: false, enhanced: false });
     }
   }
 
@@ -524,7 +543,7 @@ function startResizeLeft(e: React.MouseEvent) {
 
   async function handleDelete() {
     if (!token || !selectedPackageId) return;
-    if (!window.confirm("确定要删除当前智能体包吗？")) return;
+    if (!window.confirm("确定要删除当前智能体吗？")) return;
     await liteApi.deletePackage(token, selectedPackageId);
     // Clean up package-scoped localStorage data
     localStorage.removeItem(interactiveStorageKey(selectedPackageId));
@@ -574,7 +593,7 @@ function startResizeLeft(e: React.MouseEvent) {
     setInteractiveAdopted([]);
     startProgress("交互式优化", "正在初始化分析...");
     const stepTimers: number[] = [];
-    stepTimers.push(window.setTimeout(() => pushProgress("正在读取智能体包内容..."), 600));
+    stepTimers.push(window.setTimeout(() => pushProgress("正在读取智能体内容..."), 600));
     stepTimers.push(window.setTimeout(() => pushProgress("正在分析 Arena 对话轨迹..."), 1800));
     stepTimers.push(window.setTimeout(() => pushProgress("正在识别潜在优化问题..."), 4000));
     stepTimers.push(window.setTimeout(() => pushProgress("正在生成优化建议..."), 7000));
@@ -866,7 +885,7 @@ function startResizeLeft(e: React.MouseEvent) {
                     </div>
                   </button>
                 ))}
-                {packages.length === 0 && <div className="rounded-xl border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">暂无智能体包</div>}
+                {packages.length === 0 && <div className="rounded-xl border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">暂无智能体</div>}
               </div>
             </div>
           </div>
@@ -896,7 +915,7 @@ function startResizeLeft(e: React.MouseEvent) {
             <div className="flex min-h-12 shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border/70 bg-card/40 px-14 py-2 lg:px-5">
               <div className="flex min-w-0 items-center gap-3">
                 <div className="text-sm font-semibold">💬 交互式优化</div>
-                <div className="hidden text-xs text-muted-foreground sm:block">与专家对话逐步优化智能体包</div>
+                <div className="hidden text-xs text-muted-foreground sm:block">与专家对话逐步优化智能体</div>
               </div>
               <div className="flex flex-wrap items-center justify-end gap-2">
                 {interactiveAdopted.length > 0 && (
@@ -955,7 +974,7 @@ function startResizeLeft(e: React.MouseEvent) {
                           <div className="text-xs text-muted-foreground space-y-1.5">
                             <div className="flex items-center gap-2">
                               <span className="inline-flex size-4 items-center justify-center rounded-full bg-primary/20 text-primary text-[10px]">1</span>
-                              读取智能体包内容
+                              读取智能体内容
                             </div>
                             <div className="flex items-center gap-2">
                               <span className="inline-flex size-4 items-center justify-center rounded-full bg-primary/20 text-primary text-[10px]">2</span>
@@ -1209,7 +1228,7 @@ function startResizeLeft(e: React.MouseEvent) {
         </div>
         <div className="flex-1 min-h-0 overflow-y-auto">
           <div className="space-y-4 p-3 sm:p-4">
-              {!selectedPackage && <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">请选择一个智能体包</div>}
+              {!selectedPackage && <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">请选择一个智能体</div>}
 
               {selectedPackage && detailTab === "agent" && (
                 <div className="space-y-2">

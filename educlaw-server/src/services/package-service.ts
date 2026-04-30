@@ -509,7 +509,7 @@ export async function updateVersionNote(
     [packageId, userId],
   );
   const row = packageResult.rows[0];
-  if (!row) throw new Error("智能体包不存在");
+  if (!row) throw new Error("智能体不存在");
 
   const result = await query<DbRowPackageVersion>(
     "update agent_package_versions set note = $1 where id = $2 and package_id = $3 returning *",
@@ -761,8 +761,8 @@ async function importPackageWithVersions(
     if (v.snapshot.description) packageDescription = v.snapshot.description;
     if (packageName && packageDescription) break;
   }
-  if (!packageName) packageName = "导入的智能体包";
-  if (!packageDescription) packageDescription = "导入的智能体包";
+  if (!packageName) packageName = "导入的智能体";
+  if (!packageDescription) packageDescription = "导入的智能体";
 
   // 创建所有版本记录（确保每个 snapshot 都有 name/description）
   let currentVersionId = "";
@@ -823,8 +823,8 @@ export async function importPackageZip(userId: string, zipBuffer: Buffer) {
       if (snapshot?.agentMd && Array.isArray(snapshot.skills)) {
         return createPackageWithSnapshot(userId, {
           ...snapshot,
-          name: snapshot.name?.trim() || "导入的智能体包",
-          description: snapshot.description?.trim() || "导入的智能体包",
+          name: snapshot.name?.trim() || "导入的智能体",
+          description: snapshot.description?.trim() || "导入的智能体",
           versionLabel: snapshot.versionLabel || "v1",
         }, "imported");
       }
@@ -859,8 +859,8 @@ export async function importPackageZip(userId: string, zipBuffer: Buffer) {
   });
 
   const snapshot: AgentPackageSnapshot = {
-    name: manifest.name?.trim() || "导入的智能体包",
-    description: manifest.description?.trim() || "导入的智能体包",
+    name: manifest.name?.trim() || "导入的智能体",
+    description: manifest.description?.trim() || "导入的智能体",
     versionLabel: "v1",
     agentMd: zip.readAsText(agentEntry, "utf8").trim(),
     rubricMd: rubricEntry
@@ -1074,7 +1074,7 @@ export async function getVersion(userId: string, packageId: string, versionId: s
     "select * from agent_packages where id = $1 and user_id = $2",
     [packageId, userId],
   );
-  if (!packageResult.rows[0]) throw new Error("智能体包不存在");
+  if (!packageResult.rows[0]) throw new Error("智能体不存在");
 
   const versionResult = await query<DbRowPackageVersion>(
     "select * from agent_package_versions where id = $1 and package_id = $2",
@@ -1154,7 +1154,7 @@ export async function compareVersions(
   ].join("\n");
 
   const summaryPrompt = [
-    "你是智能体包版本对比专家。请根据以下两个版本的 diff，用中文总结改动内容。",
+    "你是智能体版本对比专家。请根据以下两个版本的 diff，用中文总结改动内容。",
     "",
     `基准版本：v${base.versionNumber} (${base.source})`,
     `目标版本：v${target.versionNumber} (${target.source})`,
@@ -1179,7 +1179,7 @@ export async function compareVersions(
   try {
     const result = await generateJson<{ summary: string }>({
       model,
-      systemPrompt: '你是智能体包版本对比专家。根据 diff 内容总结改动。必须严格返回 JSON 格式：{"summary": "总结内容"}。summary 不能为空，必须包含实质性的总结内容。不要返回其他内容。',
+      systemPrompt: '你是智能体版本对比专家。根据 diff 内容总结改动。必须严格返回 JSON 格式：{"summary": "总结内容"}。summary 不能为空，必须包含实质性的总结内容。不要返回其他内容。',
       userPrompt: summaryPrompt,
       temperature: 0.3,
     });
@@ -1192,7 +1192,7 @@ export async function compareVersions(
   if (!summary) {
     try {
       const chatResult = await generateChat([
-        { role: "system", content: "你是智能体包版本对比专家。根据 diff 内容用中文总结改动。直接输出总结文本，不要返回 JSON。" },
+        { role: "system", content: "你是智能体版本对比专家。根据 diff 内容用中文总结改动。直接输出总结文本，不要返回 JSON。" },
         { role: "user", content: summaryPrompt },
       ], model, 0.3);
       summary = chatResult.trim();

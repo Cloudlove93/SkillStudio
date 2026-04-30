@@ -12,11 +12,11 @@ export async function optimizePackage(
   model?: string,
   onProgress?: ProgressCallback,
 ): Promise<OptimizationResult> {
-  await onProgress?.("读取智能体包与对话轨迹");
+  await onProgress?.("读取智能体与对话轨迹");
   const pkg = await getPackage(userId, packageId);
   const detail = await getThreadDetail(userId, threadId);
   if (detail.thread.packageId !== packageId) {
-    throw new Error("当前 Arena 对话不属于这个智能体包");
+    throw new Error("当前 Arena 对话不属于这个智能体");
   }
 
   await onProgress?.("分析并生成优化方案");
@@ -29,9 +29,9 @@ export async function optimizePackage(
     .join("\n\n");
 
   const prompt = [
-    "你是一个智能体包优化专家。请分析以下智能体包和 Arena 对话轨迹，生成优化后的新版本。",
+    "你是一个智能体优化专家。请分析以下智能体和 Arena 对话轨迹，生成优化后的新版本。",
     "",
-    "## 当前智能体包",
+    "## 当前智能体",
     "",
     "### agent.md",
     "```markdown",
@@ -52,7 +52,7 @@ export async function optimizePackage(
     transcript.slice(0, 10000),
     "",
     "## 任务",
-    "1. 分析当前智能体包存在的问题（从 persona、skill、rubric 三个角度）",
+    "1. 分析当前智能体存在的问题（从 persona、skill、rubric 三个角度）",
     "2. 生成优化后的完整包内容",
     "3. 返回 JSON，格式如下：",
     "",
@@ -95,7 +95,7 @@ export async function optimizePackage(
   }>({
     model,
     systemPrompt:
-      "你是智能体包优化专家。分析给定的智能体包和 Arena 对话轨迹，生成优化后的新版本。只返回 JSON，不要其他内容。",
+      "你是智能体优化专家。分析给定的智能体和 Arena 对话轨迹，生成优化后的新版本。只返回 JSON，不要其他内容。",
     userPrompt: prompt,
     temperature: 0.3,
   });
