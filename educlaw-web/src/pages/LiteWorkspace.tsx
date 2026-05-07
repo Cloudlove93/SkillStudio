@@ -18,6 +18,7 @@ import {
   MarkdownContent,
   OptimizationDiffView,
   PackagePreviewCard,
+  SkillMarkdownContent,
   upsertPackagePreview,
   type PackagePreview,
 } from "../components/lite/lite-rendering";
@@ -370,7 +371,7 @@ export default function LiteWorkspace() {
 
             <div className="border-t border-border bg-card/60 p-4">
               <div className="flex gap-3">
-                <Textarea value={input} onChange={(e) => setInput(e.target.value)} placeholder="输入同一个问题，同时发给基准模型和增强版本..." rows={3} className="min-h-[80px] resize-none rounded-[16px] border-border/70 bg-card/80" />
+                <Textarea value={input} onChange={(e) => setInput(e.target.value)} placeholder="输入同一个问题，同时发给基准模型和增强版本..." rows={3} className="min-h-[80px] resize-none rounded-[16px] border-border/70 bg-card/80" onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void handleSend(); } }} />
                 <Button className="self-end h-10 px-5 rounded-[12px]" onClick={() => void handleSend()} disabled={!selectedPackage || !thread || sideStreaming.baseline || sideStreaming.enhanced}><Send className="mr-1.5 size-4" />发送</Button>
               </div>
             </div>
@@ -429,7 +430,7 @@ export default function LiteWorkspace() {
                             <button key={skill.id} onClick={() => setSelectedSkillId(skill.id)} className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${selectedSkillId === skill.id ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"}`}>{skill.name}</button>
                           ))}
                         </div>
-                        <div className="rounded-[20px] border border-border/70 bg-muted/50 p-4 text-sm"><MarkdownContent content={selectedSkill?.skillMd || "暂无技能内容"} /></div>
+                        <div className="rounded-[20px] border border-border/70 bg-muted/50 p-4 text-sm"><SkillMarkdownContent content={selectedSkill?.skillMd || "暂无技能内容"} /></div>
                       </>
                     ) : <div className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">暂无技能文件</div>}
                   </div>

@@ -70,6 +70,49 @@ export function MarkdownContent({ content }: { content: string }) {
   );
 }
 
+function parseSkillFrontmatter(content: string): { name?: string; description?: string; body: string } {
+  const match = content.match(/^---\s*\n([\s\S]*?)\n---\s*\n?/);
+  if (!match) return { body: content };
+
+  const meta: { name?: string; description?: string; body: string } = {
+    body: content.slice(match[0].length).trimStart(),
+  };
+  for (const line of match[1].split("\n")) {
+    const separator = line.indexOf(":");
+    if (separator < 0) continue;
+    const key = line.slice(0, separator).trim();
+    const value = line.slice(separator + 1).trim().replace(/^["']|["']$/g, "");
+    if (key === "name") meta.name = value;
+    if (key === "description") meta.description = value;
+  }
+  return meta;
+}
+
+export function SkillMarkdownContent({ content }: { content: string }) {
+  const skill = parseSkillFrontmatter(content);
+  return (
+    <div className="space-y-3">
+      {(skill.name || skill.description) && (
+        <div className="rounded-xl border border-primary/15 bg-primary/5 px-3 py-2 text-xs">
+          {skill.name && (
+            <div className="flex gap-2">
+              <span className="shrink-0 font-semibold text-muted-foreground">技能名：</span>
+              <span className="font-medium text-foreground">{skill.name}</span>
+            </div>
+          )}
+          {skill.description && (
+            <div className="mt-1 flex gap-2">
+              <span className="shrink-0 font-semibold text-muted-foreground">触发说明：</span>
+              <span className="leading-5 text-muted-foreground">{skill.description}</span>
+            </div>
+          )}
+        </div>
+      )}
+      <MarkdownContent content={skill.body || content} />
+    </div>
+  );
+}
+
 function DiffBlock({ title, diffs }: { title: string; diffs: LineDiff[] }) {
   const [expanded, setExpanded] = useState(false);
   const hasChanges = diffs.some((d) => d.type !== "same");

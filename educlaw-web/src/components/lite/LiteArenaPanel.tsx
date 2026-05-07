@@ -20,6 +20,7 @@ import {
   MarkdownContent,
   OptimizationDiffView,
   PackagePreviewCard,
+  SkillMarkdownContent,
   upsertPackagePreview,
   VersionDiffView,
   type PackagePreview,
@@ -1147,7 +1148,9 @@ function startResizeLeft(e: React.MouseEvent) {
               ) : (
                 <div className="max-w-3xl mx-auto">
                   <div className="rounded-[20px] border border-border/70 bg-muted/50 p-5 text-sm">
-                    <MarkdownContent content={centerPreview.content} />
+                    {centerPreview.type === "skill"
+                      ? <SkillMarkdownContent content={centerPreview.content} />
+                      : <MarkdownContent content={centerPreview.content} />}
                   </div>
                 </div>
               )}
@@ -1200,7 +1203,7 @@ function startResizeLeft(e: React.MouseEvent) {
 
             <div className="border-t border-border/70 bg-card/40 p-3 sm:p-4">
               <div className="flex flex-col gap-3 sm:flex-row">
-                <Textarea value={input} onChange={(e) => setInput(e.target.value)} placeholder={`输入问题，测试 ${selectedPackage?.name || "智能体"} 效果...`} rows={2} className="min-h-[60px] resize-none rounded-[14px] border-border/70 bg-card/80" />
+                <Textarea value={input} onChange={(e) => setInput(e.target.value)} placeholder={`输入问题，测试 ${selectedPackage?.name || "智能体"} 效果...`} rows={2} className="min-h-[60px] resize-none rounded-[14px] border-border/70 bg-card/80" onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void handleSend(); } }} />
                 <Button className="h-10 w-full rounded-[12px] px-5 sm:w-auto sm:self-end" onClick={() => void handleSend()} disabled={!selectedPackage || !thread || sideStreaming.baseline || sideStreaming.enhanced}><Send className="mr-1.5 size-4" />发送</Button>
               </div>
             </div>
@@ -1293,7 +1296,7 @@ function startResizeLeft(e: React.MouseEvent) {
                         ))}
                       </div>
                       <div className="rounded-[20px] border border-border/70 bg-muted/50 p-4 text-sm cursor-pointer hover:border-primary/30 transition-colors overflow-auto max-h-[60vh]" onClick={() => selectedSkill && setCenterPreview({ type: "skill", name: selectedSkill.name, content: selectedSkill.skillMd })}>
-                        <MarkdownContent content={selectedSkill?.skillMd || "暂无技能内容"} />
+                        <SkillMarkdownContent content={selectedSkill?.skillMd || "暂无技能内容"} />
                       </div>
                     </>
                   ) : <div className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">暂无技能文件</div>}

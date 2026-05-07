@@ -272,6 +272,8 @@ function getCompactSkillTemplatePrompt(): string {
     "description: <一句话说明该 skill 做什么，以及什么时候使用，必须包含触发词如'当/如果/用于/遇到/针对'>",
     "---",
     "# <Skill 显示名称>",
+    "## When to use",
+    "## When not to use",
     "## Instructions",
     "## Workflow",
     "## Output Format",
@@ -281,6 +283,9 @@ function getCompactSkillTemplatePrompt(): string {
     "要求：",
     "- 内容要精炼，每个章节 2-5 条即可",
     "- frontmatter name 必须等于 dirName",
+    "- When to use 只写该 skill 自己负责的触发场景",
+    "- When not to use 写清楚应交给其他 skill、普通问答、或安全转介的场景",
+    "- Output Format 必须给出固定模板字段，例如：场景判断、处理方案、可用话术、风险提示、后续评估",
     "- 只返回 SKILL.md 文件内容本身，不要解释",
   ].join("\n");
 }
@@ -441,14 +446,14 @@ async function getPackageRow(userId: string, packageId: string) {
     [packageId, userId],
   );
   const row = packageResult.rows[0];
-  if (!row) throw new Error("\u667a\u80fd\u4f53\u5305\u4e0d\u5b58\u5728");
+  if (!row) throw new Error("智能体不存在");
 
   const versionResult = await query<DbRowPackageVersion>(
     "select * from agent_package_versions where id = $1",
     [row.current_version_id],
   );
   const version = versionResult.rows[0];
-  if (!version) throw new Error("瑜版挸澧犻悧鍫熸拱閺佺増宓佺紓鍝勩亼");
+  if (!version) throw new Error("当前版本不存在");
   return { row, version };
 }
 
@@ -480,7 +485,7 @@ export async function listVersions(userId: string, packageId: string) {
     [packageId, userId],
   );
   const row = packageResult.rows[0];
-  if (!row) throw new Error("\u667a\u80fd\u4f53\u5305\u4e0d\u5b58\u5728");
+  if (!row) throw new Error("智能体不存在");
 
   const versions = await query<DbRowPackageVersion>(
     "select * from agent_package_versions where package_id = $1 order by version_number desc",
@@ -640,6 +645,11 @@ export async function generatePackage(
       hasInstruction ? instruction : docParts,
       "",
       "The agent.md should define role, workflow, boundaries, and output style.",
+      "Add a concise skill routing table. For each skill, describe:",
+      "- typical user request that should use this skill",
+      "- requests that should be routed to another skill",
+      "- high-risk cases that require safety guidance or referral before continuing",
+      "Keep each skill responsibility narrow; avoid assigning the same scenario to multiple skills.",
       "Return only the Markdown file content.",
     ].join("\n"),
     temperature: 0.35,
@@ -656,6 +666,9 @@ export async function generatePackage(
     ].join("\n"),
     userPrompt: [
       "Create a rubric.md for this package with 3-5 scoring dimensions.",
+      "The rubric must include dimensions for document fidelity and safety/referral boundaries.",
+      "Document fidelity should check whether outputs stay grounded in uploaded materials and avoid unsupported invention.",
+      "Safety/referral boundaries should check whether high-risk cases such as severe harm, self-harm, medical/legal crisis, or imminent danger receive appropriate escalation guidance.",
       "",
       `Package name: ${base.name}`,
       `Package description: ${base.description}`,
@@ -708,7 +721,12 @@ export async function generatePackage(
         "Skill metadata:",
         JSON.stringify(skillMeta),
         "",
+        "Sibling skills metadata, used only for boundary clarity:",
+        JSON.stringify(skillMetas.filter((meta) => meta.dirName !== skillMeta.dirName), null, 2),
+        "",
         getCompactSkillTemplatePrompt(),
+        "",
+        "Keep this skill focused on its own trigger. If a request belongs to a sibling skill, say so in When not to use instead of covering that workflow here.",
       ].join("\n"),
       temperature: 0.35,
       maxTokens: 4000,
