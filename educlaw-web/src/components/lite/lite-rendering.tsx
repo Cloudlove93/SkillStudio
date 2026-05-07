@@ -113,6 +113,100 @@ export function SkillMarkdownContent({ content }: { content: string }) {
   );
 }
 
+function splitChangedText(text: string, counterpart: string) {
+  const current = Array.from(text);
+  const other = Array.from(counterpart);
+  let prefixLength = 0;
+
+  while (
+    prefixLength < current.length &&
+    prefixLength < other.length &&
+    current[prefixLength] === other[prefixLength]
+  ) {
+    prefixLength += 1;
+  }
+
+  let suffixLength = 0;
+  while (
+    suffixLength < current.length - prefixLength &&
+    suffixLength < other.length - prefixLength &&
+    current[current.length - 1 - suffixLength] === other[other.length - 1 - suffixLength]
+  ) {
+    suffixLength += 1;
+  }
+
+  return {
+    prefix: current.slice(0, prefixLength).join(""),
+    changed: current.slice(prefixLength, current.length - suffixLength).join(""),
+    suffix: suffixLength > 0 ? current.slice(current.length - suffixLength).join("") : "",
+  };
+}
+
+function InlineDiffText({ text, counterpart, type }: { text: string; counterpart?: string; type: "removed" | "added" }) {
+  const tone = type === "removed"
+    ? "bg-red-500/15 text-red-600"
+    : "bg-emerald-500/15 text-emerald-600";
+
+  if (counterpart === undefined) {
+    return <span className={tone}>{text}</span>;
+  }
+
+  const parts = splitChangedText(text, counterpart);
+  return (
+    <>
+      {parts.prefix}
+      {parts.changed && <span className={`rounded px-0.5 ${tone}`}>{parts.changed}</span>}
+      {parts.suffix}
+    </>
+  );
+}
+
+function DiffLineView({ line, counterpart, index }: { line: LineDiff; counterpart?: string; index: number }) {
+  if (line.type === "same" && line.text.startsWith("...")) {
+    return <div key={index} className="px-2 py-0.5 text-muted-foreground/40 italic">{line.text}</div>;
+  }
+
+  if (line.type === "removed" || line.type === "added") {
+    return (
+      <div key={index} className="px-2 py-0.5 whitespace-pre-wrap break-all text-foreground">
+        <span className={line.type === "removed" ? "text-red-500" : "text-emerald-500"}>
+          {line.type === "removed" ? "- " : "+ "}
+        </span>
+        <InlineDiffText text={line.text} counterpart={counterpart} type={line.type} />
+      </div>
+    );
+  }
+
+  return (
+    <div key={index} className="px-2 py-0.5 whitespace-pre-wrap break-all text-foreground/45">
+      <span className="text-muted-foreground/50">  </span>
+      {line.text}
+    </div>
+  );
+}
+
+function DiffLinesView({ diffs }: { diffs: LineDiff[] }) {
+  const rows = [];
+  for (let i = 0; i < diffs.length; i += 1) {
+    const current = diffs[i]!;
+    const next = diffs[i + 1];
+    if (current.type === "removed" && next?.type === "added") {
+      rows.push(<DiffLineView key={`${i}-removed`} line={current} counterpart={next.text} index={i} />);
+      rows.push(<DiffLineView key={`${i}-added`} line={next} counterpart={current.text} index={i + 1} />);
+      i += 1;
+      continue;
+    }
+    if (current.type === "added" && next?.type === "removed") {
+      rows.push(<DiffLineView key={`${i}-added`} line={current} counterpart={next.text} index={i} />);
+      rows.push(<DiffLineView key={`${i}-removed`} line={next} counterpart={current.text} index={i + 1} />);
+      i += 1;
+      continue;
+    }
+    rows.push(<DiffLineView key={i} line={current} index={i} />);
+  }
+  return <>{rows}</>;
+}
+
 function DiffBlock({ title, diffs }: { title: string; diffs: LineDiff[] }) {
   const [expanded, setExpanded] = useState(false);
   const hasChanges = diffs.some((d) => d.type !== "same");
@@ -131,16 +225,7 @@ function DiffBlock({ title, diffs }: { title: string; diffs: LineDiff[] }) {
       </button>
       {expanded && (
         <div className="mt-2 space-y-0 font-mono leading-5 text-xs border-t border-border/50 pt-2">
-          {diffs.map((line, i) => {
-            if (line.type === "same" && line.text.startsWith("...")) {
-              return <div key={i} className="px-2 py-0.5 text-muted-foreground/40 italic">{line.text}</div>;
-            }
-            return (
-              <div key={i} className={`px-2 py-0.5 whitespace-pre-wrap break-all ${line.type === "removed" ? "bg-red-500/10 text-red-600" : line.type === "added" ? "bg-emerald-500/10 text-emerald-600" : "text-foreground/40"}`}>
-                {line.type === "removed" ? "- " : line.type === "added" ? "+ " : "  "}{line.text}
-              </div>
-            );
-          })}
+          <DiffLinesView diffs={diffs} />
         </div>
       )}
     </div>
@@ -238,26 +323,21 @@ export function ConversationBoard({ messages, sideStreaming, packageName }: { me
 }
 
 export function OptimizationDiffView({ oldSnapshot, optimization }: { oldSnapshot: AgentPackageSnapshot; optimization: OptimizationResult }) {
+  const agentDiff = computeLineDiff(oldSnapshot.agentMd, optimization.snapshot.agentMd);
+  const rubricDiff = computeLineDiff(oldSnapshot.rubricMd, optimization.snapshot.rubricMd);
+
   return (
     <div className="space-y-3 text-xs">
       <div className="rounded-[20px] border border-border/70 bg-card/80 px-4 py-3">
         <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground mb-2">agent.md 变更</div>
         <div className="space-y-0.5 font-mono leading-5">
-          {diffLines(oldSnapshot.agentMd, optimization.snapshot.agentMd).map((line, i) => (
-            <div key={i} className={`px-2 rounded ${line.type === "removed" ? "bg-red-500/10 text-red-600" : line.type === "added" ? "bg-emerald-500/10 text-emerald-600" : "text-foreground"}`}>
-              {line.type === "removed" ? "- " : line.type === "added" ? "+ " : "  "}{line.text}
-            </div>
-          ))}
+          <DiffLinesView diffs={agentDiff} />
         </div>
       </div>
       <div className="rounded-[20px] border border-border/70 bg-card/80 px-4 py-3">
         <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground mb-2">rubric.md 变更</div>
         <div className="space-y-0.5 font-mono leading-5">
-          {diffLines(oldSnapshot.rubricMd, optimization.snapshot.rubricMd).map((line, i) => (
-            <div key={i} className={`px-2 rounded ${line.type === "removed" ? "bg-red-500/10 text-red-600" : line.type === "added" ? "bg-emerald-500/10 text-emerald-600" : "text-foreground"}`}>
-              {line.type === "removed" ? "- " : line.type === "added" ? "+ " : "  "}{line.text}
-            </div>
-          ))}
+          <DiffLinesView diffs={rubricDiff} />
         </div>
       </div>
     </div>
