@@ -23,33 +23,36 @@ export default function DeepStudyPanel() {
   const t = useT();
   const activeTab = useUIStore((s) => s.deepStudyTab);
   const setTab = useUIStore((s) => s.setDeepStudyTab);
+  const showTabStrip = tabs.length > 1;
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      <div className="px-5 pb-5 pt-5 sm:px-6">
-        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-6">
-          {tabs.map(({ key, icon: Icon, labelKey, color, tone }) => {
-            const active = activeTab === key;
-            const [textColor, borderColor] = color.split(' ');
-            return (
-              <button
-                key={key}
-                onClick={() => setTab(key)}
-                className={`flex items-center gap-3 rounded-[22px] border px-4 py-3 text-left transition-all duration-200 ${
-                  active
-                    ? `${textColor} ${borderColor} bg-background shadow-sm`
-                    : 'border-border/70 bg-card/80 text-muted-foreground hover:-translate-y-0.5 hover:border-primary/20 hover:bg-background hover:text-foreground'
-                }`}
-              >
-                <div className={`flex size-10 items-center justify-center rounded-2xl bg-gradient-to-br ${tone}`}>
-                  <Icon className="size-5" />
-                </div>
-                <div className="min-w-0 flex-1 truncate text-sm font-semibold">{t(labelKey)}</div>
-              </button>
-            );
-          })}
+      {showTabStrip && (
+        <div className="px-5 pb-5 pt-5 sm:px-6">
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-6">
+            {tabs.map(({ key, icon: Icon, labelKey, color, tone }) => {
+              const active = activeTab === key;
+              const [textColor, borderColor] = color.split(' ');
+              return (
+                <button
+                  key={key}
+                  onClick={() => setTab(key)}
+                  className={`flex items-center gap-3 rounded-[22px] border px-4 py-3 text-left transition-all duration-200 ${
+                    active
+                      ? `${textColor} ${borderColor} bg-background shadow-sm`
+                      : 'border-border/70 bg-card/80 text-muted-foreground hover:-translate-y-0.5 hover:border-primary/20 hover:bg-background hover:text-foreground'
+                  }`}
+                >
+                  <div className={`flex size-10 items-center justify-center rounded-2xl bg-gradient-to-br ${tone}`}>
+                    <Icon className="size-5" />
+                  </div>
+                  <div className="min-w-0 flex-1 truncate text-sm font-semibold">{t(labelKey)}</div>
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       <div className={`min-h-0 flex-1 overflow-auto ${activeTab === 'arena' ? '' : 'px-5 pb-5 sm:px-6'}`}>
         <div className={`min-h-full overflow-hidden ${activeTab === 'arena' ? 'h-full' : 'rounded-[30px] border border-border/70 bg-background/95 shadow-[var(--shadow-md)]'}`}>
