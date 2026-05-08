@@ -5,7 +5,7 @@ PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_FILE="${ENV_FILE:-$PROJECT_DIR/.env}"
 PROMPT="${PROMPT:-Reply with exactly: EduClaw API OK}"
 TIMEOUT_MS="${TIMEOUT_MS:-30000}"
-MAX_TOKENS="${MAX_TOKENS:-64}"
+MAX_TOKENS="${MAX_TOKENS:-512}"
 STREAM="${STREAM:-false}"
 
 read_env_value() {
@@ -91,6 +91,8 @@ const body = {
 
 if (model.toLowerCase() === "kimi-k2.6") {
   body.thinking = { type: "disabled" };
+} else if (model.toLowerCase() === "kimi-k2.5") {
+  body.temperature = 1;
 } else {
   body.temperature = 0.2;
 }

@@ -144,6 +144,10 @@ async function fetchWithNetworkRetry(
   throw new Error(`模型网络请求失败：${describeFetchFailure(lastError)}。请稍后重试，或在服务器运行 scripts/test-llm-api.sh 检查 LLM_BASE_URL / LLM_MODEL / 网络连通性。`);
 }
 
+function usesKimiK25(model: string): boolean {
+  return model.toLowerCase() === "kimi-k2.5";
+}
+
 function usesKimiK26(model: string): boolean {
   return model.toLowerCase() === "kimi-k2.6";
 }
@@ -164,6 +168,11 @@ function buildChatCompletionBody(
 
   if (usesKimiK26(model)) {
     body.thinking = { type: "disabled" };
+    return body;
+  }
+
+  if (usesKimiK25(model)) {
+    body.temperature = 1;
     return body;
   }
 
