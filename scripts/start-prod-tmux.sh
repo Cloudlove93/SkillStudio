@@ -70,6 +70,9 @@ ensure_tmux_session() {
 deploy_frontend() {
   local web_dist="$PROJECT_DIR/educlaw-web/dist"
 
+  log "Building frontend"
+  pnpm --filter educlaw-web build
+
   [[ -f "$web_dist/index.html" ]] || die "Built web app not found. Run: pnpm --filter educlaw-web build"
 
   case "$WEB_DEPLOY_ROOT" in
