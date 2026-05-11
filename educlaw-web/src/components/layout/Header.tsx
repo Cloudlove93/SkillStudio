@@ -202,6 +202,7 @@ export default function Header() {
   const isOwner = agent ? isOwnedAgent(agent) : false;
   const messages = activeTab?.messages ?? [];
   const isHome = !activeTabId && !mainView && !activeSessionId;
+  const showDeepStudySubTab = mainView === 'deep-study' && deepStudyTab !== 'arena';
 
   function handleGoHome() {
     setActiveTab(null);
@@ -279,7 +280,7 @@ export default function Header() {
                   <X className="size-3" />
                 </Button>
               </div>
-              {mainView === 'deep-study' && (() => {
+              {showDeepStudySubTab && (() => {
                 const tabCfg = deepStudyTabConfig[deepStudyTab];
                 const TabIcon = tabCfg.icon;
                 return (
