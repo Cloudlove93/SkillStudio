@@ -167,6 +167,8 @@ export const liteApi = {
   me: (token: string) => request<UserSummary>("/auth/me", {}, token),
   listPackages: (token: string) => request<AgentPackageSummary[]>("/packages", {}, token),
   getPackage: (token: string, packageId: string) => request<AgentPackageDetail>(`/packages/${packageId}`, {}, token),
+  renamePackage: (token: string, packageId: string, name: string) =>
+    request<AgentPackageDetail>(`/packages/${packageId}`, { method: "PATCH", body: JSON.stringify({ name }) }, token),
   listVersions: (token: string, packageId: string) => request<PackageVersion[]>(`/packages/${packageId}/versions`, {}, token),
   generatePackageStream: (token: string, instruction: string, model: string | undefined, documents: Array<{ name: string; content: string }>, onEvent: (event: PackageGenerateStreamEvent) => void) =>
     streamRequest<PackageGenerateStreamEvent>("/packages/generate/stream", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ instruction, model, documents }) }, token, onEvent),

@@ -479,6 +479,27 @@ export async function getPackage(userId: string, packageId: string) {
   return toDetail(row, version);
 }
 
+export async function renamePackage(userId: string, packageId: string, name: string) {
+  const nextName = name.trim();
+  if (!nextName) throw new Error("Package name is required");
+  if (nextName.length > 80) throw new Error("Package name is too long");
+
+  const now = new Date().toISOString();
+  const result = await query<DbRowPackage>(
+    "update agent_packages set name = $1, updated_at = $2 where id = $3 and user_id = $4 returning *",
+    [nextName, now, packageId, userId],
+  );
+  if (result.rowCount === 0) throw new Error("Package not found");
+
+  const versionResult = await query<DbRowPackageVersion>(
+    "select * from agent_package_versions where id = $1",
+    [result.rows[0].current_version_id],
+  );
+  const version = versionResult.rows[0];
+  if (!version) throw new Error("Current version not found");
+  return toDetail(result.rows[0], version);
+}
+
 export async function listVersions(userId: string, packageId: string) {
   const packageResult = await query<DbRowPackage>(
     "select * from agent_packages where id = $1 and user_id = $2",

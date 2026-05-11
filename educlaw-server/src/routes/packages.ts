@@ -14,6 +14,7 @@ import {
   listPackages,
   listVersions,
   compareVersions,
+  renamePackage,
   updateVersionNote,
 } from "../services/package-service.js";
 import { optimizePackage } from "../services/optimization-service.js";
@@ -104,6 +105,18 @@ router.get("/:packageId", requireAuth, async (req, res) => {
     res.json(await getPackage((req as AuthedRequest).userId || "", one(req.params.packageId)));
   } catch (error) {
     res.status(404).json({ error: error instanceof Error ? error.message : "找不到智能体" });
+  }
+});
+
+router.patch("/:packageId", requireAuth, async (req, res) => {
+  try {
+    res.json(await renamePackage(
+      (req as AuthedRequest).userId || "",
+      one(req.params.packageId),
+      String(req.body?.name || ""),
+    ));
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "重命名失败" });
   }
 });
 

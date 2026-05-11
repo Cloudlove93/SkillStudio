@@ -33,7 +33,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Sparkles, Send, Upload, Trash2, FileText, ListChecks, Wrench,
   History, BarChart3, Zap, GitCompare, Clock, CheckCircle2, XCircle, Loader2,
-  PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, X,
+  PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Pencil, X,
 } from "lucide-react";
 
 type DetailTab = "agent" | "rubric" | "skills" | "versions" | "report" | "optimization" | "diff";
@@ -582,6 +582,32 @@ function startResizeLeft(e: React.MouseEvent) {
     setStatus("导出已开始");
   }
 
+  async function handleRenamePackage(packageId: string, currentName: string) {
+    if (!token || !packageId) return;
+    const nextName = window.prompt("请输入新的智能体名称：", currentName);
+    if (nextName === null) return;
+    const trimmed = nextName.trim();
+    if (!trimmed || trimmed === currentName) return;
+    try {
+      const detail = await liteApi.renamePackage(token, packageId, trimmed);
+      setPackages((prev) => prev.map((item) => item.id === packageId ? {
+        ...item,
+        name: detail.name,
+        description: detail.description,
+        versionNumber: detail.versionNumber,
+        updatedAt: detail.updatedAt,
+      } : item));
+      if (selectedPackageIdRef.current === packageId) {
+        setSelectedPackage(detail);
+      }
+      setStatus("名称已更新");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "重命名失败";
+      failProgress(message);
+      setStatus(message);
+    }
+  }
+
   async function startInteractive() {
     if (!token || !thread?.id || !selectedPackageId) return;
     setInteractiveMode(true);
@@ -901,13 +927,22 @@ function startResizeLeft(e: React.MouseEvent) {
               <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">仓库 ({packages.length})</div>
               <div className="space-y-1.5">
                 {packages.map((pkg) => (
-                  <button key={pkg.id} onClick={() => void openPackage(pkg.id)} className={`flex w-full items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left transition-colors ${pkg.id === selectedPackageId ? "border-primary/30 bg-primary/5" : "border-transparent hover:bg-muted"}`}>
-                    <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary font-bold text-xs">{pkg.name.charAt(0).toUpperCase()}</div>
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-medium">{pkg.name}</div>
-                      <div className="truncate text-[11px] text-muted-foreground">v{pkg.versionNumber}</div>
-                    </div>
-                  </button>
+                  <div key={pkg.id} className={`flex w-full items-center gap-2 rounded-xl border px-2 py-2 transition-colors ${pkg.id === selectedPackageId ? "border-primary/30 bg-primary/5" : "border-transparent hover:bg-muted"}`}>
+                    <button onClick={() => void openPackage(pkg.id)} className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
+                      <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary font-bold text-xs">{pkg.name.charAt(0).toUpperCase()}</div>
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-medium">{pkg.name}</div>
+                        <div className="truncate text-[11px] text-muted-foreground">v{pkg.versionNumber}</div>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => void handleRenamePackage(pkg.id, pkg.name)}
+                      className="flex size-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+                      title="重命名"
+                    >
+                      <Pencil className="size-3.5" />
+                    </button>
+                  </div>
                 ))}
                 {packages.length === 0 && <div className="rounded-xl border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">暂无智能体</div>}
               </div>
@@ -1160,7 +1195,18 @@ function startResizeLeft(e: React.MouseEvent) {
           <>
             <div className="flex min-h-12 shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border/70 bg-card/40 px-14 py-2 lg:px-5">
               <div className="flex min-w-0 items-center gap-3">
-                <div className="truncate text-sm font-semibold">{selectedPackage?.name || "工作台"}</div>
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <div className="truncate text-sm font-semibold">{selectedPackage?.name || "工作台"}</div>
+                  {selectedPackage && (
+                    <button
+                      onClick={() => void handleRenamePackage(selectedPackage.id, selectedPackage.name)}
+                      className="flex size-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                      title="重命名"
+                    >
+                      <Pencil className="size-3.5" />
+                    </button>
+                  )}
+                </div>
                 <div className="hidden text-xs text-muted-foreground sm:block">输入问题，测试智能体效果</div>
               </div>
               <div className="flex flex-wrap items-center justify-end gap-2">
@@ -1220,7 +1266,18 @@ function startResizeLeft(e: React.MouseEvent) {
       />
       <aside style={detailStyle} className="absolute inset-y-0 right-0 z-30 flex w-[min(24rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] flex-col border-l border-border/70 bg-card/95 shadow-xl backdrop-blur lg:relative lg:z-auto lg:w-[var(--detail-width)] lg:max-w-none lg:bg-card/40 lg:shadow-none lg:backdrop-blur-0">
         <div className="flex min-h-12 shrink-0 items-center justify-between gap-2 border-b border-border/70 px-3 py-2 sm:px-4">
-          <div className="min-w-0 truncate text-sm font-semibold">{selectedPackage?.name || "未选择"}</div>
+          <div className="flex min-w-0 items-center gap-1.5">
+            <div className="min-w-0 truncate text-sm font-semibold">{selectedPackage?.name || "未选择"}</div>
+            {selectedPackage && (
+              <button
+                onClick={() => void handleRenamePackage(selectedPackage.id, selectedPackage.name)}
+                className="flex size-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                title="重命名"
+              >
+                <Pencil className="size-3.5" />
+              </button>
+            )}
+          </div>
           <div className="flex shrink-0 items-center gap-1">
             <Button size="sm" variant="outline" className="h-7 text-xs rounded-[8px]" onClick={() => void handleExport()} disabled={!selectedPackageId}>导出</Button>
             <Button size="icon" variant="ghost" className="size-7 rounded-[10px] text-destructive hover:text-destructive" onClick={() => void handleDelete()} disabled={!selectedPackageId}><Trash2 className="size-3.5" /></Button>
