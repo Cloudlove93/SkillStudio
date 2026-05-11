@@ -202,6 +202,7 @@ export default function Header() {
   const isOwner = agent ? isOwnedAgent(agent) : false;
   const messages = activeTab?.messages ?? [];
   const isHome = !activeTabId && !mainView && !activeSessionId;
+  const isDefaultArenaView = mainView === 'deep-study' && deepStudyTab === 'arena';
   const showDeepStudySubTab = mainView === 'deep-study' && deepStudyTab !== 'arena';
 
   function handleGoHome() {
@@ -268,7 +269,7 @@ export default function Header() {
             </nav>
           )}
 
-          {viewCfg && (
+          {viewCfg && !isDefaultArenaView && (
             <nav className="hidden items-center gap-2 md:flex">
               <ChevronRight className="size-4 shrink-0 text-muted-foreground/50" />
               <div className="flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 shadow-[var(--shadow-sm)]">
