@@ -213,6 +213,9 @@ main() {
 
   ensure_server_dependencies
 
+  log "Building backend"
+  pnpm --filter educlaw-server build
+
   log "Stopping systemd backend if present"
   sudo systemctl disable --now "$SERVICE_NAME" >/dev/null 2>&1 || true
 
