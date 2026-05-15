@@ -67,6 +67,19 @@ ensure_tmux_session() {
   fi
 }
 
+stop_systemd_backends() {
+  local service
+  local stopped=""
+
+  for service in "$SERVICE_NAME" educlaw-server educlaw-lite-server; do
+    case " $stopped " in
+      *" $service "*) continue ;;
+    esac
+    stopped="$stopped $service"
+    sudo systemctl disable --now "$service" >/dev/null 2>&1 || true
+  done
+}
+
 deploy_frontend() {
   local web_dist="$PROJECT_DIR/educlaw-web/dist"
 
@@ -184,6 +197,25 @@ verify() {
 
   curl -fsS "http://127.0.0.1:${PORT}/healthz"
   printf '\n'
+
+  local route_probe_body="$DEPLOY_DIR/route-probe.json"
+  local route_probe_status
+  route_probe_status="$(
+    curl -sS -o "$route_probe_body" -w '%{http_code}' \
+      -X PATCH "http://127.0.0.1:${PORT}/api/packages/__deploy_route_probe__" \
+      -H 'Content-Type: application/json' \
+      -d '{"name":"deploy-probe"}' || true
+  )"
+  if [[ "$route_probe_status" == "404" ]]; then
+    printf '\n[educlaw-tmux] Backend route probe failed: PATCH /api/packages/:id returned 404.\n' >&2
+    printf '[educlaw-tmux] This usually means an old backend is still serving port %s.\n' "$PORT" >&2
+    printf '\n[educlaw-tmux] Route probe response:\n' >&2
+    cat "$route_probe_body" >&2 || true
+    printf '\n[educlaw-tmux] Recent backend log:\n' >&2
+    tail -n 120 "$BACKEND_LOG" >&2 || true
+    die "Backend route probe failed"
+  fi
+
   curl -fsS "http://127.0.0.1/healthz"
   printf '\n'
   if ! curl -fsSI "http://127.0.0.1/" >/dev/null; then
@@ -217,7 +249,7 @@ main() {
   pnpm --filter educlaw-server build
 
   log "Stopping systemd backend if present"
-  sudo systemctl disable --now "$SERVICE_NAME" >/dev/null 2>&1 || true
+  stop_systemd_backends
 
   log "Starting backend in tmux session ${TMUX_SESSION}, window ${TMUX_WINDOW}"
   ensure_tmux_session
