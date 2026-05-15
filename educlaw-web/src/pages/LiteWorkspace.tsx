@@ -165,7 +165,7 @@ export default function LiteWorkspace() {
     const tempEnhanced: ArenaMessage = { id: tempEnhancedId, threadId: thread.id, side: "enhanced", role: "assistant", content: "", createdAt: now };
     setInput(""); setReport(null); setOptimization(null); setThreadDetail({ thread: threadDetail.thread, messages: [...threadDetail.messages, tempShared, tempBaseline, tempEnhanced] }); setSideStreaming({ baseline: true, enhanced: true }); startProgress("Arena 对比", "正在生成回复..."); setStatus("正在生成...");
     try {
-      await liteApi.sendMessageStream(token, thread.id, prompt, model || undefined, (event) => {
+      await liteApi.sendMessageStream(token, thread.id, prompt, model || undefined, "compare", (event) => {
         if (event.event === "phase") { pushProgress(event.data.label); setStatus(event.data.label); return; }
         if (event.event === "shared") { setThreadDetail((prev) => prev ? { ...prev, messages: prev.messages.map((m) => m.id === tempSharedId ? event.data.message : m) } : prev); return; }
         if (event.event === "side_start") { setSideStreaming((prev) => ({ ...prev, [event.data.side]: true })); return; }

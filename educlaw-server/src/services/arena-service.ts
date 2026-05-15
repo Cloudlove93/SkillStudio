@@ -13,6 +13,7 @@ import { getPackage } from "./package-service.js";
 import type { DbRowMessage, DbRowThread } from "../types.js";
 
 export type ArenaStreamSide = "baseline" | "enhanced";
+export type ArenaMode = "compare" | "agent" | "baseline";
 
 export type ArenaChatStreamEvent =
   | { event: "phase"; data: { label: string } }
@@ -144,9 +145,15 @@ export async function* streamMessage(
   threadId: string,
   content: string,
   model?: string,
+  mode: ArenaMode = "compare",
 ): AsyncGenerator<ArenaChatStreamEvent> {
   const prompt = content.trim();
   if (!prompt) throw new Error("Message content is required");
+  const sides: ArenaStreamSide[] = mode === "agent"
+    ? ["enhanced"]
+    : mode === "baseline"
+      ? ["baseline"]
+      : ["baseline", "enhanced"];
 
   yield { event: "phase", data: { label: "Loading conversation context" } };
   const detail = await getThreadDetail(userId, threadId);
@@ -168,14 +175,16 @@ export async function* streamMessage(
   );
 
   yield { event: "shared", data: { message: shared } };
-  yield { event: "phase", data: { label: "Generating baseline and enhanced answers" } };
+  yield {
+    event: "phase",
+    data: { label: mode === "compare" ? "Generating baseline and enhanced answers" : "Generating answer" },
+  };
 
   const fullHistory = [...detail.messages, shared];
   const queue: Array<Exclude<ArenaChatStreamEvent, { event: "done" }>> = [];
-  let pending = 2;
+  let pending = sides.length;
   let wake: (() => void) | null = null;
-  let baselineContent = "";
-  let enhancedContent = "";
+  const sideContents: Record<ArenaStreamSide, string> = { baseline: "", enhanced: "" };
 
   const signal = () => {
     const current = wake;
@@ -202,14 +211,12 @@ export async function* streamMessage(
         push({ event: "delta", data: { side, delta: chunk } });
       }
       sideContent = sideContent.trim();
-      if (side === "baseline") baselineContent = sideContent;
-      else enhancedContent = sideContent;
+      sideContents[side] = sideContent;
       push({ event: "side_done", data: { side, content: sideContent, ok: true } });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Generation failed";
       const fallback = `Generation failed: ${message}`;
-      if (side === "baseline") baselineContent = fallback;
-      else enhancedContent = fallback;
+      sideContents[side] = fallback;
       push({ event: "side_done", data: { side, content: fallback, ok: false, error: message } });
     } finally {
       pending -= 1;
@@ -217,18 +224,22 @@ export async function* streamMessage(
     }
   };
 
-  void runSide(
-    "baseline",
-    BASELINE_SYSTEM_PROMPT,
-    buildHistory(fullHistory, "baseline"),
-    resolveBaselineModel(model || detail.thread.model || undefined),
-  );
-  void runSide(
-    "enhanced",
-    buildEnhancedPrompt(pkg.snapshot, shared.content),
-    buildHistory(fullHistory, "enhanced"),
-    model || detail.thread.model || undefined,
-  );
+  if (sides.includes("baseline")) {
+    void runSide(
+      "baseline",
+      BASELINE_SYSTEM_PROMPT,
+      buildHistory(fullHistory, "baseline"),
+      resolveBaselineModel(model || detail.thread.model || undefined),
+    );
+  }
+  if (sides.includes("enhanced")) {
+    void runSide(
+      "enhanced",
+      buildEnhancedPrompt(pkg.snapshot, shared.content),
+      buildHistory(fullHistory, "enhanced"),
+      model || detail.thread.model || undefined,
+    );
+  }
 
   while (pending > 0 || queue.length > 0) {
     if (queue.length === 0) {
@@ -239,30 +250,21 @@ export async function* streamMessage(
   }
 
   const savedAt = new Date().toISOString();
-  const baselineMessage: ArenaMessage = {
+  const assistantMessages: ArenaMessage[] = sides.map((side) => ({
     id: newId(),
     threadId,
-    side: "baseline",
+    side,
     role: "assistant",
-    content: baselineContent,
+    content: sideContents[side],
     createdAt: savedAt,
-  };
-  const enhancedMessage: ArenaMessage = {
-    id: newId(),
-    threadId,
-    side: "enhanced",
-    role: "assistant",
-    content: enhancedContent,
-    createdAt: savedAt,
-  };
+  }));
 
-  await query(
-    "insert into arena_messages (id, thread_id, user_id, side, role, content, created_at) values ($1, $2, $3, $4, $5, $6, $7), ($8, $9, $10, $11, $12, $13, $14)",
-    [
-      baselineMessage.id, threadId, userId, baselineMessage.side, baselineMessage.role, baselineMessage.content, baselineMessage.createdAt,
-      enhancedMessage.id, threadId, userId, enhancedMessage.side, enhancedMessage.role, enhancedMessage.content, enhancedMessage.createdAt,
-    ],
-  );
+  for (const message of assistantMessages) {
+    await query(
+      "insert into arena_messages (id, thread_id, user_id, side, role, content, created_at) values ($1, $2, $3, $4, $5, $6, $7)",
+      [message.id, threadId, userId, message.side, message.role, message.content, message.createdAt],
+    );
+  }
 
   await query(
     "update arena_threads set updated_at = $1 where id = $2 and user_id = $3",
@@ -273,7 +275,7 @@ export async function* streamMessage(
     event: "done",
     data: {
       thread: { ...detail.thread, updatedAt: savedAt },
-      messages: [shared, baselineMessage, enhancedMessage],
+      messages: [shared, ...assistantMessages],
     },
   };
 }
@@ -283,9 +285,10 @@ export async function sendMessage(
   threadId: string,
   content: string,
   model?: string,
+  mode: ArenaMode = "compare",
 ): Promise<ArenaChatResult> {
   let finalResult: { thread: ArenaThread; messages: ArenaMessage[] } | null = null;
-  for await (const event of streamMessage(userId, threadId, content, model)) {
+  for await (const event of streamMessage(userId, threadId, content, model, mode)) {
     if (event.event === "done") finalResult = event.data;
   }
   if (!finalResult) {
@@ -294,8 +297,8 @@ export async function sendMessage(
   return {
     thread: finalResult.thread,
     shared: finalResult.messages[0]!,
-    baseline: finalResult.messages[1]!,
-    enhanced: finalResult.messages[2]!,
+    baseline: finalResult.messages.find((message) => message.side === "baseline"),
+    enhanced: finalResult.messages.find((message) => message.side === "enhanced"),
   };
 }
 

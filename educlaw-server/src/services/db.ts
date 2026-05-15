@@ -97,6 +97,24 @@ export async function initDb() {
       updated_at text not null
     )
   `);
+
+  await pool.query(`
+    create table if not exists interactive_optimization_sessions (
+      id text primary key,
+      user_id text not null,
+      package_id text not null,
+      thread_id text not null,
+      status text not null default 'active',
+      messages_json text not null default '[]',
+      issues_json text not null default '[]',
+      adopted_json text not null default '[]',
+      summary text not null default '',
+      version_id text,
+      version_number integer,
+      created_at text not null,
+      updated_at text not null
+    )
+  `);
 }
 
 export async function query<T extends QueryResultRow = Record<string, unknown>>(text: string, values: unknown[] = []) {

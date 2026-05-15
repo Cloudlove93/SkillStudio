@@ -10,7 +10,7 @@ import type {
   OptimizationResult,
   PackageVersion,
 } from "@educlaw/shared";
-import type { DiagnosisIssue, AdoptedChange, VersionCompareResult, LineDiff } from "../../api/lite-api";
+import type { DiagnosisIssue, AdoptedChange, VersionCompareResult, LineDiff, InteractiveOptimizationSession, ArenaMode } from "../../api/lite-api";
 import { computeLineDiff } from "../../api/lite-api";
 import { useAuthStore } from "../../stores/auth";
 import { liteApi } from "../../api/lite-api";
@@ -106,6 +106,10 @@ export default function LiteArenaPanel() {
   const [interactiveAdopted, setInteractiveAdopted] = useState<AdoptedChange[]>([]);
   const [interactivePhase, setInteractivePhase] = useState<"idle" | "diagnosing" | "chatting">("idle");
   const [interactiveInput, setInteractiveInput] = useState("");
+  const [interactiveSessionId, setInteractiveSessionId] = useState("");
+  const [interactiveSessions, setInteractiveSessions] = useState<InteractiveOptimizationSession[]>([]);
+  const [interactiveView, setInteractiveView] = useState<"chat" | "issues" | "adopted" | "history">("chat");
+  const [arenaMode, setArenaMode] = useState<ArenaMode>("compare");
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
   const selectedPackageIdRef = useRef(selectedPackageId);
   useEffect(() => { selectedPackageIdRef.current = selectedPackageId; }, [selectedPackageId]);
@@ -183,6 +187,44 @@ export default function LiteArenaPanel() {
     );
   }
 
+  function applyInteractiveSession(session: InteractiveOptimizationSession | null, openPanel = false) {
+    if (!session) {
+      setInteractiveSessionId("");
+      setInteractiveMessages([]);
+      setInteractiveAdopted([]);
+      setInteractiveIssues([]);
+      setHasSavedSession(false);
+      if (openPanel) setInteractiveMode(false);
+      return;
+    }
+    setInteractiveSessionId(session.id);
+    setInteractiveMessages(session.messages || []);
+    setInteractiveAdopted(session.adoptedChanges || []);
+    setInteractiveIssues(session.issues || []);
+    setHasSavedSession((session.messages || []).length > 0);
+    if (openPanel) {
+      setInteractiveMode(true);
+      setInteractiveView("chat");
+    }
+  }
+
+  async function loadInteractiveSessions(packageId: string, openLatest = false) {
+    if (!token || !packageId) return;
+    try {
+      const sessions = await liteApi.listInteractiveSessions(token, packageId);
+      setInteractiveSessions(sessions);
+      const latestActive = sessions.find((session) => session.status === "active") || sessions[0] || null;
+      if (latestActive) {
+        applyInteractiveSession(latestActive, openLatest);
+      } else {
+        applyInteractiveSession(null, false);
+      }
+    } catch {
+      setInteractiveSessions([]);
+      applyInteractiveSession(null, false);
+    }
+  }
+
   useEffect(() => {
     const preserveGenerateProgress = preserveGenerateProgressRef.current;
     preserveGenerateProgressRef.current = false;
@@ -199,41 +241,22 @@ export default function LiteArenaPanel() {
     if (!selectedPackageId) {
       setInteractiveMode(false);
       setHasSavedSession(false);
+      setInteractiveSessionId("");
+      setInteractiveSessions([]);
       setInteractiveMessages([]);
       setInteractiveAdopted([]);
       setInteractiveIssues([]);
       return;
     }
-    const saved = localStorage.getItem(interactiveStorageKey(selectedPackageId));
-    if (saved) {
-      try {
-        const data = JSON.parse(saved);
-        const validMessages = (data.messages || []).filter(
-          (m: any) => m && typeof m === "object" && typeof m.role === "string" && typeof m.content === "string"
-        );
-        const validAdopted = (data.adopted || []).filter(
-          (a: any) => a && typeof a === "object" && typeof a.id === "string"
-        );
-        const validIssues = (data.issues || []).filter(
-          (i: any) => i && typeof i === "object" && typeof i.id === "string"
-        );
-        if (validMessages.length > 0) {
-          setInteractiveMessages(validMessages);
-          setInteractiveAdopted(validAdopted);
-          setInteractiveIssues(validIssues);
-          setHasSavedSession(true);
-          setInteractiveMode(true); // auto-resume interactive panel if session exists
-          return;
-        }
-      } catch { /* ignore corrupt data */ }
-    }
-    // No saved session for this package: close interactive panel
     setInteractiveMode(false);
     setHasSavedSession(false);
+    setInteractiveSessionId("");
+    setInteractiveSessions([]);
     setInteractiveMessages([]);
     setInteractiveAdopted([]);
     setInteractiveIssues([]);
-  }, [selectedPackageId]);
+    void loadInteractiveSessions(selectedPackageId, false);
+  }, [selectedPackageId, token]);
 
   // Persist / restore optimization result per package
   const optimizationStorageKey = (packageId: string) => `arena-optimization-${packageId}`;
@@ -318,6 +341,9 @@ export default function LiteArenaPanel() {
     setSelectedSkillId("");
     setCenterPreview(null);
     setInteractiveMode(false);
+    setInteractiveSessionId("");
+    setInteractiveSessions([]);
+    setInteractiveView("chat");
     setInteractiveMessages([]);
     setInteractiveAdopted([]);
     setInteractiveIssues([]);
@@ -469,13 +495,20 @@ function startResizeLeft(e: React.MouseEvent) {
     const tempShared: ArenaMessage = { id: tempSharedId, threadId: thread.id, side: "shared", role: "user", content: prompt, createdAt: now };
     const tempBaseline: ArenaMessage = { id: tempBaselineId, threadId: thread.id, side: "baseline", role: "assistant", content: "", createdAt: now };
     const tempEnhanced: ArenaMessage = { id: tempEnhancedId, threadId: thread.id, side: "enhanced", role: "assistant", content: "", createdAt: now };
+    const shouldShowBaseline = arenaMode === "compare" || arenaMode === "baseline";
+    const shouldShowEnhanced = arenaMode === "compare" || arenaMode === "agent";
+    const tempMessages = [
+      tempShared,
+      ...(shouldShowBaseline ? [tempBaseline] : []),
+      ...(shouldShowEnhanced ? [tempEnhanced] : []),
+    ];
     setInput(""); setReport(null); setOptimization(null);
     flushSync(() => {
-      setThreadDetail({ thread: threadDetail.thread, messages: [...threadDetail.messages, tempShared, tempBaseline, tempEnhanced] });
+      setThreadDetail({ thread: threadDetail.thread, messages: [...threadDetail.messages, ...tempMessages] });
     });
-    setSideStreaming({ baseline: true, enhanced: true }); startProgress(selectedPackage?.name || "工作台", "正在生成回复..."); setStatus("正在生成...");
+    setSideStreaming({ baseline: shouldShowBaseline, enhanced: shouldShowEnhanced }); startProgress(selectedPackage?.name || "工作台", "正在生成回复..."); setStatus("正在生成...");
     try {
-      await liteApi.sendMessageStream(token, thread.id, prompt, undefined, (event) => {
+      await liteApi.sendMessageStream(token, thread.id, prompt, undefined, arenaMode, (event) => {
         if (event.event === "phase") { pushProgress(event.data.label); setStatus(event.data.label); return; }
         if (event.event === "shared") { setThreadDetail((prev) => prev ? { ...prev, messages: prev.messages.map((m) => m.id === tempSharedId ? event.data.message : m) } : prev); return; }
         if (event.event === "side_start") { setSideStreaming((prev) => ({ ...prev, [event.data.side]: true })); return; }
@@ -492,6 +525,14 @@ function startResizeLeft(e: React.MouseEvent) {
         }
         if (event.event === "done") {
           setThread(event.data.thread);
+          setThreadDetail((prev) => prev ? {
+            ...prev,
+            thread: event.data.thread,
+            messages: [
+              ...prev.messages.filter((m) => ![tempSharedId, tempBaselineId, tempEnhancedId].includes(m.id)),
+              ...event.data.messages,
+            ],
+          } : prev);
           setSideStreaming({ baseline: false, enhanced: false });
           finishProgress("回复已生成"); setStatus("回复已生成");
           return;
@@ -608,35 +649,18 @@ function startResizeLeft(e: React.MouseEvent) {
     }
   }
 
-  async function startInteractive() {
+  async function startInteractive(forceNew = false) {
     if (!token || !thread?.id || !selectedPackageId) return;
     setInteractiveMode(true);
     setCenterPreview(null);
-    // Check if there's a saved session for this package
-    const saved = localStorage.getItem(interactiveStorageKey(selectedPackageId));
-    if (saved) {
-      try {
-        const data = JSON.parse(saved);
-        const validMessages = (data.messages || []).filter(
-          (m: any) => m && typeof m === "object" && typeof m.role === "string" && typeof m.content === "string"
-        );
-        const validAdopted = (data.adopted || []).filter(
-          (a: any) => a && typeof a === "object" && typeof a.id === "string"
-        );
-        const validIssues = (data.issues || []).filter(
-          (i: any) => i && typeof i === "object" && typeof i.id === "string"
-        );
-        if (validMessages.length > 0) {
-          setInteractiveMessages(validMessages);
-          setInteractiveAdopted(validAdopted);
-          setInteractiveIssues(validIssues);
-          setHasSavedSession(true);
-          return; // Resume from saved session, no need to re-diagnose
-        }
-      } catch { /* ignore */ }
+    const latestActive = interactiveSessions.find((session) => session.status === "active") || null;
+    if (!forceNew && latestActive && latestActive.messages.length > 0) {
+      applyInteractiveSession(latestActive, true);
+      return;
     }
     setHasSavedSession(false);
     // Fresh start: run diagnosis with simulated progress steps
+    setInteractiveSessionId("");
     setInteractivePhase("diagnosing");
     setInteractiveMessages([]);
     setInteractiveIssues([]);
@@ -653,6 +677,10 @@ function startResizeLeft(e: React.MouseEvent) {
       stepTimers.forEach((id) => window.clearTimeout(id));
       const welcomeMsg = { role: "assistant", content: result.welcomeMessage };
       saveInteractiveState(currentPkgId, [welcomeMsg], [], result.issues);
+      if (result.session) {
+        setInteractiveSessionId(result.session.id);
+        setInteractiveSessions((prev) => [result.session!, ...prev.filter((session) => session.id !== result.session!.id)]);
+      }
       if (selectedPackageIdRef.current === currentPkgId) {
         setInteractiveMode(true);
         setInteractiveIssues(result.issues);
@@ -683,12 +711,11 @@ function startResizeLeft(e: React.MouseEvent) {
     const userMsg = interactiveInput.trim();
     setInteractiveInput("");
 
-    // Read latest state from localStorage to avoid stale closure after package switch
-    // Default to empty — never trust closure-captured state after a potential switch
-    let latestMessages: typeof interactiveMessages = [];
-    let latestAdopted: typeof interactiveAdopted = [];
-    let latestIssues: typeof interactiveIssues = [];
-    const saved = localStorage.getItem(interactiveStorageKey(currentPkgId));
+    // Prefer the server-backed session; localStorage only keeps older unsynced drafts alive.
+    let latestMessages: typeof interactiveMessages = interactiveMessages;
+    let latestAdopted: typeof interactiveAdopted = interactiveAdopted;
+    let latestIssues: typeof interactiveIssues = interactiveIssues;
+    const saved = latestMessages.length === 0 ? localStorage.getItem(interactiveStorageKey(currentPkgId)) : null;
     if (saved) {
       try {
         const data = JSON.parse(saved);
@@ -720,7 +747,7 @@ function startResizeLeft(e: React.MouseEvent) {
     saveInteractiveState(currentPkgId, messagesWithUser, latestAdopted, latestIssues);
 
     try {
-      const result = await liteApi.chatOptimize(token, currentPkgId, messagesWithUser, latestAdopted);
+      const result = await liteApi.chatOptimize(token, currentPkgId, interactiveSessionId || undefined, messagesWithUser, latestAdopted);
 
       // Build final messages with assistant reply using known array (not prev from state)
       const finalMessages = [...messagesWithUser, { role: "assistant", content: result.reply }];
@@ -728,6 +755,11 @@ function startResizeLeft(e: React.MouseEvent) {
 
       // Always save to localStorage for the original package
       saveInteractiveState(currentPkgId, finalMessages, finalAdopted, latestIssues);
+
+      if (result.session) {
+        setInteractiveSessionId(result.session.id);
+        setInteractiveSessions((prev) => [result.session!, ...prev.filter((session) => session.id !== result.session!.id)]);
+      }
 
       // Only update UI if user is still on the same package
       if (selectedPackageIdRef.current === currentPkgId) {
@@ -760,18 +792,15 @@ function startResizeLeft(e: React.MouseEvent) {
     if (note === null) return; // cancelled
     startProgress("保存修改", "正在应用修改并生成新版本...");
     try {
-      const result = await liteApi.applyInteractiveChanges(token, currentPkgId, currentAdopted, note);
+      const result = await liteApi.applyInteractiveChanges(token, currentPkgId, interactiveSessionId || undefined, currentAdopted, note);
       await refreshPackages(currentPkgId);
+      await loadInteractiveSessions(currentPkgId, false);
       // Clear saved interactive session
       localStorage.removeItem(interactiveStorageKey(currentPkgId));
       if (selectedPackageIdRef.current === currentPkgId) {
         setInteractiveMode(false);
-        setHasSavedSession(false);
         setOptimization(null);
-        setInteractiveMessages([]);
-        setInteractiveIssues([]);
-        setInteractiveAdopted([]);
-        setDetailTab("versions");
+        setDetailTab("optimization");
       }
       finishProgress(`已保存为新版本 v${result.versionNumber}`);
     } catch (error) {
@@ -989,7 +1018,7 @@ function startResizeLeft(e: React.MouseEvent) {
                     setInteractiveMessages([]);
                     setInteractiveAdopted([]);
                     setInteractiveIssues([]);
-                    void startInteractive();
+                    void startInteractive(true);
                   }
                 }}>↻ 重新开始</Button>
                 {interactiveAdopted.length > 0 && (
@@ -1002,8 +1031,82 @@ function startResizeLeft(e: React.MouseEvent) {
                 )}
               </div>
             </div>
+            <div className="flex shrink-0 gap-1 border-b border-border/70 bg-card/30 px-3 py-2 sm:px-5">
+              {[
+                { key: "chat" as const, label: "当前对话" },
+                { key: "issues" as const, label: `专家建议 ${interactiveIssues.length || ""}` },
+                { key: "adopted" as const, label: `已采纳 ${interactiveAdopted.length || ""}` },
+                { key: "history" as const, label: `历史 ${interactiveSessions.length || ""}` },
+              ].map((item) => (
+                <button
+                  key={item.key}
+                  onClick={() => setInteractiveView(item.key)}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${interactiveView === item.key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
             <div ref={chatScrollRef} className="flex-1 space-y-5 overflow-y-auto px-3 py-4 sm:px-6">
-              {interactiveMessages.map((m, i) => (
+              {interactiveView === "issues" && (
+                <div className="grid gap-3 lg:grid-cols-2">
+                  {interactiveIssues.map((issue) => (
+                    <div key={issue.id} className="rounded-[18px] border border-border/70 bg-card/70 p-4 text-sm">
+                      <div className="font-semibold">{issue.title}</div>
+                      <div className="mt-1 text-xs text-muted-foreground">目标：{issue.target}{issue.targetId ? ` / ${issue.targetId}` : ""}</div>
+                      <div className="mt-2 text-muted-foreground">{issue.reason}</div>
+                      <div className="mt-2 rounded-lg bg-muted/60 p-2 text-xs leading-5">{issue.suggestion}</div>
+                    </div>
+                  ))}
+                  {interactiveIssues.length === 0 && <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">暂无专家建议</div>}
+                </div>
+              )}
+              {interactiveView === "adopted" && (
+                <div className="space-y-3">
+                  {interactiveAdopted.map((change) => (
+                    <button
+                      key={change.id}
+                      onClick={() => {
+                        const diffs = computeLineDiff(change.original, change.modified);
+                        const diffLines = diffs.map((d) => d.type === "same" ? ` ${d.text}` : d.type === "removed" ? `-${d.text}` : `+${d.text}`);
+                        setInteractiveMode(false);
+                        setCenterPreview({ type: "diff", name: `${change.target}${change.targetId ? `/${change.targetId}` : ""} — ${change.reason}`, content: [`# 已采纳修改：${change.reason}`, "", "```diff", ...diffLines, "```"].join("\n") });
+                      }}
+                      className="block w-full rounded-[18px] border border-border/70 bg-card/70 p-4 text-left text-sm hover:border-primary/30 hover:bg-primary/5"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary">{change.target}{change.targetId ? `/${change.targetId}` : ""}</Badge>
+                        <span className="font-medium">{change.reason}</span>
+                      </div>
+                    </button>
+                  ))}
+                  {interactiveAdopted.length === 0 && <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">暂无已采纳修改</div>}
+                </div>
+              )}
+              {interactiveView === "history" && (
+                <div className="space-y-3">
+                  {interactiveSessions.map((session) => (
+                    <button
+                      key={session.id}
+                      onClick={() => applyInteractiveSession(session, true)}
+                      className={`block w-full rounded-[18px] border p-4 text-left text-sm transition-colors ${interactiveSessionId === session.id ? "border-primary/30 bg-primary/5" : "border-border/70 bg-card/70 hover:border-primary/25"}`}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="font-medium">{session.status === "saved" ? "已保存优化" : "进行中的优化"}</div>
+                        <div className="text-xs text-muted-foreground">{new Date(session.updatedAt).toLocaleString()}</div>
+                      </div>
+                      <div className="mt-2 text-xs leading-5 text-muted-foreground">{session.summary || "暂无总结"}</div>
+                      <div className="mt-2 flex gap-2 text-[10px] text-muted-foreground">
+                        <span>{session.issues.length} 条建议</span>
+                        <span>{session.adoptedChanges.length} 项采纳</span>
+                        {session.versionNumber && <span>v{session.versionNumber}</span>}
+                      </div>
+                    </button>
+                  ))}
+                  {interactiveSessions.length === 0 && <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">暂无历史优化记录</div>}
+                </div>
+              )}
+              {interactiveView === "chat" && interactiveMessages.map((m, i) => (
                 <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
                   <div className="max-w-[88%] sm:max-w-[70%] lg:max-w-[50%]">
                     <div className="text-[10px] font-medium text-muted-foreground mb-1">
@@ -1019,7 +1122,7 @@ function startResizeLeft(e: React.MouseEvent) {
                   </div>
                 </div>
               ))}
-              {interactivePhase !== "idle" && (
+              {interactiveView === "chat" && interactivePhase !== "idle" && (
                 <div className="flex justify-start">
                   <div className="w-full max-w-[94%] sm:max-w-[90%]">
                     <div className="text-xs font-medium text-muted-foreground mb-1.5 pl-1">🎓 优化专家</div>
@@ -1210,7 +1313,22 @@ function startResizeLeft(e: React.MouseEvent) {
                 <div className="hidden text-xs text-muted-foreground sm:block">输入问题，测试智能体效果</div>
               </div>
               <div className="flex flex-wrap items-center justify-end gap-2">
-                <Button size="sm" variant="outline" className="rounded-[12px]" onClick={() => void handleReport()} disabled={!threadDetail || threadDetail.messages.length === 0}><BarChart3 className="mr-1.5 size-3.5" />评估报告</Button>
+                <div className="inline-flex rounded-[12px] border border-border/70 bg-muted/40 p-0.5">
+                  {[
+                    { key: "compare" as const, label: "对比" },
+                    { key: "agent" as const, label: "智能体" },
+                    { key: "baseline" as const, label: "基础" },
+                  ].map((mode) => (
+                    <button
+                      key={mode.key}
+                      onClick={() => setArenaMode(mode.key)}
+                      className={`rounded-[9px] px-2.5 py-1 text-xs font-medium transition-colors ${arenaMode === mode.key ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                    >
+                      {mode.label}
+                    </button>
+                  ))}
+                </div>
+                <Button size="sm" variant="outline" className="rounded-[12px]" onClick={() => void handleReport()} disabled={!threadDetail || threadDetail.messages.length === 0 || arenaMode !== "compare"}><BarChart3 className="mr-1.5 size-3.5" />评估报告</Button>
                 <Button size="sm" variant="outline" className="rounded-[12px]" onClick={() => void startInteractive()} disabled={!thread}>
                   💬 交互式优化
                   {hasSavedSession && <span className="ml-1 text-[10px] opacity-70">(继续)</span>}
@@ -1244,7 +1362,7 @@ function startResizeLeft(e: React.MouseEvent) {
             <PackagePreviewCard previews={showGeneratePreviews ? generatePreviews : []} />
 
             <div className="flex-1 overflow-auto">
-              <ConversationBoard messages={messages} sideStreaming={sideStreaming} packageName={selectedPackage?.name} />
+              <ConversationBoard messages={messages} sideStreaming={sideStreaming} packageName={selectedPackage?.name} mode={arenaMode} />
             </div>
 
             <div className="border-t border-border/70 bg-card/40 p-3 sm:p-4">

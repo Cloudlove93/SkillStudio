@@ -41,6 +41,27 @@ export interface ChatOptimizeResult {
   newAdoptions: AdoptedChange[];
   newRejections: string[];
   isDone: boolean;
+  session?: InteractiveOptimizationSession;
+}
+
+export interface InteractiveOptimizationMessage {
+  role: "system" | "user" | "assistant";
+  content: string;
+}
+
+export interface InteractiveOptimizationSession {
+  id: string;
+  packageId: string;
+  threadId: string;
+  status: string;
+  messages: InteractiveOptimizationMessage[];
+  issues: DiagnosisIssue[];
+  adoptedChanges: AdoptedChange[];
+  summary: string;
+  versionId?: string;
+  versionNumber?: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface LineDiff {
@@ -122,6 +143,8 @@ export type ArenaMessageStreamEvent =
   | { event: "error"; data: { error: string } }
   | { event: "stream_end"; data: { ok: boolean } };
 
+export type ArenaMode = "compare" | "agent" | "baseline";
+
 export type ReportStreamEvent =
   | { event: "phase"; data: { label: string } }
   | { event: "done"; data: ArenaReport }
@@ -176,8 +199,8 @@ export const liteApi = {
   listThreads: (token: string, packageId: string) => request<ArenaThread[]>(`/arena/threads?packageId=${encodeURIComponent(packageId)}`, {}, token),
   createThread: (token: string, packageId: string, model?: string) => request<ArenaThread>("/arena/threads", { method: "POST", body: JSON.stringify({ packageId, model }) }, token),
   getThread: (token: string, threadId: string) => request<ArenaThreadDetail>(`/arena/threads/${threadId}`, {}, token),
-  sendMessageStream: (token: string, threadId: string, content: string, model: string | undefined, onEvent: (event: ArenaMessageStreamEvent) => void) =>
-    streamRequest<ArenaMessageStreamEvent>(`/arena/threads/${threadId}/messages/stream`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content, model }) }, token, onEvent),
+  sendMessageStream: (token: string, threadId: string, content: string, model: string | undefined, mode: ArenaMode, onEvent: (event: ArenaMessageStreamEvent) => void) =>
+    streamRequest<ArenaMessageStreamEvent>(`/arena/threads/${threadId}/messages/stream`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content, model, mode }) }, token, onEvent),
   generateReportStream: (token: string, threadId: string, model: string | undefined, onEvent: (event: ReportStreamEvent) => void) =>
     streamRequest<ReportStreamEvent>(`/arena/threads/${threadId}/report/stream`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model }) }, token, onEvent),
   optimizePackageStream: (token: string, packageId: string, threadId: string, model: string | undefined, onEvent: (event: OptimizeStreamEvent) => void) =>
@@ -189,11 +212,13 @@ export const liteApi = {
     return response.json();
   },
   diagnosePackage: (token: string, packageId: string, threadId: string, model?: string) =>
-    request<DiagnosisResult>(`/packages/${packageId}/optimize/diagnose`, { method: "POST", body: JSON.stringify({ threadId, model }) }, token),
-  chatOptimize: (token: string, packageId: string, messages: Array<{ role: string; content: string }>, adoptedChanges: AdoptedChange[], model?: string) =>
-    request<ChatOptimizeResult>(`/packages/${packageId}/optimize/chat`, { method: "POST", body: JSON.stringify({ messages, adoptedChanges, model }) }, token),
-  applyInteractiveChanges: (token: string, packageId: string, changes: AdoptedChange[], note?: string) =>
-    request<{ versionId: string; versionNumber: number }>(`/packages/${packageId}/optimize/apply`, { method: "POST", body: JSON.stringify({ changes, note }) }, token),
+    request<DiagnosisResult & { session?: InteractiveOptimizationSession }>(`/packages/${packageId}/optimize/diagnose`, { method: "POST", body: JSON.stringify({ threadId, model }) }, token),
+  listInteractiveSessions: (token: string, packageId: string) =>
+    request<InteractiveOptimizationSession[]>(`/packages/${packageId}/optimize/sessions`, {}, token),
+  chatOptimize: (token: string, packageId: string, sessionId: string | undefined, messages: Array<{ role: string; content: string }>, adoptedChanges: AdoptedChange[], model?: string) =>
+    request<ChatOptimizeResult>(`/packages/${packageId}/optimize/chat`, { method: "POST", body: JSON.stringify({ sessionId, messages, adoptedChanges, model }) }, token),
+  applyInteractiveChanges: (token: string, packageId: string, sessionId: string | undefined, changes: AdoptedChange[], note?: string) =>
+    request<{ versionId: string; versionNumber: number }>(`/packages/${packageId}/optimize/apply`, { method: "POST", body: JSON.stringify({ sessionId, changes, note }) }, token),
   compareVersions: (token: string, packageId: string, baseVersionId: string, targetVersionId: string, model?: string) =>
     request<VersionCompareResult>(`/packages/${packageId}/versions/compare`, { method: "POST", body: JSON.stringify({ baseVersionId, targetVersionId, model }) }, token),
   updateVersionNote: (token: string, packageId: string, versionId: string, note: string) =>

@@ -261,8 +261,18 @@ export function PackagePreviewCard({ previews }: { previews: PackagePreview[] })
   );
 }
 
-export function ConversationBoard({ messages, sideStreaming, packageName }: { messages: ArenaMessage[]; sideStreaming: { baseline: boolean; enhanced: boolean }; packageName?: string }) {
-  const sharedMessages = messages.filter((m) => m.side === "shared" && m.role === "user");
+export function ConversationBoard({ messages, sideStreaming, packageName, mode = "compare" }: { messages: ArenaMessage[]; sideStreaming: { baseline: boolean; enhanced: boolean }; packageName?: string; mode?: "compare" | "agent" | "baseline" }) {
+  const turns: Array<{ shared: ArenaMessage; baseline?: ArenaMessage; enhanced?: ArenaMessage }> = [];
+  for (const message of messages) {
+    if (message.side === "shared" && message.role === "user") {
+      turns.push({ shared: message });
+      continue;
+    }
+    const current = turns[turns.length - 1];
+    if (!current || message.role !== "assistant") continue;
+    if (message.side === "baseline") current.baseline = message;
+    if (message.side === "enhanced") current.enhanced = message;
+  }
   const scrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" }); }, [messages]);
 
@@ -279,12 +289,8 @@ export function ConversationBoard({ messages, sideStreaming, packageName }: { me
 
   return (
     <div ref={scrollRef} className="flex h-full flex-col gap-4 overflow-y-auto px-3 py-4 sm:px-5">
-      {sharedMessages.map((shared, idx) => {
-        const baselineMsgs = messages.filter((m) => m.side === "baseline" && m.role === "assistant");
-        const enhancedMsgs = messages.filter((m) => m.side === "enhanced" && m.role === "assistant");
-        const baselineMsg = baselineMsgs[idx];
-        const enhancedMsg = enhancedMsgs[idx];
-        const isLatest = idx === sharedMessages.length - 1;
+      {turns.map(({ shared, baseline: baselineMsg, enhanced: enhancedMsg }, idx) => {
+        const isLatest = idx === turns.length - 1;
 
         return (
           <div key={shared.id} className="space-y-3">
@@ -293,7 +299,8 @@ export function ConversationBoard({ messages, sideStreaming, packageName }: { me
                 {shared.content}
               </div>
             </div>
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className={`grid gap-3 ${mode === "compare" ? "md:grid-cols-2" : "md:grid-cols-1"}`}>
+              {mode !== "agent" && (
               <div className={`min-w-0 rounded-[20px] border px-4 py-3 shadow-[var(--shadow-sm)] ${sideStreaming.baseline && isLatest ? "border-cyan-500/20 bg-cyan-500/5" : "border-border/70 bg-card/80"}`}>
                 <div className="flex min-w-0 items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                   <span className="inline-flex size-6 items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-500 text-[10px]">B</span>
@@ -304,6 +311,8 @@ export function ConversationBoard({ messages, sideStreaming, packageName }: { me
                   {(baselineMsg?.content || "") ? <MarkdownContent content={baselineMsg.content} /> : <span className="text-muted-foreground/50">等待生成...</span>}
                 </div>
               </div>
+              )}
+              {mode !== "baseline" && (
               <div className={`min-w-0 rounded-[20px] border px-4 py-3 shadow-[var(--shadow-sm)] ${sideStreaming.enhanced && isLatest ? "border-primary/20 bg-primary/5" : "border-border/70 bg-card/80"}`}>
                 <div className="flex min-w-0 items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                   <span className="inline-flex size-6 items-center justify-center rounded-lg bg-primary/10 text-primary text-[10px]">E</span>
@@ -314,6 +323,7 @@ export function ConversationBoard({ messages, sideStreaming, packageName }: { me
                   {(enhancedMsg?.content || "") ? <MarkdownContent content={enhancedMsg.content} /> : <span className="text-muted-foreground/50">等待生成...</span>}
                 </div>
               </div>
+              )}
             </div>
           </div>
         );

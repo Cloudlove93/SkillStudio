@@ -2,6 +2,8 @@ import type { AgentPackageSnapshot } from "@educlaw/shared";
 import { generateChat, generateJson, type ChatMessage } from "./llm-service.js";
 import { getPackage, applyOptimizedSnapshot } from "./package-service.js";
 import { getThreadDetail } from "./arena-service.js";
+import { newId, query } from "./db.js";
+import type { DbRowInteractiveOptimizationSession } from "../types.js";
 
 export interface DiagnosisIssue {
   id: string;
@@ -26,9 +28,11 @@ export interface AdoptedChange {
 export interface DiagnosisResult {
   welcomeMessage: string;
   issues: DiagnosisIssue[];
+  session?: InteractiveOptimizationSession;
 }
 
 export interface ChatOptimizeInput {
+  sessionId?: string;
   messages: Array<{ role: "system" | "user" | "assistant"; content: string }>;
   adoptedChanges: AdoptedChange[];
 }
@@ -38,9 +42,190 @@ export interface ChatOptimizeResult {
   newAdoptions: AdoptedChange[];
   newRejections: string[];
   isDone: boolean;
+  session?: InteractiveOptimizationSession;
+}
+
+export interface InteractiveOptimizationMessage {
+  role: "system" | "user" | "assistant";
+  content: string;
+}
+
+export interface InteractiveOptimizationSession {
+  id: string;
+  packageId: string;
+  threadId: string;
+  status: string;
+  messages: InteractiveOptimizationMessage[];
+  issues: DiagnosisIssue[];
+  adoptedChanges: AdoptedChange[];
+  summary: string;
+  versionId?: string;
+  versionNumber?: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 /* ── helpers ── */
+
+function parseJsonArray<T>(value: string, fallback: T[] = []): T[] {
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed as T[] : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function toInteractiveSession(row: DbRowInteractiveOptimizationSession): InteractiveOptimizationSession {
+  return {
+    id: row.id,
+    packageId: row.package_id,
+    threadId: row.thread_id,
+    status: row.status,
+    messages: parseJsonArray<InteractiveOptimizationMessage>(row.messages_json),
+    issues: parseJsonArray<DiagnosisIssue>(row.issues_json),
+    adoptedChanges: parseJsonArray<AdoptedChange>(row.adopted_json),
+    summary: row.summary || "",
+    versionId: row.version_id || undefined,
+    versionNumber: row.version_number || undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function buildSessionSummary(
+  messages: InteractiveOptimizationMessage[],
+  adoptedChanges: AdoptedChange[],
+  issues: DiagnosisIssue[],
+) {
+  const latestAssistant = [...messages].reverse().find((message) => message.role === "assistant")?.content || "";
+  const parts = [
+    issues.length ? `发现 ${issues.length} 个问题` : "未记录诊断问题",
+    adoptedChanges.length ? `已采纳 ${adoptedChanges.length} 项修改` : "暂无采纳修改",
+  ];
+  if (latestAssistant) {
+    parts.push(latestAssistant.replace(/\s+/g, " ").slice(0, 80));
+  }
+  return parts.join("；");
+}
+
+async function createInteractiveSession(
+  userId: string,
+  packageId: string,
+  threadId: string,
+  messages: InteractiveOptimizationMessage[],
+  issues: DiagnosisIssue[],
+  adoptedChanges: AdoptedChange[] = [],
+) {
+  const now = new Date().toISOString();
+  const row: DbRowInteractiveOptimizationSession = {
+    id: newId(),
+    user_id: userId,
+    package_id: packageId,
+    thread_id: threadId,
+    status: "active",
+    messages_json: JSON.stringify(messages),
+    issues_json: JSON.stringify(issues),
+    adopted_json: JSON.stringify(adoptedChanges),
+    summary: buildSessionSummary(messages, adoptedChanges, issues),
+    version_id: null,
+    version_number: null,
+    created_at: now,
+    updated_at: now,
+  };
+
+  await query(
+    `insert into interactive_optimization_sessions
+      (id, user_id, package_id, thread_id, status, messages_json, issues_json, adopted_json, summary, version_id, version_number, created_at, updated_at)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+    [
+      row.id,
+      row.user_id,
+      row.package_id,
+      row.thread_id,
+      row.status,
+      row.messages_json,
+      row.issues_json,
+      row.adopted_json,
+      row.summary,
+      row.version_id,
+      row.version_number,
+      row.created_at,
+      row.updated_at,
+    ],
+  );
+
+  return toInteractiveSession(row);
+}
+
+export async function getInteractiveSession(userId: string, sessionId: string) {
+  const result = await query<DbRowInteractiveOptimizationSession>(
+    "select * from interactive_optimization_sessions where id = $1 and user_id = $2",
+    [sessionId, userId],
+  );
+  const row = result.rows[0];
+  if (!row) throw new Error("Optimization session not found");
+  return toInteractiveSession(row);
+}
+
+async function updateInteractiveSession(
+  userId: string,
+  sessionId: string,
+  values: {
+    messages?: InteractiveOptimizationMessage[];
+    issues?: DiagnosisIssue[];
+    adoptedChanges?: AdoptedChange[];
+    status?: string;
+    versionId?: string;
+    versionNumber?: number;
+  },
+) {
+  const current = await getInteractiveSession(userId, sessionId);
+  const messages = values.messages || current.messages;
+  const issues = values.issues || current.issues;
+  const adoptedChanges = values.adoptedChanges || current.adoptedChanges;
+  const status = values.status || current.status;
+  const summary = buildSessionSummary(messages, adoptedChanges, issues);
+  const updatedAt = new Date().toISOString();
+
+  const result = await query<DbRowInteractiveOptimizationSession>(
+    `update interactive_optimization_sessions
+       set messages_json = $1,
+           issues_json = $2,
+           adopted_json = $3,
+           status = $4,
+           summary = $5,
+           version_id = $6,
+           version_number = $7,
+           updated_at = $8
+     where id = $9 and user_id = $10
+     returning *`,
+    [
+      JSON.stringify(messages),
+      JSON.stringify(issues),
+      JSON.stringify(adoptedChanges),
+      status,
+      summary,
+      values.versionId || current.versionId || null,
+      values.versionNumber || current.versionNumber || null,
+      updatedAt,
+      sessionId,
+      userId,
+    ],
+  );
+  const row = result.rows[0];
+  if (!row) throw new Error("Optimization session not found");
+  return toInteractiveSession(row);
+}
+
+export async function listInteractiveSessions(userId: string, packageId: string) {
+  await getPackage(userId, packageId);
+  const result = await query<DbRowInteractiveOptimizationSession>(
+    "select * from interactive_optimization_sessions where user_id = $1 and package_id = $2 order by updated_at desc",
+    [userId, packageId],
+  );
+  return result.rows.map(toInteractiveSession);
+}
 
 function buildPackageContext(
   pkg: Awaited<ReturnType<typeof getPackage>>,
@@ -335,7 +520,15 @@ export async function diagnosePackage(
       : "当前智能体看起来很完善！如果有任何想调整的地方，随时告诉我。",
   ].join("\n");
 
-  return { welcomeMessage, issues };
+  const session = await createInteractiveSession(
+    userId,
+    packageId,
+    threadId,
+    [{ role: "assistant", content: welcomeMessage }],
+    issues,
+  );
+
+  return { welcomeMessage, issues, session };
 }
 
 /* ── chat optimize ── */
@@ -429,11 +622,24 @@ export async function chatOptimize(
     };
   });
 
+  const persistedMessages = [
+    ...input.messages.filter((message) => message.role !== "system"),
+    { role: "assistant" as const, content: parsed.cleanReply },
+  ];
+  const persistedAdoptions = [...input.adoptedChanges, ...newAdoptions];
+  const session = input.sessionId
+    ? await updateInteractiveSession(userId, input.sessionId, {
+        messages: persistedMessages,
+        adoptedChanges: persistedAdoptions,
+      })
+    : undefined;
+
   return {
     reply: parsed.cleanReply,
     newAdoptions,
     newRejections: parsed.rejections.map((r) => `${r.target}-${r.targetId || ""}`),
     isDone: parsed.isDone,
+    session,
   };
 }
 
@@ -445,6 +651,7 @@ export async function applyInteractiveChanges(
   changes: AdoptedChange[],
   model?: string,
   note?: string,
+  sessionId?: string,
 ): Promise<{ versionId: string; versionNumber: number }> {
   const pkg = await getPackage(userId, packageId);
 
@@ -560,6 +767,15 @@ export async function applyInteractiveChanges(
   const { listVersions } = await import("./package-service.js");
   const versions = await listVersions(userId, packageId);
   const latest = versions[0]!;
+
+  if (sessionId) {
+    await updateInteractiveSession(userId, sessionId, {
+      adoptedChanges: changes,
+      status: "saved",
+      versionId: latest.id,
+      versionNumber: latest.versionNumber,
+    });
+  }
 
   return { versionId: latest.id, versionNumber: latest.versionNumber };
 }

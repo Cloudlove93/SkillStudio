@@ -50,3 +50,19 @@ export interface DbRowMessage {
   content: string;
   created_at: string;
 }
+
+export interface DbRowInteractiveOptimizationSession {
+  id: string;
+  user_id: string;
+  package_id: string;
+  thread_id: string;
+  status: string;
+  messages_json: string;
+  issues_json: string;
+  adopted_json: string;
+  summary: string;
+  version_id: string | null;
+  version_number: number | null;
+  created_at: string;
+  updated_at: string;
+}

@@ -81,8 +81,8 @@ export interface ArenaThreadDetail {
 
 export interface ArenaChatResult {
   thread: ArenaThread;
-  baseline: ArenaMessage;
-  enhanced: ArenaMessage;
+  baseline?: ArenaMessage;
+  enhanced?: ArenaMessage;
   shared: ArenaMessage;
 }
 

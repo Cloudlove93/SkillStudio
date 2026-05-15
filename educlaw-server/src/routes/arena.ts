@@ -10,9 +10,14 @@ import {
   listThreads,
   sendMessage,
   streamMessage,
+  type ArenaMode,
 } from "../services/arena-service.js";
 
 const router: import("express").Router = Router();
+
+function parseArenaMode(value: unknown): ArenaMode {
+  return value === "agent" || value === "baseline" ? value : "compare";
+}
 
 router.get("/threads", requireAuth, async (req, res) => {
   const packageId = String(req.query.packageId || "");
@@ -56,6 +61,7 @@ router.post("/threads/:threadId/messages", requireAuth, async (req, res) => {
       one(req.params.threadId),
       content,
       typeof req.body?.model === "string" ? req.body.model : undefined,
+      parseArenaMode(req.body?.mode),
     ));
   } catch (error) {
     res.status(400).json({ error: error instanceof Error ? error.message : "发送消息失败" });
@@ -76,6 +82,7 @@ router.post("/threads/:threadId/messages/stream", requireAuth, async (req: Reque
       one(req.params.threadId),
       content,
       typeof req.body?.model === "string" ? req.body.model : undefined,
+      parseArenaMode(req.body?.mode),
     )) {
       writeSseEvent(res, event.event, event.data);
     }

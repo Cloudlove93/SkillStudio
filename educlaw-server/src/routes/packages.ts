@@ -22,6 +22,8 @@ import {
   diagnosePackage,
   chatOptimize,
   applyInteractiveChanges,
+  listInteractiveSessions,
+  getInteractiveSession,
   type AdoptedChange,
 } from "../services/interactive-optimization-service.js";
 
@@ -97,6 +99,33 @@ router.post("/import", requireAuth, upload.single("file"), async (req, res) => {
     res.json(await importPackageZip((req as AuthedRequest).userId || "", req.file.buffer));
   } catch (error) {
     res.status(400).json({ error: error instanceof Error ? error.message : "导入失败" });
+  }
+});
+
+router.get("/:packageId/optimize/sessions", requireAuth, async (req, res) => {
+  try {
+    res.json(await listInteractiveSessions(
+      (req as AuthedRequest).userId || "",
+      one(req.params.packageId),
+    ));
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "读取优化记录失败" });
+  }
+});
+
+router.get("/:packageId/optimize/sessions/:sessionId", requireAuth, async (req, res) => {
+  try {
+    const session = await getInteractiveSession(
+      (req as AuthedRequest).userId || "",
+      one(req.params.sessionId),
+    );
+    if (session.packageId !== one(req.params.packageId)) {
+      res.status(404).json({ error: "优化记录不存在" });
+      return;
+    }
+    res.json(session);
+  } catch (error) {
+    res.status(404).json({ error: error instanceof Error ? error.message : "读取优化记录失败" });
   }
 });
 
@@ -197,6 +226,7 @@ router.post("/:packageId/optimize/chat", requireAuth, async (req, res) => {
       (req as AuthedRequest).userId || "",
       one(req.params.packageId),
       {
+        sessionId: typeof req.body?.sessionId === "string" ? req.body.sessionId : undefined,
         messages: Array.isArray(req.body?.messages) ? req.body.messages : [],
         adoptedChanges: Array.isArray(req.body?.adoptedChanges) ? req.body.adoptedChanges : [],
       },
@@ -216,6 +246,7 @@ router.post("/:packageId/optimize/apply", requireAuth, async (req, res) => {
       Array.isArray(req.body?.changes) ? (req.body.changes as AdoptedChange[]) : [],
       typeof req.body?.model === "string" ? req.body.model : undefined,
       typeof req.body?.note === "string" ? req.body.note : undefined,
+      typeof req.body?.sessionId === "string" ? req.body.sessionId : undefined,
     );
     res.json(result);
   } catch (error) {
