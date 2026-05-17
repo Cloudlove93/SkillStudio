@@ -192,6 +192,8 @@ export const liteApi = {
   getPackage: (token: string, packageId: string) => request<AgentPackageDetail>(`/packages/${packageId}`, {}, token),
   renamePackage: (token: string, packageId: string, name: string) =>
     request<AgentPackageDetail>(`/packages/${packageId}`, { method: "PATCH", body: JSON.stringify({ name }) }, token),
+  saveManualMarkdownEdit: (token: string, packageId: string, data: { target: "agent" | "skill"; content: string; skillId?: string; note?: string }) =>
+    request<AgentPackageDetail>(`/packages/${packageId}/manual-edit`, { method: "POST", body: JSON.stringify(data) }, token),
   listVersions: (token: string, packageId: string) => request<PackageVersion[]>(`/packages/${packageId}/versions`, {}, token),
   generatePackageStream: (token: string, instruction: string, model: string | undefined, documents: Array<{ name: string; content: string }>, onEvent: (event: PackageGenerateStreamEvent) => void) =>
     streamRequest<PackageGenerateStreamEvent>("/packages/generate/stream", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ instruction, model, documents }) }, token, onEvent),

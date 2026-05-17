@@ -38,6 +38,7 @@ import {
 
 type DetailTab = "agent" | "rubric" | "skills" | "versions" | "report" | "optimization" | "diff";
 type ProgressState = { title: string; phase: string; steps: string[]; startedAt: number; active: boolean; isError: boolean };
+type ManualEditState = { target: "agent" | "skill"; skillId?: string; title: string; content: string; preview: boolean };
 
 const DOCX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
@@ -110,6 +111,8 @@ export default function LiteArenaPanel() {
   const [interactiveSessions, setInteractiveSessions] = useState<InteractiveOptimizationSession[]>([]);
   const [interactiveView, setInteractiveView] = useState<"chat" | "issues" | "adopted" | "history">("chat");
   const [arenaMode, setArenaMode] = useState<ArenaMode>("compare");
+  const [manualEdit, setManualEdit] = useState<ManualEditState | null>(null);
+  const [manualEditSaving, setManualEditSaving] = useState(false);
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
   const selectedPackageIdRef = useRef(selectedPackageId);
   useEffect(() => { selectedPackageIdRef.current = selectedPackageId; }, [selectedPackageId]);
@@ -229,6 +232,7 @@ export default function LiteArenaPanel() {
     const preserveGenerateProgress = preserveGenerateProgressRef.current;
     preserveGenerateProgressRef.current = false;
     setCenterPreview(null);
+    setManualEdit(null);
     setInteractiveInput("");
     setInteractivePhase("idle");
     if (!preserveGenerateProgress) {
@@ -340,6 +344,7 @@ export default function LiteArenaPanel() {
     setCompareTargetId("");
     setSelectedSkillId("");
     setCenterPreview(null);
+    setManualEdit(null);
     setInteractiveMode(false);
     setInteractiveSessionId("");
     setInteractiveSessions([]);
@@ -646,6 +651,78 @@ function startResizeLeft(e: React.MouseEvent) {
       const message = error instanceof Error ? error.message : "重命名失败";
       failProgress(message);
       setStatus(message);
+    }
+  }
+
+  function startManualEditAgent() {
+    if (!selectedPackage) return;
+    setInteractiveMode(false);
+    setCenterPreview(null);
+    setManualEdit({
+      target: "agent",
+      title: "agent.md",
+      content: selectedPackage.snapshot.agentMd,
+      preview: false,
+    });
+  }
+
+  function startManualEditSkill() {
+    if (!selectedSkill) return;
+    setInteractiveMode(false);
+    setCenterPreview(null);
+    setManualEdit({
+      target: "skill",
+      skillId: selectedSkill.id || selectedSkill.dirName,
+      title: `${selectedSkill.name} / SKILL.md`,
+      content: selectedSkill.skillMd,
+      preview: false,
+    });
+  }
+
+  function validateManualEdit(edit: ManualEditState) {
+    const content = edit.content.trim();
+    if (!content) return "编辑内容不能为空";
+    if (edit.target === "skill") {
+      const frontmatter = content.match(/^---\s*\n([\s\S]*?)\n---/);
+      if (!frontmatter) return "SKILL.md 必须保留顶部的 YAML 元信息";
+      if (!/^name\s*:/m.test(frontmatter[1])) return "SKILL.md 的 YAML 元信息里必须包含 name";
+      if (!/^description\s*:/m.test(frontmatter[1])) return "SKILL.md 的 YAML 元信息里必须包含 description";
+    }
+    return "";
+  }
+
+  async function saveManualEdit() {
+    if (!token || !selectedPackageId || !manualEdit || manualEditSaving) return;
+    const error = validateManualEdit(manualEdit);
+    if (error) {
+      setStatus(error);
+      failProgress(error);
+      return;
+    }
+    const note = window.prompt("请输入新版本备注（可选）：", manualEdit.target === "agent" ? "手动编辑 agent.md" : "手动编辑 SKILL.md");
+    if (note === null) return;
+
+    setManualEditSaving(true);
+    startProgress("保存手动编辑", "正在保存为新版本...");
+    try {
+      const detail = await liteApi.saveManualMarkdownEdit(token, selectedPackageId, {
+        target: manualEdit.target,
+        skillId: manualEdit.skillId,
+        content: manualEdit.content,
+        note,
+      });
+      setSelectedPackage(detail);
+      await refreshPackages(detail.id);
+      setManualEdit(null);
+      setDetailTab("versions");
+      finishProgress(`已保存为新版本 v${detail.versionNumber}`);
+      setStatus(`已保存为新版本 v${detail.versionNumber}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "保存失败";
+      failProgress(message);
+      setStatus(message);
+    } finally {
+      setManualEditSaving(false);
     }
   }
 
@@ -998,7 +1075,42 @@ function startResizeLeft(e: React.MouseEvent) {
 
       {/* Main Arena */}
       <main className="flex min-w-0 flex-1 flex-col bg-card/20">
-        {interactiveMode ? (
+        {manualEdit ? (
+          <>
+            <div className="flex min-h-12 shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border/70 bg-card/40 px-14 py-2 lg:px-5">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="truncate text-sm font-semibold">编辑 {manualEdit.title}</div>
+                <div className="hidden text-xs text-muted-foreground sm:block">保存后会生成新版本</div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button size="sm" variant="outline" className="rounded-[12px]" onClick={() => setManualEdit((prev) => prev ? { ...prev, preview: !prev.preview } : prev)}>
+                  {manualEdit.preview ? "继续编辑" : "预览"}
+                </Button>
+                <Button size="sm" variant="outline" className="rounded-[12px]" onClick={() => setManualEdit(null)} disabled={manualEditSaving}>取消</Button>
+                <Button size="sm" className="rounded-[12px]" onClick={() => void saveManualEdit()} disabled={manualEditSaving || !manualEdit.content.trim()}>
+                  {manualEditSaving && <Loader2 className="mr-1.5 size-3.5 animate-spin" />}
+                  保存为新版本
+                </Button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-hidden p-3 sm:p-5">
+              {manualEdit.preview ? (
+                <div className="h-full overflow-auto rounded-[18px] border border-border/70 bg-card/70 p-5 text-sm">
+                  {manualEdit.target === "skill"
+                    ? <SkillMarkdownContent content={manualEdit.content} />
+                    : <MarkdownContent content={manualEdit.content} />}
+                </div>
+              ) : (
+                <Textarea
+                  value={manualEdit.content}
+                  onChange={(e) => setManualEdit((prev) => prev ? { ...prev, content: e.target.value } : prev)}
+                  spellCheck={false}
+                  className="h-full min-h-[520px] resize-none rounded-[18px] border-border/70 bg-card/80 font-mono text-xs leading-5"
+                />
+              )}
+            </div>
+          </>
+        ) : interactiveMode ? (
           <>
             <div className="flex min-h-12 shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border/70 bg-card/40 px-14 py-2 lg:px-5">
               <div className="flex min-w-0 items-center gap-3">
@@ -1435,7 +1547,10 @@ function startResizeLeft(e: React.MouseEvent) {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">agent.md</div>
-                    <button onClick={() => setCenterPreview({ type: "agent", name: "agent.md", content: selectedPackage.snapshot.agentMd })} className="text-[10px] text-primary hover:underline">👁 在中间打开</button>
+                    <div className="flex items-center gap-2">
+                      <button onClick={startManualEditAgent} className="text-[10px] text-primary hover:underline">编辑</button>
+                      <button onClick={() => setCenterPreview({ type: "agent", name: "agent.md", content: selectedPackage.snapshot.agentMd })} className="text-[10px] text-primary hover:underline">👁 在中间打开</button>
+                    </div>
                   </div>
                   <div className="rounded-[20px] border border-border/70 bg-muted/50 p-4 text-sm cursor-pointer hover:border-primary/30 transition-colors overflow-auto max-h-[60vh]" onClick={() => setCenterPreview({ type: "agent", name: "agent.md", content: selectedPackage.snapshot.agentMd })}>
                     <MarkdownContent content={selectedPackage.snapshot.agentMd} />
@@ -1460,7 +1575,10 @@ function startResizeLeft(e: React.MouseEvent) {
                   <div className="flex items-center justify-between">
                     <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">技能文件</div>
                     {selectedSkill && (
-                      <button onClick={() => setCenterPreview({ type: "skill", name: selectedSkill.name, content: selectedSkill.skillMd })} className="text-[10px] text-primary hover:underline">👁 在中间打开</button>
+                      <div className="flex items-center gap-2">
+                        <button onClick={startManualEditSkill} className="text-[10px] text-primary hover:underline">编辑</button>
+                        <button onClick={() => setCenterPreview({ type: "skill", name: selectedSkill.name, content: selectedSkill.skillMd })} className="text-[10px] text-primary hover:underline">👁 在中间打开</button>
+                      </div>
                     )}
                   </div>
                   {selectedPackage.snapshot.skills.length > 0 ? (

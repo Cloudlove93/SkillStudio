@@ -1001,6 +1001,54 @@ export async function applyOptimizedSnapshot(
   return getPackage(userId, packageId);
 }
 
+export async function applyManualMarkdownEdit(
+  userId: string,
+  packageId: string,
+  input: {
+    target: "agent" | "skill";
+    content: string;
+    skillId?: string;
+    note?: string;
+  },
+) {
+  const pkg = await getPackage(userId, packageId);
+  const content = String(input.content || "").trim();
+  if (!content) throw new Error("编辑内容不能为空");
+
+  const nextSnapshot: AgentPackageSnapshot = {
+    ...pkg.snapshot,
+    skills: pkg.snapshot.skills.map((skill) => ({ ...skill })),
+  };
+
+  if (input.target === "agent") {
+    if (content === pkg.snapshot.agentMd.trim()) throw new Error("内容没有变化，无需保存新版本");
+    nextSnapshot.agentMd = content;
+    return applyOptimizedSnapshot(userId, packageId, nextSnapshot, "manual", input.note || "手动编辑 agent.md");
+  }
+
+  const skillId = String(input.skillId || "");
+  if (!skillId) throw new Error("缺少要编辑的技能");
+  const skillIndex = nextSnapshot.skills.findIndex((skill) => skill.id === skillId || skill.dirName === skillId);
+  if (skillIndex === -1) throw new Error("技能不存在");
+
+  const fmName = extractFrontmatterValue(content, "name");
+  const fmDescription = extractFrontmatterValue(content, "description");
+  if (!content.startsWith("---") || !fmName || !fmDescription) {
+    throw new Error("SKILL.md 必须保留 YAML frontmatter，并包含 name 和 description");
+  }
+
+  const currentSkill = nextSnapshot.skills[skillIndex]!;
+  if (content === currentSkill.skillMd.trim()) throw new Error("内容没有变化，无需保存新版本");
+  nextSnapshot.skills[skillIndex] = {
+    ...currentSkill,
+    name: fmName,
+    description: fmDescription,
+    skillMd: content,
+  };
+
+  return applyOptimizedSnapshot(userId, packageId, nextSnapshot, "manual", input.note || `手动编辑 ${currentSkill.dirName}/SKILL.md`);
+}
+
 /* ── version compare ── */
 
 export interface LineDiff {

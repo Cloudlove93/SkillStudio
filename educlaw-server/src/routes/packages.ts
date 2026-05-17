@@ -15,6 +15,7 @@ import {
   listVersions,
   compareVersions,
   renamePackage,
+  applyManualMarkdownEdit,
   updateVersionNote,
 } from "../services/package-service.js";
 import { optimizePackage } from "../services/optimization-service.js";
@@ -166,6 +167,24 @@ router.get("/:packageId/export", requireAuth, async (req, res) => {
     res.send(data);
   } catch (error) {
     res.status(404).json({ error: error instanceof Error ? error.message : "导出失败" });
+  }
+});
+
+router.post("/:packageId/manual-edit", requireAuth, async (req, res) => {
+  try {
+    const result = await applyManualMarkdownEdit(
+      (req as AuthedRequest).userId || "",
+      one(req.params.packageId),
+      {
+        target: req.body?.target === "skill" ? "skill" : "agent",
+        skillId: typeof req.body?.skillId === "string" ? req.body.skillId : undefined,
+        content: String(req.body?.content || ""),
+        note: typeof req.body?.note === "string" ? req.body.note : undefined,
+      },
+    );
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "保存手动编辑失败" });
   }
 });
 
