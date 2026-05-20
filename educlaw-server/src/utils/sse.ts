@@ -17,3 +17,8 @@ export function writeSseEvent(res: Response, event: string, data: unknown) {
   res.write(`data: ${JSON.stringify(data)}\n\n`);
   (res as FlushableResponse).flush?.();
 }
+
+//加一个例子展示
+// ReadableStream({
+//       start(controller  这样的response 的功能 更加贴近openai这样的
+

@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Minimal Express Router</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="panel">
+        <div class="header">
+          <div>
+            <p class="eyebrow">Express Router demo</p>
+            <h1>Minimal Express Router</h1>
+          </div>
+          <span id="status" class="status">Idle</span>
+        </div>
+
+        <form id="create-form" class="form">
+          <label>
+            Package ID
+            <input id="package-id" name="packageId" value="package-alpha" autocomplete="off" />
+          </label>
+          <label>
+            Title
+            <input id="title" name="title" value="New router thread" autocomplete="off" />
+          </label>
+          <div class="actions">
+            <button type="submit">Create Thread</button>
+            <button id="refresh" type="button" class="secondary">Refresh</button>
+          </div>
+        </form>
+
+        <ol id="threads" class="threads" aria-live="polite"></ol>
+      </section>
+    </main>
+
+    <script src="/main.js"></script>
+  </body>
+</html>
