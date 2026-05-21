@@ -58,7 +58,24 @@ afterEach(() => {
   vi.doUnmock("../config.js");
 });
 
+
 describe("llm-service", () => {
+
+  it("streamText falls back to a normal JSON response when the response is not SSE", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockChatResponse("fallback text")));
+    const { streamText } = await loadService();
+
+    const chunks: string[] = [];
+    for await (const chunk of streamText({
+      systemPrompt: "System",
+      userPrompt: "User",
+    })) {
+      chunks.push(chunk);
+    }
+
+    expect(chunks).toEqual(["fallback text"]);
+  });
+
   it("generateText posts chat completion request and returns trimmed content", async () => {
     const fetchMock = vi.fn().mockResolvedValue(mockChatResponse("  Hello EduClaw  "));
     vi.stubGlobal("fetch", fetchMock);
@@ -118,20 +135,6 @@ describe("llm-service", () => {
     expect(chunks).toEqual(["Hel", "lo"]);
   });
 
-  it("streamText falls back to a normal JSON response when the response is not SSE", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockChatResponse("fallback text")));
-    const { streamText } = await loadService();
-
-    const chunks: string[] = [];
-    for await (const chunk of streamText({
-      systemPrompt: "System",
-      userPrompt: "User",
-    })) {
-      chunks.push(chunk);
-    }
-
-    expect(chunks).toEqual(["fallback text"]);
-  });
 
   it("generateJson parses strict JSON returned by the model", async () => {
     const fetchMock = vi.fn().mockResolvedValue(mockChatResponse('{"ok":true,"count":2}'));

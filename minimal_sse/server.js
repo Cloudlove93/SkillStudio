@@ -25,6 +25,13 @@ function writeSseEvent(res, event, data) {
   res.flush?.();
 }
 
+
+//加一个例子展示
+// ReadableStream({
+//       start(controller  这样的response 的功能 更加贴近openai这样的
+
+
+
 async function serveStatic(req, res) {
   const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
   const pathname = url.pathname === "/" ? "/index.html" : url.pathname;
