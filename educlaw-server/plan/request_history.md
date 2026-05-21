@@ -11,3 +11,5 @@
 
 实现一个vitest 测试  /Users/l/other_git_repos/EduClaw-js/educlaw-server/src/routes/auth.ts 创建一个app 并发一个get 请求
 针对这个workflow 设计test 创建一个app 并发一个get 请求 到 package_initial_loading.test.ts
+
+拆一下 /Users/l/other_git_repos/EduClaw-js/educlaw-server/src/routes/auth.test.ts： 每个file 里面只放一个 it 测试 方便调试
