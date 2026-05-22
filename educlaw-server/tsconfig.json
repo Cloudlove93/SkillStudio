@@ -8,9 +8,13 @@
     "skipLibCheck": true,
     "outDir": "dist",
     "baseUrl": ".",
-    "paths": {
-      "@educlaw/shared": ["../educlaw-shared/index.ts"]
+  "paths": {
+    "@educlaw/shared": ["../educlaw-shared/index.ts"]
     }
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*"],
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/**/auth-test-utils.ts"
+  ]
 }

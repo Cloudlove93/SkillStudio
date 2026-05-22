@@ -39,6 +39,14 @@ import {
 type DetailTab = "agent" | "rubric" | "skills" | "versions" | "report" | "optimization" | "diff";
 type ProgressState = { title: string; phase: string; steps: string[]; startedAt: number; active: boolean; isError: boolean };
 type ManualEditState = { target: "agent" | "skill"; skillId?: string; title: string; content: string; preview: boolean };
+type BatchGenerateItem = {
+  id: string;
+  name: string;
+  status: "waiting" | "running" | "done" | "error";
+  packageId?: string;
+  packageName?: string;
+  error?: string;
+};
 
 const DOCX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
@@ -96,6 +104,7 @@ export default function LiteArenaPanel() {
   const [leftWidth, setLeftWidth] = useState(400);
   const [rightWidth, setRightWidth] = useState(450);
   const [documents, setDocuments] = useState<Array<{ name: string; content: string }>>([]);
+  const [batchRuns, setBatchRuns] = useState<BatchGenerateItem[]>([]);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const docFileRef = useRef<HTMLInputElement | null>(null);
   const preserveGenerateProgressRef = useRef(false);
@@ -430,6 +439,16 @@ function startResizeLeft(e: React.MouseEvent) {
     document.addEventListener('mouseup', onUp);
   }
 
+  function updateBatchRun(id: string, patch: Partial<BatchGenerateItem>) {
+    setBatchRuns((prev) => prev.map((item) => (item.id === id ? { ...item, ...patch } : item)));
+  }
+
+  async function reloadPackageList() {
+    if (!token) return;
+    const list = await liteApi.listPackages(token);
+    setPackages(list);
+  }
+
   async function handleDocFiles(fileList: FileList | null) {
     if (!fileList) return;
     const files = Array.from(fileList);
@@ -461,6 +480,97 @@ function startResizeLeft(e: React.MouseEvent) {
         if (event.event === "done") { createdId = event.data.id; createdName = event.data.name; }
         if (event.event === "error") throw new Error(event.data.error || "生成失败");
       });
+      if (createdId) {
+        preserveGenerateProgressRef.current = true;
+        setInstruction("");
+        setDocuments([]);
+        await refreshPackages(createdId);
+      }
+      const doneLabel = createdName ? `生成完成：${createdName}` : "生成完成，已打开新智能体";
+      setGeneratePreviews([]);
+      finishProgress(doneLabel); setStatus(doneLabel);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "生成失败";
+      setGeneratePreviews([]);
+      failProgress(message); setStatus(message);
+    }
+  }
+
+  async function handleGeneratePackages() {
+    if ((!instruction.trim() && documents.length === 0) || !token) return;
+    const instructionText = instruction.trim();
+    const jobDocuments = documents.length > 0 ? documents : [];
+    const batchMode = jobDocuments.length > 1;
+    const batchPlan = batchMode
+      ? jobDocuments.map((doc, index) => ({
+          id: `${Date.now()}-${index}-${doc.name}`,
+          name: doc.name,
+          status: "waiting" as const,
+        }))
+      : [];
+
+    setBatchRuns(batchPlan);
+    startProgress("生成智能体", batchMode ? `正在逐个处理 ${jobDocuments.length} 个文档...` : "正在生成智能体...");
+    setStatus(batchMode ? `正在逐个处理 ${jobDocuments.length} 个文档...` : "正在生成智能体...");
+    setGeneratePreviews([]);
+
+    try {
+      const runGenerateJob = async (docs: Array<{ name: string; content: string }>) => {
+        let createdId = "";
+        let createdName = "";
+        setGeneratePreviews([]);
+        await liteApi.generatePackageStream(token, instructionText, undefined, docs, (event) => {
+          if (event.event === "phase") { pushProgress(event.data.label); setStatus(event.data.label); }
+          if (event.event === "preview_delta") { setGeneratePreviews((prev) => appendPackagePreviewDelta(prev, event.data)); }
+          if (event.event === "preview") { setGeneratePreviews((prev) => upsertPackagePreview(prev, event.data)); }
+          if (event.event === "done") { createdId = event.data.id; createdName = event.data.name; }
+          if (event.event === "error") throw new Error(event.data.error || "生成失败");
+        });
+        return { createdId, createdName };
+      };
+
+      if (batchMode) {
+        let successCount = 0;
+        let failureCount = 0;
+        for (let index = 0; index < batchPlan.length; index += 1) {
+          const item = batchPlan[index]!;
+          const sourceDoc = jobDocuments[index]!;
+          updateBatchRun(item.id, { status: "running" });
+          setStatus(`正在生成 ${sourceDoc.name}...`);
+          try {
+            const result = await runGenerateJob([sourceDoc]);
+            if (result.createdId) {
+              successCount += 1;
+              updateBatchRun(item.id, {
+                status: "done",
+                packageId: result.createdId,
+                packageName: result.createdName || sourceDoc.name,
+              });
+            } else {
+              failureCount += 1;
+              updateBatchRun(item.id, { status: "error", error: "未生成出结果" });
+            }
+          } catch (error) {
+            failureCount += 1;
+            updateBatchRun(item.id, {
+              status: "error",
+              error: error instanceof Error ? error.message : "生成失败",
+            });
+          }
+        }
+        await reloadPackageList();
+        if (failureCount === 0) {
+          setInstruction("");
+          setDocuments([]);
+        }
+        const doneLabel = `批量生成完成，成功 ${successCount} 个，失败 ${failureCount} 个`;
+        setGeneratePreviews([]);
+        if (failureCount > 0 && successCount === 0) failProgress(doneLabel); else finishProgress(doneLabel);
+        setStatus(doneLabel);
+        return;
+      }
+
+      const { createdId, createdName } = await runGenerateJob(jobDocuments);
       if (createdId) {
         preserveGenerateProgressRef.current = true;
         setInstruction("");
@@ -1020,8 +1130,41 @@ function startResizeLeft(e: React.MouseEvent) {
                   ))}
                 </div>
               )}
+              {documents.length > 1 && (
+                <div className="text-[11px] text-muted-foreground">多文档会逐个生成，不会合并成一个包。</div>
+              )}
+              {batchRuns.length > 0 && (
+                <div className="space-y-1.5 rounded-xl border border-border/70 bg-card/40 p-2">
+                  <div className="flex items-center justify-between px-0.5 text-[11px] text-muted-foreground">
+                    <span>批量任务</span>
+                    <span>{batchRuns.filter((item) => item.status === "done").length}/{batchRuns.length}</span>
+                  </div>
+                  {batchRuns.map((item) => (
+                    <div key={item.id} className="flex items-start justify-between gap-3 rounded-lg border border-border/70 bg-card/70 px-2.5 py-2 text-xs">
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-medium">{item.name}</div>
+                        {item.packageName && item.packageName !== item.name && (
+                          <div className="truncate text-[11px] text-muted-foreground">生成结果：{item.packageName}</div>
+                        )}
+                        {item.error && <div className="truncate text-[11px] text-destructive">{item.error}</div>}
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1.5 text-[11px] text-muted-foreground">
+                        {item.status === "running" && <Loader2 className="size-3.5 animate-spin" />}
+                        {item.status === "done" && <CheckCircle2 className="size-3.5 text-emerald-500" />}
+                        {item.status === "error" && <XCircle className="size-3.5 text-destructive" />}
+                        <span>
+                          {item.status === "waiting" && "等待中"}
+                          {item.status === "running" && "生成中"}
+                          {item.status === "done" && "已完成"}
+                          {item.status === "error" && "失败"}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
               <div className="flex flex-wrap gap-2">
-                <Button size="sm" className="flex-1 min-w-[4rem] rounded-[12px]" onClick={() => void handleGenerate()} disabled={!instruction.trim() && documents.length === 0}><Sparkles className="mr-1.5 size-3.5" />生成</Button>
+                <Button size="sm" className="flex-1 min-w-[4rem] rounded-[12px]" onClick={() => void handleGeneratePackages()} disabled={!instruction.trim() && documents.length === 0}><Sparkles className="mr-1.5 size-3.5" />{documents.length > 1 ? "批量生成" : "生成"}</Button>
                 <Button size="sm" variant="outline" className="flex-1 min-w-[4rem] rounded-[12px]" onClick={() => docFileRef.current?.click()}><FileText className="mr-1.5 size-3.5" />文档</Button>
                 <input ref={docFileRef} type="file" multiple accept=".txt,.md,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.csv,.json,.yaml,.yml,.js,.ts,.py,.html,.css" hidden onChange={(e) => { void handleDocFiles(e.target.files); e.currentTarget.value = ""; }} />
                 <Button size="sm" variant="outline" className="flex-1 min-w-[4rem] rounded-[12px]" onClick={() => fileRef.current?.click()}><Upload className="mr-1.5 size-3.5" />导入</Button>
