@@ -13,3 +13,10 @@
 针对这个workflow 设计test 创建一个app 并发一个get 请求 到 package_initial_loading.test.ts
 
 拆一下 /Users/l/other_git_repos/EduClaw-js/educlaw-server/src/routes/auth.test.ts： 每个file 里面只放一个 it 测试 方便调试
+写一个测试
+
+对应的前后端的route路径抽成常量  放到/Users/l/other_git_repos/EduClaw-js/educlaw-shared 然后前端引用这个路径 改成get的参数的 （detail?param1=val1 这样的）
+
+educlaw-web/src/api/lite-api.ts:207
+educlaw-server/src/routes/arena.ts:73
+对应的前后端的route路径抽成常量  放到/Users/l/other_git_repos/EduClaw-js/educlaw-shared 然后前端引用这个路径 改成get的参数的 （detail?param1=val1 这样的）

@@ -4,9 +4,7 @@ import compression from "compression";
 import { config } from "./config.js";
 import { initDb } from "./services/db.js";
 import { seedUsers } from "./services/auth-service.js";
-import authRoutes from "./routes/auth.js";
-import packageRoutes from "./routes/packages.js";
-import arenaRoutes from "./routes/arena.js";
+import apiRoutes from "./routes/index.js";
 import compatRoutes from "./routes/compat.js";
 
 const app = express();
@@ -28,9 +26,7 @@ app.get("/healthz", (_req, res) => {
   res.json({ ok: true, service: "educlaw-lite-server" });
 });
 
-app.use("/api/auth", authRoutes);
-app.use("/api/packages", packageRoutes);
-app.use("/api/arena", arenaRoutes);
+app.use("/api", apiRoutes);
 app.use(compatRoutes);
 
 app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

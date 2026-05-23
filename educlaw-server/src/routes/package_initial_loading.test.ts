@@ -17,7 +17,7 @@ async function createApp() {
   const packageRoutes = (await import("./packages.js")).default;
   const app = express();
   app.use(express.json());
-  app.use("/api/packages", packageRoutes);
+  app.use("/api", packageRoutes);
   return app;
 }
 
