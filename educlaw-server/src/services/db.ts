@@ -115,6 +115,33 @@ export async function initDb() {
       updated_at text not null
     )
   `);
+
+  await pool.query(`
+    create table if not exists auto_eval_specs (
+      user_id text not null,
+      package_id text not null,
+      questions_json text not null default '[]',
+      dimensions_json text not null default '[]',
+      created_at text not null,
+      updated_at text not null,
+      primary key (user_id, package_id)
+    )
+  `);
+
+  await pool.query(`
+    create table if not exists auto_eval_runs (
+      id text primary key,
+      user_id text not null,
+      package_id text not null,
+      scene_name text not null,
+      status text not null default 'pending',
+      questions_json text not null default '[]',
+      report_json text not null default '{}',
+      error_message text not null default '',
+      created_at text not null,
+      updated_at text not null
+    )
+  `);
 }
 
 export async function query<T extends QueryResultRow = Record<string, unknown>>(text: string, values: unknown[] = []) {

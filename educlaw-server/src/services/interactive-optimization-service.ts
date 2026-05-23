@@ -326,6 +326,78 @@ function parseModifiedBlocks(reply: string): Array<{
   return blocks;
 }
 
+function extractFrontmatterValue(text: string, key: string): string | null {
+  const match = text.match(/^---\s*\n([\s\S]*?)\n---/);
+  if (!match) return null;
+  const line = match[1].split("\n").find((item) => item.trim().startsWith(`${key}:`));
+  if (!line) return null;
+  const value = line.slice(line.indexOf(":") + 1).trim();
+  return value.replace(/^["']|["']$/g, "");
+}
+
+function buildInteractiveSnapshotFromAdoptions(
+  pkg: Awaited<ReturnType<typeof getPackage>>,
+  adoptedChanges: AdoptedChange[],
+): AgentPackageSnapshot {
+  const nextSnapshot: AgentPackageSnapshot = {
+    ...pkg.snapshot,
+    name: pkg.snapshot.name,
+    description: pkg.snapshot.description,
+    versionLabel: pkg.snapshot.versionLabel,
+    skills: pkg.snapshot.skills.map((skill) => ({ ...skill })),
+  };
+
+  let changed = false;
+
+  for (const change of adoptedChanges) {
+    const modified = String(change.modified || "").trim();
+    if (!modified) continue;
+
+    if (change.target === "agent") {
+      if (modified !== nextSnapshot.agentMd.trim()) {
+        nextSnapshot.agentMd = modified;
+        changed = true;
+      }
+      continue;
+    }
+
+    if (change.target === "rubric") {
+      if (modified !== nextSnapshot.rubricMd.trim()) {
+        nextSnapshot.rubricMd = modified;
+        changed = true;
+      }
+      continue;
+    }
+
+    if (change.target === "skill" && change.targetId) {
+      const skillIndex = nextSnapshot.skills.findIndex((skill) => skill.id === change.targetId || skill.dirName === change.targetId);
+      if (skillIndex === -1) continue;
+      const currentSkill = nextSnapshot.skills[skillIndex]!;
+      if (modified === currentSkill.skillMd.trim()) continue;
+
+      const fmName = extractFrontmatterValue(modified, "name");
+      const fmDescription = extractFrontmatterValue(modified, "description");
+      if (!modified.startsWith("---") || !fmName || !fmDescription) {
+        throw new Error("SKILL.md 必须保留 YAML frontmatter，并包含 name 和 description");
+      }
+
+      nextSnapshot.skills[skillIndex] = {
+        ...currentSkill,
+        name: fmName,
+        description: fmDescription,
+        skillMd: modified,
+      };
+      changed = true;
+    }
+  }
+
+  if (!changed) {
+    throw new Error("采纳的修改没有产生实际差异，请确认已采纳的内容确实包含修改后的完整内容。");
+  }
+
+  return nextSnapshot;
+}
+
 function parseMarkers(reply: string): {
   cleanReply: string;
   adoptions: Array<{ target: string; targetId?: string; summary: string; modifiedContent?: string }>;
@@ -557,7 +629,7 @@ export async function chatOptimize(
     "3. 修改建议要简短聚焦，不要在一次回复中罗列多个问题或大量细节",
     "4. 说明修改的原因和预期效果（每段不超过 3 句话）",
     "5. 向用户说明修改建议时，用通俗、口语化的方式解释，就像跟朋友聊天一样。只说明改了什么、为什么改、预期效果如何。不要展示完整的技术文档，不要贴大段代码或 markdown 原文。",
-    "6. 当你提出具体修改建议时，在回复末尾用 <MODIFIED> 标签包裹修改后的完整内容供系统内部使用（用户看不到这部分）：",
+    "6. 当你提出具体修改建议时，在回复末尾用 <MODIFIED> 标签包裹修改后的完整内容供系统内部使用（用户看不到这部分）。只修改被明确指出的部分，未被提及的内容必须保持原样，尤其不要随意压缩 package description 或其他概述性说明：",
     "   <MODIFIED target=\"agent\" targetId=\"\">",
     "   ```markdown",
     "   修改后的完整内容",
@@ -654,114 +726,7 @@ export async function applyInteractiveChanges(
   sessionId?: string,
 ): Promise<{ versionId: string; versionNumber: number }> {
   const pkg = await getPackage(userId, packageId);
-
-  // Build detailed changes context with full original content
-  const changesText = changes
-    .map((c, i) => {
-      const lines: string[] = [
-        `${i + 1}. [${c.target}${c.targetId ? ` / ${c.targetId}` : ""}] ${c.reason}`,
-        `   原始文件内容：`,
-        `   \`\`\`markdown`,
-        `   ${c.original.slice(0, 6000)}`,
-        `   \`\`\``,
-      ];
-      // If modified contains actual content (not just a summary), include it as reference
-      if (c.modified && c.modified !== c.original && c.modified.length > c.reason.length + 10) {
-        lines.push(
-          `   期望的修改方向（参考）：`,
-          `   \`\`\`markdown`,
-          `   ${c.modified.slice(0, 6000)}`,
-          `   \`\`\``,
-        );
-      } else {
-        lines.push(
-          `   ⚠️ 修改要求：请根据以下原因对原始内容做出明确、实质性的修改`,
-          `   原因：${c.reason}`,
-          `   注意：必须输出与原始内容有明显差异的修改结果，不能只复述原始内容`,
-        );
-      }
-      return lines.join("\n");
-    })
-    .join("\n\n");
-
-  const skillBundle = pkg.snapshot.skills
-    .map((s) => `## ${s.dirName} (${s.name})\n${s.skillMd}`)
-    .join("\n\n");
-
-  const prompt = [
-    "你是一个智能体优化专家。请根据以下已确认的修改意图，对原始文件做出实质性修改，生成完整的优化后智能体。",
-    "",
-    "## 已确认的修改意图（含原始文件内容）",
-    "对于每个修改意图，请执行以下操作：",
-    "1. 读取对应的原始文件内容（已附在每个修改意图下方）",
-    "2. 根据修改原因，对原始内容做出明确、实质性的修改",
-    "3. 确保修改后的内容与原始内容有可见差异",
-    "4. 返回修改后的完整文件内容（不要只返回修改摘要）",
-    "",
-    changesText,
-    "",
-    "## 任务",
-    "1. 根据上述修改意图，对原始文件逐一做出实质性修改",
-    "2. 生成完整的优化后包内容（保持原有结构，技能列表顺序不变）",
-    "3. 返回 JSON，包含完整的 snapshot（skills 数组必须与原始技能一一对应，顺序不变，数量相同）",
-    "",
-    "```json",
-    "{",
-    '  "snapshot": {',
-    '    "name": "智能体名称",',
-    '    "description": "智能体描述",',
-    '    "agentMd": "优化后的完整 agent.md 内容",',
-    '    "rubricMd": "优化后的完整 rubric.md 内容",',
-    '    "skills": [',
-    "      {",
-    '        "id": "技能ID（保持原值或留空）",',
-    '        "name": "技能名称",',
-    '        "dirName": "目录名",',
-    '        "description": "技能描述",',
-    '        "skillMd": "优化后的完整 skill.md 内容"',
-    "      }",
-    "    ]",
-    "  }",
-    "}",
-    "```",
-  ].join("\n");
-
-  const result = await generateJson<{ snapshot: AgentPackageSnapshot }>({
-    model,
-    systemPrompt:
-      "你是智能体优化专家。每个修改意图都附带了完整的原始文件内容，你必须根据修改原因对原始内容做出明确、实质性的改动，返回完整的优化后内容。只返回 JSON，不要其他内容。",
-    userPrompt: prompt,
-    temperature: 0.3,
-  });
-
-  // Normalize snapshot to guard against partial LLM output
-  const normalizedSnapshot: AgentPackageSnapshot = {
-    name: result.snapshot?.name || pkg.snapshot.name,
-    description: result.snapshot?.description || pkg.snapshot.description,
-    versionLabel: result.snapshot?.versionLabel || pkg.snapshot.versionLabel,
-    agentMd: typeof result.snapshot?.agentMd === "string" ? result.snapshot.agentMd : pkg.snapshot.agentMd,
-    rubricMd: typeof result.snapshot?.rubricMd === "string" ? result.snapshot.rubricMd : pkg.snapshot.rubricMd,
-    skills: Array.isArray(result.snapshot?.skills)
-      ? result.snapshot.skills.map((s: any, idx: number) => ({
-          id: s?.id || ``,
-          dirName: s?.dirName || pkg.snapshot.skills[idx]?.dirName || `skill-${idx}`,
-          name: s?.name || pkg.snapshot.skills[idx]?.name || `技能${idx + 1}`,
-          description: s?.description || pkg.snapshot.skills[idx]?.description || "",
-          skillMd: typeof s?.skillMd === "string" ? s.skillMd : (pkg.snapshot.skills[idx]?.skillMd || ""),
-        }))
-      : pkg.snapshot.skills,
-  };
-
-  // Verify the snapshot actually changed
-  const isSameAgent = normalizedSnapshot.agentMd === pkg.snapshot.agentMd;
-  const isSameRubric = normalizedSnapshot.rubricMd === pkg.snapshot.rubricMd;
-  const isSameSkills = normalizedSnapshot.skills.length === pkg.snapshot.skills.length &&
-    normalizedSnapshot.skills.every((s, i) =>
-      s.skillMd === (pkg.snapshot.skills[i]?.skillMd || "")
-    );
-  if (isSameAgent && isSameRubric && isSameSkills) {
-    throw new Error("优化后的内容与原始内容没有差异，请确保每次修改建议都包含具体的修改内容（<MODIFIED> 块）后再保存。");
-  }
+  const normalizedSnapshot = buildInteractiveSnapshotFromAdoptions(pkg, changes);
 
   await applyOptimizedSnapshot(userId, packageId, normalizedSnapshot, "interactive", note);
   const { listVersions } = await import("./package-service.js");

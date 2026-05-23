@@ -84,5 +84,7 @@ export const config = {
   llmApiKey,
   llmModel: process.env.LLM_MODEL || "gpt-4.1-mini",
   llmNetworkRetries: readNumber("LLM_NETWORK_RETRIES", 2),
-  llmBaselineModel: process.env.LLM_BASELINE_MODEL || ""
+  llmBaselineModel: process.env.LLM_BASELINE_MODEL || "",
+  conversationEvalBaseUrl: (process.env.CONVERSATION_EVAL_BASE_URL || "http://127.0.0.1:8090").replace(/\/+$/, ""),
+  conversationEvalScenesDir: process.env.CONVERSATION_EVAL_SCENES_DIR || path.join(workspaceRoot, ".eval-scenes"),
 };

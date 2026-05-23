@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import type {
   AgentPackageDetail,
   AgentPackageSummary,
@@ -8,7 +8,6 @@ import type {
   ArenaThreadDetail,
   OptimizationResult,
   PackageVersion,
-  UserSummary,
 } from "@educlaw/shared";
 import { useAuthStore } from "../stores/auth";
 import { liteApi } from "../api/lite-api";
@@ -29,7 +28,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Sparkles, Send, Upload, Download, Trash2, FileText, ListChecks, Wrench,
-  History, BarChart3, Zap, GitCompare, Clock, CheckCircle2, XCircle, Loader2,
+  History, BarChart3, Zap, GitCompare, Clock, CheckCircle2, XCircle, Loader2, LogOut,
 } from "lucide-react";
 
 type DetailTab = "agent" | "rubric" | "skills" | "versions" | "report" | "optimization" | "diff";
@@ -37,7 +36,6 @@ type ProgressState = { title: string; phase: string; steps: string[]; startedAt:
 
 export default function LiteWorkspace() {
   const token = useAuthStore((s) => s.token) || "";
-  const [user, setUser] = useState<UserSummary | null>(null);
   const [packages, setPackages] = useState<AgentPackageSummary[]>([]);
   const [selectedPackageId, setSelectedPackageId] = useState("");
   const [selectedPackage, setSelectedPackage] = useState<AgentPackageDetail | null>(null);
@@ -62,14 +60,14 @@ export default function LiteWorkspace() {
 
   const messages = threadDetail?.messages || [];
   const selectedSkill = selectedPackage?.snapshot.skills.find((s) => s.id === selectedSkillId) || selectedPackage?.snapshot.skills[0] || null;
-  const showGeneratePreviews = progress?.active && progress.title === "生成智能体";
+  const showGeneratePreviews = progress?.active && progress.title === "鐢熸垚鏅鸿兘浣?;
 
   useEffect(() => { const timer = window.setInterval(() => setNowMs(Date.now()), 1000); return () => window.clearInterval(timer); }, []);
   useEffect(() => { if (selectedPackage?.snapshot.skills.length) setSelectedSkillId((c) => c || selectedPackage.snapshot.skills[0]!.id); else setSelectedSkillId(""); }, [selectedPackage]);
-  useEffect(() => { if (!token) return; liteApi.me(token).then(setUser).catch(() => {}); refreshPackages(); }, [token]);
+  useEffect(() => { if (!token) return; refreshPackages(); }, [token]);
 
   function startProgress(title: string, phase: string) { setProgress({ title, phase, steps: [phase], startedAt: Date.now(), active: true, isError: false }); }
-  function pushProgress(label: string) { setProgress((prev) => prev ? { ...prev, phase: label, steps: prev.steps[prev.steps.length - 1] === label ? prev.steps : [...prev.steps, label] } : { title: "当前进度", phase: label, steps: [label], startedAt: Date.now(), active: true, isError: false }); }
+  function pushProgress(label: string) { setProgress((prev) => prev ? { ...prev, phase: label, steps: prev.steps[prev.steps.length - 1] === label ? prev.steps : [...prev.steps, label] } : { title: "褰撳墠杩涘害", phase: label, steps: [label], startedAt: Date.now(), active: true, isError: false }); }
   function finishProgress(label: string) { setProgress((prev) => prev ? { ...prev, active: false, isError: false, phase: label, steps: prev.steps[prev.steps.length - 1] === label ? prev.steps : [...prev.steps, label] } : null); }
   function failProgress(label: string) { setProgress((prev) => prev ? { ...prev, active: false, isError: true, phase: label, steps: prev.steps[prev.steps.length - 1] === label ? prev.steps : [...prev.steps, label] } : null); }
   function formatElapsed(ms: number) { const total = Math.max(0, Math.floor(ms / 1000)); return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`; }
@@ -117,7 +115,7 @@ export default function LiteWorkspace() {
 
   async function handleGenerate() {
     if (!instruction.trim() || !token) return;
-    startProgress("生成智能体", "正在生成智能体..."); setStatus("正在生成智能体...");
+    startProgress("鐢熸垚鏅鸿兘浣?, "姝ｅ湪鐢熸垚鏅鸿兘浣?.."); setStatus("姝ｅ湪鐢熸垚鏅鸿兘浣?..");
     setGeneratePreviews([]);
     try {
       let createdId = "";
@@ -127,14 +125,14 @@ export default function LiteWorkspace() {
         if (event.event === "preview_delta") { setGeneratePreviews((prev) => appendPackagePreviewDelta(prev, event.data)); }
         if (event.event === "preview") { setGeneratePreviews((prev) => upsertPackagePreview(prev, event.data)); }
         if (event.event === "done") { createdId = event.data.id; createdName = event.data.name; }
-        if (event.event === "error") throw new Error(event.data.error || "生成失败");
+        if (event.event === "error") throw new Error(event.data.error || "鐢熸垚澶辫触");
       });
       if (createdId) { setInstruction(""); await refreshPackages(createdId); }
-      const doneLabel = createdName ? `生成完成：${createdName}` : "生成完成，已打开新智能体";
+      const doneLabel = createdName ? `鐢熸垚瀹屾垚锛?{createdName}` : "鐢熸垚瀹屾垚锛屽凡鎵撳紑鏂版櫤鑳戒綋";
       setGeneratePreviews([]);
       finishProgress(doneLabel); setStatus(doneLabel);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "生成失败";
+      const message = error instanceof Error ? error.message : "鐢熸垚澶辫触";
       setGeneratePreviews([]);
       failProgress(message); setStatus(message);
     }
@@ -142,13 +140,13 @@ export default function LiteWorkspace() {
 
   async function handleImport(file: File) {
     if (!token) return;
-    startProgress("导入 ZIP", "正在导入..."); setStatus("正在导入...");
+    startProgress("瀵煎叆 ZIP", "姝ｅ湪瀵煎叆..."); setStatus("姝ｅ湪瀵煎叆...");
     try {
       const created = await liteApi.importPackage(token, file);
       await refreshPackages(created.id);
-      finishProgress("导入成功"); setStatus("导入成功");
+      finishProgress("瀵煎叆鎴愬姛"); setStatus("瀵煎叆鎴愬姛");
     } catch (error) {
-      const message = error instanceof Error ? error.message : "导入失败";
+      const message = error instanceof Error ? error.message : "瀵煎叆澶辫触";
       failProgress(message); setStatus(message);
     }
   }
@@ -163,7 +161,7 @@ export default function LiteWorkspace() {
     const tempShared: ArenaMessage = { id: tempSharedId, threadId: thread.id, side: "shared", role: "user", content: prompt, createdAt: now };
     const tempBaseline: ArenaMessage = { id: tempBaselineId, threadId: thread.id, side: "baseline", role: "assistant", content: "", createdAt: now };
     const tempEnhanced: ArenaMessage = { id: tempEnhancedId, threadId: thread.id, side: "enhanced", role: "assistant", content: "", createdAt: now };
-    setInput(""); setReport(null); setOptimization(null); setThreadDetail({ thread: threadDetail.thread, messages: [...threadDetail.messages, tempShared, tempBaseline, tempEnhanced] }); setSideStreaming({ baseline: true, enhanced: true }); startProgress("Arena 对比", "正在生成回复..."); setStatus("正在生成...");
+    setInput(""); setReport(null); setOptimization(null); setThreadDetail({ thread: threadDetail.thread, messages: [...threadDetail.messages, tempShared, tempBaseline, tempEnhanced] }); setSideStreaming({ baseline: true, enhanced: true }); startProgress("Arena 瀵规瘮", "姝ｅ湪鐢熸垚鍥炲..."); setStatus("姝ｅ湪鐢熸垚...");
     try {
       await liteApi.sendMessageStream(token, thread.id, prompt, model || undefined, "compare", (event) => {
         if (event.event === "phase") { pushProgress(event.data.label); setStatus(event.data.label); return; }
@@ -184,13 +182,13 @@ export default function LiteWorkspace() {
           setThread(event.data.thread);
           setThreadDetail((prev) => prev ? { thread: event.data.thread, messages: [...prev.messages.filter((m) => ![tempSharedId, tempBaselineId, tempEnhancedId].includes(m.id)), ...event.data.messages] } : prev);
           setSideStreaming({ baseline: false, enhanced: false });
-          finishProgress("回复已生成"); setStatus("回复已生成");
+          finishProgress("鍥炲宸茬敓鎴?); setStatus("鍥炲宸茬敓鎴?);
           return;
         }
-        if (event.event === "error") throw new Error(event.data.error || "发送失败");
+        if (event.event === "error") throw new Error(event.data.error || "鍙戦€佸け璐?);
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "发送失败";
+      const message = error instanceof Error ? error.message : "鍙戦€佸け璐?;
       setSideStreaming({ baseline: false, enhanced: false });
       setInput(prompt);
       failProgress(message); setStatus(message);
@@ -199,40 +197,40 @@ export default function LiteWorkspace() {
 
   async function handleReport() {
     if (!token || !thread?.id) return;
-    startProgress("生成评估报告", "正在生成报告..."); setStatus("正在生成报告...");
+    startProgress("鐢熸垚璇勪及鎶ュ憡", "姝ｅ湪鐢熸垚鎶ュ憡..."); setStatus("姝ｅ湪鐢熸垚鎶ュ憡...");
     try {
       let nextReport: ArenaReport | null = null;
       await liteApi.generateReportStream(token, thread.id, model || undefined, (event) => {
         if (event.event === "phase") { pushProgress(event.data.label); setStatus(event.data.label); }
         if (event.event === "done") nextReport = event.data;
-        if (event.event === "error") throw new Error(event.data.error || "评估失败");
+        if (event.event === "error") throw new Error(event.data.error || "璇勪及澶辫触");
       });
       if (nextReport) { setReport(nextReport); setDetailTab("report"); }
-      finishProgress("报告已生成"); setStatus("报告已生成");
+      finishProgress("鎶ュ憡宸茬敓鎴?); setStatus("鎶ュ憡宸茬敓鎴?);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "评估失败";
+      const message = error instanceof Error ? error.message : "璇勪及澶辫触";
       failProgress(message); setStatus(message);
     }
   }
 
   async function handleOptimize() {
     if (!token || !thread?.id || !selectedPackageId) return;
-    startProgress("执行优化", "正在运行专家优化..."); setStatus("正在优化...");
+    startProgress("鎵ц浼樺寲", "姝ｅ湪杩愯涓撳浼樺寲..."); setStatus("姝ｅ湪浼樺寲...");
     try {
       let result: OptimizationResult | null = null;
       await liteApi.optimizePackageStream(token, selectedPackageId, thread.id, model || undefined, (event) => {
         if (event.event === "phase") { pushProgress(event.data.label); setStatus(event.data.label); }
         if (event.event === "done") result = event.data;
-        if (event.event === "error") throw new Error(event.data.error || "优化失败");
+        if (event.event === "error") throw new Error(event.data.error || "浼樺寲澶辫触");
       });
       if (result) {
         await refreshPackages(selectedPackageId);
         setOptimization(result);
         setDetailTab("optimization");
       }
-      finishProgress("优化完成"); setStatus("优化完成");
+      finishProgress("浼樺寲瀹屾垚"); setStatus("浼樺寲瀹屾垚");
     } catch (error) {
-      const message = error instanceof Error ? error.message : "优化失败";
+      const message = error instanceof Error ? error.message : "浼樺寲澶辫触";
       failProgress(message); setStatus(message);
     }
   }
@@ -240,13 +238,13 @@ export default function LiteWorkspace() {
   async function handleDelete() {
     const deletingId = selectedPackageIdRef.current || selectedPackageId;
     if (!token || !deletingId) return;
-    if (!window.confirm("确定要删除当前智能体吗？")) return;
+    if (!window.confirm("纭畾瑕佸垹闄ゅ綋鍓嶆櫤鑳戒綋鍚楋紵")) return;
     clearWorkspaceState();
     setPackages((prev) => prev.filter((item) => item.id !== deletingId));
     try {
       await liteApi.deletePackage(token, deletingId);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "删除失败";
+      const message = error instanceof Error ? error.message : "鍒犻櫎澶辫触";
       failProgress(message);
       setStatus(message);
       await refreshPackages(deletingId);
@@ -258,12 +256,12 @@ export default function LiteWorkspace() {
   async function handleExport() {
     if (!token || !selectedPackageId) return;
     await liteApi.exportPackage(token, selectedPackageId);
-    setStatus("导出已开始");
+    setStatus("瀵煎嚭宸插紑濮?);
   }
 
-  function formatWinner(value: ArenaReport["winningSide"]) { return value === "baseline" ? "基准模型" : value === "enhanced" ? "增强版本" : "平局"; }
-  function formatExpert(value: OptimizationResult["issues"][number]["expert"]) { return value === "persona" ? "角色专家" : value === "skill" ? "技能专家" : value === "rubric" ? "评估专家" : "合并专家"; }
-  function formatTarget(value: OptimizationResult["issues"][number]["target"]) { return value === "agent" ? "agent.md" : value === "skill" ? "技能文件" : "rubric.md"; }
+  function formatWinner(value: ArenaReport["winningSide"]) { return value === "baseline" ? "鍩哄噯妯″瀷" : value === "enhanced" ? "澧炲己鐗堟湰" : "骞冲眬"; }
+  function formatExpert(value: OptimizationResult["issues"][number]["expert"]) { return value === "persona" ? "瑙掕壊涓撳" : value === "skill" ? "鎶€鑳戒笓瀹? : value === "rubric" ? "璇勪及涓撳" : "鍚堝苟涓撳"; }
+  function formatTarget(value: OptimizationResult["issues"][number]["target"]) { return value === "agent" ? "agent.md" : value === "skill" ? "鎶€鑳芥枃浠? : "rubric.md"; }
 
   return (
     <div className="relative flex h-screen flex-col overflow-hidden bg-background text-foreground">
@@ -272,21 +270,7 @@ export default function LiteWorkspace() {
       <div className="pointer-events-none absolute left-[-8rem] top-[-7rem] h-72 w-72 rounded-full bg-[radial-gradient(circle,rgba(85,90,255,0.12),transparent_65%)] blur-3xl animate-float-orb-1" />
       <div className="pointer-events-none absolute right-[-8rem] top-12 h-64 w-64 rounded-full bg-[radial-gradient(circle,rgba(55,130,255,0.12),transparent_65%)] blur-3xl animate-float-orb-2" />
 
-      <div className="relative z-10 flex h-full flex-col gap-3 p-3 sm:p-4">
-        {/* Header */}
-        <div className="flex items-center justify-between rounded-[20px] border border-border/70 bg-background/95 px-5 py-3 shadow-[var(--shadow-sm)]">
-          <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-[14px] bg-primary text-white font-bold">E</div>
-            <div>
-              <div className="text-sm font-semibold tracking-tight">EduClaw Lite</div>
-              <div className="text-[11px] text-muted-foreground">Prompt + Arena + Optimize</div>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-muted-foreground">{user?.username || "用户"}</span>
-            <button className="text-xs text-muted-foreground hover:text-foreground" onClick={() => useAuthStore.getState().logout()}>退出</button>
-          </div>
-        </div>
+      <div className="relative z-10 flex h-full flex-col gap-2 p-2 sm:p-3">
 
         {/* Main workspace */}
         <div className="flex min-h-0 flex-1 overflow-hidden rounded-[24px] border border-border/70 bg-background/95 shadow-[var(--shadow-md)]">
@@ -294,38 +278,50 @@ export default function LiteWorkspace() {
           <aside className="flex w-80 flex-col border-r border-border bg-card/60">
             <div className="flex items-center gap-3 border-b border-border px-5 py-4">
               <div className="flex size-9 items-center justify-center rounded-xl bg-primary text-white font-bold text-sm">E</div>
-              <div className="font-semibold tracking-tight text-sm">智能体</div>
+              <div className="min-w-0 flex-1">
+                <div className="font-semibold tracking-tight text-sm">智能体</div>
+                <div className="text-[11px] text-muted-foreground">Prompt + Arena + Optimize</div>
+              </div>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="size-8 rounded-lg text-muted-foreground hover:text-foreground"
+                onClick={() => useAuthStore.getState().logout()}
+                title="退出"
+              >
+                <LogOut className="size-3.5" />
+              </Button>
             </div>
             <ScrollArea className="flex-1">
               <div className="space-y-4 p-4">
                 {/* Generate */}
                 <div className="space-y-2">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">生成智能体</div>
-                  <Textarea value={instruction} onChange={(e) => setInstruction(e.target.value)} placeholder="描述你想生成的智能体，例如：班级管理助手、作文批改导师..." rows={4} className="resize-none rounded-[16px] border-border/70 bg-card/80" />
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">鐢熸垚鏅鸿兘浣?/div>
+                  <Textarea value={instruction} onChange={(e) => setInstruction(e.target.value)} placeholder="鎻忚堪浣犳兂鐢熸垚鐨勬櫤鑳戒綋锛屼緥濡傦細鐝骇绠＄悊鍔╂墜銆佷綔鏂囨壒鏀瑰甯?.." rows={4} className="resize-none rounded-[16px] border-border/70 bg-card/80" />
                   <div className="flex gap-2">
-                    <Input value={model} onChange={(e) => setModel(e.target.value)} placeholder="覆盖模型（可选）" className="h-9 text-xs rounded-[12px] border-border/70 bg-card/80" />
+                    <Input value={model} onChange={(e) => setModel(e.target.value)} placeholder="瑕嗙洊妯″瀷锛堝彲閫夛級" className="h-9 text-xs rounded-[12px] border-border/70 bg-card/80" />
                   </div>
                   <div className="flex gap-2">
-                    <Button size="sm" className="flex-1 rounded-[12px]" onClick={() => void handleGenerate()} disabled={!instruction.trim()}><Sparkles className="mr-1.5 size-3.5" />生成</Button>
-                    <Button size="sm" variant="outline" className="rounded-[12px]" onClick={() => fileRef.current?.click()}><Upload className="mr-1.5 size-3.5" />导入</Button>
+                    <Button size="sm" className="flex-1 rounded-[12px]" onClick={() => void handleGenerate()} disabled={!instruction.trim()}><Sparkles className="mr-1.5 size-3.5" />鐢熸垚</Button>
+                    <Button size="sm" variant="outline" className="rounded-[12px]" onClick={() => fileRef.current?.click()}><Upload className="mr-1.5 size-3.5" />瀵煎叆</Button>
                     <input ref={fileRef} type="file" accept=".zip" hidden onChange={(e) => { const file = e.target.files?.[0]; if (file) void handleImport(file); }} />
                   </div>
                 </div>
                 <div className="h-px bg-border" />
                 {/* Package list */}
                 <div className="space-y-2">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">仓库 ({packages.length})</div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">浠撳簱 ({packages.length})</div>
                   <div className="space-y-1.5">
                     {packages.map((pkg) => (
                       <button key={pkg.id} onClick={() => void openPackage(pkg.id)} className={`flex w-full items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left transition-colors ${pkg.id === selectedPackageId ? "border-primary/30 bg-primary/5" : "border-transparent hover:bg-muted"}`}>
                         <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary font-bold text-xs">{pkg.name.charAt(0).toUpperCase()}</div>
                         <div className="min-w-0">
                           <div className="truncate text-sm font-medium">{pkg.name}</div>
-                          <div className="truncate text-[11px] text-muted-foreground">v{pkg.versionNumber} · {pkg.description}</div>
+                          <div className="truncate text-[11px] text-muted-foreground">v{pkg.versionNumber} 路 {pkg.description}</div>
                         </div>
                       </button>
                     ))}
-                    {packages.length === 0 && <div className="rounded-xl border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">暂无智能体</div>}
+                    {packages.length === 0 && <div className="rounded-xl border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">鏆傛棤鏅鸿兘浣?/div>}
                   </div>
                 </div>
               </div>
@@ -336,12 +332,12 @@ export default function LiteWorkspace() {
           <main className="flex min-w-0 flex-1 flex-col bg-card/30">
             <div className="flex items-center justify-between border-b border-border bg-card/60 px-5 py-3">
               <div className="flex items-center gap-3">
-                <div className="text-sm font-semibold">Arena 对比</div>
-                <div className="text-xs text-muted-foreground">同一问题同时发给基准模型与增强版本</div>
+                <div className="text-sm font-semibold">Arena 瀵规瘮</div>
+                <div className="text-xs text-muted-foreground">鍚屼竴闂鍚屾椂鍙戠粰鍩哄噯妯″瀷涓庡寮虹増鏈?/div>
               </div>
               <div className="flex items-center gap-2">
-                <Button size="sm" variant="outline" className="rounded-[12px]" onClick={() => void handleReport()} disabled={!threadDetail || threadDetail.messages.length === 0}><BarChart3 className="mr-1.5 size-3.5" />评估报告</Button>
-                <Button size="sm" className="rounded-[12px]" onClick={() => void handleOptimize()} disabled={!thread}><Zap className="mr-1.5 size-3.5" />优化</Button>
+                <Button size="sm" variant="outline" className="rounded-[12px]" onClick={() => void handleReport()} disabled={!threadDetail || threadDetail.messages.length === 0}><BarChart3 className="mr-1.5 size-3.5" />璇勪及鎶ュ憡</Button>
+                <Button size="sm" className="rounded-[12px]" onClick={() => void handleOptimize()} disabled={!thread}><Zap className="mr-1.5 size-3.5" />浼樺寲</Button>
               </div>
             </div>
 
@@ -371,8 +367,8 @@ export default function LiteWorkspace() {
 
             <div className="border-t border-border bg-card/60 p-4">
               <div className="flex gap-3">
-                <Textarea value={input} onChange={(e) => setInput(e.target.value)} placeholder="输入同一个问题，同时发给基准模型和增强版本..." rows={3} className="min-h-[80px] resize-none rounded-[16px] border-border/70 bg-card/80" onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void handleSend(); } }} />
-                <Button className="self-end h-10 px-5 rounded-[12px]" onClick={() => void handleSend()} disabled={!selectedPackage || !thread || sideStreaming.baseline || sideStreaming.enhanced}><Send className="mr-1.5 size-4" />发送</Button>
+                <Textarea value={input} onChange={(e) => setInput(e.target.value)} placeholder="杈撳叆鍚屼竴涓棶棰橈紝鍚屾椂鍙戠粰鍩哄噯妯″瀷鍜屽寮虹増鏈?.." rows={3} className="min-h-[80px] resize-none rounded-[16px] border-border/70 bg-card/80" onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void handleSend(); } }} />
+                <Button className="self-end h-10 px-5 rounded-[12px]" onClick={() => void handleSend()} disabled={!selectedPackage || !thread || sideStreaming.baseline || sideStreaming.enhanced}><Send className="mr-1.5 size-4" />鍙戦€?/Button>
               </div>
             </div>
           </main>
@@ -380,7 +376,7 @@ export default function LiteWorkspace() {
           {/* Detail panel */}
           <aside className="flex w-96 flex-col border-l border-border bg-card/60">
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
-              <div className="text-sm font-semibold">{selectedPackage?.name || "未选择"}</div>
+              <div className="text-sm font-semibold">{selectedPackage?.name || "鏈€夋嫨"}</div>
               <div className="flex items-center gap-1">
                 <Button size="icon" variant="ghost" className="size-7 rounded-[10px]" onClick={() => void handleExport()} disabled={!selectedPackageId}><Download className="size-3.5" /></Button>
                 <Button size="icon" variant="ghost" className="size-7 rounded-[10px] text-destructive hover:text-destructive" onClick={() => void handleDelete()} disabled={!selectedPackageId}><Trash2 className="size-3.5" /></Button>
@@ -393,10 +389,10 @@ export default function LiteWorkspace() {
                     { key: "agent" as DetailTab, label: "Agent", icon: FileText },
                     { key: "rubric" as DetailTab, label: "Rubric", icon: ListChecks },
                     { key: "skills" as DetailTab, label: "Skills", icon: Wrench },
-                    { key: "versions" as DetailTab, label: "版本", icon: History },
-                    { key: "report" as DetailTab, label: "报告", icon: BarChart3 },
-                    { key: "optimization" as DetailTab, label: "优化", icon: Zap },
-                    { key: "diff" as DetailTab, label: "对比", icon: GitCompare },
+                    { key: "versions" as DetailTab, label: "鐗堟湰", icon: History },
+                    { key: "report" as DetailTab, label: "鎶ュ憡", icon: BarChart3 },
+                    { key: "optimization" as DetailTab, label: "浼樺寲", icon: Zap },
+                    { key: "diff" as DetailTab, label: "瀵规瘮", icon: GitCompare },
                   ].map((tab) => (
                     <button key={tab.key} onClick={() => setDetailTab(tab.key)} className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${detailTab === tab.key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
                       <tab.icon className="size-3" />{tab.label}
@@ -404,7 +400,7 @@ export default function LiteWorkspace() {
                   ))}
                 </div>
 
-                {!selectedPackage && <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">请选择一个智能体</div>}
+                {!selectedPackage && <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">璇烽€夋嫨涓€涓櫤鑳戒綋</div>}
 
                 {selectedPackage && detailTab === "agent" && (
                   <div className="space-y-2">
@@ -422,7 +418,7 @@ export default function LiteWorkspace() {
 
                 {selectedPackage && detailTab === "skills" && (
                   <div className="space-y-2">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">技能文件</div>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">鎶€鑳芥枃浠?/div>
                     {selectedPackage.snapshot.skills.length > 0 ? (
                       <>
                         <div className="flex flex-wrap gap-1">
@@ -430,15 +426,15 @@ export default function LiteWorkspace() {
                             <button key={skill.id} onClick={() => setSelectedSkillId(skill.id)} className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${selectedSkillId === skill.id ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"}`}>{skill.name}</button>
                           ))}
                         </div>
-                        <div className="rounded-[20px] border border-border/70 bg-muted/50 p-4 text-sm"><SkillMarkdownContent content={selectedSkill?.skillMd || "暂无技能内容"} /></div>
+                        <div className="rounded-[20px] border border-border/70 bg-muted/50 p-4 text-sm"><SkillMarkdownContent content={selectedSkill?.skillMd || "鏆傛棤鎶€鑳藉唴瀹?} /></div>
                       </>
-                    ) : <div className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">暂无技能文件</div>}
+                    ) : <div className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">鏆傛棤鎶€鑳芥枃浠?/div>}
                   </div>
                 )}
 
                 {selectedPackage && detailTab === "versions" && (
                   <div className="space-y-2">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">版本记录</div>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">鐗堟湰璁板綍</div>
                     <div className="space-y-1.5">
                       {versions.map((v) => (
                         <div key={v.id} className="flex items-center justify-between rounded-lg border border-border/70 bg-muted/50 px-3 py-2 text-xs">
@@ -447,33 +443,33 @@ export default function LiteWorkspace() {
                           <span className="text-muted-foreground">{new Date(v.createdAt).toLocaleString()}</span>
                         </div>
                       ))}
-                      {versions.length === 0 && <div className="text-center text-sm text-muted-foreground py-4">暂无版本记录</div>}
+                      {versions.length === 0 && <div className="text-center text-sm text-muted-foreground py-4">鏆傛棤鐗堟湰璁板綍</div>}
                     </div>
                   </div>
                 )}
 
                 {detailTab === "report" && (report ? (
                   <div className="space-y-3">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">评估报告</div>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">璇勪及鎶ュ憡</div>
                     <div className="grid grid-cols-2 gap-2">
                       <div className="rounded-[20px] border border-border/70 bg-muted/50 p-3 text-center">
-                        <div className="text-xs text-muted-foreground">基准模型</div>
+                        <div className="text-xs text-muted-foreground">鍩哄噯妯″瀷</div>
                         <div className="text-2xl font-bold">{report.baseline.total}</div>
                         <div className="text-[10px] text-muted-foreground">{report.baseline.summary}</div>
                       </div>
                       <div className="rounded-[20px] border border-border/70 bg-muted/50 p-3 text-center">
-                        <div className="text-xs text-muted-foreground">增强版本</div>
+                        <div className="text-xs text-muted-foreground">澧炲己鐗堟湰</div>
                         <div className="text-2xl font-bold">{report.enhanced.total}</div>
                         <div className="text-[10px] text-muted-foreground">{report.enhanced.summary}</div>
                       </div>
                     </div>
                     <div className="rounded-[20px] border border-border/70 bg-muted/50 p-3 text-sm">
-                      <div><strong>结果：</strong>{formatWinner(report.winningSide)}</div>
-                      <div className="mt-1"><strong>建议：</strong>{report.recommendation}</div>
+                      <div><strong>缁撴灉锛?/strong>{formatWinner(report.winningSide)}</div>
+                      <div className="mt-1"><strong>寤鸿锛?/strong>{report.recommendation}</div>
                     </div>
                     <div className="overflow-hidden rounded-[20px] border border-border/70">
                       <table className="w-full text-xs">
-                        <thead className="bg-muted/80"><tr><th className="px-2 py-1.5 text-left">维度</th><th className="px-2 py-1.5 text-left">基准</th><th className="px-2 py-1.5 text-left">增强</th></tr></thead>
+                        <thead className="bg-muted/80"><tr><th className="px-2 py-1.5 text-left">缁村害</th><th className="px-2 py-1.5 text-left">鍩哄噯</th><th className="px-2 py-1.5 text-left">澧炲己</th></tr></thead>
                         <tbody>
                           {report.baseline.dimensions.map((d, i) => {
                             const e = report.enhanced.dimensions[i];
@@ -483,30 +479,30 @@ export default function LiteWorkspace() {
                       </table>
                     </div>
                   </div>
-                ) : <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">还没有生成报告</div>)}
+                ) : <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">杩樻病鏈夌敓鎴愭姤鍛?/div>)}
 
                 {detailTab === "optimization" && (optimization ? (
                   <div className="space-y-3">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">优化结果</div>
-                    <div className="rounded-[20px] border border-border/70 bg-muted/50 p-3 text-sm"><strong>新版本：</strong>v{optimization.versionNumber}</div>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">浼樺寲缁撴灉</div>
+                    <div className="rounded-[20px] border border-border/70 bg-muted/50 p-3 text-sm"><strong>鏂扮増鏈細</strong>v{optimization.versionNumber}</div>
                     <div className="space-y-2">
                       {optimization.issues.map((issue, i) => (
                         <div key={`${issue.expert}-${i}`} className="rounded-[20px] border border-border/70 bg-muted/50 p-3 text-sm">
                           <div className="font-medium">[{formatExpert(issue.expert)}] {issue.title}</div>
-                          <div className="mt-1 text-xs text-muted-foreground"><strong>目标：</strong>{formatTarget(issue.target)}{issue.targetId ? ` / ${issue.targetId}` : ""}</div>
+                          <div className="mt-1 text-xs text-muted-foreground"><strong>鐩爣锛?/strong>{formatTarget(issue.target)}{issue.targetId ? ` / ${issue.targetId}` : ""}</div>
                           <div className="mt-1">{issue.reason}</div>
-                          {issue.evidence.length > 0 && <div className="mt-1 text-xs text-muted-foreground"><strong>证据：</strong>{issue.evidence.join("; ")}</div>}
+                          {issue.evidence.length > 0 && <div className="mt-1 text-xs text-muted-foreground"><strong>璇佹嵁锛?/strong>{issue.evidence.join("; ")}</div>}
                         </div>
                       ))}
-                      {optimization.issues.length === 0 && <div className="text-sm text-muted-foreground">当前没有额外优化项</div>}
+                      {optimization.issues.length === 0 && <div className="text-sm text-muted-foreground">褰撳墠娌℃湁棰濆浼樺寲椤?/div>}
                     </div>
                     {optimization && selectedPackage && <OptimizationDiffView oldSnapshot={selectedPackage.snapshot} optimization={optimization} />}
                   </div>
-                ) : <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">还没有执行优化</div>)}
+                ) : <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">杩樻病鏈夋墽琛屼紭鍖?/div>)}
 
                 {detailTab === "diff" && (optimization && selectedPackage ? (
                   <OptimizationDiffView oldSnapshot={selectedPackage.snapshot} optimization={optimization} />
-                ) : <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">还没有执行优化</div>)}
+                ) : <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">杩樻病鏈夋墽琛屼紭鍖?/div>)}
               </div>
             </ScrollArea>
           </aside>

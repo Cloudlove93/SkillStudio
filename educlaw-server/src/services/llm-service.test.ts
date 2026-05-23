@@ -184,7 +184,7 @@ describe("llm-service", () => {
   });
 
   it("uses special request body fields for Kimi models", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(mockChatResponse("ok"));
+    const fetchMock = vi.fn().mockImplementation(() => mockChatResponse("ok"));
     vi.stubGlobal("fetch", fetchMock);
     const { generateText } = await loadService();
 

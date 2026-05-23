@@ -108,6 +108,61 @@ export interface ArenaReport {
   winningSide: "baseline" | "enhanced" | "tie";
 }
 
+export interface AutoEvalQuestion {
+  id: string;
+  title: string;
+  prompt: string;
+  source: "builtin" | "document";
+}
+
+export interface AutoEvalDimensionScore {
+  key: string;
+  name: string;
+  score: number;
+  maxScore: number;
+  reason: string;
+}
+
+export interface AutoEvalCaseResult {
+  questionId: string;
+  title: string;
+  prompt: string;
+  score: number;
+  maxScore: number;
+  summary: string;
+  issues: string[];
+  suggestions: string[];
+  transcript: Array<{ role: string; content: string }>;
+}
+
+export interface AutoEvalReport {
+  runId: string;
+  packageId: string;
+  sceneName: string;
+  status: "pending" | "running" | "completed" | "failed";
+  totalScore: number;
+  maxScore: number;
+  summary: string;
+  dimensions: AutoEvalDimensionScore[];
+  cases: AutoEvalCaseResult[];
+  issues: string[];
+  suggestions: string[];
+  compactRetryUsed?: boolean;
+  createdAt: string;
+  updatedAt: string;
+  errorMessage?: string;
+}
+
+export interface AutoEvalPreview {
+  packageId: string;
+  packageName: string;
+  skillCount: number;
+  builtinQuestions: AutoEvalQuestion[];
+  documentQuestions: AutoEvalQuestion[];
+  dimensions: Array<{ key: string; name: string; maxScore: number; description: string }>;
+  latestRun?: AutoEvalReport;
+}
+
 export interface OptimizationIssue {
   expert: "persona" | "skill" | "rubric" | "merge";
   target: "agent" | "skill" | "rubric";
