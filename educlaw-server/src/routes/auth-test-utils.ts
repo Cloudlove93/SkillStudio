@@ -37,7 +37,7 @@ export async function createAuthApp() {
   const authRoutes = (await import("./auth.js")).default;
   const app = express();
   app.use(express.json());
-  app.use("/auth", authRoutes);
+  app.use(authRoutes);
   return app;
 }
 

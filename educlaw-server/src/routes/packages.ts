@@ -1,5 +1,6 @@
 import multer from "multer";
 import { Router, type Request, type Response } from "express";
+import { PACKAGE_ROUTES } from "@educlaw/shared";
 import type { AuthedRequest } from "../types.js";
 import { config } from "../config.js";
 import { requireAuth } from "../middleware/auth.js";
@@ -31,11 +32,11 @@ import {
 const router: import("express").Router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: config.uploadLimitBytes } });
 
-router.get("/", requireAuth, async (req, res) => {
+router.get(PACKAGE_ROUTES.LIST, requireAuth, async (req, res) => {
   res.json(await listPackages((req as AuthedRequest).userId || ""));
 });
 
-router.post("/generate", requireAuth, async (req, res) => {
+router.post("/packages/generate", requireAuth, async (req, res) => {
   try {
     const pkg = await generatePackage(
       (req as AuthedRequest).userId || "",
@@ -49,7 +50,7 @@ router.post("/generate", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/generate/stream", requireAuth, async (req: Request, res: Response) => {
+router.post("/packages/generate/stream", requireAuth, async (req: Request, res: Response) => {
   initSse(res);
   const startedAt = Date.now();
   const documents: Array<{ name: string; content: string }> | undefined = Array.isArray(req.body?.documents)
@@ -91,7 +92,7 @@ router.post("/generate/stream", requireAuth, async (req: Request, res: Response)
   }
 });
 
-router.post("/import", requireAuth, upload.single("file"), async (req, res) => {
+router.post("/packages/import", requireAuth, upload.single("file"), async (req, res) => {
   try {
     if (!req.file?.buffer) {
       res.status(400).json({ error: "请上传 ZIP 文件" });
@@ -103,7 +104,7 @@ router.post("/import", requireAuth, upload.single("file"), async (req, res) => {
   }
 });
 
-router.get("/:packageId/optimize/sessions", requireAuth, async (req, res) => {
+router.get("/packages/:packageId/optimize/sessions", requireAuth, async (req, res) => {
   try {
     res.json(await listInteractiveSessions(
       (req as AuthedRequest).userId || "",
@@ -114,7 +115,7 @@ router.get("/:packageId/optimize/sessions", requireAuth, async (req, res) => {
   }
 });
 
-router.get("/:packageId/optimize/sessions/:sessionId", requireAuth, async (req, res) => {
+router.get("/packages/:packageId/optimize/sessions/:sessionId", requireAuth, async (req, res) => {
   try {
     const session = await getInteractiveSession(
       (req as AuthedRequest).userId || "",
@@ -130,15 +131,15 @@ router.get("/:packageId/optimize/sessions/:sessionId", requireAuth, async (req, 
   }
 });
 
-router.get("/:packageId", requireAuth, async (req, res) => {
+router.get(PACKAGE_ROUTES.DETAIL, requireAuth, async (req, res) => {
   try {
-    res.json(await getPackage((req as AuthedRequest).userId || "", one(req.params.packageId)));
+    res.json(await getPackage((req as AuthedRequest).userId || "", one(req.query.packageId as string | string[] | undefined)));
   } catch (error) {
     res.status(404).json({ error: error instanceof Error ? error.message : "找不到智能体" });
   }
 });
 
-router.patch("/:packageId", requireAuth, async (req, res) => {
+router.patch("/packages/:packageId", requireAuth, async (req, res) => {
   try {
     res.json(await renamePackage(
       (req as AuthedRequest).userId || "",
@@ -150,7 +151,7 @@ router.patch("/:packageId", requireAuth, async (req, res) => {
   }
 });
 
-router.get("/:packageId/versions", requireAuth, async (req, res) => {
+router.get("/packages/:packageId/versions", requireAuth, async (req, res) => {
   try {
     res.json(await listVersions((req as AuthedRequest).userId || "", one(req.params.packageId)));
   } catch (error) {
@@ -158,7 +159,7 @@ router.get("/:packageId/versions", requireAuth, async (req, res) => {
   }
 });
 
-router.get("/:packageId/export", requireAuth, async (req, res) => {
+router.get("/packages/:packageId/export", requireAuth, async (req, res) => {
   try {
     const packageId = one(req.params.packageId);
     const data = await exportPackageZip((req as AuthedRequest).userId || "", packageId);
@@ -170,7 +171,7 @@ router.get("/:packageId/export", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/:packageId/manual-edit", requireAuth, async (req, res) => {
+router.post("/packages/:packageId/manual-edit", requireAuth, async (req, res) => {
   try {
     const result = await applyManualMarkdownEdit(
       (req as AuthedRequest).userId || "",
@@ -188,7 +189,7 @@ router.post("/:packageId/manual-edit", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/:packageId/optimize", requireAuth, async (req, res) => {
+router.post("/packages/:packageId/optimize", requireAuth, async (req, res) => {
   try {
     const result = await optimizePackage(
       (req as AuthedRequest).userId || "",
@@ -202,7 +203,7 @@ router.post("/:packageId/optimize", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/:packageId/optimize/stream", requireAuth, async (req: Request, res: Response) => {
+router.post("/packages/:packageId/optimize/stream", requireAuth, async (req: Request, res: Response) => {
   initSse(res);
   const heartbeat = setInterval(() => {
     try { writeSseEvent(res, "ping", {}); } catch { /* ignore */ }
@@ -225,7 +226,7 @@ router.post("/:packageId/optimize/stream", requireAuth, async (req: Request, res
   }
 });
 
-router.post("/:packageId/optimize/diagnose", requireAuth, async (req, res) => {
+router.post("/packages/:packageId/optimize/diagnose", requireAuth, async (req, res) => {
   try {
     const result = await diagnosePackage(
       (req as AuthedRequest).userId || "",
@@ -239,7 +240,7 @@ router.post("/:packageId/optimize/diagnose", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/:packageId/optimize/chat", requireAuth, async (req, res) => {
+router.post("/packages/:packageId/optimize/chat", requireAuth, async (req, res) => {
   try {
     const result = await chatOptimize(
       (req as AuthedRequest).userId || "",
@@ -257,7 +258,7 @@ router.post("/:packageId/optimize/chat", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/:packageId/optimize/apply", requireAuth, async (req, res) => {
+router.post("/packages/:packageId/optimize/apply", requireAuth, async (req, res) => {
   try {
     const result = await applyInteractiveChanges(
       (req as AuthedRequest).userId || "",
@@ -273,7 +274,7 @@ router.post("/:packageId/optimize/apply", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/:packageId/versions/compare", requireAuth, async (req, res) => {
+router.post("/packages/:packageId/versions/compare", requireAuth, async (req, res) => {
   try {
     const result = await compareVersions(
       (req as AuthedRequest).userId || "",
@@ -288,7 +289,7 @@ router.post("/:packageId/versions/compare", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/:packageId/versions/:versionId/note", requireAuth, async (req, res) => {
+router.post("/packages/:packageId/versions/:versionId/note", requireAuth, async (req, res) => {
   try {
     const result = await updateVersionNote(
       (req as AuthedRequest).userId || "",
@@ -302,7 +303,7 @@ router.post("/:packageId/versions/:versionId/note", requireAuth, async (req, res
   }
 });
 
-router.delete("/:packageId", requireAuth, async (req, res) => {
+router.delete("/packages/:packageId", requireAuth, async (req, res) => {
   try {
     await deletePackage((req as AuthedRequest).userId || "", one(req.params.packageId));
     res.json({ ok: true });

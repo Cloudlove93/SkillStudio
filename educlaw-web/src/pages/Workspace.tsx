@@ -58,15 +58,15 @@ export default function Workspace() {
   const activeTab = activeTabId ? tabs.get(activeTabId) : undefined;
   const [homeInput, setHomeInput] = useState('');
 
-  useEffect(() => {
-    fetchProfiles();
-    fetchAgents().then(() => {
-      restorePendingQuestions();
-    });
-    fetchSessions();
-    connectSSE();
-    return () => disconnectSSE();
-  }, [fetchProfiles, fetchAgents, fetchSessions]);
+  // useEffect(() => {
+  // fetchProfiles();
+  // fetchAgents().then(() => {
+  //   restorePendingQuestions();
+  // });
+  // fetchSessions();
+  // connectSSE();
+  //   return () => disconnectSSE();
+  // }, [fetchProfiles, fetchAgents, fetchSessions]);
 
   useEffect(() => {
     reconcileChatAgents(agents.map((agent) => ({ id: agent.id, name: agent.name })));

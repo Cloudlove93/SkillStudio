@@ -219,15 +219,15 @@ export default function Header() {
     <header className="relative z-[160] shrink-0 rounded-[20px] border border-border/70 bg-background/95 px-3 py-3 shadow-[var(--shadow-sm)] sm:px-4">
       <div className="flex items-center gap-3">
         <div className="flex min-w-0 flex-1 items-center gap-3">
-          <Button
-            variant="outline"
-            size="icon-sm"
-            onClick={toggleSidebar}
-            title={t('status.toggleSidebar')}
-            className="rounded-[10px]"
-          >
-            <PanelLeft className="size-4" />
-          </Button>
+          {/*<Button*/}
+          {/*  variant="outline"*/}
+          {/*  size="icon-sm"*/}
+          {/*  onClick={toggleSidebar}*/}
+          {/*  title={t('status.toggleSidebar')}*/}
+          {/*  className="rounded-[10px]"*/}
+          {/*>*/}
+          {/*  <PanelLeft className="size-4" />*/}
+          {/*</Button>*/}
 
           <button
             onClick={handleGoHome}
@@ -240,127 +240,127 @@ export default function Header() {
             </div>
             <div className="min-w-0">
               <div className={`truncate text-[15px] font-semibold tracking-[-0.03em] ${isHome ? 'text-gradient-primary' : 'text-foreground'}`}>
-                EduClaw
+                EduArena
               </div>
-              <div className="truncate text-xs text-muted-foreground">AI workspace for study and creation</div>
+              <div className="truncate text-xs text-muted-foreground">Arena for agent evaluation</div>
             </div>
           </button>
 
-          {activeTab && (
-            <nav className="hidden min-w-0 items-center gap-2 lg:flex">
-              <ChevronRight className="size-4 shrink-0 text-muted-foreground/50" />
-              <div className="flex min-w-0 items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-sm shadow-[var(--shadow-sm)]">
-                <span className={`size-2 shrink-0 rounded-full ${agent?.status === 'running' ? 'bg-[color:var(--success)] animate-pulse-dot' : 'bg-muted-foreground/40'}`} />
-                <span className="truncate font-medium text-foreground">{activeTab.agentName}</span>
-              </div>
-            </nav>
-          )}
+          {/*{activeTab && (*/}
+          {/*  <nav className="hidden min-w-0 items-center gap-2 lg:flex">*/}
+          {/*    <ChevronRight className="size-4 shrink-0 text-muted-foreground/50" />*/}
+          {/*    <div className="flex min-w-0 items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-sm shadow-[var(--shadow-sm)]">*/}
+          {/*      <span className={`size-2 shrink-0 rounded-full ${agent?.status === 'running' ? 'bg-[color:var(--success)] animate-pulse-dot' : 'bg-muted-foreground/40'}`} />*/}
+          {/*      <span className="truncate font-medium text-foreground">{activeTab.agentName}</span>*/}
+          {/*    </div>*/}
+          {/*  </nav>*/}
+          {/*)}*/}
 
-          {!activeTab && !viewCfg && activeHomeChatTitle && (
-            <nav className="hidden min-w-0 items-center gap-2 lg:flex">
-              <ChevronRight className="size-4 shrink-0 text-muted-foreground/50" />
-              <div className="flex min-w-0 items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-sm shadow-[var(--shadow-sm)]">
-                <MessageSquare className="size-3.5 shrink-0 text-primary" />
-                <span className="max-w-[220px] truncate font-medium text-foreground">{activeHomeChatTitle}</span>
-                <Button variant="ghost" size="icon-xs" onClick={() => setActiveSession(null)} className="rounded-full">
-                  <X className="size-3" />
-                </Button>
-              </div>
-            </nav>
-          )}
+          {/*{!activeTab && !viewCfg && activeHomeChatTitle && (*/}
+          {/*  <nav className="hidden min-w-0 items-center gap-2 lg:flex">*/}
+          {/*    <ChevronRight className="size-4 shrink-0 text-muted-foreground/50" />*/}
+          {/*    <div className="flex min-w-0 items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-sm shadow-[var(--shadow-sm)]">*/}
+          {/*      <MessageSquare className="size-3.5 shrink-0 text-primary" />*/}
+          {/*      <span className="max-w-[220px] truncate font-medium text-foreground">{activeHomeChatTitle}</span>*/}
+          {/*      <Button variant="ghost" size="icon-xs" onClick={() => setActiveSession(null)} className="rounded-full">*/}
+          {/*        <X className="size-3" />*/}
+          {/*      </Button>*/}
+          {/*    </div>*/}
+          {/*  </nav>*/}
+          {/*)}*/}
 
-          {viewCfg && !isDefaultArenaView && (
-            <nav className="hidden items-center gap-2 md:flex">
-              <ChevronRight className="size-4 shrink-0 text-muted-foreground/50" />
-              <div className="flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 shadow-[var(--shadow-sm)]">
-                <div className={`flex size-7 items-center justify-center rounded-full ${viewCfg.accent}`}>
-                  <viewCfg.icon className="size-4" />
-                </div>
-                <span className="text-sm font-medium text-foreground">{t(viewCfg.labelKey)}</span>
-                <Button variant="ghost" size="icon-xs" onClick={() => { setMainView('deep-study'); setDeepStudyTab('arena'); }} className="rounded-full">
-                  <X className="size-3" />
-                </Button>
-              </div>
-              {showDeepStudySubTab && (() => {
-                const tabCfg = deepStudyTabConfig[deepStudyTab];
-                const TabIcon = tabCfg.icon;
-                return (
-                  <div className="flex items-center gap-1.5 rounded-full border border-border bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
-                    <TabIcon className="size-3.5" />
-                    {t(tabCfg.labelKey as MessageKey)}
-                  </div>
-                );
-              })()}
-            </nav>
-          )}
+          {/*{viewCfg && !isDefaultArenaView && (*/}
+          {/*  <nav className="hidden items-center gap-2 md:flex">*/}
+          {/*    <ChevronRight className="size-4 shrink-0 text-muted-foreground/50" />*/}
+          {/*    <div className="flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 shadow-[var(--shadow-sm)]">*/}
+          {/*      <div className={`flex size-7 items-center justify-center rounded-full ${viewCfg.accent}`}>*/}
+          {/*        <viewCfg.icon className="size-4" />*/}
+          {/*      </div>*/}
+          {/*      <span className="text-sm font-medium text-foreground">{t(viewCfg.labelKey)}</span>*/}
+          {/*      <Button variant="ghost" size="icon-xs" onClick={() => { setMainView('deep-study'); setDeepStudyTab('arena'); }} className="rounded-full">*/}
+          {/*        <X className="size-3" />*/}
+          {/*      </Button>*/}
+          {/*    </div>*/}
+          {/*    {showDeepStudySubTab && (() => {*/}
+          {/*      const tabCfg = deepStudyTabConfig[deepStudyTab];*/}
+          {/*      const TabIcon = tabCfg.icon;*/}
+          {/*      return (*/}
+          {/*        <div className="flex items-center gap-1.5 rounded-full border border-border bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">*/}
+          {/*          <TabIcon className="size-3.5" />*/}
+          {/*          {t(tabCfg.labelKey as MessageKey)}*/}
+          {/*        </div>*/}
+          {/*      );*/}
+          {/*    })()}*/}
+          {/*  </nav>*/}
+          {/*)}*/}
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true, ctrlKey: true }))}
-            className="hidden gap-1.5 rounded-[10px] text-muted-foreground md:flex"
-          >
-            <Search className="size-3.5" />
-            <kbd className="rounded border border-border bg-muted px-1 py-0.5 text-[10px] font-medium">Ctrl K</kbd>
-          </Button>
+        {/*<div className="flex items-center gap-2">*/}
+        {/*  <Button*/}
+        {/*    variant="outline"*/}
+        {/*    size="sm"*/}
+        {/*    onClick={() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true, ctrlKey: true }))}*/}
+        {/*    className="hidden gap-1.5 rounded-[10px] text-muted-foreground md:flex"*/}
+        {/*  >*/}
+        {/*    <Search className="size-3.5" />*/}
+        {/*    <kbd className="rounded border border-border bg-muted px-1 py-0.5 text-[10px] font-medium">Ctrl K</kbd>*/}
+        {/*  </Button>*/}
 
-          <NotificationBell />
-          <SessionMetrics messages={messages} />
+        {/*  <NotificationBell />*/}
+        {/*  <SessionMetrics messages={messages} />*/}
 
-          {agent && isOwner && (
-            agent.status === 'running' ? (
-              <Button
-                variant="outline"
-                size="icon-sm"
-                onClick={() => stopAgent(agentId!)}
-                title="Stop agent"
-                className="rounded-[10px] text-destructive"
-              >
-                <Square className="size-4" />
-              </Button>
-            ) : (
-              <Button
-                variant="outline"
-                size="icon-sm"
-                onClick={() => startAgent(agentId!)}
-                title="Start agent"
-                className="rounded-[10px] text-[color:var(--success)]"
-              >
-                <Play className="size-4" />
-              </Button>
-            )
-          )}
+        {/*  {agent && isOwner && (*/}
+        {/*    agent.status === 'running' ? (*/}
+        {/*      <Button*/}
+        {/*        variant="outline"*/}
+        {/*        size="icon-sm"*/}
+        {/*        onClick={() => stopAgent(agentId!)}*/}
+        {/*        title="Stop agent"*/}
+        {/*        className="rounded-[10px] text-destructive"*/}
+        {/*      >*/}
+        {/*        <Square className="size-4" />*/}
+        {/*      </Button>*/}
+        {/*    ) : (*/}
+        {/*      <Button*/}
+        {/*        variant="outline"*/}
+        {/*        size="icon-sm"*/}
+        {/*        onClick={() => startAgent(agentId!)}*/}
+        {/*        title="Start agent"*/}
+        {/*        className="rounded-[10px] text-[color:var(--success)]"*/}
+        {/*      >*/}
+        {/*        <Play className="size-4" />*/}
+        {/*      </Button>*/}
+        {/*    )*/}
+        {/*  )}*/}
 
-          {authUser && (
-            <div className="hidden items-center gap-2 xl:flex">
-              <HeaderQuickAction
-                active={mainView === 'deep-study'}
-                onClick={() => {
-                  setActiveTab(null);
-                  setActiveSession(null);
-                  setMainView('deep-study');
-                  setDeepStudyTab('arena');
-                }}
-                icon={GraduationCap}
-                label={t('sidebar.deepStudy')}
-                tone="study"
-              />
-              <HeaderQuickAction
-                active={mainView === 'diary'}
-                onClick={() => {
-                  setActiveTab(null);
-                  setActiveSession(null);
-                  setMainView('diary');
-                }}
-                icon={CalendarDays}
-                label={t('sidebar.diary')}
-                tone="diary"
-              />
-            </div>
-          )}
-        </div>
+        {/*  {authUser && (*/}
+        {/*    <div className="hidden items-center gap-2 xl:flex">*/}
+        {/*      <HeaderQuickAction*/}
+        {/*        active={mainView === 'deep-study'}*/}
+        {/*        onClick={() => {*/}
+        {/*          setActiveTab(null);*/}
+        {/*          setActiveSession(null);*/}
+        {/*          setMainView('deep-study');*/}
+        {/*          setDeepStudyTab('arena');*/}
+        {/*        }}*/}
+        {/*        icon={GraduationCap}*/}
+        {/*        label={t('sidebar.deepStudy')}*/}
+        {/*        tone="study"*/}
+        {/*      />*/}
+        {/*      <HeaderQuickAction*/}
+        {/*        active={mainView === 'diary'}*/}
+        {/*        onClick={() => {*/}
+        {/*          setActiveTab(null);*/}
+        {/*          setActiveSession(null);*/}
+        {/*          setMainView('diary');*/}
+        {/*        }}*/}
+        {/*        icon={CalendarDays}*/}
+        {/*        label={t('sidebar.diary')}*/}
+        {/*        tone="diary"*/}
+        {/*      />*/}
+        {/*    </div>*/}
+        {/*  )}*/}
+        {/*</div>*/}
       </div>
     </header>
   );
