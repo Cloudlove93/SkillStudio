@@ -36,6 +36,7 @@ import {
   Sparkles, Send, Upload, Trash2, FileText, ListChecks, Wrench,
   History, BarChart3, Zap, GitCompare, Clock, CheckCircle2, XCircle, Loader2,
   PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Pencil, X,
+  LogOut,
 } from "lucide-react";
 
 type DetailTab = "agent" | "rubric" | "skills" | "versions" | "report" | "optimization" | "diff";
@@ -82,6 +83,8 @@ async function readTextDocument(file: File): Promise<{ name: string; content: st
 
 export default function LiteArenaPanel() {
   const token = useAuthStore((s) => s.token) || "";
+  const authUser = useAuthStore((s) => s.user);
+  const logout = useAuthStore((s) => s.logout);
   const [packages, setPackages] = useState<AgentPackageSummary[]>([]);
   const [selectedPackageId, setSelectedPackageId] = useState("");
   const [selectedPackage, setSelectedPackage] = useState<AgentPackageDetail | null>(null);
@@ -1262,7 +1265,7 @@ function startResizeLeft(e: React.MouseEvent) {
       {!isWideLayout && (sidebarOpen || rightSidebarOpen) && (
         <button
           type="button"
-          aria-label="鍏抽棴闈㈡澘"
+          aria-label="关闭面板"
           className="absolute inset-0 z-20 bg-background/60 backdrop-blur-sm lg:hidden"
           onClick={() => {
             setSidebarOpen(false);
@@ -1274,14 +1277,33 @@ function startResizeLeft(e: React.MouseEvent) {
       {sidebarOpen ? (
       <>
       <aside style={sidebarStyle} className="absolute inset-y-0 left-0 z-30 flex w-[min(22rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] flex-col border-r border-border/70 bg-card/95 shadow-xl backdrop-blur lg:relative lg:z-auto lg:w-[var(--sidebar-width)] lg:max-w-none lg:bg-card/40 lg:shadow-none lg:backdrop-blur-0">
-        <div className="flex h-12 shrink-0 items-center justify-end border-b border-border/70 px-3">
-          <button
-            onClick={() => setSidebarOpen(false)}
-            className="flex size-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-            title="收起侧边栏"
-          >
-            <PanelLeftClose className="size-4" />
-          </button>
+        <div className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-border/70 px-3">
+          {authUser ? (
+            <div className="flex min-w-0 items-center gap-2">
+              <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-xs font-bold uppercase text-primary">
+                {authUser.username.charAt(0)}
+              </div>
+              <div className="truncate text-xs font-medium text-foreground" title={authUser.username}>{authUser.username}</div>
+            </div>
+          ) : (
+            <div />
+          )}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={logout}
+              className="flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+              title="退出登录"
+            >
+              <LogOut className="size-4" />
+            </button>
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="flex size-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              title="收起侧边栏"
+            >
+              <PanelLeftClose className="size-4" />
+            </button>
+          </div>
         </div>
         <ScrollArea className="flex-1 min-h-0">
           <div className="space-y-4 p-4">
@@ -1309,7 +1331,7 @@ function startResizeLeft(e: React.MouseEvent) {
               {batchRuns.length > 0 && (
                 <div className="space-y-1.5 rounded-xl border border-border/70 bg-card/40 p-2">
                   <div className="flex items-center justify-between px-0.5 text-[11px] text-muted-foreground">
-                    <span>鎵归噺浠诲姟</span>
+                    <span>批量任务</span>
                     <span>{batchRuns.filter((item) => item.status === "done").length}/{batchRuns.length}</span>
                   </div>
                   {batchRuns.map((item) => (
@@ -1611,7 +1633,7 @@ function startResizeLeft(e: React.MouseEvent) {
                             type: "diff",
                             name: `${change.target}${change.targetId ? `/${change.targetId}` : ""} - ${change.reason}`,
                             content: [
-                              `# 宸查噰绾充慨鏀癸細${change.reason}`,
+                              `# 已采纳修改：${change.reason}`,
                               "",
                               "```diff",
                               ...diffLines,
