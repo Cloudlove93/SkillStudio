@@ -1709,7 +1709,7 @@ function startResizeLeft(e: React.MouseEvent) {
                 <Button size="sm" variant="outline" className="rounded-[12px]" onClick={() => void handleReport()} disabled={!threadDetail || threadDetail.messages.length === 0 || arenaMode !== "compare"}><BarChart3 className="mr-1.5 size-3.5" />测评报告</Button>
                 <Button size="sm" variant="outline" className="rounded-[12px]" onClick={() => void startInteractive()} disabled={!thread}>
                   交互式优化
-                  {hasSavedSession && <span className="ml-1 text-[10px] opacity-70">(缁х画)</span>}
+                  {hasSavedSession && <span className="ml-1 text-[10px] opacity-70">(继续)</span>}
                 </Button>
               </div>
             </div>
