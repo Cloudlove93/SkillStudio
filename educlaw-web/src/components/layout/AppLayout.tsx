@@ -2,7 +2,6 @@ import { type ReactNode, useEffect, useState } from 'react';
 import { useUIStore } from '../../stores/ui';
 import { useChatStore } from '../../stores/chat';
 import { useAgentStore, isOwnedAgent } from '../../stores/agent';
-import Header from './Header';
 import AgentList from '../sidebar/AgentList';
 import AgentDetailSections from '../sidebar/AgentDetailSections';
 
@@ -53,8 +52,6 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       <div className="pointer-events-none absolute right-[-8rem] top-12 h-64 w-64 rounded-full bg-[radial-gradient(circle,rgba(55,130,255,0.12),transparent_65%)] blur-3xl animate-float-orb-2" />
 
       <div className="relative z-10 flex h-full flex-col gap-3 p-3 sm:p-4">
-        <Header />
-
         <div className="relative flex min-h-0 flex-1 overflow-hidden rounded-[24px] border border-border/70 bg-background/95 shadow-[var(--shadow-md)]">
           <aside
             className={`relative hidden h-full min-w-0 flex-shrink-0 border-r border-border bg-card/88 transition-all duration-200 lg:flex ${
