@@ -11,6 +11,7 @@ import type {
   PackageVersion,
   UserSummary,
 } from "@educlaw/shared";
+import { ARENA_ROUTES, PACKAGE_ROUTES } from "@educlaw/shared";
 import { API_BASE } from "./client";
 
 export interface DiagnosisIssue {
@@ -192,8 +193,9 @@ async function streamRequest<TEvent>(path: string, init: RequestInit, token: str
 
 export const liteApi = {
   me: (token: string) => request<UserSummary>("/auth/me", {}, token),
-  listPackages: (token: string) => request<AgentPackageSummary[]>("/packages", {}, token),
-  getPackage: (token: string, packageId: string) => request<AgentPackageDetail>(`/packages/${packageId}`, {}, token),
+  listPackages: (token: string) => request<AgentPackageSummary[]>(PACKAGE_ROUTES.LIST, {}, token),
+  getPackage: (token: string, packageId: string) =>
+    request<AgentPackageDetail>(`${PACKAGE_ROUTES.DETAIL}?packageId=${encodeURIComponent(packageId)}`, {}, token),
   renamePackage: (token: string, packageId: string, name: string) =>
     request<AgentPackageDetail>(`/packages/${packageId}`, { method: "PATCH", body: JSON.stringify({ name }) }, token),
   saveManualMarkdownEdit: (token: string, packageId: string, data: { target: "agent" | "skill"; content: string; skillId?: string; note?: string }) =>
@@ -202,11 +204,11 @@ export const liteApi = {
   generatePackageStream: (token: string, instruction: string, model: string | undefined, documents: Array<{ name: string; content: string }>, onEvent: (event: PackageGenerateStreamEvent) => void) =>
     streamRequest<PackageGenerateStreamEvent>("/packages/generate/stream", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ instruction, model, documents }) }, token, onEvent),
   deletePackage: (token: string, packageId: string) => request<{ ok: boolean }>(`/packages/${packageId}`, { method: "DELETE" }, token),
-  listThreads: (token: string, packageId: string) => request<ArenaThread[]>(`/arena/threads?packageId=${encodeURIComponent(packageId)}`, {}, token),
-  createThread: (token: string, packageId: string, model?: string) => request<ArenaThread>("/arena/threads", { method: "POST", body: JSON.stringify({ packageId, model }) }, token),
-  getThread: (token: string, threadId: string) => request<ArenaThreadDetail>(`/arena/threads/${threadId}`, {}, token),
+  listThreads: (token: string, packageId: string) => request<ArenaThread[]>(`${ARENA_ROUTES.THREADS}?packageId=${encodeURIComponent(packageId)}`, {}, token),
+  createThread: (token: string, packageId: string, model?: string) => request<ArenaThread>(ARENA_ROUTES.CREATE_THREAD, { method: "POST", body: JSON.stringify({ packageId, model }) }, token),
+  getThread: (token: string, threadId: string) => request<ArenaThreadDetail>(`${ARENA_ROUTES.THREAD_DETAIL}?threadId=${encodeURIComponent(threadId)}`, {}, token),
   sendMessageStream: (token: string, threadId: string, content: string, model: string | undefined, mode: ArenaMode, onEvent: (event: ArenaMessageStreamEvent) => void) =>
-    streamRequest<ArenaMessageStreamEvent>(`/arena/threads/${threadId}/messages/stream`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content, model, mode }) }, token, onEvent),
+    streamRequest<ArenaMessageStreamEvent>(`${ARENA_ROUTES.MESSAGE_STREAM}?threadId=${encodeURIComponent(threadId)}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content, model, mode }) }, token, onEvent),
   generateReportStream: (token: string, threadId: string, model: string | undefined, onEvent: (event: ReportStreamEvent) => void) =>
     streamRequest<ReportStreamEvent>(`/arena/threads/${threadId}/report/stream`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model }) }, token, onEvent),
   optimizePackageStream: (token: string, packageId: string, threadId: string, model: string | undefined, onEvent: (event: OptimizeStreamEvent) => void) =>

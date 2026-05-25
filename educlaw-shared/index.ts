@@ -1,3 +1,21 @@
+export const AUTH_ROUTES = {
+  REGISTER: "/register",
+  LOGIN: "/login",
+  ME: "/me",
+} as const;
+
+export const PACKAGE_ROUTES = {
+  LIST: "/packages",
+  DETAIL: "/packages/detail",
+} as const;
+
+export const ARENA_ROUTES = {
+  THREADS: "/arena/threads",
+  CREATE_THREAD: "/arena/threads/create",
+  THREAD_DETAIL: "/arena/threads/detail",
+  MESSAGE_STREAM: "/arena/threads/messages/stream",
+} as const;
+
 export interface LoginRequest {
   username: string;
   password: string;

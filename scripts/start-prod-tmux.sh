@@ -245,6 +245,9 @@ main() {
 
   ensure_server_dependencies
 
+  log "Building shared package"
+  pnpm --filter @educlaw/shared build
+
   log "Building backend"
   pnpm --filter educlaw-server build
 
