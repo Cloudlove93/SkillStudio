@@ -197,7 +197,7 @@ export function useChatMessages(
       if (commandName === 'optimize-skill') {
         const skillQuery = args.join(' ').trim();
         if (!skillQuery) {
-          toast.error('闂佽崵濮村ú銈夊床閹绘帪鑰?/optimize-skill 闂備礁鎲￠懝鍓р偓娑掓櫈閵囨劖鎷呴崷顓犳嚌濠电偞鍨堕悷銉ㄧ亣闂備胶鍘ч悿鍥涢崟顖氱畺闁哄洨濮烽惌鎾绘煟濡も偓閻楀棝鎮樺Δ鍛厽闁冲搫锕ら弸娑氱磽瀹ュ懐效鐎?');
+          toast.error('Please provide a skill name after /optimize-skill');
           return;
         }
 
@@ -219,11 +219,11 @@ export function useChatMessages(
           const matches = Array.from(new Map(partialMatches.map((skill) => [skill.dirName, skill])).values());
 
           if (matches.length === 0) {
-            toast.error(`闂備礁鎼悧婊勭濠靛洨鐝舵慨妞诲亾鐎规洘宀搁幃褔宕煎顏咁殜閺屻倝鎼归锝囦紕缂?{skillQuery}`);
+            toast.error(`No matching skill found: ${skillQuery}`);
             return;
           }
           if (matches.length > 1) {
-            toast.error(`闂備胶鎳撻悘姘跺磿閹惰棄鏄ラ悘鐐村劤缁剁偞鎱ㄥ鍡椾喊闁搞倕顑夐弻鐔煎垂濞戞ü澹曢梻浣藉濞呮洟寮搁懡銈嗩潟婵犻潧鐗婄€氭岸鏌у顒€鈧悂鍩㈣箛娑欑厽妞ゎ偒鍓欐俊鑺ョ箾閼艰埖纭堕柛鎺撳浮瀹曟粏顦柍褜鍓氶敃銏ゅ箚閸愵喖绀嬫い鎰剁到閳ь剙纾槐鎺撳緞鐏炵瓔鏆梺鎼炲妸閸旀垿骞嗛崟顖ｆ晩闁兼祴鏅濆崗闂備礁鎲￠懝鍓х矙閸曨厽顫?{matches.slice(0, 5).map((skill) => skill.dirName).join(', ')}`);
+            toast.error(`Multiple matching skills found. Please be more specific: ${matches.slice(0, 5).map((skill) => skill.dirName).join(', ')}`);
             return;
           }
 

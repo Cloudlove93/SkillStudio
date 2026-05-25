@@ -65,10 +65,10 @@ async function readTextDocument(file: File): Promise<{ name: string; content: st
     const mammoth = await import("mammoth");
     const result = await mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() });
     const warnings = result.messages?.map((message) => message.message).filter(Boolean) || [];
-    const warningText = warnings.length ? `\n\n[Word 瑙ｆ瀽鎻愮ず]\n${warnings.map((message) => `- ${message}`).join("\n")}` : "";
+    const warningText = warnings.length ? `\n\n[Word 解析提示]\n${warnings.map((message) => `- ${message}`).join("\n")}` : "";
     return {
       name: file.name,
-      content: `${result.value.trim()}${warningText}`.trim() || "[Word 鏂囨。娌℃湁鎻愬彇鍒板彲鐢ㄦ枃鏈琞",
+      content: `${result.value.trim()}${warningText}`.trim() || "[Word 文档没有提取到可用文本]",
     };
   }
 
@@ -325,7 +325,7 @@ export default function LiteArenaPanel() {
   }
 
   function startProgress(title: string, phase: string) { setProgress({ title, phase, steps: [phase], startedAt: Date.now(), active: true, isError: false }); }
-  function pushProgress(label: string) { setProgress((prev) => prev ? { ...prev, phase: label, steps: prev.steps[prev.steps.length - 1] === label ? prev.steps : [...prev.steps, label] } : { title: "褰撳墠杩涘害", phase: label, steps: [label], startedAt: Date.now(), active: true, isError: false }); }
+  function pushProgress(label: string) { setProgress((prev) => prev ? { ...prev, phase: label, steps: prev.steps[prev.steps.length - 1] === label ? prev.steps : [...prev.steps, label] } : { title: "当前进度", phase: label, steps: [label], startedAt: Date.now(), active: true, isError: false }); }
   function finishProgress(label: string) { setProgress((prev) => prev ? { ...prev, active: false, isError: false, phase: label, steps: prev.steps[prev.steps.length - 1] === label ? prev.steps : [...prev.steps, label] } : null); }
   function failProgress(label: string) { setProgress((prev) => prev ? { ...prev, active: false, isError: true, phase: label, steps: prev.steps[prev.steps.length - 1] === label ? prev.steps : [...prev.steps, label] } : null); }
   function formatElapsed(ms: number) { const total = Math.max(0, Math.floor(ms / 1000)); return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`; }
@@ -513,8 +513,8 @@ function startResizeLeft(e: React.MouseEvent) {
       const preview = await liteApi.importAutoEvalQuestions(token, selectedPackageId, parsed);
       setAutoEvalPreview(preview);
       setSelectedEvalQuestionIds(preview.documentQuestions.slice(0, 3).map((question) => question.id));
-      finishProgress(`宸插鍏?${preview.documentQuestions.length} 閬撴祴璇勯`);
-      setStatus(`宸插鍏?${preview.documentQuestions.length} 閬撴祴璇勯`);
+      finishProgress(`已导入 ${preview.documentQuestions.length} 道测评题`);
+      setStatus(`已导入 ${preview.documentQuestions.length} 道测评题`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "导入测评题失败";
       failProgress(message);
@@ -536,7 +536,7 @@ function startResizeLeft(e: React.MouseEvent) {
         if (event.event === "preview_delta") { setGeneratePreviews((prev) => appendPackagePreviewDelta(prev, event.data)); }
         if (event.event === "preview") { setGeneratePreviews((prev) => upsertPackagePreview(prev, event.data)); }
         if (event.event === "done") { createdId = event.data.id; createdName = event.data.name; }
-        if (event.event === "error") throw new Error(event.data.error || "鐢熸垚澶辫触");
+        if (event.event === "error") throw new Error(event.data.error || "生成失败");
       });
       if (createdId) {
         preserveGenerateProgressRef.current = true;
@@ -544,11 +544,11 @@ function startResizeLeft(e: React.MouseEvent) {
         setDocuments([]);
         await refreshPackages(createdId);
       }
-      const doneLabel = createdName ? `鐢熸垚瀹屾垚锛?{createdName}` : "鐢熸垚瀹屾垚锛屽凡鎵撳紑鏂版櫤鑳戒綋";
+      const doneLabel = createdName ? `生成完成：${createdName}` : "生成完成，已打开新智能体";
       setGeneratePreviews([]);
       finishProgress(doneLabel); setStatus(doneLabel);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "鐢熸垚澶辫触";
+      const message = error instanceof Error ? error.message : "生成失败";
       setGeneratePreviews([]);
       failProgress(message); setStatus(message);
     }
@@ -569,7 +569,7 @@ function startResizeLeft(e: React.MouseEvent) {
 
     setBatchRuns(batchPlan);
     startProgress("生成智能体", batchMode ? `正在逐个处理 ${jobDocuments.length} 个文档...` : "正在生成智能体...");
-    setStatus(batchMode ? `姝ｅ湪閫愪釜澶勭悊 ${jobDocuments.length} 涓枃妗?..` : "姝ｅ湪鐢熸垚鏅鸿兘浣?..");
+    setStatus(batchMode ? `正在逐个处理 ${jobDocuments.length} 个文档...` : "正在生成智能体...");
     setGeneratePreviews([]);
 
     try {
@@ -582,7 +582,7 @@ function startResizeLeft(e: React.MouseEvent) {
           if (event.event === "preview_delta") { setGeneratePreviews((prev) => appendPackagePreviewDelta(prev, event.data)); }
           if (event.event === "preview") { setGeneratePreviews((prev) => upsertPackagePreview(prev, event.data)); }
           if (event.event === "done") { createdId = event.data.id; createdName = event.data.name; }
-          if (event.event === "error") throw new Error(event.data.error || "鐢熸垚澶辫触");
+          if (event.event === "error") throw new Error(event.data.error || "生成失败");
         });
         return { createdId, createdName };
       };
@@ -594,7 +594,7 @@ function startResizeLeft(e: React.MouseEvent) {
           const item = batchPlan[index]!;
           const sourceDoc = jobDocuments[index]!;
           updateBatchRun(item.id, { status: "running" });
-          setStatus(`姝ｅ湪鐢熸垚 ${sourceDoc.name}...`);
+          setStatus(`正在生成 ${sourceDoc.name}...`);
           try {
             const result = await runGenerateJob([sourceDoc]);
             if (result.createdId) {
@@ -606,13 +606,13 @@ function startResizeLeft(e: React.MouseEvent) {
               });
             } else {
               failureCount += 1;
-              updateBatchRun(item.id, { status: "error", error: "鏈敓鎴愬嚭缁撴灉" });
+              updateBatchRun(item.id, { status: "error", error: "未生成出结果" });
             }
           } catch (error) {
             failureCount += 1;
             updateBatchRun(item.id, {
               status: "error",
-              error: error instanceof Error ? error.message : "鐢熸垚澶辫触",
+              error: error instanceof Error ? error.message : "生成失败",
             });
           }
         }
@@ -635,11 +635,11 @@ function startResizeLeft(e: React.MouseEvent) {
         setDocuments([]);
         await refreshPackages(createdId);
       }
-      const doneLabel = createdName ? `鐢熸垚瀹屾垚锛?{createdName}` : "鐢熸垚瀹屾垚锛屽凡鎵撳紑鏂版櫤鑳戒綋";
+      const doneLabel = createdName ? `生成完成：${createdName}` : "生成完成，已打开新智能体";
       setGeneratePreviews([]);
       finishProgress(doneLabel); setStatus(doneLabel);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "鐢熸垚澶辫触";
+      const message = error instanceof Error ? error.message : "生成失败";
       setGeneratePreviews([]);
       failProgress(message); setStatus(message);
     }
@@ -647,13 +647,13 @@ function startResizeLeft(e: React.MouseEvent) {
 
   async function handleImport(file: File) {
     if (!token) return;
-    startProgress("瀵煎叆 ZIP", "姝ｅ湪瀵煎叆..."); setStatus("姝ｅ湪瀵煎叆...");
+    startProgress("导入 ZIP", "正在导入..."); setStatus("正在导入...");
     try {
       const created = await liteApi.importPackage(token, file);
       await refreshPackages(created.id);
-      finishProgress("瀵煎叆鎴愬姛"); setStatus("瀵煎叆鎴愬姛");
+      finishProgress("导入成功"); setStatus("导入成功");
     } catch (error) {
-      const message = error instanceof Error ? error.message : "瀵煎叆澶辫触";
+      const message = error instanceof Error ? error.message : "导入失败";
       failProgress(message); setStatus(message);
     }
   }
@@ -750,13 +750,13 @@ function startResizeLeft(e: React.MouseEvent) {
   async function handleOptimize() {
     if (!token || !thread?.id || !selectedPackageId) return;
     const currentPkgId = selectedPackageId;
-    startProgress("鎵ц浼樺寲", "姝ｅ湪杩愯涓撳浼樺寲..."); setStatus("姝ｅ湪浼樺寲...");
+    startProgress("执行优化", "正在运行专家优化..."); setStatus("正在优化...");
     try {
       let result: OptimizationResult | null = null;
       await liteApi.optimizePackageStream(token, currentPkgId, thread.id, undefined, (event) => {
         if (event.event === "phase") { pushProgress(event.data.label); setStatus(event.data.label); }
         if (event.event === "done") result = event.data;
-        if (event.event === "error") throw new Error(event.data.error || "浼樺寲澶辫触");
+        if (event.event === "error") throw new Error(event.data.error || "优化失败");
       });
       if (result) {
         await refreshPackages(currentPkgId);
@@ -765,9 +765,9 @@ function startResizeLeft(e: React.MouseEvent) {
           setOptimization(result);
         }
       }
-      finishProgress("浼樺寲瀹屾垚"); setStatus("浼樺寲瀹屾垚");
+      finishProgress("优化完成"); setStatus("优化完成");
     } catch (error) {
-      const message = error instanceof Error ? error.message : "浼樺寲澶辫触";
+      const message = error instanceof Error ? error.message : "优化失败";
       failProgress(message); setStatus(message);
     }
   }
@@ -775,13 +775,13 @@ function startResizeLeft(e: React.MouseEvent) {
   async function handleDelete() {
     const deletingId = selectedPackageIdRef.current || selectedPackageId;
     if (!token || !deletingId) return;
-    if (!window.confirm("纭畾瑕佸垹闄ゅ綋鍓嶆櫤鑳戒綋鍚楋紵")) return;
+    if (!window.confirm("确定要删除当前智能体吗？")) return;
     clearWorkspaceState();
     setPackages((prev) => prev.filter((item) => item.id !== deletingId));
     try {
       await liteApi.deletePackage(token, deletingId);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "鍒犻櫎澶辫触";
+      const message = error instanceof Error ? error.message : "删除失败";
       failProgress(message);
       setStatus(message);
       await refreshPackages(deletingId);
@@ -853,12 +853,12 @@ function startResizeLeft(e: React.MouseEvent) {
 
   function validateManualEdit(edit: ManualEditState) {
     const content = edit.content.trim();
-    if (!content) return "缂栬緫鍐呭涓嶈兘涓虹┖";
+    if (!content) return "编辑内容不能为空";
     if (edit.target === "skill") {
       const frontmatter = content.match(/^---\s*\n([\s\S]*?)\n---/);
       if (!frontmatter) return "SKILL.md 必须保留顶部的 YAML 元信息";
-      if (!/^name\s*:/m.test(frontmatter[1])) return "SKILL.md 鐨?YAML 鍏冧俊鎭噷蹇呴』鍖呭惈 name";
-      if (!/^description\s*:/m.test(frontmatter[1])) return "SKILL.md 鐨?YAML 鍏冧俊鎭噷蹇呴』鍖呭惈 description";
+      if (!/^name\s*:/m.test(frontmatter[1])) return "SKILL.md 的 YAML 元信息里必须包含 name";
+      if (!/^description\s*:/m.test(frontmatter[1])) return "SKILL.md 的 YAML 元信息里必须包含 description";
     }
     return "";
   }
@@ -875,7 +875,7 @@ function startResizeLeft(e: React.MouseEvent) {
     if (note === null) return;
 
     setManualEditSaving(true);
-    startProgress("淇濆瓨鎵嬪姩缂栬緫", "姝ｅ湪淇濆瓨涓烘柊鐗堟湰...");
+    startProgress("保存手动编辑", "正在保存为新版本...");
     try {
       const detail = await liteApi.saveManualMarkdownEdit(token, selectedPackageId, {
         target: manualEdit.target,
@@ -887,10 +887,10 @@ function startResizeLeft(e: React.MouseEvent) {
       await refreshPackages(detail.id);
       setManualEdit(null);
       setDetailTab("versions");
-      finishProgress(`宸蹭繚瀛樹负鏂扮増鏈?v${detail.versionNumber}`);
-      setStatus(`宸蹭繚瀛樹负鏂扮増鏈?v${detail.versionNumber}`);
+      finishProgress(`已保存为新版本 v${detail.versionNumber}`);
+      setStatus(`已保存为新版本 v${detail.versionNumber}`);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "淇濆瓨澶辫触";
+      const message = error instanceof Error ? error.message : "保存失败";
       failProgress(message);
       setStatus(message);
     } finally {
@@ -916,10 +916,10 @@ function startResizeLeft(e: React.MouseEvent) {
     setInteractiveAdopted([]);
     startProgress("交互式优化", "正在初始化分析...");
     const stepTimers: number[] = [];
-    stepTimers.push(window.setTimeout(() => pushProgress("姝ｅ湪璇诲彇鏅鸿兘浣撳唴瀹?.."), 600));
-    stepTimers.push(window.setTimeout(() => pushProgress("姝ｅ湪鍒嗘瀽 Arena 瀵硅瘽杞ㄨ抗..."), 1800));
-    stepTimers.push(window.setTimeout(() => pushProgress("姝ｅ湪璇嗗埆娼滃湪浼樺寲闂..."), 4000));
-    stepTimers.push(window.setTimeout(() => pushProgress("姝ｅ湪鐢熸垚浼樺寲寤鸿..."), 7000));
+    stepTimers.push(window.setTimeout(() => pushProgress("正在读取智能体内容..."), 600));
+    stepTimers.push(window.setTimeout(() => pushProgress("正在分析 Arena 对话轨迹..."), 1800));
+    stepTimers.push(window.setTimeout(() => pushProgress("正在识别潜在优化问题..."), 4000));
+    stepTimers.push(window.setTimeout(() => pushProgress("正在生成优化建议..."), 7000));
     const currentPkgId = selectedPackageId;
     try {
       const result = await liteApi.diagnosePackage(token, currentPkgId, thread.id);
@@ -939,8 +939,8 @@ function startResizeLeft(e: React.MouseEvent) {
       finishProgress(`分析完成，发现 ${result.issues.length} 个问题`);
     } catch (error) {
       stepTimers.forEach((id) => window.clearTimeout(id));
-      const message = error instanceof Error ? error.message : "璇婃柇澶辫触";
-      const errorMsg = { role: "assistant", content: `鉂?璇婃柇澶辫触锛?{message}` };
+      const message = error instanceof Error ? error.message : "诊断失败";
+      const errorMsg = { role: "assistant", content: `诊断失败：${message}` };
       saveInteractiveState(currentPkgId, [errorMsg], [], []);
       if (selectedPackageIdRef.current === currentPkgId) {
         setInteractiveMode(true);
@@ -1019,8 +1019,8 @@ function startResizeLeft(e: React.MouseEvent) {
       }
       finishProgress("专家已回复");
     } catch (error) {
-      const message = error instanceof Error ? error.message : "瀵硅瘽澶辫触";
-      const errorMessages = [...messagesWithUser, { role: "assistant", content: `鉂?瀵硅瘽澶辫触锛?{message}` }];
+      const message = error instanceof Error ? error.message : "对话失败";
+      const errorMessages = [...messagesWithUser, { role: "assistant", content: `对话失败：${message}` }];
       saveInteractiveState(currentPkgId, errorMessages, latestAdopted, latestIssues);
       if (selectedPackageIdRef.current === currentPkgId) {
         setInteractiveMessages(errorMessages);
@@ -1039,7 +1039,7 @@ function startResizeLeft(e: React.MouseEvent) {
     const currentAdopted = interactiveAdopted;
     const note = window.prompt("请输入新版本备注（可选）：");
     if (note === null) return; // cancelled
-    startProgress("淇濆瓨淇敼", "姝ｅ湪搴旂敤淇敼骞剁敓鎴愭柊鐗堟湰...");
+    startProgress("保存修改", "正在应用修改并生成新版本...");
     try {
       const result = await liteApi.applyInteractiveChanges(token, currentPkgId, interactiveSessionId || undefined, currentAdopted, note);
       await refreshPackages(currentPkgId);
@@ -1051,22 +1051,22 @@ function startResizeLeft(e: React.MouseEvent) {
         setOptimization(null);
         setDetailTab("optimization");
       }
-      finishProgress(`宸蹭繚瀛樹负鏂扮増鏈?v${result.versionNumber}`);
+      finishProgress(`已保存为新版本 v${result.versionNumber}`);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "淇濆瓨澶辫触";
+      const message = error instanceof Error ? error.message : "保存失败";
       failProgress(message);
     }
   }
 
   async function handleUpdateNote(versionId: string, currentNote: string) {
     if (!token || !selectedPackageId) return;
-    const note = window.prompt("璇疯緭鍏ョ増鏈娉細", currentNote);
+    const note = window.prompt("请输入版本备注：", currentNote);
     if (note === null) return;
     try {
       await liteApi.updateVersionNote(token, selectedPackageId, versionId, note);
       await refreshPackages(selectedPackageId);
     } catch (error) {
-      alert(error instanceof Error ? error.message : "鏇存柊澶囨敞澶辫触");
+      alert(error instanceof Error ? error.message : "更新备注失败");
     }
   }
 
@@ -1225,11 +1225,11 @@ function startResizeLeft(e: React.MouseEvent) {
 
   function buildDiffMarkdown(result: VersionCompareResult): string {
     const lines: string[] = [
-      `# 鐗堟湰瀵规瘮锛歷${result.baseVersion.versionNumber} 鈫?v${result.targetVersion.versionNumber}`,
+      `# 版本对比：v${result.baseVersion.versionNumber} -> v${result.targetVersion.versionNumber}`,
       "",
-      "## 馃 AI 鎬荤粨",
+      "## AI 总结",
       "",
-      result.summary || "鏆傛棤鎬荤粨",
+      result.summary || "暂无总结",
       "",
       "---",
       "",
@@ -1286,8 +1286,8 @@ function startResizeLeft(e: React.MouseEvent) {
         <ScrollArea className="flex-1 min-h-0">
           <div className="space-y-4 p-4">
             <div className="space-y-2">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">鐢熸垚 Agent / Skill</div>
-              <Textarea value={instruction} onChange={(e) => setInstruction(e.target.value)} placeholder="杈撳叆闇€姹傛弿杩帮紝鎴栫洿鎺ヤ笂浼犳枃妗ｈ AI 鑷姩鐢熸垚..." rows={3} className="resize-none rounded-[14px] border-border/70 bg-card/80 text-xs" />
+              <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">生成 Agent / Skill</div>
+              <Textarea value={instruction} onChange={(e) => setInstruction(e.target.value)} placeholder="输入需求描述，或直接上传文档让 AI 自动生成..." rows={3} className="resize-none rounded-[14px] border-border/70 bg-card/80 text-xs" />
               {documents.length > 0 && (
                 <div className="space-y-1.5">
                   {documents.map((doc, i) => (
@@ -1329,7 +1329,7 @@ function startResizeLeft(e: React.MouseEvent) {
                           {item.status === "waiting" && "等待中"}
                           {item.status === "running" && "生成中"}
                           {item.status === "done" && "已完成"}
-                          {item.status === "error" && "澶辫触"}
+                          {item.status === "error" && "失败"}
                         </span>
                       </div>
                     </div>
@@ -1337,16 +1337,16 @@ function startResizeLeft(e: React.MouseEvent) {
                 </div>
               )}
               <div className="flex flex-wrap gap-2">
-                <Button size="sm" className="flex-1 min-w-[4rem] rounded-[12px]" onClick={() => void handleGeneratePackages()} disabled={!instruction.trim() && documents.length === 0}><Sparkles className="mr-1.5 size-3.5" />{documents.length > 1 ? "鎵归噺鐢熸垚" : "鐢熸垚"}</Button>
-                <Button size="sm" variant="outline" className="flex-1 min-w-[4rem] rounded-[12px]" onClick={() => docFileRef.current?.click()}><FileText className="mr-1.5 size-3.5" />鏂囨。</Button>
+                <Button size="sm" className="flex-1 min-w-[4rem] rounded-[12px]" onClick={() => void handleGeneratePackages()} disabled={!instruction.trim() && documents.length === 0}><Sparkles className="mr-1.5 size-3.5" />{documents.length > 1 ? "批量生成" : "生成"}</Button>
+                <Button size="sm" variant="outline" className="flex-1 min-w-[4rem] rounded-[12px]" onClick={() => docFileRef.current?.click()}><FileText className="mr-1.5 size-3.5" />文档</Button>
                 <input ref={docFileRef} type="file" multiple accept=".txt,.md,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.csv,.json,.yaml,.yml,.js,.ts,.py,.html,.css" hidden onChange={(e) => { void handleDocFiles(e.target.files); e.currentTarget.value = ""; }} />
-                <Button size="sm" variant="outline" className="flex-1 min-w-[4rem] rounded-[12px]" onClick={() => fileRef.current?.click()}><Upload className="mr-1.5 size-3.5" />瀵煎叆</Button>
+                <Button size="sm" variant="outline" className="flex-1 min-w-[4rem] rounded-[12px]" onClick={() => fileRef.current?.click()}><Upload className="mr-1.5 size-3.5" />导入</Button>
                 <input ref={fileRef} type="file" accept=".zip" hidden onChange={(e) => { const file = e.target.files?.[0]; if (file) void handleImport(file); }} />
               </div>
             </div>
             <div className="h-px bg-border/70" />
             <div className="space-y-2">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">浠撳簱 ({packages.length})</div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">仓库 ({packages.length})</div>
               <div className="space-y-1.5">
                 {packages.map((pkg) => (
                   <div key={pkg.id} className={`flex w-full items-center gap-2 rounded-xl border px-2 py-2 transition-colors ${pkg.id === selectedPackageId ? "border-primary/30 bg-primary/5" : "border-transparent hover:bg-muted"}`}>
@@ -1395,17 +1395,17 @@ function startResizeLeft(e: React.MouseEvent) {
           <>
             <div className="flex min-h-12 shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border/70 bg-card/40 px-14 py-2 lg:px-5">
               <div className="flex min-w-0 items-center gap-3">
-                <div className="truncate text-sm font-semibold">缂栬緫 {manualEdit.title}</div>
+                <div className="truncate text-sm font-semibold">编辑 {manualEdit.title}</div>
                 <div className="hidden text-xs text-muted-foreground sm:block">保存后会生成新版本</div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <Button size="sm" variant="outline" className="rounded-[12px]" onClick={() => setManualEdit((prev) => prev ? { ...prev, preview: !prev.preview } : prev)}>
-                  {manualEdit.preview ? "缁х画缂栬緫" : "棰勮"}
+                  {manualEdit.preview ? "继续编辑" : "预览"}
                 </Button>
-                <Button size="sm" variant="outline" className="rounded-[12px]" onClick={() => setManualEdit(null)} disabled={manualEditSaving}>鍙栨秷</Button>
+                <Button size="sm" variant="outline" className="rounded-[12px]" onClick={() => setManualEdit(null)} disabled={manualEditSaving}>取消</Button>
                 <Button size="sm" className="rounded-[12px]" onClick={() => void saveManualEdit()} disabled={manualEditSaving || !manualEdit.content.trim()}>
                   {manualEditSaving && <Loader2 className="mr-1.5 size-3.5 animate-spin" />}
-                  淇濆瓨涓烘柊鐗堟湰
+                  保存为新版本
                 </Button>
               </div>
             </div>
@@ -1437,7 +1437,7 @@ function startResizeLeft(e: React.MouseEvent) {
                 {interactiveAdopted.length > 0 && (
                   <span className="text-[10px] text-muted-foreground">{interactiveAdopted.length} 椤瑰凡閲囩撼</span>
                 )}
-                <Button size="sm" variant="ghost" className="rounded-[12px] text-muted-foreground hover:text-foreground" onClick={() => setInteractiveMode(false)}>鉁?鍏抽棴</Button>
+                <Button size="sm" variant="ghost" className="rounded-[12px] text-muted-foreground hover:text-foreground" onClick={() => setInteractiveMode(false)}>关闭</Button>
                 <Button size="sm" variant="outline" className="rounded-[12px] text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => {
                   if (window.confirm("确定要重新开始吗？当前对话和已采纳的修改将被清空。")) {
                     if (selectedPackageId) {
@@ -1455,16 +1455,16 @@ function startResizeLeft(e: React.MouseEvent) {
                     if (window.confirm(`确认将以下修改保存为新版本？\n\n${list}\n\n保存后将生成新版本并退出交互式优化。`)) {
                       void saveInteractiveChanges();
                     }
-                  }}>淇濆瓨</Button>
+                  }}>保存</Button>
                 )}
               </div>
             </div>
             <div className="flex shrink-0 gap-1 border-b border-border/70 bg-card/30 px-3 py-2 sm:px-5">
               {[
-                { key: "chat" as const, label: "褰撳墠瀵硅瘽" },
-                { key: "issues" as const, label: `涓撳寤鸿 ${interactiveIssues.length || ""}` },
-                { key: "adopted" as const, label: `宸查噰绾?${interactiveAdopted.length || ""}` },
-                { key: "history" as const, label: `鍘嗗彶 ${interactiveSessions.length || ""}` },
+                { key: "chat" as const, label: "当前对话" },
+                { key: "issues" as const, label: `专家建议 ${interactiveIssues.length || ""}` },
+                { key: "adopted" as const, label: `已采纳 ${interactiveAdopted.length || ""}` },
+                { key: "history" as const, label: `历史 ${interactiveSessions.length || ""}` },
               ].map((item) => (
                 <button
                   key={item.key}
@@ -1486,7 +1486,7 @@ function startResizeLeft(e: React.MouseEvent) {
                       <div className="mt-2 rounded-lg bg-muted/60 p-2 text-xs leading-5">{issue.suggestion}</div>
                     </div>
                   ))}
-                  {interactiveIssues.length === 0 && <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">鏆傛棤涓撳寤鸿</div>}
+                  {interactiveIssues.length === 0 && <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">暂无专家建议</div>}
                 </div>
               )}
               {interactiveView === "adopted" && (
@@ -1498,7 +1498,7 @@ function startResizeLeft(e: React.MouseEvent) {
                         const diffs = computeLineDiff(change.original, change.modified);
                         const diffLines = diffs.map((d) => d.type === "same" ? ` ${d.text}` : d.type === "removed" ? `-${d.text}` : `+${d.text}`);
                         setInteractiveMode(false);
-                        setCenterPreview({ type: "diff", name: `${change.target}${change.targetId ? `/${change.targetId}` : ""} 鈥?${change.reason}`, content: [`# 宸查噰绾充慨鏀癸細${change.reason}`, "", "```diff", ...diffLines, "```"].join("\n") });
+                        setCenterPreview({ type: "diff", name: `${change.target}${change.targetId ? `/${change.targetId}` : ""} - ${change.reason}`, content: [`# 已采纳修改：${change.reason}`, "", "```diff", ...diffLines, "```"].join("\n") });
                       }}
                       className="block w-full rounded-[18px] border border-border/70 bg-card/70 p-4 text-left text-sm hover:border-primary/30 hover:bg-primary/5"
                     >
@@ -1523,7 +1523,7 @@ function startResizeLeft(e: React.MouseEvent) {
                         <div className="font-medium">{session.status === "saved" ? "已保存优化" : "进行中的优化"}</div>
                         <div className="text-xs text-muted-foreground">{new Date(session.updatedAt).toLocaleString()}</div>
                       </div>
-                      <div className="mt-2 text-xs leading-5 text-muted-foreground">{session.summary || "鏆傛棤鎬荤粨"}</div>
+                      <div className="mt-2 text-xs leading-5 text-muted-foreground">{session.summary || "暂无总结"}</div>
                       <div className="mt-2 flex gap-2 text-[10px] text-muted-foreground">
                         <span>{session.issues.length} 条建议</span>
                         <span>{session.adoptedChanges.length} 项采纳</span>
@@ -1553,30 +1553,30 @@ function startResizeLeft(e: React.MouseEvent) {
               {interactiveView === "chat" && interactivePhase !== "idle" && (
                 <div className="flex justify-start">
                   <div className="w-full max-w-[94%] sm:max-w-[90%]">
-                    <div className="text-xs font-medium text-muted-foreground mb-1.5 pl-1">馃帗 浼樺寲涓撳</div>
+                    <div className="text-xs font-medium text-muted-foreground mb-1.5 pl-1">优化专家</div>
                     {interactivePhase === "diagnosing" ? (
                       <div className="rounded-2xl px-5 py-4 text-sm bg-muted/70 border border-border/60 rounded-tl-sm shadow-sm">
                         <div className="space-y-3">
                           <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
                             <Loader2 className="size-4 animate-spin" />
-                            <span>棣栨鍒嗘瀽闇€瑕?10-30 绉掞紝璇风◢鍊?..</span>
+                            <span>首次分析需要 10-30 秒，请稍候...</span>
                           </div>
                           <div className="text-xs text-muted-foreground space-y-1.5">
                             <div className="flex items-center gap-2">
                               <span className="inline-flex size-4 items-center justify-center rounded-full bg-primary/20 text-primary text-[10px]">1</span>
-                              璇诲彇鏅鸿兘浣撳唴瀹?
+                              读取智能体内容
                             </div>
                             <div className="flex items-center gap-2">
                               <span className="inline-flex size-4 items-center justify-center rounded-full bg-primary/20 text-primary text-[10px]">2</span>
-                              鍒嗘瀽 Arena 瀵硅瘽杞ㄨ抗
+                              分析 Arena 对话轨迹
                             </div>
                             <div className="flex items-center gap-2">
                               <span className="inline-flex size-4 items-center justify-center rounded-full bg-primary/20 text-primary text-[10px]">3</span>
-                              璇嗗埆娼滃湪浼樺寲闂
+                              识别潜在优化问题
                             </div>
                             <div className="flex items-center gap-2">
                               <span className="inline-flex size-4 items-center justify-center rounded-full bg-muted text-muted-foreground text-[10px]">4</span>
-                              鐢熸垚璇婃柇鎶ュ憡
+                              生成诊断报告
                             </div>
                           </div>
                         </div>
@@ -1584,7 +1584,7 @@ function startResizeLeft(e: React.MouseEvent) {
                     ) : (
                       <div className="rounded-2xl px-4 py-3 text-sm bg-muted/70 border border-border/60 rounded-tl-sm shadow-sm">
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <Loader2 className="size-3 animate-spin" />涓撳姝ｅ湪鎬濊€?..
+                          <Loader2 className="size-3 animate-spin" />专家正在思考...
                         </div>
                       </div>
                     )}
@@ -1596,7 +1596,7 @@ function startResizeLeft(e: React.MouseEvent) {
               <div className="shrink-0 border-t border-border/70 bg-card/40">
                 <div className="px-5 py-2.5">
                   <div className="flex items-center justify-between mb-2">
-                    <div className="text-[11px] font-medium text-muted-foreground">馃搵 宸查噰绾崇殑淇敼 ({interactiveAdopted.length})</div>
+                    <div className="text-[11px] font-medium text-muted-foreground">已采纳的修改 ({interactiveAdopted.length})</div>
                     <div className="text-[10px] text-primary/80">点击“保存”后会生成新版本</div>
                   </div>
                   <div className="flex gap-2 overflow-x-auto pb-1">
@@ -1609,7 +1609,7 @@ function startResizeLeft(e: React.MouseEvent) {
                           const diffLines = diffs.map((d) => d.type === "same" ? ` ${d.text}` : d.type === "removed" ? `-${d.text}` : `+${d.text}`);
                           setCenterPreview({
                             type: "diff",
-                            name: `${change.target}${change.targetId ? `/${change.targetId}` : ""} 鈥?${change.reason}`,
+                            name: `${change.target}${change.targetId ? `/${change.targetId}` : ""} - ${change.reason}`,
                             content: [
                               `# 宸查噰绾充慨鏀癸細${change.reason}`,
                               "",
@@ -1633,7 +1633,7 @@ function startResizeLeft(e: React.MouseEvent) {
             )}
             <div className="shrink-0 border-t border-border/70 bg-card/40 p-3 sm:p-4">
               <div className="flex flex-col gap-3 sm:flex-row">
-                <Textarea value={interactiveInput} onChange={(e) => setInteractiveInput(e.target.value)} placeholder="杈撳叆娑堟伅涓庝笓瀹跺璇?.." rows={2} className="min-h-[56px] resize-none rounded-[14px] border-border/70 bg-card/80" onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void sendInteractiveMessage(); } }} />
+                <Textarea value={interactiveInput} onChange={(e) => setInteractiveInput(e.target.value)} placeholder="输入消息与专家对话..." rows={2} className="min-h-[56px] resize-none rounded-[14px] border-border/70 bg-card/80" onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void sendInteractiveMessage(); } }} />
                 <Button className="h-10 w-full rounded-[12px] px-5 sm:w-auto sm:self-end" onClick={() => void sendInteractiveMessage()} disabled={interactivePhase !== "idle" || !interactiveInput.trim()}><Send className="mr-1.5 size-4" />发送</Button>
               </div>
             </div>
@@ -1642,7 +1642,7 @@ function startResizeLeft(e: React.MouseEvent) {
           <>
             <div className="flex min-h-12 shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border/70 bg-card/40 px-14 py-2 lg:px-5">
               <div className="flex min-w-0 items-center gap-3">
-                <div className="truncate text-sm font-semibold">馃憗 {centerPreview.name}</div>
+                <div className="truncate text-sm font-semibold">{centerPreview.name}</div>
                 <div className="hidden text-xs text-muted-foreground sm:block">中间预览</div>
               </div>
               <div className="flex items-center gap-2">
@@ -1688,14 +1688,14 @@ function startResizeLeft(e: React.MouseEvent) {
                     </button>
                   )}
                 </div>
-                <div className="hidden text-xs text-muted-foreground sm:block">杈撳叆闂锛屾祴璇曟櫤鑳戒綋鏁堟灉</div>
+                <div className="hidden text-xs text-muted-foreground sm:block">输入问题，测试智能体效果</div>
               </div>
               <div className="flex flex-wrap items-center justify-end gap-2">
                 <div className="inline-flex rounded-[12px] border border-border/70 bg-muted/40 p-0.5">
                   {[
-                    { key: "compare" as const, label: "瀵规瘮" },
+                    { key: "compare" as const, label: "对比" },
                     { key: "agent" as const, label: "智能体" },
-                    { key: "baseline" as const, label: "鍩虹" },
+                    { key: "baseline" as const, label: "基础" },
                   ].map((mode) => (
                     <button
                       key={mode.key}
@@ -1706,9 +1706,9 @@ function startResizeLeft(e: React.MouseEvent) {
                     </button>
                   ))}
                 </div>
-                <Button size="sm" variant="outline" className="rounded-[12px]" onClick={() => void handleReport()} disabled={!threadDetail || threadDetail.messages.length === 0 || arenaMode !== "compare"}><BarChart3 className="mr-1.5 size-3.5" />璇勪及鎶ュ憡</Button>
+                <Button size="sm" variant="outline" className="rounded-[12px]" onClick={() => void handleReport()} disabled={!threadDetail || threadDetail.messages.length === 0 || arenaMode !== "compare"}><BarChart3 className="mr-1.5 size-3.5" />测评报告</Button>
                 <Button size="sm" variant="outline" className="rounded-[12px]" onClick={() => void startInteractive()} disabled={!thread}>
-                  馃挰 浜や簰寮忎紭鍖?
+                  交互式优化
                   {hasSavedSession && <span className="ml-1 text-[10px] opacity-70">(缁х画)</span>}
                 </Button>
               </div>
@@ -1763,7 +1763,7 @@ function startResizeLeft(e: React.MouseEvent) {
       <aside style={detailStyle} className="absolute inset-y-0 right-0 z-30 flex w-[min(24rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] flex-col border-l border-border/70 bg-card/95 shadow-xl backdrop-blur lg:relative lg:z-auto lg:w-[var(--detail-width)] lg:max-w-none lg:bg-card/40 lg:shadow-none lg:backdrop-blur-0">
         <div className="flex min-h-12 shrink-0 items-center justify-between gap-2 border-b border-border/70 px-3 py-2 sm:px-4">
           <div className="flex min-w-0 items-center gap-1.5">
-            <div className="min-w-0 truncate text-sm font-semibold">{selectedPackage?.name || "鏈€夋嫨"}</div>
+            <div className="min-w-0 truncate text-sm font-semibold">{selectedPackage?.name || "未选择"}</div>
             {selectedPackage && (
               <button
                 onClick={() => void handleRenamePackage(selectedPackage.id, selectedPackage.name)}
@@ -1775,12 +1775,12 @@ function startResizeLeft(e: React.MouseEvent) {
             )}
           </div>
           <div className="flex shrink-0 items-center gap-1">
-            <Button size="sm" variant="outline" className="h-7 text-xs rounded-[8px]" onClick={() => void handleExport()} disabled={!selectedPackageId}>瀵煎嚭</Button>
+            <Button size="sm" variant="outline" className="h-7 text-xs rounded-[8px]" onClick={() => void handleExport()} disabled={!selectedPackageId}>导出</Button>
             <Button size="icon" variant="ghost" className="size-7 rounded-[10px] text-destructive hover:text-destructive" onClick={() => void handleDelete()} disabled={!selectedPackageId}><Trash2 className="size-3.5" /></Button>
             <button
               onClick={() => setRightSidebarOpen(false)}
               className="flex size-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-              title="鏀惰捣鍙充晶闈㈡澘"
+              title="收起右侧面板"
             >
               <PanelRightClose className="size-4" />
             </button>
@@ -1791,12 +1791,12 @@ function startResizeLeft(e: React.MouseEvent) {
             { key: "agent" as DetailTab, label: "Agent", icon: FileText },
             { key: "rubric" as DetailTab, label: "Rubric", icon: ListChecks },
             { key: "skills" as DetailTab, label: "Skills", icon: Wrench },
-            { key: "versions" as DetailTab, label: "鐗堟湰", icon: GitCompare },
-            { key: "report" as DetailTab, label: "鎶ュ憡", icon: BarChart3 },
+            { key: "versions" as DetailTab, label: "版本", icon: GitCompare },
+            { key: "report" as DetailTab, label: "报告", icon: BarChart3 },
           ].map((tab) => (
             <button key={tab.key} onClick={() => {
               if (interactiveMode) {
-                if (!window.confirm('鍒囨崲鏍囩灏嗘殏鏃堕€€鍑轰氦浜掑紡浼樺寲妯″紡锛屽凡閲囩撼鐨勪慨鏀逛笉浼氫涪澶便€傛槸鍚︾户缁紵')) return;
+                if (!window.confirm("切换标签将暂时退出交互式优化模式，已采纳的修改不会丢失。是否继续？")) return;
                 setInteractiveMode(false);
               }
               setDetailTab(tab.key);
@@ -1807,15 +1807,15 @@ function startResizeLeft(e: React.MouseEvent) {
         </div>
         <div className="flex-1 min-h-0 overflow-y-auto">
           <div className="space-y-4 p-3 sm:p-4">
-              {!selectedPackage && <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">璇烽€夋嫨涓€涓櫤鑳戒綋</div>}
+              {!selectedPackage && <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">请选择一个智能体</div>}
 
               {selectedPackage && detailTab === "agent" && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">agent.md</div>
                     <div className="flex items-center gap-2">
-                      <button onClick={startManualEditAgent} className="text-[10px] text-primary hover:underline">缂栬緫</button>
-                      <button onClick={() => setCenterPreview({ type: "agent", name: "agent.md", content: selectedPackage.snapshot.agentMd })} className="text-[10px] text-primary hover:underline">馃憗 鍦ㄤ腑闂存墦寮€</button>
+                      <button onClick={startManualEditAgent} className="text-[10px] text-primary hover:underline">编辑</button>
+                      <button onClick={() => setCenterPreview({ type: "agent", name: "agent.md", content: selectedPackage.snapshot.agentMd })} className="text-[10px] text-primary hover:underline">在中间打开</button>
                     </div>
                   </div>
                   <div className="rounded-[20px] border border-border/70 bg-muted/50 p-4 text-sm cursor-pointer hover:border-primary/30 transition-colors overflow-auto max-h-[60vh]" onClick={() => setCenterPreview({ type: "agent", name: "agent.md", content: selectedPackage.snapshot.agentMd })}>
@@ -1828,7 +1828,7 @@ function startResizeLeft(e: React.MouseEvent) {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">rubric.md</div>
-                    <button onClick={() => setCenterPreview({ type: "rubric", name: "rubric.md", content: selectedPackage.snapshot.rubricMd })} className="text-[10px] text-primary hover:underline">馃憗 鍦ㄤ腑闂存墦寮€</button>
+                    <button onClick={() => setCenterPreview({ type: "rubric", name: "rubric.md", content: selectedPackage.snapshot.rubricMd })} className="text-[10px] text-primary hover:underline">在中间打开</button>
                   </div>
                   <div className="rounded-[20px] border border-border/70 bg-muted/50 p-4 text-sm cursor-pointer hover:border-primary/30 transition-colors overflow-auto max-h-[60vh]" onClick={() => setCenterPreview({ type: "rubric", name: "rubric.md", content: selectedPackage.snapshot.rubricMd })}>
                     <MarkdownContent content={selectedPackage.snapshot.rubricMd} />
@@ -1842,8 +1842,8 @@ function startResizeLeft(e: React.MouseEvent) {
                     <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">技能文件</div>
                     {selectedSkill && (
                       <div className="flex items-center gap-2">
-                        <button onClick={startManualEditSkill} className="text-[10px] text-primary hover:underline">缂栬緫</button>
-                        <button onClick={() => setCenterPreview({ type: "skill", name: selectedSkill.name, content: selectedSkill.skillMd })} className="text-[10px] text-primary hover:underline">馃憗 鍦ㄤ腑闂存墦寮€</button>
+                        <button onClick={startManualEditSkill} className="text-[10px] text-primary hover:underline">编辑</button>
+                        <button onClick={() => setCenterPreview({ type: "skill", name: selectedSkill.name, content: selectedSkill.skillMd })} className="text-[10px] text-primary hover:underline">在中间打开</button>
                       </div>
                     )}
                   </div>
@@ -1865,9 +1865,9 @@ function startResizeLeft(e: React.MouseEvent) {
               {selectedPackage && detailTab === "versions" && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">鐗堟湰璁板綍</div>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">版本记录</div>
                     {compareResult && (
-                      <button onClick={() => { setCompareResult(null); setCompareBaseId(""); setCompareTargetId(""); }} className="text-[10px] text-primary hover:underline">娓呴櫎瀵规瘮</button>
+                      <button onClick={() => { setCompareResult(null); setCompareBaseId(""); setCompareTargetId(""); }} className="text-[10px] text-primary hover:underline">清除对比</button>
                     )}
                   </div>
 
@@ -1879,7 +1879,7 @@ function startResizeLeft(e: React.MouseEvent) {
                         value={compareBaseId}
                         onChange={(e) => setCompareBaseId(e.target.value)}
                       >
-                        <option value="">閫夋嫨鍩哄噯鐗堟湰</option>
+                        <option value="">选择基准版本</option>
                         {versions.map((v) => (
                           <option key={v.id} value={v.id}>v{v.versionNumber} ({v.source})</option>
                         ))}
@@ -1890,7 +1890,7 @@ function startResizeLeft(e: React.MouseEvent) {
                         value={compareTargetId}
                         onChange={(e) => setCompareTargetId(e.target.value)}
                       >
-                        <option value="">閫夋嫨鐩爣鐗堟湰</option>
+                          <option value="">选择目标版本</option>
                         {versions.map((v) => (
                           <option key={v.id} value={v.id}>v{v.versionNumber} ({v.source})</option>
                         ))}
@@ -1911,7 +1911,7 @@ function startResizeLeft(e: React.MouseEvent) {
                                 setCompareResult(res);
                               }
                             })
-                            .catch((err) => { alert(err.message || "瀵规瘮澶辫触"); })
+                            .catch((err) => { alert(err.message || "对比失败"); })
                             .finally(() => {
                               if (selectedPackageIdRef.current === currentPkgId) {
                                 setCompareLoading(false);
@@ -1929,18 +1929,18 @@ function startResizeLeft(e: React.MouseEvent) {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs">
                         <div>
-                          <div className="font-medium">瀵规瘮缁撴灉</div>
-                          <div className="text-muted-foreground">v{compareResult.baseVersion.versionNumber} 鈫?v{compareResult.targetVersion.versionNumber}</div>
+                          <div className="font-medium">对比结果</div>
+                          <div className="text-muted-foreground">v{compareResult.baseVersion.versionNumber} {"->"} v{compareResult.targetVersion.versionNumber}</div>
                         </div>
-                        <button onClick={() => setCenterPreview({ type: "diff", name: "鐗堟湰瀵规瘮", content: buildDiffMarkdown(compareResult) })} className="text-[10px] text-primary hover:underline">馃憗 鍦ㄤ腑闂存墦寮€</button>
+                        <button onClick={() => setCenterPreview({ type: "diff", name: "版本对比", content: buildDiffMarkdown(compareResult) })} className="text-[10px] text-primary hover:underline">在中间打开</button>
                       </div>
                       <div className="rounded-lg border border-primary/15 bg-primary/5 px-3 py-2.5 text-xs">
                         <div className="flex items-center gap-1.5 font-medium text-primary mb-2">
-                          <span className="inline-flex size-5 items-center justify-center rounded-md bg-primary/10 text-[10px]">馃</span>
-                          AI 鎬荤粨
+                          <span className="inline-flex size-5 items-center justify-center rounded-md bg-primary/10 text-[10px]">AI</span>
+                          AI 总结
                         </div>
                         <div className="text-muted-foreground leading-relaxed">
-                          <MarkdownContent content={compareResult.summary || "鏆傛棤鎬荤粨"} />
+                          <MarkdownContent content={compareResult.summary || "暂无总结"} />
                         </div>
                       </div>
                       <VersionDiffView result={compareResult} />
@@ -1962,23 +1962,23 @@ function startResizeLeft(e: React.MouseEvent) {
                               <button
                                 onClick={() => handleUpdateNote(v.id, v.note || "")}
                                 className="text-left text-[11px] text-muted-foreground hover:text-foreground transition-colors"
-                                title="鐐瑰嚮缂栬緫澶囨敞"
+                                title="点击编辑备注"
                               >
-                                馃摑 {v.note}
+                                备注：{v.note}
                               </button>
                             ) : (
                               <button
                                 onClick={() => handleUpdateNote(v.id, "")}
                                 className="text-[11px] text-muted-foreground/60 hover:text-muted-foreground transition-colors"
-                                title="鐐瑰嚮娣诲姞澶囨敞"
+                                title="点击添加备注"
                               >
-                                + 娣诲姞澶囨敞
+                                + 添加备注
                               </button>
                             )}
                           </div>
                         </div>
                       ))}
-                      {versions.length === 0 && <div className="text-center text-sm text-muted-foreground py-4">鏆傛棤鐗堟湰璁板綍</div>}
+                      {versions.length === 0 && <div className="text-center text-sm text-muted-foreground py-4">暂无版本记录</div>}
                     </div>
                   )}
                 </div>
@@ -2121,7 +2121,7 @@ function startResizeLeft(e: React.MouseEvent) {
                     <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">优化结果</div>
                     <Button size="sm" variant="outline" className="h-7 text-xs rounded-[8px]" onClick={() => void startInteractive()}>开始交互式优化</Button>
                   </div>
-                  <div className="rounded-[20px] border border-border/70 bg-muted/50 p-3 text-sm"><strong>鏂扮増鏈細</strong>v{optimization.versionNumber}</div>
+                  <div className="rounded-[20px] border border-border/70 bg-muted/50 p-3 text-sm"><strong>新版本：</strong>v{optimization.versionNumber}</div>
                   <div className="space-y-2">
                     {optimization.issues.map((issue, i) => (
                       <div key={`${issue.expert}-${i}`} className="rounded-[20px] border border-border/70 bg-muted/50 p-3 text-sm">
@@ -2137,9 +2137,9 @@ function startResizeLeft(e: React.MouseEvent) {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">浼樺寲</div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">优化</div>
                   <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground space-y-3">
-                    <div>杩樻病鏈夎繘琛屼氦浜掑紡浼樺寲</div>
+                    <div>还没有进行交互式优化</div>
                     <Button size="sm" variant="outline" className="rounded-[8px]" onClick={() => void startInteractive()} disabled={!thread}>开始交互式优化</Button>
                   </div>
                 </div>
@@ -2157,7 +2157,7 @@ function startResizeLeft(e: React.MouseEvent) {
         <button
           onClick={() => setRightSidebarOpen(true)}
           className="flex size-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-          title="灞曞紑鍙充晶闈㈡澘"
+          title="展开右侧面板"
         >
           <PanelRightOpen className="size-4" />
         </button>
