@@ -701,11 +701,12 @@ function startResizeLeft(e: React.MouseEvent) {
         }
         if (event.event === "done") {
           setThread(event.data.thread);
+          const finalMessageIds = new Set(event.data.messages.map((message) => message.id));
           setThreadDetail((prev) => prev ? {
             ...prev,
             thread: event.data.thread,
             messages: [
-              ...prev.messages.filter((m) => ![tempSharedId, tempBaselineId, tempEnhancedId].includes(m.id)),
+              ...prev.messages.filter((m) => ![tempSharedId, tempBaselineId, tempEnhancedId].includes(m.id) && !finalMessageIds.has(m.id)),
               ...event.data.messages,
             ],
           } : prev);
