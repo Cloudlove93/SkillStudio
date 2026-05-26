@@ -231,38 +231,21 @@ function buildPackageContext(
   pkg: Awaited<ReturnType<typeof getPackage>>,
   adoptedChanges: AdoptedChange[] = [],
 ) {
-  // Start with original snapshot
-  let currentAgentMd = pkg.snapshot.agentMd;
-  let currentRubricMd = pkg.snapshot.rubricMd;
-  const currentSkills = new Map(pkg.snapshot.skills.map((s) => [s.dirName, { ...s }]));
+  const current = buildCurrentEditableSnapshot(pkg, adoptedChanges);
 
-  // Apply adopted changes in order to get current state
-  for (const change of adoptedChanges) {
-    if (change.target === "agent") {
-      currentAgentMd = change.modified;
-    } else if (change.target === "rubric") {
-      currentRubricMd = change.modified;
-    } else if (change.target === "skill" && change.targetId) {
-      const skill = currentSkills.get(change.targetId);
-      if (skill) {
-        skill.skillMd = change.modified;
-      }
-    }
-  }
-
-  const skillBundle = Array.from(currentSkills.values())
+  const skillBundle = Array.from(current.skills.values())
     .map((s) => `## ${s.dirName} (${s.name})\n${s.skillMd}`)
     .join("\n\n");
 
   return [
     "### agent.md",
     "```markdown",
-    currentAgentMd,
+    current.agentMd,
     "```",
     "",
     "### rubric.md",
     "```markdown",
-    currentRubricMd,
+    current.rubricMd,
     "```",
     "",
     "### skills",
@@ -270,6 +253,56 @@ function buildPackageContext(
     skillBundle || "（暂无技能）",
     "```",
   ].join("\n");
+}
+
+function buildCurrentEditableSnapshot(
+  pkg: Awaited<ReturnType<typeof getPackage>>,
+  adoptedChanges: AdoptedChange[] = [],
+) {
+  const current = {
+    agentMd: pkg.snapshot.agentMd,
+    rubricMd: pkg.snapshot.rubricMd,
+    skills: new Map(pkg.snapshot.skills.map((s) => [s.dirName, { ...s }])),
+  };
+
+  for (const change of adoptedChanges) {
+    const modified = String(change.modified || "").trim();
+    if (!modified) continue;
+
+    if (change.target === "agent") {
+      current.agentMd = modified;
+      continue;
+    }
+
+    if (change.target === "rubric") {
+      current.rubricMd = modified;
+      continue;
+    }
+
+    if (change.target === "skill" && change.targetId) {
+      const skill = Array.from(current.skills.values()).find((item) => item.dirName === change.targetId || item.id === change.targetId);
+      if (skill) {
+        current.skills.set(skill.dirName, { ...skill, skillMd: modified });
+      }
+    }
+  }
+
+  return current;
+}
+
+function resolveCurrentContentForAdoption(
+  pkg: Awaited<ReturnType<typeof getPackage>>,
+  adoptedChanges: AdoptedChange[],
+  target: AdoptedChange["target"],
+  targetId?: string,
+) {
+  const current = buildCurrentEditableSnapshot(pkg, adoptedChanges);
+  if (target === "agent") return { content: current.agentMd };
+  if (target === "rubric") return { content: current.rubricMd };
+  const skill = targetId
+    ? Array.from(current.skills.values()).find((item) => item.dirName === targetId || item.id === targetId)
+    : undefined;
+  return { content: skill?.skillMd || "", targetName: skill?.name };
 }
 
 function stripInternalMarkers(text: string): string {
@@ -668,26 +701,17 @@ export async function chatOptimize(
   // 将 adoptions 转换为 AdoptedChange
   const newAdoptions: AdoptedChange[] = parsed.adoptions.map((a) => {
     const target = a.target as "agent" | "rubric" | "skill";
-    let original = "";
-    let modified = "";
-
-    if (target === "agent") {
-      original = pkg.snapshot.agentMd;
-    } else if (target === "rubric") {
-      original = pkg.snapshot.rubricMd;
-    } else if (target === "skill" && a.targetId) {
-      const skill = pkg.snapshot.skills.find((s) => s.dirName === a.targetId);
-      original = skill?.skillMd || "";
-    }
+    const current = resolveCurrentContentForAdoption(pkg, input.adoptedChanges, target, a.targetId);
+    const original = current.content;
 
     // Use the full modified content from <MODIFIED> block if available, otherwise fallback to original
-    modified = a.modifiedContent !== undefined ? a.modifiedContent : original;
+    const modified = a.modifiedContent !== undefined ? a.modifiedContent : original;
 
     return {
       id: `${target}-${a.targetId || ""}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       target,
       targetId: a.targetId,
-      targetName: a.targetId,
+      targetName: current.targetName || a.targetId,
       original,
       modified,
       reason: a.summary,
