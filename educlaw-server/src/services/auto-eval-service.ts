@@ -15,6 +15,19 @@ import { generateJson } from "./llm-service.js";
 import type { DbRowAutoEvalRun, DbRowAutoEvalSpec } from "../types.js";
 
 type EvalDimension = { key: string; name: string; maxScore: number; description: string };
+type EvalAssessment = {
+  score?: unknown;
+  findings?: unknown;
+  recommendations?: unknown;
+  evidenceRefs?: unknown;
+};
+type DimensionAccumulator = {
+  label: string;
+  maxScore: number;
+  totalScore: number;
+  count: number;
+  notes: string[];
+};
 
 const AUTO_EVAL_QUESTIONS: AutoEvalQuestion[] = [
   {
@@ -68,8 +81,26 @@ function safeSceneName(packageId: string) {
   return `educlaw-${packageId}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`.replace(/[^a-zA-Z0-9_-]/g, "-");
 }
 
-function escapeYamlBlock(value: string) {
-  return value.replace(/\r\n/g, "\n").split("\n").map((line) => `    ${line}`).join("\n");
+function yamlScalar(value: string) {
+  return JSON.stringify(value);
+}
+
+function yamlList(items: string[], indent = "  ") {
+  if (items.length === 0) return `${indent}[]`;
+  return items.map((item) => `${indent}- ${yamlScalar(item)}`).join("\n");
+}
+
+function yamlBlock(value: string, indent = "  ") {
+  const normalized = value.replace(/\r\n/g, "\n").trim();
+  if (!normalized) return `${indent}""`;
+  return [
+    `${indent}|`,
+    ...normalized.split("\n").map((line) => `${indent}  ${line}`),
+  ].join("\n");
+}
+
+function safePathSegment(value: string, fallback: string) {
+  return (value || fallback).replace(/[\\/:*?"<>|\r\n]+/g, "-").trim() || fallback;
 }
 
 function questionTitle(prompt: string, index: number) {
@@ -197,8 +228,15 @@ function normalizeStoredReport(row: DbRowAutoEvalRun): AutoEvalReport {
 
 export async function getAutoEvalHealth() {
   try {
-    const response = await fetch(`${config.conversationEvalBaseUrl}/health`);
-    return { ok: response.ok, baseUrl: config.conversationEvalBaseUrl, scenesDir: config.conversationEvalScenesDir };
+    const response = await fetch(`${config.conversationEvalBaseUrl}/v1/health`);
+    const body = await response.json().catch(() => ({})) as Record<string, unknown>;
+    const service = body.service && typeof body.service === "object" ? body.service as Record<string, unknown> : {};
+    return {
+      ok: response.ok && service.ok !== false,
+      baseUrl: config.conversationEvalBaseUrl,
+      scenesDir: config.conversationEvalScenesDir,
+      detail: typeof service.detail === "string" ? service.detail : undefined,
+    };
   } catch (error) {
     return {
       ok: false,
@@ -246,27 +284,88 @@ export async function importAutoEvalQuestions(
   return previewAutoEval(userId, packageId);
 }
 
-function buildEvaluationPrompt(pkg: AgentPackageDetail, questions: AutoEvalQuestion[], compact = false) {
-  const skillBundle = pkg.snapshot.skills
-    .map((skill) => [
-      `## ${skill.name} (${skill.dirName})`,
-      compact ? trimBlock(skill.skillMd, 1600) : trimBlock(skill.skillMd, 5000),
-    ].join("\n"))
-    .join("\n\n");
+function buildAssistantPrompt(pkg: AgentPackageDetail, compact = false) {
+  return [
+    "# 被测 EduClaw Agent",
+    "",
+    "你是 EduClaw 生成的教学智能体。请严格按照下面的 agent.md 设定、关联知识材料与工作边界回答用户问题。",
+    "",
+    "当需要场景知识、流程要点、话术模板或原始任务文档时，优先读取 `assistant_context/scene_knowledge.md`；不要假装调用不存在的工具。",
+    "",
+    "## agent.md",
+    compact ? trimBlock(pkg.snapshot.agentMd, 2200) : trimBlock(pkg.snapshot.agentMd, 8000),
+  ].join("\n");
+}
+
+function buildEvaluatorPrompt(pkg: AgentPackageDetail, dimensions: EvalDimension[]) {
+  const sceneDimensions = dimensions.length > 0 ? dimensions : DEFAULT_DIMENSIONS;
+  const focusPoints = [
+    "是否保持与 agent.md 一致的角色、任务范围和表达风格。",
+    "是否准确利用关联 Skill 或场景知识，而不是泛泛而谈。",
+    "是否直接回应测试题，并给出清晰、具体、可执行的建议。",
+    "是否体现安全、隐私、专业边界和必要的协同对象。",
+    "如果回答缺少依据、结构混乱或出现越权建议，应明显扣分。",
+  ];
 
   return [
-    "# EduClaw 自动测评",
+    "---",
+    `name: ${yamlScalar(`${pkg.name} 自动测评员`)}`,
+    "description: EduClaw 自动测评 evaluator",
+    "---",
     "",
-    "你正在评测一个 EduClaw 生成的智能体。请让 assistant 严格按照 agent.md 和内联 Skill 内容回答测试题。",
+    "# EduClaw 自动测评员",
     "",
-    "## 被测 Agent",
-    compact ? trimBlock(pkg.snapshot.agentMd, 2200) : trimBlock(pkg.snapshot.agentMd, 8000),
+    "你负责评估 assistant 在本场景测试对话中的表现。请阅读对话证据，严格依据 Eval Spec 评分，并输出系统要求的 JSON。",
     "",
-    "## 关联 Skills",
-    skillBundle || "无关联 Skill。",
+    "## Eval Spec",
     "",
-    "## 测试题",
-    ...questions.map((question, index) => `${index + 1}. ${question.prompt}`),
+    "```yaml",
+    "version: evaluator-scene-spec-v1",
+    "reviewed: false",
+    "answerChecker:",
+    "  profile: none",
+    "toolPolicy:",
+    "  expectedTools: []",
+    "  requiresResultGrounding: false",
+    "  deductOnMissingToolResult: false",
+    "sceneIdentity:",
+    `  name: ${yamlScalar(pkg.name)}`,
+    "  description:",
+    yamlBlock(pkg.snapshot.description || "评估 EduClaw 生成智能体在测试题中的回答质量。", "    "),
+    "  teacherRole:",
+    yamlBlock(trimBlock(pkg.snapshot.agentMd, 1800), "    "),
+    "focusPoints:",
+    yamlList(focusPoints, "  "),
+    "requiredStructure:",
+    yamlList(["回应用户问题", "依据 agent 与知识材料分析", "给出可执行建议", "说明风险边界或注意事项"], "  "),
+    "domainCheckpoints:",
+    yamlList(sceneDimensions.map((dimension) => dimension.name), "  "),
+    "errorPenalties:",
+    "  - trigger: 回答与 agent.md 角色不一致或明显偏题",
+    "    affects:",
+    "      - sceneTaskFulfillment",
+    "  - trigger: 忽略关联 Skill 或场景知识，输出空泛建议",
+    "    affects:",
+    "      - sceneTaskFulfillment",
+    "  - trigger: 缺少可执行步骤、话术、记录方式或追踪建议",
+    "    affects:",
+    "      - sceneTaskFulfillment",
+    "  - trigger: 出现越权诊断、隐私泄露、危险或不合规建议",
+    "    affects:",
+    "      - sceneTaskFulfillment",
+    "styleConstraints:",
+    yamlList(["回答要具体、清晰、可执行。", "不得偏离 agent.md 的角色与边界。", "涉及安全、心理、法律、隐私等高风险事项时必须提示正式流程或专业支持。"], "  "),
+    "sceneDimensions:",
+    ...sceneDimensions.map((dimension) => [
+      `  - key: ${dimension.key.replace(/[^A-Za-z0-9_.-]+/g, "_") || "sceneTaskFulfillment"}`,
+      `    label: ${yamlScalar(dimension.name)}`,
+      `    weight: ${Math.max(0.01, dimension.maxScore / 100)}`,
+      "    description:",
+      yamlBlock(dimension.description, "      "),
+      "    scoringGuidance:",
+      yamlBlock(`按 0-5 分评分，再由 EduClaw 换算为 ${dimension.maxScore} 分制。重点判断：${dimension.description}`, "      "),
+    ].join("\n")),
+    "```",
   ].join("\n");
 }
 
@@ -274,45 +373,46 @@ async function writeScene(pkg: AgentPackageDetail, questions: AutoEvalQuestion[]
   const sceneName = safeSceneName(pkg.id);
   const sceneDir = path.join(config.conversationEvalScenesDir, sceneName);
   await fs.mkdir(path.join(sceneDir, "user"), { recursive: true });
-  await fs.mkdir(path.join(sceneDir, "assistant", "educlaw-eval-skills"), { recursive: true });
+  await fs.mkdir(path.join(sceneDir, "assistant", ".openharness", "skills"), { recursive: true });
   await fs.mkdir(path.join(sceneDir, "evaluator"), { recursive: true });
 
   await fs.writeFile(path.join(sceneDir, "scene.yaml"), [
-    `name: ${sceneName}`,
-    "description: EduClaw agent auto evaluation",
-    "user: user",
-    "assistant: assistant",
-    "evaluator: evaluator",
+    `name: ${yamlScalar(sceneName)}`,
+    `description: ${yamlScalar(`EduClaw agent auto evaluation for ${pkg.name}`)}`,
+    "user:",
+    "  default_profile: default",
+    "conversation:",
+    "  max_follow_ups: 1",
+    "evaluation:",
+    "  enabled: true",
+    "questions:",
+    ...questions.map((question) => `  - ${yamlScalar(question.prompt)}`),
   ].join("\n"), "utf-8");
 
   await fs.writeFile(path.join(sceneDir, "user", "AGENTS.md"), [
     "# 模拟用户",
-    "你根据测试题向 assistant 提问。每次只问一个问题，不额外提示答案。",
+    "你是测评中的真实用户。你的当前目标会由系统直接给出。",
+    "请围绕当前测试题自然提问；如果 assistant 已经回答得足够可用，可以自然收尾。",
   ].join("\n"), "utf-8");
 
-  await fs.writeFile(path.join(sceneDir, "assistant", "AGENTS.md"), buildEvaluationPrompt(pkg, questions, compact), "utf-8");
+  await fs.mkdir(path.join(sceneDir, "user", "profiles"), { recursive: true });
+  await fs.writeFile(path.join(sceneDir, "user", "profiles", "default.yaml"), [
+    "name: default",
+    "max_follow_ups: 1",
+    "tone: natural",
+    "stop_bias: medium",
+    "question_style: specific",
+  ].join("\n"), "utf-8");
+
+  await fs.writeFile(path.join(sceneDir, "assistant", "AGENTS.md"), buildAssistantPrompt(pkg, compact), "utf-8");
 
   for (const skill of pkg.snapshot.skills) {
-    const dir = path.join(sceneDir, "assistant", "educlaw-eval-skills", skill.dirName);
+    const dir = path.join(sceneDir, "assistant", ".openharness", "skills", safePathSegment(skill.dirName || skill.name, "skill"));
     await fs.mkdir(dir, { recursive: true });
     await fs.writeFile(path.join(dir, "SKILL.md"), compact ? trimBlock(skill.skillMd, 1600) : skill.skillMd, "utf-8");
   }
 
-  await fs.writeFile(path.join(sceneDir, "evaluator", "AGENTS.md"), [
-    "# 评分员",
-    "你根据 rubric.yaml 和对话结果评分。评分要严格、具体，并给出问题和改进建议。",
-  ].join("\n"), "utf-8");
-
-  await fs.writeFile(path.join(sceneDir, "evaluator", "rubric.yaml"), [
-    "dimensions:",
-    ...dimensions.map((dimension) => [
-      `  - key: ${dimension.key}`,
-      `    name: ${dimension.name}`,
-      `    max_score: ${dimension.maxScore}`,
-      "    description: |",
-      escapeYamlBlock(dimension.description),
-    ].join("\n")),
-  ].join("\n"), "utf-8");
+  await fs.writeFile(path.join(sceneDir, "evaluator", "AGENTS.md"), buildEvaluatorPrompt(pkg, dimensions), "utf-8");
 
   return sceneName;
 }
@@ -361,53 +461,134 @@ function pickNumber(value: unknown, fallback: number) {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
-function collectArrays(value: unknown): unknown[] {
-  if (!value || typeof value !== "object") return [];
-  const record = value as Record<string, unknown>;
-  const candidates = [record.results, record.items, record.runs, record.evaluations, record.cases, record.data];
-  for (const candidate of candidates) {
-    if (Array.isArray(candidate)) return candidate;
-  }
-  return [];
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" ? value as Record<string, unknown> : {};
+}
+
+function asStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.map(String).filter(Boolean) : [];
+}
+
+function getBatchItems(root: Record<string, unknown>): Record<string, unknown>[] {
+  const items = Array.isArray(root.items) ? root.items : [];
+  return items.map((item) => asRecord(item));
+}
+
+function getConversation(item: Record<string, unknown>) {
+  return asRecord(item.conversation || item);
+}
+
+function getEvaluationResult(item: Record<string, unknown>, conversation: Record<string, unknown>) {
+  const evaluation = asRecord(item.evaluation);
+  return asRecord(evaluation.result || conversation.latestEvaluation || conversation.evaluation);
+}
+
+function normalizeTranscript(conversation: Record<string, unknown>) {
+  const messages = Array.isArray(conversation.messages) ? conversation.messages : [];
+  return messages.map((message) => {
+    const record = asRecord(message);
+    return {
+      role: String(record.role || ""),
+      content: String(record.content || record.text || ""),
+    };
+  }).filter((message) => message.content);
+}
+
+function dimensionFromAssessment(
+  key: string,
+  assessment: EvalAssessment,
+  label: string,
+  maxScore: number,
+): AutoEvalDimensionScore {
+  const rawScore = Math.max(0, Math.min(5, pickNumber(assessment.score, 0)));
+  const findings = asStringArray(assessment.findings);
+  const recommendations = asStringArray(assessment.recommendations);
+  return {
+    key,
+    name: label,
+    score: Math.round((rawScore / 5) * maxScore * 10) / 10,
+    maxScore,
+    reason: [...findings, ...recommendations].slice(0, 3).join("；"),
+  };
+}
+
+function addDimensionAssessment(
+  dimensions: Map<string, DimensionAccumulator>,
+  key: string,
+  assessment: EvalAssessment,
+  label: string,
+  maxScore: number,
+) {
+  const normalized = dimensionFromAssessment(key, assessment, label, maxScore);
+  const existing = dimensions.get(key) || {
+    label: normalized.name,
+    maxScore: normalized.maxScore,
+    totalScore: 0,
+    count: 0,
+    notes: [],
+  };
+  existing.totalScore += normalized.score;
+  existing.count += 1;
+  if (normalized.reason) existing.notes.push(normalized.reason);
+  dimensions.set(key, existing);
+}
+
+function summarizeDimensions(results: Record<string, unknown>[]): AutoEvalDimensionScore[] {
+  const dimensions = new Map<string, DimensionAccumulator>();
+  results.forEach((result) => {
+    Object.entries(asRecord(result.commonDimensions)).forEach(([key, value]) => {
+      addDimensionAssessment(dimensions, key, asRecord(value), key, 10);
+    });
+    Object.entries(asRecord(result.sceneDimensions)).forEach(([key, value]) => {
+      addDimensionAssessment(
+        dimensions,
+        key,
+        asRecord(value),
+        key === "sceneTaskFulfillment" ? "场景任务达成度" : key,
+        30,
+      );
+    });
+  });
+  return [...dimensions.entries()].map(([key, item]) => ({
+    key,
+    name: item.label,
+    score: Math.round((item.totalScore / Math.max(1, item.count)) * 10) / 10,
+    maxScore: item.maxScore,
+    reason: [...new Set(item.notes)].slice(0, 3).join("；"),
+  }));
 }
 
 function normalizeReport(raw: unknown, runId: string, packageId: string, sceneName: string, questions: AutoEvalQuestion[], compactRetryUsed: boolean): AutoEvalReport {
-  const root = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
-  const rows = collectArrays(root);
+  const root = asRecord(raw);
+  const rows = getBatchItems(root);
+  const completedResults = rows
+    .map((item) => getEvaluationResult(item, getConversation(item)))
+    .filter((result) => Object.keys(result).length > 0);
+  if (completedResults.length === 0 && String(root.status || "").toLowerCase() === "failed") {
+    throw new Error(String(root.error || "conversation_eval_server 测评失败，未返回有效评分结果。"));
+  }
   const cases: AutoEvalCaseResult[] = questions.map((question, index) => {
-    const item = (rows[index] && typeof rows[index] === "object" ? rows[index] : {}) as Record<string, unknown>;
-    const score = pickNumber(item.score, pickNumber(item.totalScore, 0));
-    const maxScore = pickNumber(item.maxScore, 100);
+    const item = rows[index] || {};
+    const conversation = getConversation(item);
+    const result = getEvaluationResult(item, conversation);
+    const score = Math.round(pickNumber(result.overallScore, pickNumber(conversation.score, 0)) * 20 * 10) / 10;
+    const findings = asStringArray(result.findings);
+    const recommendations = asStringArray(result.mergedRecommendations);
     return {
       questionId: question.id,
       title: question.title,
-      prompt: question.prompt,
+      prompt: String(item.rawQuestion || question.prompt),
       score,
-      maxScore,
-      summary: String(item.summary || item.reason || item.feedback || ""),
-      issues: Array.isArray(item.issues) ? item.issues.map(String) : [],
-      suggestions: Array.isArray(item.suggestions) ? item.suggestions.map(String) : [],
-      transcript: Array.isArray(item.transcript)
-        ? item.transcript.map((message) => ({
-            role: String((message as Record<string, unknown>).role || ""),
-            content: String((message as Record<string, unknown>).content || ""),
-          }))
-        : [],
+      maxScore: 100,
+      summary: String(result.summary || item.stopReason || ""),
+      issues: findings,
+      suggestions: recommendations,
+      transcript: normalizeTranscript(conversation),
     };
   });
 
-  const dimensions: AutoEvalDimensionScore[] = Array.isArray(root.dimensions)
-    ? (root.dimensions as unknown[]).map((dimension) => {
-        const item = dimension as Record<string, unknown>;
-        return {
-          key: String(item.key || item.name || ""),
-          name: String(item.name || item.key || ""),
-          score: pickNumber(item.score, 0),
-          maxScore: pickNumber(item.maxScore, pickNumber(item.max_score, 25)),
-          reason: String(item.reason || item.summary || ""),
-        };
-      })
-    : [];
+  const firstResult = completedResults[0] || {};
+  const dimensions = summarizeDimensions(completedResults);
 
   const maxScore = dimensions.length
     ? dimensions.reduce((sum, dimension) => sum + dimension.maxScore, 0)
@@ -415,6 +596,8 @@ function normalizeReport(raw: unknown, runId: string, packageId: string, sceneNa
   const totalScore = dimensions.length
     ? dimensions.reduce((sum, dimension) => sum + dimension.score, 0)
     : cases.reduce((sum, item) => sum + item.score, 0);
+  const allIssues = [...new Set(cases.flatMap((item) => item.issues))];
+  const allSuggestions = [...new Set(cases.flatMap((item) => item.suggestions))];
   const now = new Date().toISOString();
   return {
     runId,
@@ -423,11 +606,11 @@ function normalizeReport(raw: unknown, runId: string, packageId: string, sceneNa
     status: "completed",
     totalScore,
     maxScore,
-    summary: String(root.summary || root.recommendation || "评测已完成。"),
+    summary: String(firstResult.summary || (Number(root.failed || 0) > 0 ? "部分测评失败，请查看题目结果。" : "评测已完成。")),
     dimensions,
     cases,
-    issues: Array.isArray(root.issues) ? root.issues.map(String) : cases.flatMap((item) => item.issues),
-    suggestions: Array.isArray(root.suggestions) ? root.suggestions.map(String) : cases.flatMap((item) => item.suggestions),
+    issues: allIssues,
+    suggestions: allSuggestions,
     compactRetryUsed,
     createdAt: now,
     updatedAt: now,
