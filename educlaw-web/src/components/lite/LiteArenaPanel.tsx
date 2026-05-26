@@ -1458,7 +1458,7 @@ function startResizeLeft(e: React.MouseEvent) {
               </div>
               <div className="flex flex-wrap items-center justify-end gap-2">
                 {interactiveAdopted.length > 0 && (
-                  <span className="text-[10px] text-muted-foreground">{interactiveAdopted.length} 椤瑰凡閲囩撼</span>
+                  <span className="text-[10px] text-muted-foreground">{interactiveAdopted.length} 项已采纳</span>
                 )}
                 <Button size="sm" variant="ghost" className="rounded-[12px] text-muted-foreground hover:text-foreground" onClick={() => setInteractiveMode(false)}>关闭</Button>
                 <Button size="sm" variant="outline" className="rounded-[12px] text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => {
