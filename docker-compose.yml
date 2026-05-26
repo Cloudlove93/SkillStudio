@@ -29,13 +29,22 @@ services:
       - LLM_API_KEY=${LLM_API_KEY}
       - LLM_MODEL=${LLM_MODEL}
       - LLM_BASELINE_MODEL=${LLM_BASELINE_MODEL}
+      - CONVERSATION_EVAL_BASE_URL=${CONVERSATION_EVAL_BASE_URL:-http://host.docker.internal:8090}
+      - CONVERSATION_EVAL_SCENES_DIR=${CONVERSATION_EVAL_SCENES_DIR:-/data/educlaw-eval-scenes}
+      - ASSISTANT_OAH_BASE_URL=${ASSISTANT_OAH_BASE_URL:-http://host.docker.internal:8787/api/v1}
+      - USER_OAH_BASE_URL=${USER_OAH_BASE_URL:-http://host.docker.internal:8787/api/v1}
+      - EVAL_OAH_BASE_URL=${EVAL_OAH_BASE_URL:-http://host.docker.internal:8787/api/v1}
       - APP_ORIGIN=${APP_ORIGIN:-http://localhost}
       - SEED_USERS=${SEED_USERS:-false}
       - SEED_USER_NAMES=${SEED_USER_NAMES:-}
       - SEED_USER_PASSWORD=${SEED_USER_PASSWORD:-}
       - PORT=3000
+    volumes:
+      - ${CONVERSATION_EVAL_SCENES_DIR:-/data/educlaw-eval-scenes}:${CONVERSATION_EVAL_SCENES_DIR:-/data/educlaw-eval-scenes}
     ports:
       - "127.0.0.1:${SERVER_PORT:-3000}:3000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       educlaw-postgres:
         condition: service_healthy
