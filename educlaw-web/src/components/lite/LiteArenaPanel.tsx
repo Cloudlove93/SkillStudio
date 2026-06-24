@@ -3,16 +3,13 @@ import { flushSync } from "react-dom";
 import type {
   AgentPackageDetail,
   AgentPackageSummary,
-  AutoEvalPreview,
-  AutoEvalReport,
-  AutoEvalQuestion,
   ArenaMessage,
   ArenaThread,
   ArenaThreadDetail,
   OptimizationResult,
   PackageVersion,
 } from "@educlaw/shared";
-import type { DiagnosisIssue, AdoptedChange, VersionCompareResult, LineDiff, InteractiveOptimizationSession, ArenaMode, AutoEvalHealth } from "../../api/lite-api";
+import type { DiagnosisIssue, AdoptedChange, VersionCompareResult, LineDiff, InteractiveOptimizationSession, ArenaMode } from "../../api/lite-api";
 import { computeLineDiff } from "../../api/lite-api";
 import { useAuthStore } from "../../stores/auth";
 import { liteApi } from "../../api/lite-api";
@@ -34,14 +31,14 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Sparkles, Send, Upload, Trash2, FileText, ListChecks, Wrench,
-  History, BarChart3, Zap, GitCompare, Clock, CheckCircle2, XCircle, Loader2,
+  History, Zap, GitCompare, Clock, CheckCircle2, XCircle, Loader2,
   PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Pencil, X,
   LogOut,
 } from "lucide-react";
 
-type DetailTab = "agent" | "rubric" | "skills" | "versions" | "report" | "optimization" | "diff";
+type DetailTab = "agent" | "rubric" | "skills" | "versions" | "optimization" | "diff";
 type ProgressState = { title: string; phase: string; steps: string[]; startedAt: number; active: boolean; isError: boolean };
-type ManualEditState = { target: "agent" | "skill"; skillId?: string; title: string; content: string; preview: boolean };
+type ManualEditState = { target: "agent" | "rubric" | "skill"; skillId?: string; title: string; content: string; preview: boolean };
 type BatchGenerateItem = {
   id: string;
   name: string;
@@ -52,10 +49,49 @@ type BatchGenerateItem = {
 };
 type CenterPreviewState =
   | { type: "agent" | "rubric" | "skill" | "diff"; name: string; content: string }
-  | { type: "adoptedDiff"; name: string; change: AdoptedChange; diffs: LineDiff[] }
-  | { type: "report"; name: string; report: AutoEvalReport };
+  | { type: "adoptedDiff"; name: string; change: AdoptedChange; diffs: LineDiff[] };
 
 const DOCX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+const RUBRIC_TEMPLATE = [
+  "# Rubric",
+  "",
+  "## 评分目标",
+  "- 请用这个 rubric 判断智能体回答是否符合预期。",
+  "- 每个维度都写清楚满分标准、常见扣分点和一票否决项（如果有）。",
+  "",
+  "## 评分维度",
+  "### 角色贴合",
+  "- 满分标准：",
+  "- 常见扣分点：",
+  "",
+  "### Skill 遵循",
+  "- 满分标准：",
+  "- 常见扣分点：",
+  "",
+  "### 回答质量",
+  "- 满分标准：",
+  "- 常见扣分点：",
+  "",
+  "### 安全边界",
+  "- 满分标准：",
+  "- 常见扣分点：",
+  "",
+  "## 使用说明",
+  "- 先看回答是否完成用户任务，再按上面四个维度评分。",
+  "- 如果回答明显越界、误导或缺少关键事实，可以直接判定为低分。",
+].join("\n");
+
+function buildRubricDraft(seedContent = "") {
+  const trimmed = seedContent.trim();
+  if (!trimmed) return RUBRIC_TEMPLATE;
+  if (trimmed.includes("## 评分维度")) return trimmed;
+  return [
+    RUBRIC_TEMPLATE,
+    "",
+    "## 参考草稿",
+    trimmed,
+  ].join("\n");
+}
 
 function prefersWideLayout(): boolean {
   return typeof window === "undefined" || window.matchMedia("(min-width: 1024px)").matches;
@@ -95,10 +131,6 @@ export default function LiteArenaPanel() {
   const [versions, setVersions] = useState<PackageVersion[]>([]);
   const [thread, setThread] = useState<ArenaThread | null>(null);
   const [threadDetail, setThreadDetail] = useState<ArenaThreadDetail | null>(null);
-  const [report, setReport] = useState<AutoEvalReport | null>(null);
-  const [autoEvalPreview, setAutoEvalPreview] = useState<AutoEvalPreview | null>(null);
-  const [autoEvalHealth, setAutoEvalHealth] = useState<AutoEvalHealth | null>(null);
-  const [selectedEvalQuestionIds, setSelectedEvalQuestionIds] = useState<string[]>([]);
   const [optimization, setOptimization] = useState<OptimizationResult | null>(null);
   const [detailTab, setDetailTab] = useState<DetailTab>("agent");
   const [selectedSkillId, setSelectedSkillId] = useState("");
@@ -119,7 +151,7 @@ export default function LiteArenaPanel() {
   const [batchRuns, setBatchRuns] = useState<BatchGenerateItem[]>([]);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const docFileRef = useRef<HTMLInputElement | null>(null);
-  const evalFileRef = useRef<HTMLInputElement | null>(null);
+  const rubricFileRef = useRef<HTMLInputElement | null>(null);
   const preserveGenerateProgressRef = useRef(false);
 
   // Interactive optimization state
@@ -153,9 +185,8 @@ export default function LiteArenaPanel() {
 
   const messages = threadDetail?.messages || [];
   const selectedSkill = selectedPackage?.snapshot.skills.find((s) => (s.id || s.dirName) === selectedSkillId) || selectedPackage?.snapshot.skills[0] || null;
-  const autoEvalBuiltinQuestions = autoEvalPreview?.builtinQuestions || [];
-  const autoEvalDocumentQuestions = autoEvalPreview?.documentQuestions || [];
-  const autoEvalQuestions = [...autoEvalDocumentQuestions, ...autoEvalBuiltinQuestions];
+  const rubricConfigured = Boolean(selectedPackage?.snapshot.rubricMd.trim());
+  const rubricRequiredMessage = "当前还没有配置 rubric。请先在 Rubric 标签中补充评分规则后，再使用交互式优化。";
   const showGeneratePreviews = progress?.active && progress.title === "生成智能体";
   const sidebarStyle = { "--sidebar-width": `${leftWidth}px` } as CSSProperties;
   const detailStyle = { "--detail-width": `${rightWidth}px` } as CSSProperties;
@@ -340,7 +371,6 @@ export default function LiteArenaPanel() {
     setThread(null);
     setThreadDetail(null);
     setVersions([]);
-    setReport(null);
     setOptimization(null);
     setCompareResult(null);
     setCompareBaseId("");
@@ -396,8 +426,7 @@ export default function LiteArenaPanel() {
     const activeDetail = await liteApi.getThread(token, activeThread.id);
     // Guard against race: user may have switched to another package while we were loading
     if (selectedPackageIdRef.current === packageId) {
-      setSelectedPackage(detail); setVersions(versionList); setThread(activeThread); setThreadDetail(activeDetail); setReport(null); setOptimization(null); setDetailTab("agent"); setSideStreaming({ baseline: false, enhanced: false });
-      void loadAutoEvalPreview(packageId);
+      setSelectedPackage(detail); setVersions(versionList); setThread(activeThread); setThreadDetail(activeDetail); setOptimization(null); setDetailTab("agent"); setSideStreaming({ baseline: false, enhanced: false });
     }
     if (!snapshotList) setPackages((prev) => prev.map((item) => item.id === packageId ? { ...item, name: detail.name, description: detail.description, versionNumber: detail.versionNumber, updatedAt: detail.updatedAt } : item));
   }
@@ -444,44 +473,6 @@ function startResizeLeft(e: React.MouseEvent) {
     setPackages(list);
   }
 
-  async function loadAutoEvalPreview(packageId: string) {
-    if (!token || !packageId) return;
-    try {
-      const health = await liteApi.getAutoEvalHealth(token).catch(() => null);
-      const preview = await liteApi.previewAutoEval(token, packageId);
-      setAutoEvalHealth(health);
-      setAutoEvalPreview(preview);
-      setReport(preview.latestRun || null);
-      const preferredQuestions = preview.documentQuestions.length > 0 ? preview.documentQuestions : preview.builtinQuestions;
-      setSelectedEvalQuestionIds((current) => {
-        const allIds = new Set([...preview.documentQuestions, ...preview.builtinQuestions].map((question) => question.id));
-        const kept = current.filter((id) => allIds.has(id));
-        return kept.length > 0 ? kept : preferredQuestions.slice(0, 3).map((question) => question.id);
-      });
-    } catch {
-      setAutoEvalHealth(null);
-      setAutoEvalPreview(null);
-      setReport(null);
-      setSelectedEvalQuestionIds([]);
-    }
-  }
-
-  function getAllAutoEvalQuestions(): AutoEvalQuestion[] {
-    return [...(autoEvalPreview?.documentQuestions || []), ...(autoEvalPreview?.builtinQuestions || [])];
-  }
-
-  function toggleAutoEvalQuestion(questionId: string) {
-    setSelectedEvalQuestionIds((current) => (
-      current.includes(questionId)
-        ? current.filter((id) => id !== questionId)
-        : [...current, questionId]
-    ));
-  }
-
-  function selectAutoEvalQuestions(questionIds: string[]) {
-    setSelectedEvalQuestionIds(questionIds);
-  }
-
   async function handleDocFiles(fileList: FileList | null) {
     if (!fileList) return;
     const files = Array.from(fileList);
@@ -496,34 +487,6 @@ function startResizeLeft(e: React.MouseEvent) {
     if (results.length > 0) {
       setDocuments((prev) => [...prev, ...results]);
       setStatus(`已添加 ${results.length} 个文档`);
-    }
-  }
-
-  async function handleEvalQuestionFiles(fileList: FileList | null) {
-    if (!fileList || !token || !selectedPackageId) return;
-    const files = Array.from(fileList);
-    const parsed: Array<{ name: string; content: string }> = [];
-    for (const file of files) {
-      try {
-        parsed.push(await readTextDocument(file));
-      } catch (error) {
-        setStatus(`${file.name} 读取失败：${error instanceof Error ? error.message : "不支持的文档格式"}`);
-      }
-    }
-    if (parsed.length === 0) return;
-    startProgress("导入测评题", "正在提取测试题...");
-    try {
-      const preview = await liteApi.importAutoEvalQuestions(token, selectedPackageId, parsed);
-      setAutoEvalPreview(preview);
-      setSelectedEvalQuestionIds(preview.documentQuestions.slice(0, 3).map((question) => question.id));
-      finishProgress(`已导入 ${preview.documentQuestions.length} 道测评题`);
-      setStatus(`已导入 ${preview.documentQuestions.length} 道测评题`);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "导入测评题失败";
-      failProgress(message);
-      setStatus(message);
-    } finally {
-      if (evalFileRef.current) evalFileRef.current.value = "";
     }
   }
 
@@ -678,7 +641,7 @@ function startResizeLeft(e: React.MouseEvent) {
       ...(shouldShowBaseline ? [tempBaseline] : []),
       ...(shouldShowEnhanced ? [tempEnhanced] : []),
     ];
-    setInput(""); setReport(null); setOptimization(null);
+    setInput(""); setOptimization(null);
     flushSync(() => {
       setThreadDetail({ thread: threadDetail.thread, messages: [...threadDetail.messages, ...tempMessages] });
     });
@@ -724,35 +687,9 @@ function startResizeLeft(e: React.MouseEvent) {
     }
   }
 
-  async function handleReport() {
-    if (!token || !selectedPackageId) return;
-    const allQuestions = getAllAutoEvalQuestions();
-    const questionIds = selectedEvalQuestionIds.length > 0
-      ? selectedEvalQuestionIds
-      : allQuestions.slice(0, 3).map((question) => question.id);
-    if (questionIds.length === 0) {
-      failProgress("请先导入或选择测评题");
-      setStatus("请先导入或选择测评题");
-      return;
-    }
-    startProgress("启动自动测评", "正在启动评测服务...");
-    setStatus("正在启动自动测评...");
-    try {
-      const nextReport = await liteApi.runAutoEval(token, selectedPackageId, questionIds);
-      setReport(nextReport);
-      setDetailTab("report");
-      await loadAutoEvalPreview(selectedPackageId);
-      finishProgress("自动测评已完成");
-      setStatus("自动测评已完成");
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "自动测评失败";
-      failProgress(message);
-      setStatus(message);
-    }
-  }
-
   async function handleOptimize() {
     if (!token || !thread?.id || !selectedPackageId) return;
+    if (!ensureRubricConfigured("交互式优化")) return;
     const currentPkgId = selectedPackageId;
     startProgress("执行优化", "正在运行专家优化..."); setStatus("正在优化...");
     try {
@@ -855,9 +792,60 @@ function startResizeLeft(e: React.MouseEvent) {
     });
   }
 
+  function startManualEditRubric(seedContent?: string) {
+    setInteractiveMode(false);
+    setCenterPreview(null);
+    setManualEdit({
+      target: "rubric",
+      title: "rubric.md",
+      content: buildRubricDraft(seedContent || selectedPackage?.snapshot.rubricMd || ""),
+      preview: false,
+    });
+  }
+
+  async function handleRubricFiles(fileList: FileList | null) {
+    const file = fileList?.[0];
+    if (!file) return;
+    try {
+      const parsed = await readTextDocument(file);
+      startManualEditRubric(parsed.content);
+      setDetailTab("rubric");
+      setStatus(`已载入 ${parsed.name}，请检查后保存`);
+    } catch (error) {
+      const message = `${file.name} 读取失败：${error instanceof Error ? error.message : "不支持的文档格式"}`;
+      failProgress(message);
+      setStatus(message);
+    }
+  }
+
+  function ensureRubricConfigured(actionLabel: string) {
+    if (rubricConfigured) return true;
+    setInteractiveMode(false);
+    setDetailTab("rubric");
+    setStatus(rubricRequiredMessage);
+    failProgress(`${actionLabel}不可用：请先补充 rubric`);
+    return false;
+  }
+
   function validateManualEdit(edit: ManualEditState) {
     const content = edit.content.trim();
     if (!content) return "编辑内容不能为空";
+    if (edit.target === "rubric") {
+      const requiredHeadings = [
+        "# Rubric",
+        "## 评分目标",
+        "## 评分维度",
+        "### 角色贴合",
+        "### Skill 遵循",
+        "### 回答质量",
+        "### 安全边界",
+        "## 使用说明",
+      ];
+      for (const heading of requiredHeadings) {
+        if (!content.includes(heading)) return `rubric.md 需要保留模板章节：${heading}`;
+      }
+      return "";
+    }
     if (edit.target === "skill") {
       const frontmatter = content.match(/^---\s*\n([\s\S]*?)\n---/);
       if (!frontmatter) return "SKILL.md 必须保留顶部的 YAML 元信息";
@@ -875,7 +863,13 @@ function startResizeLeft(e: React.MouseEvent) {
       failProgress(error);
       return;
     }
-    const note = window.prompt("请输入新版本备注（可选）：", manualEdit.target === "agent" ? "手动编辑 agent.md" : "手动编辑 SKILL.md");
+    const defaultNote =
+      manualEdit.target === "agent"
+        ? "手动编辑 agent.md"
+        : manualEdit.target === "rubric"
+          ? "手动编辑 rubric.md"
+          : "手动编辑 SKILL.md";
+    const note = window.prompt("请输入新版本备注（可选）：", defaultNote);
     if (note === null) return;
 
     setManualEditSaving(true);
@@ -904,6 +898,7 @@ function startResizeLeft(e: React.MouseEvent) {
 
   async function startInteractive(forceNew = false) {
     if (!token || !thread?.id || !selectedPackageId) return;
+    if (!ensureRubricConfigured("交互式优化")) return;
     setInteractiveMode(true);
     setCenterPreview(null);
     const latestActive = interactiveSessions.find((session) => session.status === "active") || null;
@@ -1072,159 +1067,6 @@ function startResizeLeft(e: React.MouseEvent) {
     } catch (error) {
       alert(error instanceof Error ? error.message : "更新备注失败");
     }
-  }
-
-  function renderAutoEvalReportView(currentReport: AutoEvalReport) {
-    const scoreRate = currentReport.maxScore > 0
-      ? Math.round((currentReport.totalScore / currentReport.maxScore) * 100)
-      : 0;
-    return (
-      <div className="space-y-4">
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-          <div className="rounded-[20px] border border-border/70 bg-muted/50 p-4 text-center">
-            <div className="text-xs text-muted-foreground">总分</div>
-            <div className="text-3xl font-bold">{currentReport.totalScore}</div>
-            <div className="text-[10px] text-muted-foreground">/{currentReport.maxScore}</div>
-          </div>
-          <div className="rounded-[20px] border border-border/70 bg-muted/50 p-4 text-center">
-            <div className="text-xs text-muted-foreground">完成度</div>
-            <div className="text-3xl font-bold">{scoreRate}%</div>
-            <div className="text-[10px] text-muted-foreground">{currentReport.cases.length} 道题</div>
-          </div>
-          <div className="rounded-[20px] border border-border/70 bg-muted/50 p-4 text-center">
-            <div className="text-xs text-muted-foreground">状态</div>
-            <div className="text-2xl font-bold">
-              {currentReport.status === "completed" ? "已完成" : currentReport.status === "running" ? "进行中" : currentReport.status === "failed" ? "失败" : "等待中"}
-            </div>
-            <div className="text-[10px] text-muted-foreground">{currentReport.compactRetryUsed ? "已启用压缩重试" : "标准评测"}</div>
-          </div>
-        </div>
-
-        <div className="rounded-[20px] border border-border/70 bg-muted/50 p-4">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">测评摘要</div>
-          <div className="mt-2 text-sm leading-6 text-foreground">
-            {currentReport.summary || "暂无摘要"}
-          </div>
-          {currentReport.issues.length > 0 && (
-            <div className="mt-3 space-y-1">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">问题</div>
-              <div className="flex flex-wrap gap-2">
-                {currentReport.issues.map((item, index) => (
-                  <span key={`${item}-${index}`} className="rounded-full border border-destructive/20 bg-destructive/5 px-2.5 py-1 text-[11px] text-destructive">
-                    {item}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-          {currentReport.suggestions.length > 0 && (
-            <div className="mt-3 space-y-1">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">建议</div>
-              <div className="flex flex-wrap gap-2">
-                {currentReport.suggestions.map((item, index) => (
-                  <span key={`${item}-${index}`} className="rounded-full border border-primary/20 bg-primary/5 px-2.5 py-1 text-[11px] text-primary">
-                    {item}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="space-y-2">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">维度得分</div>
-          <div className="grid gap-2">
-            {currentReport.dimensions.map((dimension) => (
-              <div key={dimension.key} className="rounded-[18px] border border-border/70 bg-card/80 px-4 py-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="text-sm font-medium">{dimension.name}</div>
-                    <div className="text-xs text-muted-foreground">{dimension.reason || "暂无说明"}</div>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <div className="text-lg font-semibold">{dimension.score}/{dimension.maxScore}</div>
-                    <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">score</div>
-                  </div>
-                </div>
-              </div>
-            ))}
-            {currentReport.dimensions.length === 0 && (
-              <div className="rounded-[18px] border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
-                暂无维度得分
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">题目结果</div>
-          <div className="space-y-2">
-            {currentReport.cases.map((item) => (
-              <details key={item.questionId} className="rounded-[20px] border border-border/70 bg-card/80 px-4 py-3 shadow-[var(--shadow-sm)]">
-                <summary className="flex cursor-pointer items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-medium">{item.title}</div>
-                    <div className="mt-1 line-clamp-2 text-xs text-muted-foreground">{item.prompt}</div>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <div className="text-lg font-semibold">{item.score}/{item.maxScore}</div>
-                    <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">case</div>
-                  </div>
-                </summary>
-                <div className="mt-3 space-y-3">
-                  <div>
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">总结</div>
-                    <div className="mt-1 text-sm leading-6 text-foreground">{item.summary || "暂无总结"}</div>
-                  </div>
-                  {item.issues.length > 0 && (
-                    <div>
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">问题</div>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {item.issues.map((issue, index) => (
-                          <span key={`${issue}-${index}`} className="rounded-full border border-destructive/20 bg-destructive/5 px-2.5 py-1 text-[11px] text-destructive">
-                            {issue}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {item.suggestions.length > 0 && (
-                    <div>
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">建议</div>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {item.suggestions.map((suggestion, index) => (
-                          <span key={`${suggestion}-${index}`} className="rounded-full border border-primary/20 bg-primary/5 px-2.5 py-1 text-[11px] text-primary">
-                            {suggestion}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {item.transcript.length > 0 && (
-                    <div>
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">对话记录</div>
-                      <div className="mt-2 space-y-2">
-                        {item.transcript.map((message, index) => (
-                          <div key={`${item.questionId}-${index}`} className={`rounded-[14px] border px-3 py-2 text-xs leading-5 ${message.role === "assistant" ? "border-primary/15 bg-primary/5" : "border-border/70 bg-muted/40"}`}>
-                            <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{message.role}</div>
-                            <div className="whitespace-pre-wrap break-words">{message.content}</div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </details>
-            ))}
-            {currentReport.cases.length === 0 && (
-              <div className="rounded-[18px] border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
-                暂无题目结果
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    );
   }
 
   function buildDiffMarkdown(result: VersionCompareResult): string {
@@ -1538,7 +1380,7 @@ function startResizeLeft(e: React.MouseEvent) {
               )}
             </div>
           </>
-        ) : interactiveMode ? (
+              ) : interactiveMode ? (
           <>
             <div className="flex min-h-12 shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border/70 bg-card/40 px-14 py-2 lg:px-5">
               <div className="flex min-w-0 items-center gap-3">
@@ -1550,7 +1392,7 @@ function startResizeLeft(e: React.MouseEvent) {
                   <span className="text-[10px] text-muted-foreground">{interactiveAdopted.length} 项已采纳</span>
                 )}
                 <Button size="sm" variant="ghost" className="rounded-[12px] text-muted-foreground hover:text-foreground" onClick={() => setInteractiveMode(false)}>关闭</Button>
-                <Button size="sm" variant="outline" className="rounded-[12px] text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => {
+                    <Button size="sm" variant="outline" className="rounded-[12px] text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => {
                   if (window.confirm("确定要重新开始吗？当前对话和已采纳的修改将被清空。")) {
                     if (selectedPackageId) {
                       localStorage.removeItem(interactiveStorageKey(selectedPackageId));
@@ -1759,18 +1601,7 @@ function startResizeLeft(e: React.MouseEvent) {
               </div>
             </div>
             <div className="flex-1 overflow-auto p-3 sm:p-6">
-              {centerPreview.type === "report" ? (
-                <div className="mx-auto max-w-4xl space-y-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="text-xl font-bold">自动测评报告</div>
-                      <div className="text-xs text-muted-foreground">{centerPreview.name}</div>
-                    </div>
-                    <Button size="sm" variant="outline" className="rounded-[12px]" onClick={() => setCenterPreview(null)}>返回工作台</Button>
-                  </div>
-                  {renderAutoEvalReportView(centerPreview.report)}
-                </div>
-              ) : centerPreview.type === "adoptedDiff" ? (
+              {centerPreview.type === "adoptedDiff" ? (
                 renderAdoptedChangeDiffView(centerPreview)
               ) : (
                 <div className="max-w-3xl mx-auto">
@@ -1817,8 +1648,7 @@ function startResizeLeft(e: React.MouseEvent) {
                     </button>
                   ))}
                 </div>
-                <Button size="sm" variant="outline" className="rounded-[12px]" onClick={() => void handleReport()} disabled={!threadDetail || threadDetail.messages.length === 0 || arenaMode !== "compare"}><BarChart3 className="mr-1.5 size-3.5" />测评报告</Button>
-                <Button size="sm" variant="outline" className="rounded-[12px]" onClick={() => void startInteractive()} disabled={!thread}>
+                <Button size="sm" variant="outline" className="rounded-[12px]" onClick={() => void startInteractive()} disabled={!thread || !rubricConfigured}>
                   交互式优化
                   {hasSavedSession && <span className="ml-1 text-[10px] opacity-70">(继续)</span>}
                 </Button>
@@ -1903,7 +1733,6 @@ function startResizeLeft(e: React.MouseEvent) {
             { key: "rubric" as DetailTab, label: "Rubric", icon: ListChecks },
             { key: "skills" as DetailTab, label: "Skills", icon: Wrench },
             { key: "versions" as DetailTab, label: "版本", icon: GitCompare },
-            { key: "report" as DetailTab, label: "报告", icon: BarChart3 },
           ].map((tab) => (
             <button key={tab.key} onClick={() => {
               if (interactiveMode) {
@@ -1939,11 +1768,41 @@ function startResizeLeft(e: React.MouseEvent) {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">rubric.md</div>
-                    <button onClick={() => setCenterPreview({ type: "rubric", name: "rubric.md", content: selectedPackage.snapshot.rubricMd })} className="text-[10px] text-primary hover:underline">在中间打开</button>
+                    <div className="flex items-center gap-2">
+                      <button onClick={startManualEditRubric} className="text-[10px] text-primary hover:underline">{rubricConfigured ? "编辑" : "填写 rubric"}</button>
+                      <button onClick={() => rubricFileRef.current?.click()} className="text-[10px] text-primary hover:underline">导入文件</button>
+                      {rubricConfigured && (
+                        <button onClick={() => setCenterPreview({ type: "rubric", name: "rubric.md", content: selectedPackage.snapshot.rubricMd })} className="text-[10px] text-primary hover:underline">在中间打开</button>
+                      )}
+                    </div>
                   </div>
-                  <div className="rounded-[20px] border border-border/70 bg-muted/50 p-4 text-sm cursor-pointer hover:border-primary/30 transition-colors overflow-auto max-h-[60vh]" onClick={() => setCenterPreview({ type: "rubric", name: "rubric.md", content: selectedPackage.snapshot.rubricMd })}>
-                    <MarkdownContent content={selectedPackage.snapshot.rubricMd} />
-                  </div>
+                  <input
+                    ref={rubricFileRef}
+                    type="file"
+                    accept=".txt,.md,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    hidden
+                    onChange={(e) => { void handleRubricFiles(e.target.files); e.currentTarget.value = ""; }}
+                  />
+                  {rubricConfigured ? (
+                    <div className="rounded-[20px] border border-border/70 bg-muted/50 p-4 text-sm cursor-pointer hover:border-primary/30 transition-colors overflow-auto max-h-[60vh]" onClick={() => setCenterPreview({ type: "rubric", name: "rubric.md", content: selectedPackage.snapshot.rubricMd })}>
+                      <MarkdownContent content={selectedPackage.snapshot.rubricMd} />
+                    </div>
+                  ) : (
+                    <div className="rounded-[20px] border border-dashed border-border bg-muted/35 p-4 text-sm">
+                      <div className="font-medium text-foreground">当前还没有配置 rubric</div>
+                      <div className="mt-2 leading-6 text-muted-foreground">
+                        先补充评分目标、评分维度和使用说明，后面就可以直接用交互式优化。
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Button size="sm" className="rounded-[10px]" onClick={startManualEditRubric}>开始填写</Button>
+                        <Button size="sm" variant="outline" className="rounded-[10px]" onClick={() => rubricFileRef.current?.click()}>从文件导入</Button>
+                      </div>
+                      <div className="mt-4 rounded-[16px] border border-border/70 bg-card/70 p-3 text-xs leading-5 text-muted-foreground">
+                        <div className="font-medium text-foreground">模板会自动包含这些部分：</div>
+                        <div className="mt-2 whitespace-pre-wrap">{["评分目标", "角色贴合", "Skill 遵循", "回答质量", "安全边界", "使用说明"].map((item) => `- ${item}`).join("\n")}</div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -2095,143 +1954,18 @@ function startResizeLeft(e: React.MouseEvent) {
                 </div>
               )}
 
-              {detailTab === "report" && (
-                <div className="space-y-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">自动测评</div>
-                      <div className="mt-1 text-xs text-muted-foreground">选择题目后直接跑评分，结果会同时保留在当前智能体下。</div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Button size="sm" variant="outline" className="h-7 text-xs rounded-[8px]" onClick={() => evalFileRef.current?.click()}>
-                        <Upload className="mr-1.5 size-3.5" />导入题目
-                      </Button>
-                      <input
-                        ref={evalFileRef}
-                        type="file"
-                        multiple
-                        accept=".txt,.md,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                        hidden
-                        onChange={(e) => { void handleEvalQuestionFiles(e.target.files); e.currentTarget.value = ""; }}
-                      />
-                      <Button size="sm" variant="outline" className="h-7 text-xs rounded-[8px]" onClick={() => selectAutoEvalQuestions(autoEvalQuestions.map((question) => question.id))} disabled={autoEvalQuestions.length === 0}>
-                        全选
-                      </Button>
-                      <Button size="sm" variant="outline" className="h-7 text-xs rounded-[8px]" onClick={() => selectAutoEvalQuestions([])} disabled={selectedEvalQuestionIds.length === 0}>
-                        清空
-                      </Button>
-                      <Button size="sm" className="h-7 text-xs rounded-[8px]" onClick={() => void handleReport()} disabled={!selectedPackageId || autoEvalQuestions.length === 0}>
-                        <BarChart3 className="mr-1.5 size-3.5" />开始测评
-                      </Button>
-                      {report && (
-                        <button onClick={() => setCenterPreview({ type: "report", name: "自动测评报告", report })} className="text-[10px] text-primary hover:underline">
-                          在中间打开
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    <div className="rounded-[20px] border border-border/70 bg-muted/50 p-3 text-sm">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">当前智能体</div>
-                      <div className="mt-1 font-medium">{selectedPackage?.name || "未选择"}</div>
-                      <div className="mt-1 text-xs text-muted-foreground">{selectedPackage?.snapshot.skills.length || 0} 个 skill，{autoEvalQuestions.length} 道测评题</div>
-                      <div className="mt-2 text-xs text-muted-foreground">已选 {selectedEvalQuestionIds.length} 道题</div>
-                    </div>
-                    <div className="rounded-[20px] border border-border/70 bg-muted/50 p-3 text-sm">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">评测服务</div>
-                      <div className="mt-1 font-medium">{autoEvalHealth?.ok ? "服务正常" : "服务状态未知"}</div>
-                      <div className="mt-1 text-xs text-muted-foreground break-all">{autoEvalHealth?.baseUrl || "未加载"}</div>
-                      <div className="mt-1 text-xs text-muted-foreground break-all">{autoEvalHealth?.scenesDir || ""}</div>
-                      {autoEvalHealth?.error && <div className="mt-1 text-xs text-destructive">{autoEvalHealth.error}</div>}
-                    </div>
-                  </div>
-
-                  <div className="space-y-3 rounded-[20px] border border-border/70 bg-card/80 p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div>
-                        <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">测评题选择</div>
-                        <div className="mt-1 text-xs text-muted-foreground">点击题目卡片即可切换是否纳入本次测评。</div>
-                      </div>
-                      <div className="text-xs text-muted-foreground">{selectedEvalQuestionIds.length}/{autoEvalQuestions.length}</div>
-                    </div>
-
-                    {autoEvalDocumentQuestions.length > 0 && (
-                      <div className="space-y-2">
-                        <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">文档题</div>
-                        <div className="space-y-2">
-                          {autoEvalDocumentQuestions.map((question) => {
-                            const selected = selectedEvalQuestionIds.includes(question.id);
-                            return (
-                              <button
-                                key={question.id}
-                                type="button"
-                                onClick={() => toggleAutoEvalQuestion(question.id)}
-                                className={`w-full rounded-[18px] border px-3 py-3 text-left transition-colors ${selected ? "border-primary/30 bg-primary/5" : "border-border/70 bg-background hover:border-primary/20"}`}
-                              >
-                                <div className="flex items-start gap-3">
-                                  <div className={`mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border ${selected ? "border-primary bg-primary text-primary-foreground" : "border-border/70 text-transparent"}`}>
-                                    <CheckCircle2 className="size-2.5" />
-                                  </div>
-                                  <div className="min-w-0 flex-1">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                      <div className="truncate text-sm font-medium">{question.title}</div>
-                                      <Badge variant="secondary" className="rounded-full text-[10px]">文档题</Badge>
-                                    </div>
-                                    <div className="mt-1 text-xs leading-5 text-muted-foreground line-clamp-3">{question.prompt}</div>
-                                  </div>
-                                </div>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="space-y-2">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">通用题</div>
-                      <div className="space-y-2">
-                        {autoEvalBuiltinQuestions.map((question) => {
-                          const selected = selectedEvalQuestionIds.includes(question.id);
-                          return (
-                            <button
-                              key={question.id}
-                              type="button"
-                              onClick={() => toggleAutoEvalQuestion(question.id)}
-                              className={`w-full rounded-[18px] border px-3 py-3 text-left transition-colors ${selected ? "border-primary/30 bg-primary/5" : "border-border/70 bg-background hover:border-primary/20"}`}
-                            >
-                              <div className="flex items-start gap-3">
-                                <div className={`mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border ${selected ? "border-primary bg-primary text-primary-foreground" : "border-border/70 text-transparent"}`}>
-                                  <CheckCircle2 className="size-2.5" />
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                  <div className="flex flex-wrap items-center gap-2">
-                                    <div className="truncate text-sm font-medium">{question.title}</div>
-                                    <Badge variant="secondary" className="rounded-full text-[10px]">通用题</Badge>
-                                  </div>
-                                  <div className="mt-1 text-xs leading-5 text-muted-foreground line-clamp-3">{question.prompt}</div>
-                                </div>
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-
-                  {report ? renderAutoEvalReportView(report) : (
-                    <div className="rounded-[20px] border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
-                      还没有生成测评结果。先选题，再点“开始测评”。
-                    </div>
-                  )}
-                </div>
-              )}
               {detailTab === "optimization" && (optimization ? (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">优化结果</div>
-                    <Button size="sm" variant="outline" className="h-7 text-xs rounded-[8px]" onClick={() => void startInteractive()}>开始交互式优化</Button>
+                    <Button size="sm" variant="outline" className="h-7 text-xs rounded-[8px]" onClick={() => void startInteractive()} disabled={!rubricConfigured}>开始交互式优化</Button>
                   </div>
+                  {!rubricConfigured && (
+                    <div className="rounded-[18px] border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-200">
+                      <div className="font-medium">交互式优化暂不可用</div>
+                      <div className="mt-1 text-xs leading-5">{rubricRequiredMessage}</div>
+                    </div>
+                  )}
                   <div className="rounded-[20px] border border-border/70 bg-muted/50 p-3 text-sm"><strong>新版本：</strong>v{optimization.versionNumber}</div>
                   <div className="space-y-2">
                     {optimization.issues.map((issue, i) => (
@@ -2251,7 +1985,8 @@ function startResizeLeft(e: React.MouseEvent) {
                   <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">优化</div>
                   <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground space-y-3">
                     <div>还没有进行交互式优化</div>
-                    <Button size="sm" variant="outline" className="rounded-[8px]" onClick={() => void startInteractive()} disabled={!thread}>开始交互式优化</Button>
+                    {!rubricConfigured && <div className="text-xs text-amber-700 dark:text-amber-300">{rubricRequiredMessage}</div>}
+                    <Button size="sm" variant="outline" className="rounded-[8px]" onClick={() => void startInteractive()} disabled={!thread || !rubricConfigured}>开始交互式优化</Button>
                   </div>
                 </div>
               ))}

@@ -131,6 +131,45 @@ function stripMarkdownFence(value: string): string {
   return (match ? match[1] : trimmed).trim();
 }
 
+const RUBRIC_REQUIRED_HEADINGS = [
+  "# Rubric",
+  "## 评分目标",
+  "## 评分维度",
+  "### 角色贴合",
+  "### Skill 遵循",
+  "### 回答质量",
+  "### 安全边界",
+  "## 使用说明",
+];
+
+export function hasConfiguredRubricText(rubricMd: string | undefined | null): boolean {
+  return Boolean(String(rubricMd || "").trim());
+}
+
+export function validateRubricMarkdown(rubricMd: string): string[] {
+  const content = String(rubricMd || "").trim();
+  if (!content) return ["rubric.md 不能为空"];
+
+  const errors: string[] = [];
+  for (const heading of RUBRIC_REQUIRED_HEADINGS) {
+    if (!content.includes(heading)) {
+      errors.push(`rubric.md 缺少必要章节：${heading}`);
+    }
+  }
+
+  if ((content.match(/^###\s+/gm) || []).length < 4) {
+    errors.push("rubric.md 至少需要 4 个评分维度（### 标题）");
+  }
+
+  return errors;
+}
+
+export function assertRubricConfigured(rubricMd: string | undefined | null, feature: string): void {
+  if (!hasConfiguredRubricText(rubricMd)) {
+    throw new Error(`当前智能体还没有配置 rubric。请先在 Rubric 标签中补充评分规则后再使用${feature}。`);
+  }
+}
+
 async function collectStreamedText(
   input: Parameters<typeof generateText>[0],
   onDelta?: (delta: string) => void,
@@ -164,13 +203,57 @@ function normalizeSkillMdFrontmatter(skillMd: string, dirName: string, descripti
   return `${frontmatter}\n\n${body}`.trim();
 }
 
+function normalizeSkillMdMissingSections(skillMd: string, skillName: string, description: string): string {
+  const match = skillMd.match(/^---\s*\n[\s\S]*?\n---\s*\n?/);
+  const frontmatter = match ? match[0].trim() : "";
+  let body = match ? skillMd.slice(match[0].length).trim() : skillMd.trim();
+  const safeDescription = sanitizeSkillDescription(description);
+
+  const sectionTemplates: Array<{ title: string; lines: string[] }> = [
+    {
+      title: "Workflow",
+      lines: [
+        `1. 识别用户是否属于“${skillName}”负责的场景。`,
+        `2. 根据“${safeDescription}”整理处理步骤与关键约束。`,
+        "3. 输出前检查边界、风险提示与后续建议是否完整。",
+      ],
+    },
+    {
+      title: "Examples",
+      lines: [
+        `- 示例 1：当用户提出与“${skillName}”直接相关的请求时，先判断场景，再给出分步骤方案。`,
+        "- 示例 2：当输入信息不足时，先补问关键条件，再继续提供可执行结果。",
+      ],
+    },
+    {
+      title: "Common Issues",
+      lines: [
+        "- 信息不足：先追问缺失条件，不要直接假设。",
+        "- 请求越界：明确说明不适用范围，并引导到更合适的能力或人工处理。",
+      ],
+    },
+  ];
+
+  for (const section of sectionTemplates) {
+    if (!new RegExp(`^##?\\s*${section.title}`, "im").test(body)) {
+      body = [
+        body.trim(),
+        `## ${section.title}`,
+        ...section.lines,
+      ].filter(Boolean).join("\n\n");
+    }
+  }
+
+  return frontmatter ? `${frontmatter}\n\n${body.trim()}`.trim() : body.trim();
+}
+
 function normalizeSnapshot(input: PackageGenerationResult): AgentPackageSnapshot {
   return {
     name: input.name.trim(),
     description: input.description.trim(),
     versionLabel: "v1",
     agentMd: input.agentMd.trim(),
-    rubricMd: input.rubricMd.trim(),
+    rubricMd: input.rubricMd?.trim() || "",
     skills: input.skills.map((skill) => ({
       id: newId(),
       dirName: slugify(skill.dirName || skill.name),
@@ -391,7 +474,6 @@ function validateGenerationResult(generated: PackageGenerationResult): void {
   if (!generated.name?.trim()) errors.push("缺少智能体 name");
   if (!generated.description?.trim()) errors.push("缺少智能体 description");
   if (!generated.agentMd?.trim()) errors.push("缺少 agentMd");
-  if (!generated.rubricMd?.trim()) errors.push("缺少 rubricMd");
 
   // 检查 skills
   if (!Array.isArray(generated.skills) || generated.skills.length === 0) {
@@ -677,34 +759,43 @@ export async function generatePackage(
     maxTokens: 3500,
   }, (delta) => onPreviewDelta?.({ type: "agent", name: "agent.md", delta })));
 
-  const rubricMd = stripMarkdownFence(await collectStreamedText({
-    model,
-    systemPrompt: [
-      "You are an evaluation rubric author.",
-      "Return plain Markdown only.",
-      "Do not wrap the answer in Markdown fences.",
-      "Prefer Chinese content when the source content is Chinese.",
-    ].join("\n"),
-    userPrompt: [
-      "Create a rubric.md for this package with 3-5 scoring dimensions.",
-      "The rubric must include dimensions for document fidelity and safety/referral boundaries.",
-      "Document fidelity should check whether outputs stay grounded in uploaded materials and avoid unsupported invention.",
-      "Safety/referral boundaries should check whether high-risk cases such as severe harm, self-harm, medical/legal crisis, or imminent danger receive appropriate escalation guidance.",
-      "",
-      `Package name: ${base.name}`,
-      `Package description: ${base.description}`,
-      "",
-      "agent.md 摘要：",
-      agentMd.slice(0, 1800),
-      "",
-      "Return only the Markdown file content.",
-    ].join("\n"),
-    temperature: 0.25,
-    maxTokens: 2000,
-  }, (delta) => onPreviewDelta?.({ type: "rubric", name: "rubric.md", delta })));
+  let rubricMd = "";
+  try {
+    rubricMd = stripMarkdownFence(await collectStreamedText({
+      model,
+      systemPrompt: [
+        "You are an evaluation rubric author.",
+        "Return plain Markdown only.",
+        "Do not wrap the answer in Markdown fences.",
+        "Prefer Chinese content when the source content is Chinese.",
+      ].join("\n"),
+      userPrompt: [
+        "Create a rubric.md for this package with 3-5 scoring dimensions.",
+        "The rubric must include dimensions for document fidelity and safety/referral boundaries.",
+        "Document fidelity should check whether outputs stay grounded in uploaded materials and avoid unsupported invention.",
+        "Safety/referral boundaries should check whether high-risk cases such as severe harm, self-harm, medical/legal crisis, or imminent danger receive appropriate escalation guidance.",
+        "",
+        `Package name: ${base.name}`,
+        `Package description: ${base.description}`,
+        "",
+        "agent.md 摘要：",
+        agentMd.slice(0, 1800),
+        "",
+        "Return only the Markdown file content.",
+      ].join("\n"),
+      temperature: 0.25,
+      maxTokens: 2000,
+    }, (delta) => onPreviewDelta?.({ type: "rubric", name: "rubric.md", delta })));
+  } catch (error) {
+    console.warn("[packages.generate] rubric generation failed; continuing without rubric", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 
   onPreview?.({ type: "agent", name: "agent.md", content: agentMd.trim().slice(0, 1200) });
-  onPreview?.({ type: "rubric", name: "rubric.md", content: rubricMd.trim().slice(0, 800) });
+  if (rubricMd.trim()) {
+    onPreview?.({ type: "rubric", name: "rubric.md", content: rubricMd.trim().slice(0, 800) });
+  }
 
   const skills: PackageGenerationResult["skills"] = [];
   for (let index = 0; index < skillMetas.length; index += 1) {
@@ -753,7 +844,11 @@ export async function generatePackage(
       maxTokens: 4000,
     }, (delta) => onPreviewDelta?.({ type: "skill", name: skillMeta.name, delta }));
 
-    const skillMd = normalizeSkillMdFrontmatter(skillMdRaw || "", skillMeta.dirName, skillMeta.description);
+    const skillMd = normalizeSkillMdMissingSections(
+      normalizeSkillMdFrontmatter(skillMdRaw || "", skillMeta.dirName, skillMeta.description),
+      skillMeta.name,
+      skillMeta.description,
+    );
     const skill = { ...skillMeta, skillMd };
     skills.push(skill);
     onPreview?.({ type: "skill", name: skill.name, content: skill.skillMd.slice(0, 800) });
@@ -865,6 +960,7 @@ export async function importPackageZip(userId: string, zipBuffer: Buffer) {
           name: snapshot.name?.trim() || "导入的智能体",
           description: snapshot.description?.trim() || "导入的智能体",
           versionLabel: snapshot.versionLabel || "v1",
+          rubricMd: typeof snapshot.rubricMd === "string" ? snapshot.rubricMd.trim() : "",
         }, "imported");
       }
     } catch {
@@ -904,7 +1000,7 @@ export async function importPackageZip(userId: string, zipBuffer: Buffer) {
     agentMd: zip.readAsText(agentEntry, "utf8").trim(),
     rubricMd: rubricEntry
       ? zip.readAsText(rubricEntry, "utf8").trim()
-      : "# Rubric\n\n## Dimensions\n- Clarity\n- Correctness\n- Structure",
+      : "",
     skills,
   };
 
@@ -1005,7 +1101,7 @@ export async function applyManualMarkdownEdit(
   userId: string,
   packageId: string,
   input: {
-    target: "agent" | "skill";
+    target: "agent" | "rubric" | "skill";
     content: string;
     skillId?: string;
     note?: string;
@@ -1024,6 +1120,16 @@ export async function applyManualMarkdownEdit(
     if (content === pkg.snapshot.agentMd.trim()) throw new Error("内容没有变化，无需保存新版本");
     nextSnapshot.agentMd = content;
     return applyOptimizedSnapshot(userId, packageId, nextSnapshot, "manual", input.note || "手动编辑 agent.md");
+  }
+
+  if (input.target === "rubric") {
+    const rubricErrors = validateRubricMarkdown(content);
+    if (rubricErrors.length > 0) {
+      throw new Error(rubricErrors.join("\n"));
+    }
+    if (content === pkg.snapshot.rubricMd.trim()) throw new Error("内容没有变化，无需保存新版本");
+    nextSnapshot.rubricMd = content;
+    return applyOptimizedSnapshot(userId, packageId, nextSnapshot, "manual", input.note || "手动编辑 rubric.md");
   }
 
   const skillId = String(input.skillId || "");

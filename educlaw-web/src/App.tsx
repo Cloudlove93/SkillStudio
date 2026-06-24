@@ -36,10 +36,10 @@ function AppRoutes() {
       <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4">
         <div className="pointer-events-none absolute inset-0 bg-mesh-gradient opacity-80" />
         <div className="card-premium relative z-10 flex w-full max-w-md items-center gap-4 rounded-[20px] px-6 py-5">
-          <img src={`${BASE}/logo.png`} alt="EduClaw" className="size-12 rounded-[14px]" />
+          <img src={`${BASE}/logo.png`} alt="EduSkill" className="size-12 rounded-[14px]" />
           <div>
             <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-              EduClaw Workspace
+              EduSkill Workspace
             </div>
             <div className="mt-1 text-base font-semibold text-foreground">Loading your workspace...</div>
           </div>

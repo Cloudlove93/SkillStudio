@@ -3,3 +3,5 @@ packages:
   - educlaw-server
   - educlaw-web
   - openagent
+allowBuilds:
+  esbuild: true

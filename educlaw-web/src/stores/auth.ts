@@ -10,7 +10,7 @@ interface AuthStore {
   isAuthenticated: boolean;
   isAdmin: boolean;
   login: (username: string, password: string) => Promise<void>;
-  register: (username: string, password: string) => Promise<void>;
+  register: (username: string, password: string, inviteCode: string) => Promise<void>;
   logout: () => void;
   checkAuth: () => Promise<boolean>;
 }
@@ -32,8 +32,8 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     } catch { /* ignore */ }
   },
 
-  async register(username: string, password: string) {
-    const { token, user } = await authApi.register(username, password);
+  async register(username: string, password: string, inviteCode: string) {
+    const { token, user } = await authApi.register(username, password, inviteCode);
     localStorage.setItem(TOKEN_KEY, token);
     set({ token, user, isAuthenticated: true, isAdmin: !!user.isAdmin });
   },

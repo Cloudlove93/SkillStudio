@@ -1,8 +1,6 @@
 import type {
   AgentPackageDetail,
   AgentPackageSummary,
-  AutoEvalPreview,
-  AutoEvalReport,
   ArenaMessage,
   ArenaReport,
   ArenaThread,
@@ -161,8 +159,6 @@ export type OptimizeStreamEvent =
   | { event: "error"; data: { error: string } }
   | { event: "stream_end"; data: { ok: boolean } };
 
-export type AutoEvalHealth = { ok: boolean; baseUrl: string; scenesDir: string; error?: string };
-
 async function request<T>(path: string, init: RequestInit = {}, token?: string): Promise<T> {
   const response = await fetch(`${API_BASE}/api${path}`, {
     ...init,
@@ -198,7 +194,7 @@ export const liteApi = {
     request<AgentPackageDetail>(`${PACKAGE_ROUTES.DETAIL}?packageId=${encodeURIComponent(packageId)}`, {}, token),
   renamePackage: (token: string, packageId: string, name: string) =>
     request<AgentPackageDetail>(`/packages/${packageId}`, { method: "PATCH", body: JSON.stringify({ name }) }, token),
-  saveManualMarkdownEdit: (token: string, packageId: string, data: { target: "agent" | "skill"; content: string; skillId?: string; note?: string }) =>
+  saveManualMarkdownEdit: (token: string, packageId: string, data: { target: "agent" | "rubric" | "skill"; content: string; skillId?: string; note?: string }) =>
     request<AgentPackageDetail>(`/packages/${packageId}/manual-edit`, { method: "POST", body: JSON.stringify(data) }, token),
   listVersions: (token: string, packageId: string) => request<PackageVersion[]>(`/packages/${packageId}/versions`, {}, token),
   generatePackageStream: (token: string, instruction: string, model: string | undefined, documents: Array<{ name: string; content: string }>, onEvent: (event: PackageGenerateStreamEvent) => void) =>
@@ -213,14 +209,6 @@ export const liteApi = {
     streamRequest<ReportStreamEvent>(`/arena/threads/${threadId}/report/stream`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model }) }, token, onEvent),
   optimizePackageStream: (token: string, packageId: string, threadId: string, model: string | undefined, onEvent: (event: OptimizeStreamEvent) => void) =>
     streamRequest<OptimizeStreamEvent>(`/packages/${packageId}/optimize/stream`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ threadId, model }) }, token, onEvent),
-  getAutoEvalHealth: (token: string) =>
-    request<AutoEvalHealth>("/auto-eval/health", {}, token),
-  previewAutoEval: (token: string, packageId: string) =>
-    request<AutoEvalPreview>("/auto-eval/preview", { method: "POST", body: JSON.stringify({ packageId }) }, token),
-  importAutoEvalQuestions: (token: string, packageId: string, documents: Array<{ name: string; content: string }>, model?: string) =>
-    request<AutoEvalPreview>("/auto-eval/questions/import", { method: "POST", body: JSON.stringify({ packageId, documents, model }) }, token),
-  runAutoEval: (token: string, packageId: string, questionIds: string[]) =>
-    request<AutoEvalReport>("/auto-eval/runs", { method: "POST", body: JSON.stringify({ packageId, questionIds }) }, token),
   async importPackage(token: string, file: File): Promise<AgentPackageDetail> {
     const formData = new FormData(); formData.append("file", file, file.name);
     const response = await fetch(`${API_BASE}/api/packages/import`, { method: "POST", body: formData, headers: token ? { Authorization: `Bearer ${token}` } : undefined });

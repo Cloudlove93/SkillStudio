@@ -70,6 +70,7 @@ export const config = {
   llmTimeoutMs: readNumber("LLM_TIMEOUT_MS", 300_000),
   databaseUrl: process.env.DATABASE_URL || "postgres://educlawlite:educlawlite@127.0.0.1:5435/educlawlite",
   jwtSecret,
+  inviteCode: process.env.INVITE_CODE || "",
   appOrigin: process.env.APP_ORIGIN || "http://localhost:4173",
   appOrigins: readList("APP_ORIGIN", ["http://localhost:4173"]),
   seedUsers: readBoolean("SEED_USERS", !isProduction),

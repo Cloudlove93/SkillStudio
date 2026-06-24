@@ -1,13 +1,22 @@
 import { Router } from "express";
 import { AUTH_ROUTES } from "@educlaw/shared";
 import type { AuthedRequest } from "../types.js";
-import { getUserById, loginUser, registerUser } from "../services/auth-service.js";
+import { getUserById, loginUser, registerUserWithInvite } from "../services/auth-service.js";
 import { requireAuth } from "../middleware/auth.js";
 
 const router: import("express").Router = Router();
 
-router.post(`/auth${AUTH_ROUTES.REGISTER}`, async (_req, res) => {
-  res.status(403).json({ error: "注册已关闭，请使用预置账号登录" });
+router.post(`/auth${AUTH_ROUTES.REGISTER}`, async (req, res) => {
+  try {
+    const result = await registerUserWithInvite(
+      String(req.body?.username || ""),
+      String(req.body?.password || ""),
+      String(req.body?.inviteCode || ""),
+    );
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "注册失败" });
+  }
 });
 
 router.post(`/auth${AUTH_ROUTES.LOGIN}`, async (req, res) => {

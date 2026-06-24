@@ -35,6 +35,17 @@ export async function registerUser(username: string, password: string) {
   return issueToken(row);
 }
 
+export async function registerUserWithInvite(username: string, password: string, inviteCode: string) {
+  const expectedInvite = config.inviteCode.trim();
+  if (!expectedInvite) {
+    throw new Error("注册暂未开放");
+  }
+  if (inviteCode.trim() !== expectedInvite) {
+    throw new Error("邀请码无效");
+  }
+  return registerUser(username, password);
+}
+
 export async function loginUser(username: string, password: string) {
   const result = await query<DbRowUser>("select * from users where username = $1", [username.trim()]);
   const row = result.rows[0];
