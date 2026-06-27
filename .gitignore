@@ -12,6 +12,9 @@ educlaw-server/public/
 .env
 .env.local
 .env.*.local
+.env.development
+.env.test
+.env.docker
 
 # IDE
 .vscode/
@@ -30,3 +33,6 @@ npm-debug.log*
 
 # Claude
 .claude/
+
+# Local planning artifacts
+docs/superpowers/

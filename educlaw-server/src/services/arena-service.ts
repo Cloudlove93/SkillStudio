@@ -23,6 +23,103 @@ export type ArenaChatStreamEvent =
   | { event: "side_done"; data: { side: ArenaStreamSide; content: string; ok: boolean; error?: string } }
   | { event: "done"; data: { thread: ArenaThread; messages: ArenaMessage[] } };
 
+function clampNonNegativeNumber(value: unknown, fallback = 0): number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0
+    ? value
+    : fallback;
+}
+
+function normalizeDimension(
+  value: unknown,
+  index: number,
+): ArenaReportSide["dimensions"][number] {
+  const record = value as Record<string, unknown> | undefined;
+  return {
+    key: String(record?.key || `dimension_${index + 1}`),
+    name: String(record?.name || `维度 ${index + 1}`),
+    score: clampNonNegativeNumber(record?.score),
+    maxScore: clampNonNegativeNumber(record?.maxScore, 10) || 10,
+    reason: String(record?.reason || "").trim(),
+  };
+}
+
+function buildFallbackSideSummary(
+  label: string,
+  side: ArenaReportSide,
+): string {
+  const dimensions = side.dimensions;
+  if (dimensions.length === 0) {
+    return `${label}当前总分为 ${side.total.toFixed(2)}。这次报告没有返回足够的维度细节，建议结合对话内容再人工确认一次表现。`;
+  }
+
+  const sorted = [...dimensions].sort(
+    (left, right) =>
+      right.score / Math.max(right.maxScore, 1) -
+      left.score / Math.max(left.maxScore, 1),
+  );
+  const strongest = sorted[0];
+  const weakest = sorted[sorted.length - 1];
+  const strongestReason = strongest?.reason || "这一项表现相对更稳。";
+  const weakestReason =
+    weakest && weakest !== strongest
+      ? weakest.reason || "这一项还有进一步补强空间。"
+      : "整体表现比较平均，没有明显短板。";
+
+  const sentences = [
+    `${label}当前总分为 ${side.total.toFixed(2)}，整体表现${dimensions.length >= 3 ? "已经覆盖多个评分维度" : "已能覆盖当前主要维度"}。`,
+    `相对更强的是“${strongest?.name || "核心维度"}”：${strongestReason}`,
+  ];
+
+  if (weakest && weakest !== strongest) {
+    sentences.push(`最需要继续打磨的是“${weakest.name}”：${weakestReason}`);
+  } else {
+    sentences.push(weakestReason);
+  }
+
+  return sentences.join("");
+}
+
+function buildFallbackRecommendation(
+  report: Pick<ArenaReport, "baseline" | "enhanced" | "winningSide">,
+  enhancedLabel: string,
+): string {
+  const baselineLabel = "Baseline";
+  const winner =
+    report.winningSide === "enhanced"
+      ? enhancedLabel
+      : report.winningSide === "baseline"
+        ? baselineLabel
+        : "两边";
+  const loser =
+    report.winningSide === "enhanced"
+      ? baselineLabel
+      : report.winningSide === "baseline"
+        ? enhancedLabel
+        : "两边";
+
+  const firstSentence =
+    report.winningSide === "tie"
+      ? `这次对比里，两边总分接近，暂时没有明显拉开差距。`
+      : `这次更推荐 ${winner}，因为它在当前 rubric 下的整体完成度更高。`;
+
+  const secondSentence =
+    report.winningSide === "tie"
+      ? `如果要进一步区分，建议重点看各维度理由里是否真的贴合用户场景。`
+      : `${winner}在关键维度上的得分更稳，说明它不仅回答到了点上，也更贴合当前场景要求。`;
+
+  const thirdSentence =
+    report.winningSide === "tie"
+      ? `后续可以继续补充更细的 rubric 或再跑一轮对话，帮助报告给出更明确的判断。`
+      : `${loser}并不是完全不可用，但在针对性、完整性或边界处理上还存在明显短板。`;
+
+  const fourthSentence =
+    report.winningSide === "tie"
+      ? `下一步优先补充更能拉开差距的评分维度。`
+      : `下一步最值得优先改进的方向，是把失分最多的维度补齐到可直接执行、可直接复用的程度。`;
+
+  return [firstSentence, secondSentence, thirdSentence, fourthSentence].join("");
+}
+
 function toThread(row: DbRowThread): ArenaThread {
   return {
     id: row.id,
@@ -305,6 +402,7 @@ export async function sendMessage(
 export async function generateReport(userId: string, threadId: string, model?: string): Promise<ArenaReport> {
   const detail = await getThreadDetail(userId, threadId);
   const pkg = await getPackage(userId, detail.thread.packageId);
+  const enhancedLabel = pkg.snapshot.name || "Enhanced";
   const latestUser = [...detail.messages].reverse().find((message) => message.side === "shared" && message.role === "user");
   const latestBaseline = [...detail.messages].reverse().find((message) => message.side === "baseline");
   const latestEnhanced = [...detail.messages].reverse().find((message) => message.side === "enhanced");
@@ -320,6 +418,9 @@ export async function generateReport(userId: string, threadId: string, model?: s
       "只返回 JSON 格式。",
       "根据 rubric.md 的评分标准，对基础模型和增强模型进行评估对比。",
       "每一边都必须包含 summary、total 和 dimensions。",
+      "summary 必须是 2-4 句完整说明，能让普通用户直接看懂强项、短板和适用性。",
+      "recommendation 必须是 3-5 句完整结论，明确说明哪一边更好、为什么更好、还差什么。",
+      "dimensions.reason 必须引用回答里的具体表现，不要只写空泛判断。",
     ].join("\n"),
     userPrompt: [
       "[rubric.md]",
@@ -337,42 +438,58 @@ export async function generateReport(userId: string, threadId: string, model?: s
       "返回包含以下字段的 JSON：threadId、baseline、enhanced、recommendation、winningSide",
       "",
       "每一边（baseline 和 enhanced）必须包含：",
-      "- summary：简要评估总结",
+      "- summary：面向普通用户的评估总结，2-4 句完整中文",
       "- total：总分（数字）",
       "- dimensions：评分维度数组，每个维度包含：",
       "  - key：维度标识符（如 'accuracy'、'completeness'）",
       "  - name：维度显示名称",
       "  - score：得分（数字）",
       "  - maxScore：满分（数字，通常为 10 或 20）",
-      "  - reason：得分的简要说明",
+      "  - reason：2-3 句具体说明，要点名回答中做得好的地方或没做到的地方",
+      "",
+      "recommendation 需要单独给出一段更完整的综合判断：",
+      "- 直接说清最终推荐哪一边",
+      "- 说明胜出的关键原因",
+      "- 说明另一边主要短板",
+      "- 给出下一步最值得优先改进的方向",
     ].join("\n"),
     temperature: 0.2,
   });
 
   // Normalize with defaults to prevent frontend crashes
-  const normalizeSide = (side?: Partial<ArenaReportSide>): ArenaReportSide => ({
-    summary: side?.summary || "",
-    total: typeof side?.total === "number" ? side.total : 0,
-    dimensions: Array.isArray(side?.dimensions)
-      ? (side.dimensions as unknown[]).map((d) => ({
-          key: String((d as Record<string, unknown>).key || ""),
-          name: String((d as Record<string, unknown>).name || ""),
-          score: typeof (d as Record<string, unknown>).score === "number" ? (d as Record<string, unknown>).score as number : 0,
-          maxScore: typeof (d as Record<string, unknown>).maxScore === "number" ? (d as Record<string, unknown>).maxScore as number : 10,
-          reason: String((d as Record<string, unknown>).reason || ""),
-        }))
-      : [],
-  });
+  const normalizeSide = (
+    side: Partial<ArenaReportSide> | undefined,
+    label: string,
+  ): ArenaReportSide => {
+    const dimensions = Array.isArray(side?.dimensions)
+      ? (side.dimensions as unknown[]).map((dimension, index) =>
+          normalizeDimension(dimension, index),
+        )
+      : [];
+    const normalized: ArenaReportSide = {
+      summary: String(side?.summary || "").trim(),
+      total: clampNonNegativeNumber(side?.total),
+      dimensions,
+    };
+    if (!normalized.summary) {
+      normalized.summary = buildFallbackSideSummary(label, normalized);
+    }
+    return normalized;
+  };
 
   const report: ArenaReport = {
     threadId,
-    baseline: normalizeSide(rawReport.baseline),
-    enhanced: normalizeSide(rawReport.enhanced),
-    recommendation: rawReport.recommendation || "",
+    baseline: normalizeSide(rawReport.baseline, "Baseline"),
+    enhanced: normalizeSide(rawReport.enhanced, enhancedLabel),
+    recommendation: String(rawReport.recommendation || "").trim(),
     winningSide: ["baseline", "enhanced", "tie"].includes(rawReport.winningSide as string)
       ? (rawReport.winningSide as "baseline" | "enhanced" | "tie")
       : "tie",
   };
+
+  if (!report.recommendation) {
+    report.recommendation = buildFallbackRecommendation(report, enhancedLabel);
+  }
 
   return report;
 }

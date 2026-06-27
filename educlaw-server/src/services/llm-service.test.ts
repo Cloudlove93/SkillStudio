@@ -58,9 +58,7 @@ afterEach(() => {
   vi.doUnmock("../config.js");
 });
 
-
 describe("llm-service", () => {
-
   it("streamText falls back to a normal JSON response when the response is not SSE", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockChatResponse("fallback text")));
     const { streamText } = await loadService();
@@ -118,7 +116,7 @@ describe("llm-service", () => {
   it("streamText yields content deltas from server-sent event chunks", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockStreamResponse([
       'data: {"choices":[{"delta":{"content":"Hel"}}]}\n\n',
-      'data: malformed-json\n\n',
+      "data: malformed-json\n\n",
       'data: {"choices":[{"delta":{"content":"lo"}}]}\n\n',
       "data: [DONE]\n\n",
     ])));
@@ -134,7 +132,6 @@ describe("llm-service", () => {
 
     expect(chunks).toEqual(["Hel", "lo"]);
   });
-
 
   it("generateJson parses strict JSON returned by the model", async () => {
     const fetchMock = vi.fn().mockResolvedValue(mockChatResponse('{"ok":true,"count":2}'));
@@ -160,7 +157,7 @@ describe("llm-service", () => {
     await expect(generateText({
       systemPrompt: "System",
       userPrompt: "User",
-    })).rejects.toThrow("尚未配置 LLM_API_KEY");
+    })).rejects.toThrow("LLM_API_KEY is not configured");
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -171,7 +168,7 @@ describe("llm-service", () => {
     await expect(generateText({
       systemPrompt: "System",
       userPrompt: "User",
-    })).rejects.toThrow("模型请求失败：400 bad request");
+    })).rejects.toThrow("LLM request failed: 400 bad request");
   });
 
   it("resolveBaselineModel prefers explicit model, then baseline model, then default model", async () => {

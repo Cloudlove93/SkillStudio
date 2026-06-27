@@ -1,4 +1,4 @@
-import { apiFetchJson, API_BASE } from './client';
+import { apiFetchJson } from './client';
 
 export interface AdminUserOverview {
   id: string;

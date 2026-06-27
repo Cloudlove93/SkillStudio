@@ -1,5 +1,5 @@
 import type { AgentPackageSnapshot } from "@educlaw/shared";
-import { generateChat, generateJson, type ChatMessage } from "./llm-service.js";
+import { generateChat, type ChatMessage } from "./llm-service.js";
 import { getPackage, applyOptimizedSnapshot } from "./package-service.js";
 import { getThreadDetail } from "./arena-service.js";
 import { newId, query } from "./db.js";

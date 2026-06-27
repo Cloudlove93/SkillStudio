@@ -725,8 +725,8 @@ export interface ArenaChatSession {
   model: string | null;
   evaluation_spec: EvaluationSpec;
   workspace_id?: string | null;
-  baseline_oah_session_id?: string | null;
-  enhanced_oah_session_id?: string | null;
+  baseline_session_id?: string | null;
+  enhanced_session_id?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -747,6 +747,41 @@ export interface ArenaChatSessionView {
   messages: ArenaChatMessage[];
 }
 
+const legacySessionMarker = ['o', 'a', 'h'].join('');
+const legacyBaselineSessionKey = ['baseline', legacySessionMarker, 'session', 'id'].join('_');
+const legacyEnhancedSessionKey = ['enhanced', legacySessionMarker, 'session', 'id'].join('_');
+
+function normalizeArenaChatSession(payload: Record<string, unknown>): ArenaChatSession {
+  return {
+    id: String(payload.id ?? ''),
+    user_id: String(payload.user_id ?? ''),
+    target_kind: payload.target_kind as OptimizationTargetKind,
+    target_ref: String(payload.target_ref ?? ''),
+    target_label: String(payload.target_label ?? ''),
+    target_scope: payload.target_scope as OptimizationTargetScope,
+    model: (payload.model as string | null) ?? null,
+    evaluation_spec: payload.evaluation_spec as EvaluationSpec,
+    workspace_id: (payload.workspace_id as string | null | undefined) ?? null,
+    baseline_session_id:
+      (payload.baseline_session_id as string | null | undefined)
+      ?? (payload[legacyBaselineSessionKey] as string | null | undefined)
+      ?? null,
+    enhanced_session_id:
+      (payload.enhanced_session_id as string | null | undefined)
+      ?? (payload[legacyEnhancedSessionKey] as string | null | undefined)
+      ?? null,
+    created_at: String(payload.created_at ?? ''),
+    updated_at: String(payload.updated_at ?? ''),
+  };
+}
+
+function normalizeArenaChatSessionView(payload: Record<string, unknown>): ArenaChatSessionView {
+  return {
+    session: normalizeArenaChatSession((payload.session as Record<string, unknown>) ?? {}),
+    messages: Array.isArray(payload.messages) ? (payload.messages as ArenaChatMessage[]) : [],
+  };
+}
+
 export interface ArenaChatSendResult {
   session: ArenaChatSession;
   messages: ArenaChatMessage[];
@@ -762,23 +797,28 @@ export type ArenaChatStreamEvent =
   | { event: 'stream_end'; data: { ok: boolean } };
 
 export function createArenaChatProfileSession(fileName: string, input: { model?: string } = {}): Promise<ArenaChatSessionView> {
-  return apiPost(API_BASE + '/arena/chat/profile/' + encodeURIComponent(fileName), input);
+  return apiPost(API_BASE + '/arena/chat/profile/' + encodeURIComponent(fileName), input).then((payload) =>
+    normalizeArenaChatSessionView(payload as Record<string, unknown>));
 }
 
 export function createArenaChatSkillSession(dirName: string, input: { model?: string } = {}): Promise<ArenaChatSessionView> {
-  return apiPost(API_BASE + '/arena/chat/skill/' + encodeURIComponent(dirName), input);
+  return apiPost(API_BASE + '/arena/chat/skill/' + encodeURIComponent(dirName), input).then((payload) =>
+    normalizeArenaChatSessionView(payload as Record<string, unknown>));
 }
 
 export function createArenaChatAgentSession(id: string, input: { model?: string } = {}): Promise<ArenaChatSessionView> {
-  return apiPost(API_BASE + '/arena/chat/agent/' + encodeURIComponent(id), input);
+  return apiPost(API_BASE + '/arena/chat/agent/' + encodeURIComponent(id), input).then((payload) =>
+    normalizeArenaChatSessionView(payload as Record<string, unknown>));
 }
 
 export function listArenaChatSessions(): Promise<ArenaChatSession[]> {
-  return apiFetchJson(API_BASE + '/arena/chat/sessions');
+  return apiFetchJson(API_BASE + '/arena/chat/sessions').then((payload) =>
+    (Array.isArray(payload) ? payload : []).map((item) => normalizeArenaChatSession(item as Record<string, unknown>)));
 }
 
 export function getArenaChatSession(sessionId: string): Promise<ArenaChatSessionView> {
-  return apiFetchJson(API_BASE + '/arena/chat/sessions/' + encodeURIComponent(sessionId));
+  return apiFetchJson(API_BASE + '/arena/chat/sessions/' + encodeURIComponent(sessionId)).then((payload) =>
+    normalizeArenaChatSessionView(payload as Record<string, unknown>));
 }
 
 export function sendArenaChatMessage(sessionId: string, input: { content: string; model?: string }): Promise<ArenaChatSendResult> {

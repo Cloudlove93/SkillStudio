@@ -360,8 +360,8 @@ export default function ArenaPanel() {
                     <div className="mt-1 text-sm text-muted-foreground">{selectedSession.session.target_kind} / {selectedSession.session.target_scope}</div>
                     <div className="mt-2 space-y-1 text-[11px] text-muted-foreground">
                       {selectedSession.session.workspace_id && <div>workspace: <span className="font-mono">{selectedSession.session.workspace_id}</span></div>}
-                      {selectedSession.session.baseline_oah_session_id && <div>baseline session: <span className="font-mono">{selectedSession.session.baseline_oah_session_id}</span></div>}
-                      {selectedSession.session.enhanced_oah_session_id && <div>enhanced session: <span className="font-mono">{selectedSession.session.enhanced_oah_session_id}</span></div>}
+                      {selectedSession.session.baseline_session_id && <div>baseline run: <span className="font-mono">{selectedSession.session.baseline_session_id}</span></div>}
+                      {selectedSession.session.enhanced_session_id && <div>enhanced run: <span className="font-mono">{selectedSession.session.enhanced_session_id}</span></div>}
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">

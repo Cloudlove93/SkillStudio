@@ -1,4 +1,4 @@
-import { apiFetchJson, apiPut, API_BASE } from './client';
+import { apiFetchJson, apiPut } from './client';
 
 export function fetchDiary(date: string): Promise<{ date: string; content: string }> {
   return apiFetchJson(`/api/diary/${date}`);

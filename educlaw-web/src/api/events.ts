@@ -1,9 +1,6 @@
 import { useChatStore } from '../stores/chat';
 import { useUIStore } from '../stores/ui';
-import { useInteractionQueueStore, type QuestionRequest } from '../stores/interaction-queue';
 import { useTodoStore } from '../stores/todo';
-import { useAgentStore } from '../stores/agent';
-import { agentApi } from './oah';
 import { getToken, API_BASE } from './client';
 import { startPolling, stopPolling } from '../services/polling-transport';
 
@@ -55,31 +52,8 @@ export function connectSSE() {
   };
 }
 
-/** Fetch pending questions from all running agents and add to store.
- *  Should be called after agents are loaded (e.g. from Workspace init). */
 export function restorePendingQuestions() {
-  const agents = useAgentStore.getState().agents;
-  const running = agents.filter((a) => a.status === 'running');
-  for (const agent of running) {
-    agentApi(agent.id)
-      .listQuestions()
-      .then((questions: unknown) => {
-        const list = (Array.isArray(questions)
-          ? questions
-          : (typeof questions === 'object' && questions !== null && 'data' in questions
-            ? (questions as { data?: unknown }).data
-            : [])) as QuestionRequest[];
-        const store = useInteractionQueueStore.getState();
-        for (const question of list) {
-          if (question?.id) {
-            store.addQuestion({ ...question, agentId: agent.id });
-          }
-        }
-      })
-      .catch(() => {
-        // Agent may not be ready yet; ignore
-      });
-  }
+  void 0;
 }
 
 export function disconnectSSE() {

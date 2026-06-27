@@ -1,4 +1,6 @@
 import { config } from "../config.js";
+import { safeError, truncateForLog } from "../lib/logger.js";
+import { getLogger } from "../lib/request-context.js";
 import { parseJsonObject } from "../utils/json.js";
 
 export interface ChatMessage {
@@ -44,6 +46,10 @@ function withStrictJsonContract(input: ChatRequestInput): ChatRequestInput {
   };
 }
 
+function llmLogger(bindings?: Record<string, unknown>) {
+  return getLogger({ component: "llm", ...(bindings || {}) });
+}
+
 function logLlmRequestStart(
   kind: string,
   messages: ChatMessage[],
@@ -51,7 +57,8 @@ function logLlmRequestStart(
   stream: boolean,
   maxTokens?: number,
 ) {
-  console.log("[llm] request start", {
+  llmLogger().info({
+    event: "llm.request.start",
     kind,
     model,
     stream,
@@ -60,6 +67,31 @@ function logLlmRequestStart(
     messageCount: messages.length,
     totalChars: messages.reduce((sum, message) => sum + message.content.length, 0),
     baseUrl: config.llmBaseUrl,
+    messages: messages.map((message, index) => ({
+      index,
+      role: message.role,
+      content: truncateForLog(message.content, 400),
+    })),
+  });
+}
+
+function logLlmResponseMeta(kind: string, model: string, response: Response) {
+  llmLogger().info({
+    event: "llm.response.meta",
+    kind,
+    model,
+    status: response.status,
+    ok: response.ok,
+  });
+}
+
+function logLlmTextResult(kind: string, model: string, content: string) {
+  llmLogger().info({
+    event: "llm.response.text",
+    kind,
+    model,
+    outputChars: content.length,
+    outputPreview: truncateForLog(content, 500),
   });
 }
 
@@ -120,20 +152,24 @@ async function fetchWithNetworkRetry(
     } catch (error) {
       lastError = error;
       if (error instanceof Error && error.name === "AbortError") {
-        console.error("[llm] request timeout", {
+        llmLogger().error({
+          event: "llm.request.timeout",
           ...context,
           timeoutMs: config.llmTimeoutMs,
+          error: safeError(error),
         });
-        throw new Error(`模型请求超时：超过 ${Math.round(config.llmTimeoutMs / 1000)} 秒未返回`);
+        throw new Error(`LLM request timed out after ${Math.round(config.llmTimeoutMs / 1000)} seconds`, { cause: error });
       }
 
       const retryable = shouldRetryFetchFailure(error);
-      console.warn("[llm] network request failed", {
+      llmLogger().warn({
+        event: "llm.request.retry",
         ...context,
         attempt: attempt + 1,
         retries,
         retryable,
         error: describeFetchFailure(error),
+        detail: safeError(error),
       });
 
       if (!retryable || attempt >= retries) break;
@@ -141,7 +177,7 @@ async function fetchWithNetworkRetry(
     }
   }
 
-  throw new Error(`模型网络请求失败：${describeFetchFailure(lastError)}。请稍后重试，或在服务器运行 scripts/test-llm-api.sh 检查 LLM_BASE_URL / LLM_MODEL / 网络连通性。`);
+  throw new Error(`LLM network request failed: ${describeFetchFailure(lastError)}. Please verify LLM_BASE_URL, LLM_MODEL, and network connectivity.`);
 }
 
 function usesKimiK25(model: string): boolean {
@@ -182,7 +218,7 @@ function buildChatCompletionBody(
 
 async function createChatResponse(input: ChatRequestInput, stream: boolean): Promise<Response> {
   if (!config.llmApiKey) {
-    throw new Error("尚未配置 LLM_API_KEY");
+    throw new Error("LLM_API_KEY is not configured");
   }
 
   const messages = buildMessages(input);
@@ -203,11 +239,11 @@ async function createChatResponse(input: ChatRequestInput, stream: boolean): Pro
     { kind: "prompt", model, stream },
   );
 
-  console.log("[llm] response received", { kind: "prompt", model, status: response.status, ok: response.ok });
+  logLlmResponseMeta("prompt", model, response);
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`模型请求失败：${response.status} ${text}`);
+    throw new Error(`LLM request failed: ${response.status} ${text}`);
   }
 
   return response;
@@ -215,7 +251,7 @@ async function createChatResponse(input: ChatRequestInput, stream: boolean): Pro
 
 async function createChatResponseMessages(messages: ChatMessage[], model?: string, temperature?: number, stream = false): Promise<Response> {
   if (!config.llmApiKey) {
-    throw new Error("尚未配置 LLM_API_KEY");
+    throw new Error("LLM_API_KEY is not configured");
   }
 
   const resolvedModel = model || config.llmModel;
@@ -235,11 +271,11 @@ async function createChatResponseMessages(messages: ChatMessage[], model?: strin
     { kind: "messages", model: resolvedModel, stream },
   );
 
-  console.log("[llm] response received", { kind: "messages", model: resolvedModel, status: response.status, ok: response.ok });
+  logLlmResponseMeta("messages", resolvedModel, response);
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`模型请求失败：${response.status} ${text}`);
+    throw new Error(`LLM request failed: ${response.status} ${text}`);
   }
 
   return response;
@@ -255,23 +291,30 @@ async function readChatText(response: Response): Promise<string> {
   const choice = json.choices?.[0];
   const content = choice?.message?.content?.trim() || "";
   if (!content && choice?.finish_reason === "length") {
-    throw new Error("模型输出达到长度限制但没有返回正文，请减少生成内容或提高 max_tokens");
+    throw new Error("LLM output hit the length limit without returning usable content");
   }
   return content;
 }
 
 export async function generateText(input: ChatRequestInput) {
   const response = await createChatResponse(input, false);
-  return readChatText(response);
+  const text = await readChatText(response);
+  logLlmTextResult("prompt", input.model || config.llmModel, text);
+  return text;
 }
 
 export async function* streamText(input: ChatRequestInput): AsyncGenerator<string> {
   const response = await createChatResponse(input, true);
   const contentType = response.headers.get("content-type") || "";
+  const output: string[] = [];
 
   if (!contentType.includes("text/event-stream") || !response.body) {
     const text = await readChatText(response);
-    if (text) yield text;
+    if (text) {
+      output.push(text);
+      yield text;
+    }
+    logLlmTextResult("prompt-stream-fallback", input.model || config.llmModel, output.join(""));
     return;
   }
 
@@ -298,6 +341,7 @@ export async function* streamText(input: ChatRequestInput): AsyncGenerator<strin
           };
           const delta = parsed.choices?.[0]?.delta?.content;
           if (typeof delta === "string" && delta.length > 0) {
+            output.push(delta);
             yield delta;
           }
         } catch {
@@ -306,20 +350,29 @@ export async function* streamText(input: ChatRequestInput): AsyncGenerator<strin
       }
     }
   }
+
+  logLlmTextResult("prompt-stream", input.model || config.llmModel, output.join(""));
 }
 
 export async function generateChat(messages: ChatMessage[], model?: string, temperature?: number): Promise<string> {
   const response = await createChatResponseMessages(messages, model, temperature, false);
-  return readChatText(response);
+  const text = await readChatText(response);
+  logLlmTextResult("messages", model || config.llmModel, text);
+  return text;
 }
 
 export async function* streamChat(messages: ChatMessage[], model?: string, temperature?: number): AsyncGenerator<string> {
   const response = await createChatResponseMessages(messages, model, temperature, true);
   const contentType = response.headers.get("content-type") || "";
+  const output: string[] = [];
 
   if (!contentType.includes("text/event-stream") || !response.body) {
     const text = await readChatText(response);
-    if (text) yield text;
+    if (text) {
+      output.push(text);
+      yield text;
+    }
+    logLlmTextResult("messages-stream-fallback", model || config.llmModel, output.join(""));
     return;
   }
 
@@ -346,6 +399,7 @@ export async function* streamChat(messages: ChatMessage[], model?: string, tempe
           };
           const delta = parsed.choices?.[0]?.delta?.content;
           if (typeof delta === "string" && delta.length > 0) {
+            output.push(delta);
             yield delta;
           }
         } catch {
@@ -354,35 +408,36 @@ export async function* streamChat(messages: ChatMessage[], model?: string, tempe
       }
     }
   }
+
+  logLlmTextResult("messages-stream", model || config.llmModel, output.join(""));
 }
 
 export async function generateJson<T>(input: ChatRequestInput, retries = 1): Promise<T> {
   let lastError: Error | undefined;
   const jsonInput = withStrictJsonContract(input);
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    let raw = "";
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
     try {
-      raw = await generateText(jsonInput);
+      const raw = await generateText(jsonInput);
       try {
         return parseJsonObject<T>(raw);
       } catch (parseError) {
-        console.warn("[llm] invalid json output", {
+        llmLogger().warn({
+          event: "llm.response.invalid_json",
           model: jsonInput.model || config.llmModel,
           attempt: attempt + 1,
           error: parseError instanceof Error ? parseError.message : String(parseError),
-          preview: raw.slice(0, 500),
+          preview: truncateForLog(raw, 500),
         });
         return await repairJsonOutput<T>(jsonInput, raw, parseError);
       }
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
       if (attempt < retries) {
-        // Brief delay before retry
-        await new Promise((r) => setTimeout(r, 500));
+        await new Promise((resolve) => setTimeout(resolve, 500));
       }
     }
   }
-  throw new Error(`JSON 生成失败：${lastError?.message || "模型未返回可解析的 JSON"}`);
+  throw new Error(`JSON generation failed: ${lastError?.message || "model did not return parseable JSON"}`);
 }
 
 export function resolveBaselineModel(preferred?: string) {
@@ -418,8 +473,6 @@ async function repairJsonOutput<T>(
   try {
     return parseJsonObject<T>(repaired);
   } catch (repairError) {
-    throw new Error(
-      `模型返回的 JSON 格式无效，自动修复也失败：${repairError instanceof Error ? repairError.message : String(repairError)}`,
-    );
+    throw new Error(`Model returned invalid JSON and automatic repair also failed: ${repairError instanceof Error ? repairError.message : String(repairError)}`, { cause: repairError });
   }
 }

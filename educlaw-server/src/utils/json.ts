@@ -29,7 +29,7 @@ export function parseJsonObject<T>(raw: string): T {
   const candidate = extractFirstJsonObject(raw) || raw;
   try {
     return JSON.parse(candidate) as T;
-  } catch (error) {
+  } catch {
     return JSON.parse(jsonrepair(candidate)) as T;
   }
 }

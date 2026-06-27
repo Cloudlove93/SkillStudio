@@ -678,7 +678,7 @@ export async function runAutoEval(userId: string, packageId: string, questionIds
       "update auto_eval_runs set scene_name = $1, status = $2, report_json = $3, error_message = $4, updated_at = $5 where id = $6 and user_id = $7",
       [sceneName, "failed", JSON.stringify(failed), message, updatedAt, runId, userId],
     );
-    throw new Error(message);
+    throw new Error(message, { cause: error });
   }
 }
 

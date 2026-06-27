@@ -1,4 +1,4 @@
-import { apiFetchJson, apiPost, apiPatch, API_BASE } from './client';
+import { apiFetchJson, apiPost, apiPatch } from './client';
 
 export interface SidebarGroupItem {
   group_id: string;

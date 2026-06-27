@@ -606,19 +606,23 @@ export default function FileExplorer({
 
   const reloadDir = useCallback(
     async (dirPath: string, tree: TreeNode[]): Promise<TreeNode[]> => {
-      if (dirPath === '.') return loadDir('.');
-      const result: TreeNode[] = [];
-      for (const node of tree) {
-        if (node.path === dirPath && node.type === 'directory') {
-          const children = await loadDir(node.path);
-          result.push({ ...node, children, loaded: true });
-        } else if (node.children) {
-          result.push({ ...node, children: await reloadDir(dirPath, node.children) });
-        } else {
-          result.push(node);
+      const reloadNodeChildren = async (currentDirPath: string, currentTree: TreeNode[]): Promise<TreeNode[]> => {
+        if (currentDirPath === '.') return loadDir('.');
+        const result: TreeNode[] = [];
+        for (const node of currentTree) {
+          if (node.path === currentDirPath && node.type === 'directory') {
+            const children = await loadDir(node.path);
+            result.push({ ...node, children, loaded: true });
+          } else if (node.children) {
+            result.push({ ...node, children: await reloadNodeChildren(currentDirPath, node.children) });
+          } else {
+            result.push(node);
+          }
         }
-      }
-      return result;
+        return result;
+      };
+
+      return reloadNodeChildren(dirPath, tree);
     },
     [loadDir],
   );
@@ -652,19 +656,23 @@ export default function FileExplorer({
 
   const ensureExpanded = useCallback(
     async (dirPath: string, tree: TreeNode[]): Promise<TreeNode[]> => {
-      if (dirPath === '.') return tree;
-      const result: TreeNode[] = [];
-      for (const node of tree) {
-        if (node.path === dirPath && node.type === 'directory' && !node.loaded) {
-          const children = await loadDir(node.path);
-          result.push({ ...node, children, loaded: true });
-        } else if (node.children) {
-          result.push({ ...node, children: await ensureExpanded(dirPath, node.children) });
-        } else {
-          result.push(node);
+      const expandNodeChildren = async (currentDirPath: string, currentTree: TreeNode[]): Promise<TreeNode[]> => {
+        if (currentDirPath === '.') return currentTree;
+        const result: TreeNode[] = [];
+        for (const node of currentTree) {
+          if (node.path === currentDirPath && node.type === 'directory' && !node.loaded) {
+            const children = await loadDir(node.path);
+            result.push({ ...node, children, loaded: true });
+          } else if (node.children) {
+            result.push({ ...node, children: await expandNodeChildren(currentDirPath, node.children) });
+          } else {
+            result.push(node);
+          }
         }
-      }
-      return result;
+        return result;
+      };
+
+      return expandNodeChildren(dirPath, tree);
     },
     [loadDir],
   );

@@ -20,22 +20,6 @@ function pickUserId(req: Request) {
   return (req as AuthedRequest).userId || "";
 }
 
-function packageToProfile(pkg: Awaited<ReturnType<typeof getPackage>>) {
-  return {
-    fileName: pkg.id,
-    name: pkg.name,
-    description: pkg.description,
-    details: pkg.snapshot.agentMd.slice(0, 500),
-    agent_runtime: "default",
-    agent_template: "default",
-    tools: [],
-    skills: pkg.snapshot.skills.map((s) => s.name),
-    subagents: [],
-    isPublished: false,
-    publishedName: null as string | null,
-  };
-}
-
 function calcTurnIndex(messages: Array<{ side: string; role: string; created_at?: string; createdAt?: string }>) {
   let turn = 0;
   const result: number[] = [];
@@ -200,7 +184,7 @@ router.post("/profiles/published/:fileName/delete", requireAuth, async (_req, re
 
 router.post("/arena/profile/:fileName", requireAuth, async (req, res) => {
   try {
-    const thread = await createThread(pickUserId(req), String(req.params.fileName));
+    await createThread(pickUserId(req), String(req.params.fileName));
     ok(res, { id: newId(), target_kind: "profile", target_ref: String(req.params.fileName), status: "completed", created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
   } catch (e) { bad(res, e instanceof Error ? e.message : "Failed"); }
 });
@@ -361,11 +345,6 @@ router.post("/arena/chat/sessions/:sessionId/messages/stream", requireAuth, asyn
       turnIndex = detail.messages.filter((m) => m.side === "shared" && m.role === "user").length + 1;
     } catch { /* ignore */ }
 
-    const tempUserId = `temp-user-${Date.now()}`;
-    const tempBaselineId = `temp-baseline-${Date.now()}`;
-    const tempEnhancedId = `temp-enhanced-${Date.now()}`;
-    const now = new Date().toISOString();
-
     for await (const event of streamMessage(userId, String(req.params.sessionId), content, req.body?.model)) {
       if (event.event === "shared") {
         writeSseEvent(res, "shared", { message: { ...event.data.message, arena_session_id: event.data.message.threadId, user_id: userId, turn_index: turnIndex, created_at: event.data.message.createdAt } });
@@ -378,7 +357,7 @@ router.post("/arena/chat/sessions/:sessionId/messages/stream", requireAuth, asyn
       } else if (event.event === "done") {
         writeSseEvent(res, "done", {
           session: threadToSession(event.data.thread),
-          messages: event.data.messages.map((m, i) => ({
+          messages: event.data.messages.map((m) => ({
             id: m.id,
             arena_session_id: m.threadId,
             user_id: userId,

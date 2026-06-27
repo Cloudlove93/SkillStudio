@@ -1,6 +1,6 @@
 import { useInteractionQueueStore } from '../../stores/interaction-queue';
 import { useAgentStore } from '../../stores/agent';
-import { agentApi } from '../../api/oah';
+import { agentRuntimeApi } from '../../api/runtime';
 import {
   Dialog,
   DialogContent,
@@ -25,7 +25,7 @@ export default function PermissionDialog() {
   const agent = agents.find((a) => a.id === perm.agentId);
 
   async function respond(reply: 'once' | 'always' | 'reject') {
-    const api = agentApi(perm.agentId);
+    const api = agentRuntimeApi(perm.agentId);
     const sessionID = perm.sessionID ?? '';
     await api.respondPermission(sessionID, perm.id, reply);
     useInteractionQueueStore.getState().removePermission(perm.id);

@@ -1,22 +1,11 @@
-import { lazy, Suspense, useEffect, useState, useCallback, type KeyboardEvent, type ReactNode } from 'react';
-import {
-  ArrowRight,
-  Bot,
-  PanelsLeftRight,
-  Send,
-  Sparkles,
-  Zap,
-} from 'lucide-react';
-import { BASE } from '../api/client';
+import { lazy, Suspense, useEffect, type ReactNode } from 'react';
 import { useAgentStore } from '../stores/agent';
 import { useUIStore } from '../stores/ui';
 import { useChatStore } from '../stores/chat';
-import { connectSSE, disconnectSSE, restorePendingQuestions } from '../api/events';
 import AppLayout from '../components/layout/AppLayout';
 import PermissionDialog from '../components/permission/PermissionDialog';
 import GlobalSearch from '../components/search/GlobalSearch';
 import { useHomeChatStore } from '../stores/home-chat';
-import { useT } from '../i18n';
 
 const ChatPanel = lazy(() => import('../components/chat/ChatPanel'));
 const ProfileGallery = lazy(() => import('../components/agent/ProfileGallery'));
@@ -40,54 +29,17 @@ function withLazyBoundary(node: ReactNode) {
 }
 
 export default function Workspace() {
-  const t = useT();
-  const fetchProfiles = useAgentStore((s) => s.fetchProfiles);
-  const fetchAgents = useAgentStore((s) => s.fetchAgents);
   const agents = useAgentStore((s) => s.agents);
   const mainView = useUIStore((s) => s.mainView);
-  const setMainView = useUIStore((s) => s.setMainView);
-  const setDeepStudyTab = useUIStore((s) => s.setDeepStudyTab);
   const reconcileChatAgents = useChatStore((s) => s.reconcileAgents);
   const activeSessionId = useHomeChatStore((s) => s.activeSessionId);
-  const setActiveSession = useHomeChatStore((s) => s.setActiveSession);
-  const createSession = useHomeChatStore((s) => s.createSession);
-  const setPendingMessage = useHomeChatStore((s) => s.setPendingMessage);
-  const fetchSessions = useHomeChatStore((s) => s.fetchSessions);
   const activeTabId = useChatStore((s) => s.activeTabId);
   const tabs = useChatStore((s) => s.tabs);
   const activeTab = activeTabId ? tabs.get(activeTabId) : undefined;
-  const [homeInput, setHomeInput] = useState('');
-
-  // useEffect(() => {
-  // fetchProfiles();
-  // fetchAgents().then(() => {
-  //   restorePendingQuestions();
-  // });
-  // fetchSessions();
-  // connectSSE();
-  //   return () => disconnectSSE();
-  // }, [fetchProfiles, fetchAgents, fetchSessions]);
 
   useEffect(() => {
     reconcileChatAgents(agents.map((agent) => ({ id: agent.id, name: agent.name })));
   }, [agents, reconcileChatAgents]);
-
-
-  const handleHomeSend = useCallback(async () => {
-    const text = homeInput.trim();
-    if (!text) return;
-    setHomeInput('');
-    setPendingMessage(text);
-    const id = await createSession(text);
-    setActiveSession(id);
-  }, [homeInput, createSession, setActiveSession, setPendingMessage]);
-
-  function handleHomeKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleHomeSend();
-    }
-  }
 
   function renderMainContent() {
     if (mainView === 'deep-study') return withLazyBoundary(<DeepStudyPanel />);

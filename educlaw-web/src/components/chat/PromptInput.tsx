@@ -16,7 +16,7 @@ export interface ImageAttachment {
   dataUrl: string;
 }
 
-export interface OahAgent {
+export interface AgentOption {
   name: string;
   description?: string;
   mode?: string;
@@ -53,7 +53,7 @@ export default function PromptInput({
   isStreaming: boolean;
   disabled: boolean;
   placeholder?: string;
-  agents?: OahAgent[];
+  agents?: AgentOption[];
   currentAgent?: string;
   onAgentChange?: (name: string) => void;
   customCommands?: CustomCommand[];

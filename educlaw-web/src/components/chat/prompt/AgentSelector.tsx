@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { ChevronUp } from 'lucide-react';
-import type { OahAgent } from '../PromptInput';
+import type { AgentOption } from '../PromptInput';
 import { useT } from '../../../i18n';
 
 export default function AgentSelector({
@@ -8,7 +8,7 @@ export default function AgentSelector({
   currentAgent,
   onAgentChange,
 }: {
-  agents: OahAgent[];
+  agents: AgentOption[];
   currentAgent?: string;
   onAgentChange?: (name: string) => void;
 }) {

@@ -1,14 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Check, ChevronLeft, ChevronRight, X, Send, Pencil, MessageCircleQuestion, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { agentApi } from '../../api/oah';
+import { agentRuntimeApi } from '../../api/runtime';
 import type { QuestionRequest } from '../../stores/interaction-queue';
 import { useInteractionQueueStore } from '../../stores/interaction-queue';
 import { useT } from '../../i18n';
 import { PremiumPill } from '@/components/ui/premium';
 
 /**
- * QuestionDock renders OAH's interactive question tool.
+ * QuestionDock renders the interactive question tool.
  * Follows the same UX pattern as the runtime question dock:
  * multi-question tabs, single/multi select options, custom text input.
  */
@@ -169,7 +169,7 @@ export default function QuestionDock({ request }: { request: QuestionRequest }) 
     if (sending) return;
     setSending(true);
     try {
-      const api = agentApi(request.agentId);
+      const api = agentRuntimeApi(request.agentId);
       await api.questionReply(request.id, answers);
       useInteractionQueueStore.getState().removeQuestion(request.id);
     } catch {
@@ -183,7 +183,7 @@ export default function QuestionDock({ request }: { request: QuestionRequest }) 
     if (sending) return;
     setSending(true);
     try {
-      const api = agentApi(request.agentId);
+      const api = agentRuntimeApi(request.agentId);
       await api.questionReject(request.id);
       useInteractionQueueStore.getState().removeQuestion(request.id);
     } catch {

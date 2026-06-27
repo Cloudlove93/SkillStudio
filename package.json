@@ -1,4 +1,11 @@
 {
   "name": "educlaw",
-  "private": true
+  "private": true,
+  "scripts": {
+    "build": "pnpm --filter @educlaw/shared build && pnpm --filter educlaw-server build && pnpm --filter educlaw-web build",
+    "check": "pnpm lint && pnpm test && pnpm build",
+    "format": "pnpm --filter educlaw-server format && pnpm --filter educlaw-web format",
+    "lint": "pnpm --filter educlaw-server lint && pnpm --filter educlaw-web lint",
+    "test": "pnpm --filter educlaw-server test"
+  }
 }

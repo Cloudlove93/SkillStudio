@@ -1,8 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const geminiModel = "gemini-2.5-flash";
-const runIntegration = 1;
-// process.env.RUN_GEMINI_STREAMTEXT_TEST === "1";
+const runIntegration = process.env.RUN_GEMINI_STREAMTEXT_TEST === "1";
 
 async function loadService() {
   vi.resetModules();

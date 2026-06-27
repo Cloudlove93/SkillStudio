@@ -10,7 +10,7 @@ import { useChatSessions } from './hooks/useChatSessions';
 import { useSlashCommands } from './hooks/useSlashCommands';
 import MessageList from './MessageList';
 import PromptInput from './PromptInput';
-import type { ImageAttachment, OahAgent, CustomCommand, PromptMode } from './PromptInput';
+import type { ImageAttachment, AgentOption, CustomCommand, PromptMode } from './PromptInput';
 import QuestionDock from './QuestionDock';
 import TodoDock from './TodoDock';
 import FileViewer from '../editor/FileViewer';
@@ -42,7 +42,7 @@ export default function ChatPanel({ tab }: { tab: TabState }) {
   async function handleSlashCommand(commandId: string) {
     switch (commandId) {
       case 'new':
-        await sessions.handleCreateSession(slashCommands.currentOahAgent);
+        await sessions.handleCreateSession(slashCommands.currentAgent);
         break;
       default:
         break;
@@ -82,9 +82,9 @@ export default function ChatPanel({ tab }: { tab: TabState }) {
       onAbort={chatMessages.handleAbort}
       onDeleteMessage={chatMessages.handleDeleteMessage}
       onSlashCommand={handleSlashCommand}
-      agents={slashCommands.oahAgents}
-      currentAgent={slashCommands.currentOahAgent}
-      onAgentChange={slashCommands.setCurrentOahAgent}
+      agents={slashCommands.agents}
+      currentAgent={slashCommands.currentAgent}
+      onAgentChange={slashCommands.setCurrentAgent}
       customCommands={slashCommands.customCommands}
       mode={chatMessages.promptMode}
       onModeChange={chatMessages.setPromptMode}
@@ -128,7 +128,7 @@ function ChatArea({
   onAbort: () => void;
   onDeleteMessage?: (messageId: string) => void;
   onSlashCommand?: (command: string) => void;
-  agents?: OahAgent[];
+  agents?: AgentOption[];
   currentAgent?: string;
   onAgentChange?: (name: string) => void;
   customCommands?: CustomCommand[];

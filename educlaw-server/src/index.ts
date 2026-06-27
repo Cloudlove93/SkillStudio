@@ -2,6 +2,9 @@ import express from "express";
 import cors from "cors";
 import compression from "compression";
 import { config } from "./config.js";
+import { getLogger } from "./lib/request-context.js";
+import { safeError } from "./lib/logger.js";
+import { withRequestContext } from "./middleware/request-context.js";
 import { initDb } from "./services/db.js";
 import { seedUsers } from "./services/auth-service.js";
 import apiRoutes from "./routes/index.js";
@@ -19,6 +22,7 @@ app.use(cors({
   },
   credentials: false,
 }));
+app.use(withRequestContext);
 app.use(compression());
 app.use(express.json({ limit: config.bodyLimit }));
 
@@ -29,12 +33,19 @@ app.get("/healthz", (_req, res) => {
 app.use("/api", apiRoutes);
 app.use(compatRoutes);
 
-app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+app.use((err: unknown, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  void next;
+  getLogger().error({
+    event: "request.error",
+    path: req.originalUrl || req.url,
+    method: req.method,
+    error: safeError(err),
+  }, "request.error");
   res.status(500).json({ error: err instanceof Error ? err.message : "Internal server error" });
 });
 
 await initDb();
 await seedUsers();
 app.listen(config.port, () => {
-  console.log(`EduClaw Lite server listening on :${config.port}`);
+  getLogger({ port: config.port }).info("server.listen");
 });

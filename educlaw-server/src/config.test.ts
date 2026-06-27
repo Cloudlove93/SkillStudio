@@ -20,6 +20,10 @@ const CONFIG_ENV_KEYS = [
   "LLM_BASELINE_MODEL",
 ];
 
+const DEFAULT_LOCAL_DATABASE_URL = "postgres://educlawlite:local-dev-password@127.0.0.1:5435/educlawlite";
+const DEFAULT_LOCAL_JWT_SECRET = "local-dev-jwt-secret-not-for-production";
+const DEFAULT_LOCAL_SEED_PASSWORD = "local-dev-seed-password-not-for-production";
+
 function restoreEnv() {
   for (const key of Object.keys(process.env)) {
     delete process.env[key];
@@ -30,6 +34,7 @@ function restoreEnv() {
 async function loadConfig(options: {
   env?: Record<string, string | undefined>;
   envFile?: string;
+  envLocalFile?: string;
 } = {}) {
   vi.resetModules();
   restoreEnv();
@@ -40,11 +45,27 @@ async function loadConfig(options: {
 
   vi.doMock("node:fs", () => ({
     default: {
-      existsSync: () => options.envFile != null,
-      readFileSync: () => options.envFile || "",
+      existsSync: (filePath: string) => {
+        if (filePath.endsWith(".env.local")) return options.envLocalFile != null;
+        if (filePath.endsWith(".env")) return options.envFile != null;
+        return false;
+      },
+      readFileSync: (filePath: string) => {
+        if (filePath.endsWith(".env.local")) return options.envLocalFile || "";
+        if (filePath.endsWith(".env")) return options.envFile || "";
+        return "";
+      },
     },
-    existsSync: () => options.envFile != null,
-    readFileSync: () => options.envFile || "",
+    existsSync: (filePath: string) => {
+      if (filePath.endsWith(".env.local")) return options.envLocalFile != null;
+      if (filePath.endsWith(".env")) return options.envFile != null;
+      return false;
+    },
+    readFileSync: (filePath: string) => {
+      if (filePath.endsWith(".env.local")) return options.envLocalFile || "";
+      if (filePath.endsWith(".env")) return options.envFile || "";
+      return "";
+    },
   }));
 
   return (await import("./config.js")).config;
@@ -64,13 +85,13 @@ describe("config", () => {
     expect(config.port).toBe(3000);
     expect(config.bodyLimit).toBe("100mb");
     expect(config.llmTimeoutMs).toBe(300_000);
-    expect(config.databaseUrl).toBe("postgres://educlawlite:educlawlite@127.0.0.1:5435/educlawlite");
-    expect(config.jwtSecret).toBe("educlaw-lite-dev-secret");
+    expect(config.databaseUrl).toBe(DEFAULT_LOCAL_DATABASE_URL);
+    expect(config.jwtSecret).toBe(DEFAULT_LOCAL_JWT_SECRET);
     expect(config.appOrigin).toBe("http://localhost:4173");
     expect(config.appOrigins).toEqual(["http://localhost:4173"]);
     expect(config.seedUsers).toBe(true);
     expect(config.seedUserNames).toHaveLength(15);
-    expect(config.seedUserPassword).toBe("educlaw123");
+    expect(config.seedUserPassword).toBe(DEFAULT_LOCAL_SEED_PASSWORD);
     expect(config.uploadLimitBytes).toBe(25 * 1024 * 1024);
     expect(config.llmBaseUrl).toBe("https://api.openai.com/v1");
     expect(config.llmApiKey).toBe("");
@@ -136,6 +157,22 @@ describe("config", () => {
     expect(config.seedUserNames).toEqual(["env1", "env2"]);
   });
 
+  it("prefers .env.local over .env when both exist", async () => {
+    const config = await loadConfig({
+      envFile: [
+        "JWT_SECRET=from-dot-env",
+        "DATABASE_URL=postgres://from-dot-env",
+      ].join("\n"),
+      envLocalFile: [
+        "JWT_SECRET=from-dot-env-local",
+        "DATABASE_URL=postgres://from-dot-env-local",
+      ].join("\n"),
+    });
+
+    expect(config.jwtSecret).toBe("from-dot-env-local");
+    expect(config.databaseUrl).toBe("postgres://from-dot-env-local");
+  });
+
   it("rejects weak production JWT secrets", async () => {
     await expect(loadConfig({
       env: {
@@ -150,8 +187,31 @@ describe("config", () => {
     await expect(loadConfig({
       env: {
         NODE_ENV: "production",
+        DATABASE_URL: "postgres://prod-user:prod-secret-password@db.example.com:5432/educlaw",
         JWT_SECRET: "a-strong-production-secret-value-12345",
       },
     })).rejects.toThrow("LLM_API_KEY must be set before starting production");
+  });
+
+  it("rejects placeholder database urls in production", async () => {
+    await expect(loadConfig({
+      env: {
+        NODE_ENV: "production",
+        JWT_SECRET: "a-strong-production-secret-value-12345",
+        LLM_API_KEY: "valid-test-key",
+      },
+    })).rejects.toThrow("DATABASE_URL must be set to a strong production value");
+  });
+
+  it("rejects placeholder seed passwords when seeded users are enabled in production", async () => {
+    await expect(loadConfig({
+      env: {
+        NODE_ENV: "production",
+        DATABASE_URL: "postgres://prod-user:prod-secret-password@db.example.com:5432/educlaw",
+        JWT_SECRET: "a-strong-production-secret-value-12345",
+        LLM_API_KEY: "valid-test-key",
+        SEED_USERS: "true",
+      },
+    })).rejects.toThrow("SEED_USER_PASSWORD must be set to a strong production value");
   });
 });

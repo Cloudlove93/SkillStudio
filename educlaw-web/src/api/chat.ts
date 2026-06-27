@@ -4,7 +4,7 @@ import type {
   HomeChatSession,
   HomeChatUpdateSessionInput,
 } from '@educlaw/shared';
-import { apiFetch, apiFetchJson, apiPost, apiPatch, API_BASE } from './client';
+import { apiFetch, apiFetchJson, apiPost, apiPatch } from './client';
 
 export type ChatSession = HomeChatSession;
 export type ChatMessage = HomeChatMessage;

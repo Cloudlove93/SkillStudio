@@ -1,8 +1,8 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import type { OpenAgentMessage } from '@openagent/core/types';
-import { API_BASE } from '../../api/client';
+import { apiFetch } from '../../api/client';
 import { useHomeChatStore } from '../../stores/home-chat';
-import { useHomeChatOahChat } from '../../hooks/useHomeChatOahChat';
+import { useHomeChatSessionChat } from '../../hooks/useHomeChatSessionChat';
 import { useHomeChatModels } from '../../hooks/useHomeChatModels';
 import { useHomeChatSessionLifecycle } from '../../hooks/useHomeChatSessionLifecycle';
 import HomeChatInput from './HomeChatInput';
@@ -32,7 +32,7 @@ export default function HomeChat({ sessionId }: HomeChatProps) {
     sendTextMessage,
     stop,
     status,
-  } = useHomeChatOahChat(sessionId);
+  } = useHomeChatSessionChat(sessionId);
   messagesRef.current = messages;
   const streaming = status === 'streaming';
   const submitting = status === 'submitted';
@@ -69,7 +69,7 @@ export default function HomeChat({ sessionId }: HomeChatProps) {
 
     setLoadingSuggestions(true);
     try {
-      const response = await fetch(`${API_BASE}/api/chat/suggestions`, {
+      const response = await apiFetch('/api/chat/suggestions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: currentMessages, sessionId }),

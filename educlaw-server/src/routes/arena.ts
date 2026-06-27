@@ -43,7 +43,7 @@ router.post(ARENA_ROUTES.CREATE_THREAD, requireAuth, async (req, res) => {
 
 router.get(ARENA_ROUTES.THREAD_DETAIL, requireAuth, async (req, res) => {
   try {
-    let arenaThreadDetail = await getThreadDetail((req as AuthedRequest).userId || "", one(req.query.threadId as string | string[] | undefined));
+    const arenaThreadDetail = await getThreadDetail((req as AuthedRequest).userId || "", one(req.query.threadId as string | string[] | undefined));
     res.json(arenaThreadDetail);
   } catch (error) {
     res.status(404).json({ error: error instanceof Error ? error.message : "找不到 Arena 对话" });

@@ -1,4 +1,4 @@
-import { apiFetchJson, apiPost, apiPatch, API_BASE } from './client';
+import { apiFetchJson, apiPost, apiPatch } from './client';
 
 export function agentRuntimeApi(agentId: string) {
   const prefix = `/api/${agentId}`;

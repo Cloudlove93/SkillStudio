@@ -36,7 +36,7 @@ function updateAssistantMessage(
   ));
 }
 
-export function useHomeChatOahChat(sessionId: string) {
+export function useHomeChatSessionChat(sessionId: string) {
   const [messages, setMessagesState] = useState<OpenAgentMessage[]>([]);
   const [status, setStatus] = useState<ChatStatus>('ready');
   const [error, setError] = useState<Error | undefined>(undefined);

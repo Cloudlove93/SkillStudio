@@ -1,17 +1,16 @@
 services:
-  educlaw-postgres:
-    image: postgres:16-alpine
-    container_name: educlaw-postgres
+  educlaw-db:
+    image: m.daocloud.io/docker.io/library/postgres:17
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-educlawlite}
-      POSTGRES_USER: ${POSTGRES_USER:-educlawlite}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-educlawlite}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     ports:
-      - "127.0.0.1:${POSTGRES_PORT:-5435}:5432"
+      - "${POSTGRES_PORT:-5435}:5432"
     volumes:
-      - educlaw-postgres-data:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-educlawlite} -d ${POSTGRES_DB:-educlawlite}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -23,32 +22,31 @@ services:
       dockerfile: educlaw-server/Dockerfile
     image: educlaw-server:latest
     environment:
-      - DATABASE_URL=postgres://${POSTGRES_USER:-educlawlite}:${POSTGRES_PASSWORD:-educlawlite}@educlaw-postgres:5432/${POSTGRES_DB:-educlawlite}
-      - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
+      - DATABASE_URL=${DATABASE_URL}
+      - JWT_SECRET=${JWT_SECRET:-local-dev-jwt-secret-not-for-production}
+      - INVITE_CODE=${INVITE_CODE}
       - LLM_BASE_URL=${LLM_BASE_URL}
       - LLM_API_KEY=${LLM_API_KEY}
       - LLM_MODEL=${LLM_MODEL}
       - LLM_BASELINE_MODEL=${LLM_BASELINE_MODEL}
       - CONVERSATION_EVAL_BASE_URL=${CONVERSATION_EVAL_BASE_URL:-http://host.docker.internal:8090}
       - CONVERSATION_EVAL_SCENES_DIR=${CONVERSATION_EVAL_SCENES_DIR:-/data/educlaw-eval-scenes}
-      - ASSISTANT_OAH_BASE_URL=${ASSISTANT_OAH_BASE_URL:-http://host.docker.internal:8787/api/v1}
-      - USER_OAH_BASE_URL=${USER_OAH_BASE_URL:-http://host.docker.internal:8787/api/v1}
-      - EVAL_OAH_BASE_URL=${EVAL_OAH_BASE_URL:-http://host.docker.internal:8787/api/v1}
-      - APP_ORIGIN=${APP_ORIGIN:-http://localhost}
+      - APP_ORIGIN=${APP_ORIGIN:-http://app.localhost}
       - SEED_USERS=${SEED_USERS:-false}
       - SEED_USER_NAMES=${SEED_USER_NAMES:-}
       - SEED_USER_PASSWORD=${SEED_USER_PASSWORD:-}
       - PORT=3000
     volumes:
       - ${CONVERSATION_EVAL_SCENES_DIR:-/data/educlaw-eval-scenes}:${CONVERSATION_EVAL_SCENES_DIR:-/data/educlaw-eval-scenes}
-    ports:
-      - "127.0.0.1:${SERVER_PORT:-3000}:3000"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
-      educlaw-postgres:
+      educlaw-db:
         condition: service_healthy
     restart: unless-stopped
+    networks:
+      - default
+      - auth-net
 
   educlaw-web:
     build:
@@ -56,12 +54,20 @@ services:
       dockerfile: educlaw-web/Dockerfile
     image: educlaw-web:latest
     ports:
-      - "${WEB_PORT:-80}:80"
+      - "4173:80"
     environment:
       - API_UPSTREAM=http://educlaw-server:3000
     depends_on:
       - educlaw-server
     restart: unless-stopped
+    networks:
+      - default
+      - auth-net
+
+networks:
+  auth-net:
+    name: auth-service-initial-upload_internal-net
+    external: true
 
 volumes:
-  educlaw-postgres-data:
+  postgres-data:

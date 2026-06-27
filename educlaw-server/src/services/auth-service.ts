@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import type { UserSummary } from "@educlaw/shared";
 import { config } from "../config.js";
+import { getLogger } from "../lib/request-context.js";
 import { newId, query } from "./db.js";
 import type { DbRowUser } from "../types.js";
 
@@ -91,7 +92,10 @@ export async function seedUsers() {
         "insert into users (id, username, password_hash, created_at) values ($1, $2, $3, $4)",
         [row.id, row.username, row.password_hash, row.created_at],
       );
-      console.log(`[seed] Created user: ${username}`);
+      getLogger({ component: "auth" }).info({
+        event: "seed.user.created",
+        username,
+      });
     }
   }
 }

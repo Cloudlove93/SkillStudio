@@ -269,10 +269,12 @@ function SkillDetailView({
       if (openFile.path === 'SKILL.md') {
         const { frontmatter } = parseSkillMd(openFile.content);
         if (frontmatter.name) {
-          detail.name = frontmatter.name;
-          detail.content = openFile.content;
-          if (frontmatter.description) detail.description = frontmatter.description;
-          onUpdated?.({ ...detail });
+          onUpdated?.({
+            ...detail,
+            name: frontmatter.name,
+            content: openFile.content,
+            description: frontmatter.description ?? detail.description,
+          });
         }
       }
     } catch (err) { toast.error(t('skill.saveFile'), { description: err instanceof Error ? err.message : undefined }); }
@@ -306,12 +308,14 @@ function SkillDetailView({
       } else {
         const res = await updateUserSkill(detail.dirName, editName, editDesc, detail.content);
         const newDirName = res.dirName ?? detail.dirName;
-        detail.dirName = newDirName;
-        detail.name = editName;
-        detail.description = editDesc;
         toast.success(t('skill.saveSuccess'));
         setEditing(false);
-        onUpdated?.({ ...detail });
+        onUpdated?.({
+          ...detail,
+          dirName: newDirName,
+          name: editName,
+          description: editDesc,
+        });
       }
     } catch (err) { toast.error(t('skill.save'), { description: err instanceof Error ? err.message : undefined }); }
     finally { setSaving(false); }

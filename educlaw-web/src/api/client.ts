@@ -49,7 +49,7 @@ export function getToken(): string | null {
 export function apiFetch(url: string, init?: RequestInit): Promise<Response> {
   const headers = new Headers(init?.headers);
   const token = getToken();
-  if (token) {
+  if (token && !headers.has('Authorization')) {
     headers.set('Authorization', `Bearer ${token}`);
   }
   if (!headers.has('x-request-id')) {

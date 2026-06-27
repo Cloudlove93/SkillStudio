@@ -1,9 +1,13 @@
-import type { AgentPackageSnapshot, OptimizationIssue, OptimizationResult } from "@educlaw/shared";
+import type { AgentPackageSnapshot, OptimizationIssue, OptimizationResult, PackageSkill } from "@educlaw/shared";
 import { generateJson } from "./llm-service.js";
 import { applyOptimizedSnapshot, getPackage, listVersions } from "./package-service.js";
 import { getThreadDetail } from "./arena-service.js";
 
 type ProgressCallback = (label: string) => Promise<void> | void;
+
+function isGeneratedSkill(value: unknown): value is Partial<PackageSkill> {
+  return Boolean(value) && typeof value === "object";
+}
 
 export async function optimizePackage(
   userId: string,
@@ -110,13 +114,28 @@ export async function optimizePackage(
     agentMd: typeof merged.snapshot?.agentMd === "string" ? merged.snapshot.agentMd : pkg.snapshot.agentMd,
     rubricMd: typeof merged.snapshot?.rubricMd === "string" ? merged.snapshot.rubricMd : pkg.snapshot.rubricMd,
     skills: Array.isArray(merged.snapshot?.skills)
-      ? merged.snapshot.skills.map((s: any, idx: number) => ({
-          id: s?.id || ``,
-          dirName: s?.dirName || pkg.snapshot.skills[idx]?.dirName || `skill-${idx}`,
-          name: s?.name || pkg.snapshot.skills[idx]?.name || `技能${idx + 1}`,
-          description: s?.description || pkg.snapshot.skills[idx]?.description || "",
-          skillMd: typeof s?.skillMd === "string" ? s.skillMd : (pkg.snapshot.skills[idx]?.skillMd || ""),
-        }))
+      ? merged.snapshot.skills.map((skill, idx: number) => {
+          const nextSkill: Partial<PackageSkill> = isGeneratedSkill(skill) ? skill : {};
+          return {
+            id: typeof nextSkill.id === "string" ? nextSkill.id : "",
+            dirName:
+              typeof nextSkill.dirName === "string"
+                ? nextSkill.dirName
+                : pkg.snapshot.skills[idx]?.dirName || `skill-${idx}`,
+            name:
+              typeof nextSkill.name === "string"
+                ? nextSkill.name
+                : pkg.snapshot.skills[idx]?.name || `Skill ${idx + 1}`,
+            description:
+              typeof nextSkill.description === "string"
+                ? nextSkill.description
+                : pkg.snapshot.skills[idx]?.description || "",
+            skillMd:
+              typeof nextSkill.skillMd === "string"
+                ? nextSkill.skillMd
+                : pkg.snapshot.skills[idx]?.skillMd || "",
+          };
+        })
       : pkg.snapshot.skills,
   };
 

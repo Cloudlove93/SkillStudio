@@ -1,14 +1,31 @@
-import AdmZip, { type IZipEntry } from "adm-zip";
+import AdmZip, { type IZipEntry } from 'adm-zip';
 import type {
   AgentPackageDetail,
   AgentPackageSnapshot,
   AgentPackageSummary,
   PackageSkill,
   PackageVersion,
-} from "@educlaw/shared";
-import { generateChat, generateJson, generateText, streamText } from "./llm-service.js";
-import { newId, query } from "./db.js";
-import type { DbRowPackage, DbRowPackageVersion } from "../types.js";
+} from '@educlaw/shared';
+import {
+  generateChat,
+  generateJson,
+  generateText,
+  streamText,
+} from './llm-service.js';
+import { getLogger } from '../lib/request-context.js';
+import { safeError } from '../lib/logger.js';
+import {
+  buildAgentSystemPrompt,
+  buildAgentUserPrompt,
+  buildBaseMetadataSystemPrompt,
+  buildBaseMetadataUserPrompt,
+  buildRubricSystemPrompt,
+  buildRubricUserPrompt,
+  buildSkillSystemPrompt,
+  buildSkillUserPrompt,
+} from '../prompts/package-generation.js';
+import { newId, query } from './db.js';
+import type { DbRowPackage, DbRowPackageVersion } from '../types.js';
 
 interface PackageGenerationResult {
   name: string;
@@ -48,6 +65,21 @@ interface PackageGeneratePreviewDelta {
 const MAX_BASE_DOCUMENT_CHARS = 12_000;
 const MAX_SKILL_DOCUMENT_CHARS = 8_000;
 const MAX_GENERATED_SKILLS = 2;
+const MAX_SOURCE_RUBRIC_CHARS = 4_000;
+const RUBRIC_SECTION_KEYWORDS = [
+  'rubric',
+  'evaluation criteria',
+  '评分标准',
+  '评估标准',
+  '评估规则',
+  '打分标准',
+  '评测标准',
+  '评价准则',
+  '评价标准',
+  '评估量表',
+  '评价量表',
+  '评分量表',
+];
 
 function ensureSkillIds(snapshot: AgentPackageSnapshot): AgentPackageSnapshot {
   const skills = Array.isArray(snapshot.skills) ? snapshot.skills : [];
@@ -61,25 +93,28 @@ function ensureSkillIds(snapshot: AgentPackageSnapshot): AgentPackageSnapshot {
 }
 
 function slugify(value: string) {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "") || `skill-${Math.random().toString(36).slice(2, 8)}`;
+  return (
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') ||
+    `skill-${Math.random().toString(36).slice(2, 8)}`
+  );
 }
 
 function buildDocumentContext(
   documents?: Array<{ name: string; content: string }>,
   maxChars = MAX_BASE_DOCUMENT_CHARS,
 ): string {
-  if (!documents || documents.length === 0) return "";
+  if (!documents || documents.length === 0) return '';
 
-  const parts = ["", "Uploaded documents:"];
+  const parts = ['', 'Uploaded documents:'];
   let remaining = maxChars;
 
   for (let index = 0; index < documents.length; index += 1) {
     const document = documents[index];
     const name = String(document?.name || `Document ${index + 1}`);
-    const content = String(document?.content || "");
+    const content = String(document?.content || '');
 
     if (remaining <= 0) {
       parts.push(`[Document ${index + 1}: ${name}]\n[内容已因长度限制省略]`);
@@ -88,17 +123,189 @@ function buildDocumentContext(
 
     const chunk = content.slice(0, remaining);
     remaining -= chunk.length;
-    const truncated = chunk.length < content.length ? "\n[内容已截断以控制单次模型请求长度]" : "";
+    const truncated =
+      chunk.length < content.length
+        ? '\n[内容已截断以控制单次模型请求长度]'
+        : '';
     parts.push(`[Document ${index + 1}: ${name}]\n${chunk}${truncated}`);
   }
 
-  return parts.join("\n");
+  return parts.join('\n');
 }
 
-function normalizeSkillMetadata(skills: PackageBaseGenerationResult["skills"]) {
+function getMarkdownHeadingLevel(line: string): number | null {
+  const match = line.match(/^\s*(#{1,6})\s+/);
+  return match ? match[1].length : null;
+}
+
+function normalizeSectionHeading(line: string): string {
+  return line
+    .trim()
+    .replace(/^#{1,6}\s*/, '')
+    .replace(/^[\d.\-()（）一二三四五六七八九十、\s]+/, '')
+    .replace(/[:：]\s*$/, '')
+    .trim()
+    .toLowerCase();
+}
+
+function isRubricSectionHeading(line: string): boolean {
+  const normalized = normalizeSectionHeading(line);
+  if (!normalized) return false;
+  return RUBRIC_SECTION_KEYWORDS.some(
+    (keyword) => normalized === keyword || normalized.endsWith(keyword),
+  );
+}
+
+function isLikelyNumberedSectionHeading(line: string): boolean {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed.length > 50) return false;
+  if (trimmed.includes('。')) return false;
+  return /^\d+[、.)）]\s*[\u4e00-\u9fffA-Za-z]/.test(trimmed);
+}
+
+function isLikelyRubricBodyLine(line: string): boolean {
+  const trimmed = line.trim();
+  if (!trimmed) return false;
+
+  return (
+    /^(?:#{1,6}\s*)?(?:维度[一二三四五六七八九十百0-9]+|[①-⑨]|\d+[、.)）])/.test(
+      trimmed,
+    ) ||
+    /(?:权重|分值|评分等级|评级标准|关键检查点|评估要点|评分要点|优秀|良好|合格|待改进|不合格|严重失误|\b[1-5]分\b|\d{1,3}\s*%)/.test(
+      trimmed,
+    )
+  );
+}
+
+function isLikelyRubricBoundaryLine(line: string): boolean {
+  const trimmed = line.trim();
+  if (!trimmed) return false;
+  return /^(?:#{1,6}\s*)?(?:附录|参考资料|参考文献|案例对比|其他部分|references?|appendix)\b/i.test(
+    trimmed,
+  );
+}
+
+function isLikelyStandaloneRubricStart(line: string): boolean {
+  const trimmed = line.trim();
+  if (!trimmed) return false;
+
+  if (isRubricSectionHeading(line)) return true;
+
+  const normalized = normalizeSectionHeading(line);
+  return /(?:evaluation criteria|rubric|评估|评价|评分).*(?:标准|准则|量表)?/i.test(
+    normalized,
+  );
+}
+
+function collectRubricBlock(lines: string[], startIndex: number): string {
+  const headingLevel = getMarkdownHeadingLevel(lines[startIndex] ?? '');
+  const sectionLines: string[] = [];
+  let rubricSignalCount = 0;
+
+  for (let cursor = startIndex; cursor < lines.length; cursor += 1) {
+    const currentLine = lines[cursor] ?? '';
+    const currentHeadingLevel = getMarkdownHeadingLevel(currentLine);
+    const rubricBodyLine = isLikelyRubricBodyLine(currentLine);
+
+    if (cursor > startIndex) {
+      if (isLikelyRubricBoundaryLine(currentLine)) break;
+
+      if (
+        headingLevel !== null &&
+        currentHeadingLevel !== null &&
+        currentHeadingLevel <= headingLevel &&
+        !rubricBodyLine
+      ) {
+        break;
+      }
+
+      if (headingLevel === null) {
+        if (currentHeadingLevel !== null && !rubricBodyLine) break;
+        if (
+          rubricSignalCount > 0 &&
+          isLikelyNumberedSectionHeading(currentLine) &&
+          !rubricBodyLine &&
+          !isLikelyStandaloneRubricStart(currentLine)
+        ) {
+          break;
+        }
+      }
+    }
+
+    if (rubricBodyLine) rubricSignalCount += 1;
+    sectionLines.push(currentLine);
+  }
+
+  return sectionLines.join('\n').trim();
+}
+
+function extractRubricSectionFromContent(content: string): string {
+  const normalizedContent = content.trim();
+  if (!normalizedContent) return '';
+
+  const lines = content.split(/\r?\n/);
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index] ?? '';
+    if (!isRubricSectionHeading(line)) continue;
+    return collectRubricBlock(lines, index);
+  }
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index] ?? '';
+    if (!isLikelyStandaloneRubricStart(line)) continue;
+
+    const extracted = collectRubricBlock(lines, index);
+    if (
+      extracted &&
+      (hasConfiguredRubricText(extracted) ||
+        /(?:权重|分值|评分等级|评级标准|关键检查点|评估要点|评分要点|优秀|良好|合格|待改进|不合格|\b[1-5]分\b)/.test(
+          extracted,
+        ))
+    ) {
+      return extracted;
+    }
+  }
+
+  if (hasConfiguredRubricText(normalizedContent)) return normalizedContent;
+
+  return '';
+}
+
+function buildSourceRubricExcerpt(
+  documents?: Array<{ name: string; content: string }>,
+  maxChars = MAX_SOURCE_RUBRIC_CHARS,
+): string {
+  if (!documents || documents.length === 0) return '';
+
+  const parts: string[] = [];
+  let remaining = maxChars;
+
+  for (let index = 0; index < documents.length; index += 1) {
+    if (remaining <= 0) break;
+
+    const document = documents[index];
+    const extracted = extractRubricSectionFromContent(
+      String(document?.content || ''),
+    );
+    if (!extracted) continue;
+
+    const chunk = extracted.slice(0, remaining);
+    remaining -= chunk.length;
+    const truncated =
+      chunk.length < extracted.length ? '\n[Rubric excerpt truncated]' : '';
+    parts.push(`${chunk}${truncated}`.trim());
+  }
+
+  return parts.join('\n\n').trim();
+}
+
+function normalizeSkillMetadata(skills: PackageBaseGenerationResult['skills']) {
   const used = new Set<string>();
   return skills.slice(0, MAX_GENERATED_SKILLS).map((skill, index) => {
-    const baseDirName = slugify(skill.dirName || skill.name || `skill-${index + 1}`);
+    const baseDirName = slugify(
+      skill.dirName || skill.name || `skill-${index + 1}`,
+    );
     let dirName = baseDirName;
     let suffix = 2;
     while (used.has(dirName)) {
@@ -117,38 +324,151 @@ function normalizeSkillMetadata(skills: PackageBaseGenerationResult["skills"]) {
 
 function sanitizeSkillDescription(description: string | undefined): string {
   return (
-    (description || "用于处理该智能体的核心任务")
-      .replace(/\s+/g, " ")
-      .replace(/[<>]/g, "")
+    (description || '用于处理该智能体的核心任务')
+      .replace(/\s+/g, ' ')
+      .replace(/[<>]/g, '')
       .trim()
-      .slice(0, 180) || "用于处理该智能体的核心任务"
+      .slice(0, 180) || '用于处理该智能体的核心任务'
   );
 }
 
-function stripMarkdownFence(value: string): string {
-  const trimmed = value.trim();
+function stripMarkdownFence(value: string | undefined | null): string {
+  const trimmed = String(value ?? '').trim();
   const match = trimmed.match(/^```(?:markdown|md)?\s*\n([\s\S]*?)\n```\s*$/i);
   return (match ? match[1] : trimmed).trim();
 }
 
 const RUBRIC_REQUIRED_HEADINGS = [
-  "# Rubric",
-  "## 评分目标",
-  "## 评分维度",
-  "### 角色贴合",
-  "### Skill 遵循",
-  "### 回答质量",
-  "### 安全边界",
-  "## 使用说明",
+  '# Rubric',
+  '## 评分目标',
+  '## 评分维度',
+  '### 角色贴合',
+  '### Skill 遵循',
+  '### 回答质量',
+  '### 安全边界',
+  '## 使用说明',
 ];
 
-export function hasConfiguredRubricText(rubricMd: string | undefined | null): boolean {
-  return Boolean(String(rubricMd || "").trim());
+function normalizeRubricMarkdown(rubricMd: string | undefined | null): string {
+  return stripMarkdownFence(String(rubricMd || '')).trim();
+}
+
+function hasLegacyRubricStructure(content: string): boolean {
+  const numberedSections = content.match(/^\s*\d+[.)、]\s+/gm) || [];
+  const hasScoringLanguage =
+    /评估要点|评分要点|评分标准|等级|优秀|良好|待改进|不合格/.test(content);
+  return numberedSections.length >= 4 && hasScoringLanguage;
+}
+
+function hasWeightedLegacyRubricStructure(content: string): boolean {
+  const numberedSections =
+    content.match(/^\s*(?:\d+[.)、]|[①②③④⑤⑥⑦⑧⑨⑩])\s*/gm) || [];
+  const hasScoringLanguage =
+    /璇勪及瑕佺偣|璇勫垎瑕佺偣|璇勫垎鏍囧噯|璇勪环鍑嗗垯|璇勪及鏍囧噯|鏁翠綋璇勪环|鍏蜂綋璇勪环|鏉冮噸|绛夌骇|浼樼|鑹ソ|鍚堟牸|寰呮敼杩泑涓嶅悎鏍?|涓ラ噸澶辫|搴旀彁渚?/.test(
+      content,
+    );
+  return numberedSections.length >= 4 && hasScoringLanguage;
+}
+
+function looksLikeWeightedRubric(content: string): boolean {
+  const dimensionHeadings =
+    content.match(/^\s*(?:[①②③④⑤⑥⑦⑧⑨⑩]|\d+[.)、])\s*[^\n]+$/gm) || [];
+  const hasWeights = /(?:\d{1,3}\s*%)|权重|比例|占比/.test(content);
+  const hasEvaluationShape =
+    /整体评价|具体评价|评价准则|评估标准|评分标准|应提供/.test(content);
+  return dimensionHeadings.length >= 4 && (hasWeights || hasEvaluationShape);
+}
+
+function hasTabularLegacyRubricStructure(content: string): boolean {
+  const percentMatches = content.match(/\b\d{1,3}\s*%/g) || [];
+  const hasHeaderSignals =
+    /(?:\u8bc4\u4ef7\u51c6\u5219|\u8bc4\u4f30\u6807\u51c6|\u8bc4\u5206\u6807\u51c6|Evaluation Criteria|Rubric)/i.test(
+      content,
+    );
+  const hasTableColumns = /(?:\u7ef4\u5ea6|\u6743\u91cd)/i.test(content);
+  const hasGradeSignals =
+    /(?:\u4f18\u79c0|\u826f\u597d|\u5408\u683c|\u5f85\u6539\u8fdb|\u4e0d\u5408\u683c)/i.test(
+      content,
+    );
+  return (
+    hasHeaderSignals &&
+    hasTableColumns &&
+    hasGradeSignals &&
+    percentMatches.length >= 3 &&
+    content.length >= 120
+  );
+}
+
+function hasCompactScorableRubricStructure(content: string): boolean {
+  const markdownDimensions = content.match(/^###\s+[^\n]+$/gm) || [];
+  const numberedDimensions =
+    content.match(
+      /^\s*(?:###\s*)?(?:\d+[.)、]\s*[^\d\s][^\n]*|维度[一二三四五六七八九十]?[^\n]*)$/gm,
+    ) || [];
+  const hasDimensionSection =
+    /##\s*(评分维度|评估维度)|评价准则|评估标准|评分标准|Evaluation Criteria|Rubric/i.test(
+      content,
+    );
+  const hasScoringSignals =
+    /优秀|良好|合格|待改进|不合格|满分标准|评分|score|Full score/i.test(content);
+  const hasSummaryGoal =
+    /Overall evaluation|整体评价|评分目标|评估目标|评价目标/i.test(content);
+  const hasStructuredBody = /[-*]\s+/.test(content) || hasScoringSignals;
+  return (
+    hasDimensionSection &&
+    (markdownDimensions.length >= 2 ||
+      numberedDimensions.length >= 3 ||
+      (numberedDimensions.length >= 2 && hasSummaryGoal)) &&
+    hasStructuredBody
+  );
+}
+
+function hasScoreBandWeightedRubricStructure(content: string): boolean {
+  const dimensionHeadings =
+    content.match(/^\s*维度[一二三四五六七八九十百0-9]+[:：]?[^\n]*$/gmu) || [];
+  const hasHeaderSignals =
+    /评估量表|评估标准|评分标准|评价准则|Evaluation Criteria|Rubric/i.test(
+      content,
+    );
+  const hasWeights = /权重|(?:\d{1,3}\s*%)/.test(content);
+  const hasScoreBands = /分值|评级标准|(?:^|\s)[1-5]分(?:\s|$)/m.test(content);
+  return (
+    dimensionHeadings.length >= 4 &&
+    hasHeaderSignals &&
+    hasWeights &&
+    hasScoreBands
+  );
+}
+
+export function hasConfiguredRubricText(
+  rubricMd: string | undefined | null,
+): boolean {
+  const content = normalizeRubricMarkdown(rubricMd);
+  if (!content) return false;
+  return (
+    validateRubricMarkdown(content).length === 0 ||
+    hasLegacyRubricStructure(content) ||
+    hasWeightedLegacyRubricStructure(content) ||
+    looksLikeWeightedRubric(content) ||
+    hasTabularLegacyRubricStructure(content) ||
+    hasCompactScorableRubricStructure(content) ||
+    hasScoreBandWeightedRubricStructure(content)
+  );
 }
 
 export function validateRubricMarkdown(rubricMd: string): string[] {
-  const content = String(rubricMd || "").trim();
-  if (!content) return ["rubric.md 不能为空"];
+  const content = normalizeRubricMarkdown(rubricMd);
+  if (!content) return ['rubric.md 不能为空'];
+  if (
+    hasLegacyRubricStructure(content) ||
+    hasWeightedLegacyRubricStructure(content) ||
+    looksLikeWeightedRubric(content) ||
+    hasTabularLegacyRubricStructure(content) ||
+    hasCompactScorableRubricStructure(content) ||
+    hasScoreBandWeightedRubricStructure(content)
+  ) {
+    return [];
+  }
 
   const errors: string[] = [];
   for (const heading of RUBRIC_REQUIRED_HEADINGS) {
@@ -158,15 +478,46 @@ export function validateRubricMarkdown(rubricMd: string): string[] {
   }
 
   if ((content.match(/^###\s+/gm) || []).length < 4) {
-    errors.push("rubric.md 至少需要 4 个评分维度（### 标题）");
+    errors.push('rubric.md 至少需要 4 个评分维度（### 标题）');
   }
 
   return errors;
 }
 
-export function assertRubricConfigured(rubricMd: string | undefined | null, feature: string): void {
+export function sanitizeGeneratedRubricMarkdown(
+  rubricMd: string | undefined | null,
+): string {
+  const content = normalizeRubricMarkdown(rubricMd);
+  if (!content) return '';
+  return validateRubricMarkdown(content).length === 0 ? content : '';
+}
+
+function resolveRubricMarkdown(
+  generatedRubricMd: string | undefined | null,
+  sourceRubricExcerpt: string | undefined | null,
+): string {
+  const generated = normalizeRubricMarkdown(generatedRubricMd);
+  const source = normalizeRubricMarkdown(sourceRubricExcerpt);
+
+  if (generated && hasConfiguredRubricText(generated)) {
+    return generated;
+  }
+
+  if (source) {
+    return source;
+  }
+
+  return generated;
+}
+
+export function assertRubricConfigured(
+  rubricMd: string | undefined | null,
+  feature: string,
+): void {
   if (!hasConfiguredRubricText(rubricMd)) {
-    throw new Error(`当前智能体还没有配置 rubric。请先在 Rubric 标签中补充评分规则后再使用${feature}。`);
+    throw new Error(
+      `当前智能体还没有配置 rubric。请先在 Rubric 标签中补充评分规则后再使用${feature}。`,
+    );
   }
 }
 
@@ -174,7 +525,17 @@ async function collectStreamedText(
   input: Parameters<typeof generateText>[0],
   onDelta?: (delta: string) => void,
 ): Promise<string> {
-  let content = "";
+  let content = '';
+  const fallbackToNonStream = async (event: string, error?: unknown) => {
+    getLogger({ component: 'package-generation' }).warn({
+      event,
+      ...(error ? { error: safeError(error) } : {}),
+    });
+    const fallbackText = await generateText(input);
+    onDelta?.(fallbackText);
+    return fallbackText;
+  };
+
   try {
     for await (const delta of streamText(input)) {
       content += delta;
@@ -182,19 +543,141 @@ async function collectStreamedText(
     }
   } catch (error) {
     if (content.trim().length === 0) {
-      console.warn("[packages.generate] streaming failed before content; retrying without stream", {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      const fallbackText = await generateText(input);
-      onDelta?.(fallbackText);
-      return fallbackText;
+      return fallbackToNonStream('packages.generate.stream.retry', error);
     }
-    throw new Error(`模型流式响应中断：${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(
+      `模型流式响应中断：${error instanceof Error ? error.message : String(error)}`,
+      { cause: error },
+    );
   }
+
+  if (content.trim().length === 0) {
+    return fallbackToNonStream('packages.generate.stream.empty');
+  }
+
   return content;
 }
 
-function normalizeSkillMdFrontmatter(skillMd: string, dirName: string, description: string): string {
+async function generateRubricWithRepair(
+  input: {
+    model?: string;
+    packageName: string;
+    packageDescription: string;
+    agentExcerpt: string;
+    sourceRubricExcerpt: string;
+    useStream?: boolean;
+  },
+  onPreviewDelta?: (delta: PackageGeneratePreviewDelta) => void,
+): Promise<string> {
+  const {
+    model,
+    packageName,
+    packageDescription,
+    agentExcerpt,
+    sourceRubricExcerpt,
+    useStream = true,
+  } = input;
+  const normalizedSource = normalizeRubricMarkdown(sourceRubricExcerpt);
+  const hasUsableSource = hasConfiguredRubricText(normalizedSource);
+
+  if (hasUsableSource) {
+    return normalizedSource;
+  }
+
+  const requestRubricText = async (rubricDraft?: string): Promise<string> => {
+    const normalizedDraftInput = normalizeRubricMarkdown(rubricDraft);
+    const userPrompt = buildRubricUserPrompt({
+      packageName,
+      packageDescription,
+      agentExcerpt,
+      sourceRubricExcerpt: normalizedSource,
+      rubricDraft:
+        normalizedDraftInput && normalizedDraftInput !== normalizedSource
+          ? normalizedDraftInput
+          : undefined,
+    });
+    const request = {
+      model,
+      systemPrompt: buildRubricSystemPrompt(),
+      userPrompt: useStream
+        ? userPrompt
+        : [
+            userPrompt,
+            '',
+            'Keep the repaired rubric concise.',
+            'Preserve the original dimensions and constraints, but summarize long prose instead of repeating it verbatim.',
+            'Limit each scoring dimension to a short heading plus up to 3 compact bullets.',
+          ].join('\n'),
+      temperature: 0.25,
+      maxTokens: useStream ? 2200 : 2800,
+    };
+
+    if (useStream) {
+      return stripMarkdownFence(
+        await collectStreamedText(
+          request,
+          (delta) =>
+            onPreviewDelta?.({ type: 'rubric', name: 'rubric.md', delta }),
+        ),
+      );
+    }
+
+    return stripMarkdownFence(String((await generateText(request)) ?? ''));
+  };
+
+  let rubricDraft = '';
+  try {
+    rubricDraft = await requestRubricText(normalizedSource || undefined);
+  } catch (error) {
+    getLogger({ component: 'package-generation' }).warn({
+      event: 'packages.generate.rubric.skipped',
+      error: safeError(error),
+    });
+  }
+
+  const normalizedDraft = normalizeRubricMarkdown(rubricDraft);
+  if (hasConfiguredRubricText(normalizedDraft)) {
+    return normalizedDraft;
+  }
+
+  if (normalizedDraft && !normalizedSource) {
+    try {
+      const repaired = await requestRubricText(normalizedDraft);
+      if (hasConfiguredRubricText(repaired)) {
+        return repaired;
+      }
+      rubricDraft = repaired;
+    } catch (error) {
+      getLogger({ component: 'package-generation' }).warn({
+        event: 'packages.generate.rubric.repair_failed',
+        error: safeError(error),
+      });
+    }
+  }
+
+  if (normalizedDraft) {
+    try {
+      const repaired = await requestRubricText(normalizedDraft);
+      if (hasConfiguredRubricText(repaired)) {
+        return repaired;
+      }
+      rubricDraft = repaired;
+    } catch (error) {
+      getLogger({ component: 'package-generation' }).warn({
+        event: 'packages.generate.rubric.repair_retry_failed',
+        error: safeError(error),
+      });
+    }
+  }
+
+  return resolveRubricMarkdown(rubricDraft, normalizedSource);
+}
+
+function normalizeSkillMdFrontmatter(
+  skillMd: string,
+  dirName: string,
+  description: string,
+): string {
   const trimmed = stripMarkdownFence(skillMd);
   const safeDescription = sanitizeSkillDescription(description);
   const frontmatter = `---\nname: ${dirName}\ndescription: ${safeDescription}\n---`;
@@ -203,57 +686,61 @@ function normalizeSkillMdFrontmatter(skillMd: string, dirName: string, descripti
   return `${frontmatter}\n\n${body}`.trim();
 }
 
-function normalizeSkillMdMissingSections(skillMd: string, skillName: string, description: string): string {
+function normalizeSkillMdMissingSections(
+  skillMd: string,
+  skillName: string,
+  description: string,
+): string {
   const match = skillMd.match(/^---\s*\n[\s\S]*?\n---\s*\n?/);
-  const frontmatter = match ? match[0].trim() : "";
+  const frontmatter = match ? match[0].trim() : '';
   let body = match ? skillMd.slice(match[0].length).trim() : skillMd.trim();
   const safeDescription = sanitizeSkillDescription(description);
 
   const sectionTemplates: Array<{ title: string; lines: string[] }> = [
     {
-      title: "Workflow",
+      title: 'Workflow',
       lines: [
         `1. 识别用户是否属于“${skillName}”负责的场景。`,
         `2. 根据“${safeDescription}”整理处理步骤与关键约束。`,
-        "3. 输出前检查边界、风险提示与后续建议是否完整。",
+        '3. 输出前检查边界、风险提示与后续建议是否完整。',
       ],
     },
     {
-      title: "Examples",
+      title: 'Examples',
       lines: [
         `- 示例 1：当用户提出与“${skillName}”直接相关的请求时，先判断场景，再给出分步骤方案。`,
-        "- 示例 2：当输入信息不足时，先补问关键条件，再继续提供可执行结果。",
+        '- 示例 2：当输入信息不足时，先补问关键条件，再继续提供可执行结果。',
       ],
     },
     {
-      title: "Common Issues",
+      title: 'Common Issues',
       lines: [
-        "- 信息不足：先追问缺失条件，不要直接假设。",
-        "- 请求越界：明确说明不适用范围，并引导到更合适的能力或人工处理。",
+        '- 信息不足：先追问缺失条件，不要直接假设。',
+        '- 请求越界：明确说明不适用范围，并引导到更合适的能力或人工处理。',
       ],
     },
   ];
 
   for (const section of sectionTemplates) {
-    if (!new RegExp(`^##?\\s*${section.title}`, "im").test(body)) {
-      body = [
-        body.trim(),
-        `## ${section.title}`,
-        ...section.lines,
-      ].filter(Boolean).join("\n\n");
+    if (!new RegExp(`^##?\\s*${section.title}`, 'im').test(body)) {
+      body = [body.trim(), `## ${section.title}`, ...section.lines]
+        .filter(Boolean)
+        .join('\n\n');
     }
   }
 
   return frontmatter ? `${frontmatter}\n\n${body.trim()}`.trim() : body.trim();
 }
 
-function normalizeSnapshot(input: PackageGenerationResult): AgentPackageSnapshot {
+function normalizeSnapshot(
+  input: PackageGenerationResult,
+): AgentPackageSnapshot {
   return {
     name: input.name.trim(),
     description: input.description.trim(),
-    versionLabel: "v1",
+    versionLabel: 'v1',
     agentMd: input.agentMd.trim(),
-    rubricMd: input.rubricMd?.trim() || "",
+    rubricMd: normalizeRubricMarkdown(input.rubricMd),
     skills: input.skills.map((skill) => ({
       id: newId(),
       dirName: slugify(skill.dirName || skill.name),
@@ -268,56 +755,65 @@ function normalizeSnapshot(input: PackageGenerationResult): AgentPackageSnapshot
 
 function getBaseOutputSchemaPrompt(): string {
   return [
-    "## 输出 JSON 结构",
-    "返回一个严格 JSON 对象，不要 Markdown 代码块，不要解释。",
-    "{",
-    "  \"name\": \"智能体名称\",",
-    "  \"description\": \"智能体一句话描述\",",
-    "  \"skills\": [",
-    "    {",
-    "      \"dirName\": \"kebab-case-dir-name\",",
-    "      \"name\": \"技能显示名称\",",
-    "      \"description\": \"一句话说明该 skill 做什么，以及什么时候使用\"",
-    "    }",
-    "  ]",
-    "}",
-    "",
-    "要求：",
-    "1. JSON 只包含 name、description、skills",
-    "2. skills 最多 2 个，选择最能支撑该智能体工作的核心技能",
-    "3. dirName 必须是小写英文 kebab-case",
+    '## 输出 JSON 结构',
+    '返回一个严格 JSON 对象，不要 Markdown 代码块，不要解释。',
+    '{',
+    '  "name": "智能体名称",',
+    '  "description": "智能体一句话描述",',
+    '  "skills": [',
+    '    {',
+    '      "dirName": "kebab-case-dir-name",',
+    '      "name": "技能显示名称",',
+    '      "description": "一句话说明该 skill 做什么，以及什么时候使用"',
+    '    }',
+    '  ]',
+    '}',
+    '',
+    '要求：',
+    '1. JSON 只包含 name、description、skills',
+    '2. skills 最多 2 个，选择最能支撑该智能体工作的核心技能',
+    '3. dirName 必须是小写英文 kebab-case',
     "4. description 必须包含'当/如果/用于/遇到/针对'等触发词",
-    "5. 不要在本步骤生成 agent.md、rubric.md 或 SKILL.md",
-  ].join("\n");
+    '5. 不要在本步骤生成 agent.md、rubric.md 或 SKILL.md',
+  ].join('\n');
 }
 
 function createFallbackBase(
   instruction: string,
   documents?: Array<{ name: string; content: string }>,
 ): PackageBaseGenerationResult {
-  const firstDocumentName = documents?.[0]?.name?.replace(/\.[^.]+$/, "").trim();
-  const source = instruction.trim() || documents?.map((document) => document.content).join("\n").trim() || "";
-  const compact = source.replace(/\s+/g, " ").slice(0, 28).trim();
-  const name = firstDocumentName || (compact ? `${compact}助手` : "智能体助手");
+  const firstDocumentName = documents?.[0]?.name
+    ?.replace(/\.[^.]+$/, '')
+    .trim();
+  const source =
+    instruction.trim() ||
+    documents
+      ?.map((document) => document.content)
+      .join('\n')
+      .trim() ||
+    '';
+  const compact = source.replace(/\s+/g, ' ').slice(0, 28).trim();
+  const name = firstDocumentName || (compact ? `${compact}助手` : '智能体助手');
   const description = compact
     ? `用于根据“${compact}”相关需求完成分析、生成与答疑任务。`
-    : "用于根据用户需求和上传资料完成分析、生成与答疑任务。";
+    : '用于根据用户需求和上传资料完成分析、生成与答疑任务。';
 
   return {
     name,
     description,
     skills: [
       {
-        dirName: "core-task",
-        name: "核心任务处理",
-        description: "用于当用户提出核心任务时，分析需求并生成结构化、高质量的回答。",
+        dirName: 'core-task',
+        name: '核心任务处理',
+        description:
+          '用于当用户提出核心任务时，分析需求并生成结构化、高质量的回答。',
       },
       {
-        dirName: documents?.length ? "document-grounding" : "quality-review",
-        name: documents?.length ? "资料理解与引用" : "质量检查",
+        dirName: documents?.length ? 'document-grounding' : 'quality-review',
+        name: documents?.length ? '资料理解与引用' : '质量检查',
         description: documents?.length
-          ? "用于遇到上传资料时，提取关键信息并基于资料完成回答。"
-          : "用于在输出前检查内容的准确性、完整性和表达质量。",
+          ? '用于遇到上传资料时，提取关键信息并基于资料完成回答。'
+          : '用于在输出前检查内容的准确性、完整性和表达质量。',
       },
     ],
   };
@@ -328,15 +824,31 @@ function normalizeBaseMetadataJson(
   fallback: PackageBaseGenerationResult,
 ): PackageBaseGenerationResult {
   return {
-    name: typeof parsed.name === "string" && parsed.name.trim() ? parsed.name : fallback.name,
-    description: typeof parsed.description === "string" && parsed.description.trim() ? parsed.description : fallback.description,
-    skills: Array.isArray(parsed.skills) && parsed.skills.length > 0
-      ? parsed.skills.map((skill, index) => ({
-          dirName: typeof skill?.dirName === "string" ? skill.dirName : `skill-${index + 1}`,
-          name: typeof skill?.name === "string" ? skill.name : `技能 ${index + 1}`,
-          description: typeof skill?.description === "string" ? skill.description : `用于当用户需要技能 ${index + 1} 时提供支持。`,
-        }))
-      : fallback.skills,
+    name:
+      typeof parsed.name === 'string' && parsed.name.trim()
+        ? parsed.name
+        : fallback.name,
+    description:
+      typeof parsed.description === 'string' && parsed.description.trim()
+        ? parsed.description
+        : fallback.description,
+    skills:
+      Array.isArray(parsed.skills) && parsed.skills.length > 0
+        ? parsed.skills.map((skill, index) => ({
+            dirName:
+              typeof skill?.dirName === 'string'
+                ? skill.dirName
+                : `skill-${index + 1}`,
+            name:
+              typeof skill?.name === 'string'
+                ? skill.name
+                : `技能 ${index + 1}`,
+            description:
+              typeof skill?.description === 'string'
+                ? skill.description
+                : `用于当用户需要技能 ${index + 1} 时提供支持。`,
+          }))
+        : fallback.skills,
   };
 }
 
@@ -348,55 +860,55 @@ function buildSnapshotJson(snapshot: AgentPackageSnapshot): string {
 
 function getCompactSkillTemplatePrompt(): string {
   return [
-    "返回完整 SKILL.md 的 Markdown 文本，不要 JSON，不要 Markdown 代码块。",
-    "SKILL.md 必须包含：",
-    "---",
-    "name: <dirName>",
+    '返回完整 SKILL.md 的 Markdown 文本，不要 JSON，不要 Markdown 代码块。',
+    'SKILL.md 必须包含：',
+    '---',
+    'name: <dirName>',
     "description: <一句话说明该 skill 做什么，以及什么时候使用，必须包含触发词如'当/如果/用于/遇到/针对'>",
-    "---",
-    "# <Skill 显示名称>",
-    "## When to use",
-    "## When not to use",
-    "## Instructions",
-    "## Workflow",
-    "## Output Format",
-    "## Examples",
-    "## Common Issues",
-    "",
-    "要求：",
-    "- 内容要精炼，每个章节 2-5 条即可",
-    "- frontmatter name 必须等于 dirName",
-    "- When to use 只写该 skill 自己负责的触发场景",
-    "- When not to use 写清楚应交给其他 skill、普通问答、或安全转介的场景",
-    "- Output Format 必须给出固定模板字段，例如：场景判断、处理方案、可用话术、风险提示、后续评估",
-    "- 只返回 SKILL.md 文件内容本身，不要解释",
-  ].join("\n");
+    '---',
+    '# <Skill 显示名称>',
+    '## When to use',
+    '## When not to use',
+    '## Instructions',
+    '## Workflow',
+    '## Output Format',
+    '## Examples',
+    '## Common Issues',
+    '',
+    '要求：',
+    '- 内容要精炼，每个章节 2-5 条即可',
+    '- frontmatter name 必须等于 dirName',
+    '- When to use 只写该 skill 自己负责的触发场景',
+    '- When not to use 写清楚应交给其他 skill、普通问答、或安全转介的场景',
+    '- Output Format 必须给出固定模板字段，例如：场景判断、处理方案、可用话术、风险提示、后续评估',
+    '- 只返回 SKILL.md 文件内容本身，不要解释',
+  ].join('\n');
 }
 
 function extractFrontmatterValue(skillMd: string, key: string): string | null {
   const match = skillMd.match(/^---\s*\n([\s\S]*?)\n---/);
   if (!match) return null;
-  const line = match[1].split("\n").find((l) => l.trim().startsWith(`${key}:`));
+  const line = match[1].split('\n').find((l) => l.trim().startsWith(`${key}:`));
   if (!line) return null;
-  const value = line.slice(line.indexOf(":") + 1).trim();
-  return value.replace(/^["']|["']$/g, "");
+  const value = line.slice(line.indexOf(':') + 1).trim();
+  return value.replace(/^["']|["']$/g, '');
 }
 
 function validateSkillMdStandard(skillMd: string, dirName: string): string[] {
   const errors: string[] = [];
 
   // 1. 检查是否以 YAML frontmatter 开头
-  if (!skillMd.trim().startsWith("---")) {
-    errors.push("SKILL.md 必须以 YAML frontmatter（---）开头");
+  if (!skillMd.trim().startsWith('---')) {
+    errors.push('SKILL.md 必须以 YAML frontmatter（---）开头');
     return errors; // 没有 frontmatter 后续检查无意义
   }
 
-  const fmName = extractFrontmatterValue(skillMd, "name");
-  const fmDescription = extractFrontmatterValue(skillMd, "description");
+  const fmName = extractFrontmatterValue(skillMd, 'name');
+  const fmDescription = extractFrontmatterValue(skillMd, 'description');
 
   // 2. 检查 frontmatter 中是否包含 name 和 description
-  if (!fmName) errors.push("YAML frontmatter 缺少 name 字段");
-  if (!fmDescription) errors.push("YAML frontmatter 缺少 description 字段");
+  if (!fmName) errors.push('YAML frontmatter 缺少 name 字段');
+  if (!fmDescription) errors.push('YAML frontmatter 缺少 description 字段');
 
   // 3. 检查 name 是否为小写英文 kebab-case
   if (fmName && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(fmName)) {
@@ -405,7 +917,9 @@ function validateSkillMdStandard(skillMd: string, dirName: string): string[] {
 
   // 4. 检查 name 是否包含保留词
   if (fmName && /\b(claude|anthropic)\b/i.test(fmName)) {
-    errors.push(`frontmatter name "${fmName}" 包含保留词（claude / anthropic）`);
+    errors.push(
+      `frontmatter name "${fmName}" 包含保留词（claude / anthropic）`,
+    );
   }
 
   // 5. 检查 dirName 是否与 frontmatter name 一致
@@ -415,28 +929,35 @@ function validateSkillMdStandard(skillMd: string, dirName: string): string[] {
 
   // 6. 检查 description 是否过长（>200 字符）
   if (fmDescription && fmDescription.length > 200) {
-    errors.push(`frontmatter description 过长（${fmDescription.length} 字符，建议 ≤200）`);
+    errors.push(
+      `frontmatter description 过长（${fmDescription.length} 字符，建议 ≤200）`,
+    );
   }
 
   // 7. 检查 description 是否包含 XML 尖括号
   if (fmDescription && /[<>]/.test(fmDescription)) {
-    errors.push("frontmatter description 不应包含 XML 尖括号");
+    errors.push('frontmatter description 不应包含 XML 尖括号');
+  }
+  const triggerPattern =
+    /(\u5f53|\u5982\u679c|\u7528\u4e8e|\u9002\u5408|\u573a\u666f|\u89e6\u53d1|\u8c03\u7528|\u9700\u8981|\u60c5\u51b5|\u9488\u5bf9|\u9047\u5230|\u9762\u5bf9|\u51fa\u73b0|\u7528\u6237|\u8f93\u5165|\u8bf7\u6c42|\u95ee\u9898|\u4efb\u52a1|\u4f8b\u5982|\bwhen\b|\bwhenever\b|\bif\b|\bfor\b|\buse(?:d|s|ing)?\b|\buser\b|\brequest\b|\binput\b|\btask\b|\bworkflow\b|\bscenario\b|\btrigger\b)/i;
+  if (fmDescription && !triggerPattern.test(fmDescription)) {
+    errors.push('frontmatter description 应说明 skill 的触发场景（什么时候使用）');
   }
 
-  // 8. 检查 description 是否说明了触发场景
-  if (fmDescription && !/(当|如果|用于|适合|场景|触发|调用|需要|时|情况|在|针对|遇到|面对|出现|用户|输入|请求|问题|任务|则|就|便)/.test(fmDescription)) {
-    errors.push("frontmatter description 应说明 skill 的触发场景（什么时候使用）");
-  }
-
-  // 9. 检查正文结构
-  const body = skillMd.replace(/^---\s*\n[\s\S]*?\n---\s*\n?/, "").trim();
+  const body = skillMd.replace(/^---\s*\n[\s\S]*?\n---\s*\n?/, '').trim();
   if (body.length < 200) {
-    errors.push("SKILL.md 正文过短（<200 字符），请补充详细说明");
+    errors.push('SKILL.md 正文过短（<200 字符），请补充详细说明');
   }
 
-  const requiredSections = ["Instructions", "Workflow", "Output Format", "Examples", "Common Issues"];
+  const requiredSections = [
+    'Instructions',
+    'Workflow',
+    'Output Format',
+    'Examples',
+    'Common Issues',
+  ];
   for (const section of requiredSections) {
-    if (!new RegExp(`^##?\\s*${section}`, "im").test(body)) {
+    if (!new RegExp(`^##?\\s*${section}`, 'im').test(body)) {
       errors.push(`正文缺少必要章节：${section}`);
     }
   }
@@ -444,16 +965,22 @@ function validateSkillMdStandard(skillMd: string, dirName: string): string[] {
   return errors;
 }
 
-function validateBaseGenerationResult(generated: PackageBaseGenerationResult): void {
+function validateBaseGenerationResult(
+  generated: PackageBaseGenerationResult,
+): void {
   const errors: string[] = [];
 
-  if (!generated.name?.trim()) errors.push("缺少智能体 name");
-  if (!generated.description?.trim()) errors.push("缺少智能体 description");
+  if (!generated.name?.trim()) errors.push('缺少智能体 name');
+  if (!generated.description?.trim()) errors.push('缺少智能体 description');
 
   if (!Array.isArray(generated.skills) || generated.skills.length === 0) {
-    errors.push("skills 必须为非空数组");
+    errors.push('skills 必须为非空数组');
   } else {
-    for (let index = 0; index < Math.min(generated.skills.length, MAX_GENERATED_SKILLS); index += 1) {
+    for (
+      let index = 0;
+      index < Math.min(generated.skills.length, MAX_GENERATED_SKILLS);
+      index += 1
+    ) {
       const skill = generated.skills[index];
       const prefix = `skills[${index}]`;
       if (!skill.dirName?.trim()) errors.push(`${prefix} 缺少 dirName`);
@@ -463,7 +990,9 @@ function validateBaseGenerationResult(generated: PackageBaseGenerationResult): v
   }
 
   if (errors.length > 0) {
-    throw new Error(`生成基础结构校验失败：\n${errors.map((e) => "- " + e).join("\n")}`);
+    throw new Error(
+      `生成基础结构校验失败：\n${errors.map((e) => '- ' + e).join('\n')}`,
+    );
   }
 }
 
@@ -471,13 +1000,13 @@ function validateGenerationResult(generated: PackageGenerationResult): void {
   const errors: string[] = [];
 
   // 检查顶层字段
-  if (!generated.name?.trim()) errors.push("缺少智能体 name");
-  if (!generated.description?.trim()) errors.push("缺少智能体 description");
-  if (!generated.agentMd?.trim()) errors.push("缺少 agentMd");
+  if (!generated.name?.trim()) errors.push('缺少智能体 name');
+  if (!generated.description?.trim()) errors.push('缺少智能体 description');
+  if (!generated.agentMd?.trim()) errors.push('缺少 agentMd');
 
   // 检查 skills
   if (!Array.isArray(generated.skills) || generated.skills.length === 0) {
-    errors.push("skills 必须为非空数组");
+    errors.push('skills 必须为非空数组');
   } else {
     for (let i = 0; i < generated.skills.length; i++) {
       const skill = generated.skills[i];
@@ -491,7 +1020,10 @@ function validateGenerationResult(generated: PackageGenerationResult): void {
         if (skill.skillMd.trim().length < 300) {
           errors.push(`${prefix} skillMd 过短（<300 字符），请补充详细内容`);
         }
-        const skillErrors = validateSkillMdStandard(skill.skillMd, skill.dirName || "");
+        const skillErrors = validateSkillMdStandard(
+          skill.skillMd,
+          skill.dirName || '',
+        );
         for (const e of skillErrors) {
           errors.push(`${prefix} ${e}`);
         }
@@ -500,11 +1032,16 @@ function validateGenerationResult(generated: PackageGenerationResult): void {
   }
 
   if (errors.length > 0) {
-    throw new Error(`生成结果校验失败：\n${errors.map((e) => "- " + e).join("\n")}`);
+    throw new Error(
+      `生成结果校验失败：\n${errors.map((e) => '- ' + e).join('\n')}`,
+    );
   }
 }
 
-function toSummary(row: DbRowPackage, version: DbRowPackageVersion): AgentPackageSummary {
+function toSummary(
+  row: DbRowPackage,
+  version: DbRowPackageVersion,
+): AgentPackageSummary {
   return {
     id: row.id,
     userId: row.user_id,
@@ -515,7 +1052,10 @@ function toSummary(row: DbRowPackage, version: DbRowPackageVersion): AgentPackag
   };
 }
 
-function toDetail(row: DbRowPackage, version: DbRowPackageVersion): AgentPackageDetail {
+function toDetail(
+  row: DbRowPackage,
+  version: DbRowPackageVersion,
+): AgentPackageDetail {
   return {
     ...toSummary(row, version),
     snapshot: JSON.parse(version.snapshot_json) as AgentPackageSnapshot,
@@ -524,30 +1064,30 @@ function toDetail(row: DbRowPackage, version: DbRowPackageVersion): AgentPackage
 
 async function getPackageRow(userId: string, packageId: string) {
   const packageResult = await query<DbRowPackage>(
-    "select * from agent_packages where id = $1 and user_id = $2",
+    'select * from agent_packages where id = $1 and user_id = $2',
     [packageId, userId],
   );
   const row = packageResult.rows[0];
-  if (!row) throw new Error("智能体不存在");
+  if (!row) throw new Error('智能体不存在');
 
   const versionResult = await query<DbRowPackageVersion>(
-    "select * from agent_package_versions where id = $1",
+    'select * from agent_package_versions where id = $1',
     [row.current_version_id],
   );
   const version = versionResult.rows[0];
-  if (!version) throw new Error("当前版本不存在");
+  if (!version) throw new Error('当前版本不存在');
   return { row, version };
 }
 
 export async function listPackages(userId: string) {
   const result = await query<DbRowPackage>(
-    "select * from agent_packages where user_id = $1 order by updated_at desc",
+    'select * from agent_packages where user_id = $1 order by updated_at desc',
     [userId],
   );
   const items: AgentPackageSummary[] = [];
   for (const row of result.rows) {
     const versionResult = await query<DbRowPackageVersion>(
-      "select * from agent_package_versions where id = $1",
+      'select * from agent_package_versions where id = $1',
       [row.current_version_id],
     );
     const version = versionResult.rows[0];
@@ -561,49 +1101,55 @@ export async function getPackage(userId: string, packageId: string) {
   return toDetail(row, version);
 }
 
-export async function renamePackage(userId: string, packageId: string, name: string) {
+export async function renamePackage(
+  userId: string,
+  packageId: string,
+  name: string,
+) {
   const nextName = name.trim();
-  if (!nextName) throw new Error("Package name is required");
-  if (nextName.length > 80) throw new Error("Package name is too long");
+  if (!nextName) throw new Error('Package name is required');
+  if (nextName.length > 80) throw new Error('Package name is too long');
 
   const now = new Date().toISOString();
   const result = await query<DbRowPackage>(
-    "update agent_packages set name = $1, updated_at = $2 where id = $3 and user_id = $4 returning *",
+    'update agent_packages set name = $1, updated_at = $2 where id = $3 and user_id = $4 returning *',
     [nextName, now, packageId, userId],
   );
-  if (result.rowCount === 0) throw new Error("Package not found");
+  if (result.rowCount === 0) throw new Error('Package not found');
 
   const versionResult = await query<DbRowPackageVersion>(
-    "select * from agent_package_versions where id = $1",
+    'select * from agent_package_versions where id = $1',
     [result.rows[0].current_version_id],
   );
   const version = versionResult.rows[0];
-  if (!version) throw new Error("Current version not found");
+  if (!version) throw new Error('Current version not found');
   return toDetail(result.rows[0], version);
 }
 
 export async function listVersions(userId: string, packageId: string) {
   const packageResult = await query<DbRowPackage>(
-    "select * from agent_packages where id = $1 and user_id = $2",
+    'select * from agent_packages where id = $1 and user_id = $2',
     [packageId, userId],
   );
   const row = packageResult.rows[0];
-  if (!row) throw new Error("智能体不存在");
+  if (!row) throw new Error('智能体不存在');
 
   const versions = await query<DbRowPackageVersion>(
-    "select * from agent_package_versions where package_id = $1 order by version_number desc",
+    'select * from agent_package_versions where package_id = $1 order by version_number desc',
     [packageId],
   );
 
-  return versions.rows.map((version: DbRowPackageVersion): PackageVersion => ({
-    id: version.id,
-    packageId: version.package_id,
-    versionNumber: version.version_number,
-    createdAt: version.created_at,
-    source: version.source as PackageVersion["source"],
-    note: version.note || "",
-    snapshot: JSON.parse(version.snapshot_json) as AgentPackageSnapshot,
-  }));
+  return versions.rows.map(
+    (version: DbRowPackageVersion): PackageVersion => ({
+      id: version.id,
+      packageId: version.package_id,
+      versionNumber: version.version_number,
+      createdAt: version.created_at,
+      source: version.source as PackageVersion['source'],
+      note: version.note || '',
+      snapshot: JSON.parse(version.snapshot_json) as AgentPackageSnapshot,
+    }),
+  );
 }
 
 export async function updateVersionNote(
@@ -613,25 +1159,25 @@ export async function updateVersionNote(
   note: string,
 ) {
   const packageResult = await query<DbRowPackage>(
-    "select * from agent_packages where id = $1 and user_id = $2",
+    'select * from agent_packages where id = $1 and user_id = $2',
     [packageId, userId],
   );
   const row = packageResult.rows[0];
-  if (!row) throw new Error("智能体不存在");
+  if (!row) throw new Error('智能体不存在');
 
   const result = await query<DbRowPackageVersion>(
-    "update agent_package_versions set note = $1 where id = $2 and package_id = $3 returning *",
+    'update agent_package_versions set note = $1 where id = $2 and package_id = $3 returning *',
     [note, versionId, packageId],
   );
-  if (result.rowCount === 0) throw new Error("版本不存在");
+  if (result.rowCount === 0) throw new Error('版本不存在');
   const version = result.rows[0];
   return {
     id: version.id,
     packageId: version.package_id,
     versionNumber: version.version_number,
     createdAt: version.created_at,
-    source: version.source as PackageVersion["source"],
-    note: version.note || "",
+    source: version.source as PackageVersion['source'],
+    note: version.note || '',
     snapshot: JSON.parse(version.snapshot_json) as AgentPackageSnapshot,
   };
 }
@@ -639,7 +1185,7 @@ export async function updateVersionNote(
 async function createPackageWithSnapshot(
   userId: string,
   snapshot: AgentPackageSnapshot,
-  source: PackageVersion["source"],
+  source: PackageVersion['source'],
 ) {
   const packageId = newId();
   const versionId = newId();
@@ -647,13 +1193,21 @@ async function createPackageWithSnapshot(
   const fixedSnapshot = ensureSkillIds(snapshot);
 
   await query(
-    "insert into agent_package_versions (id, package_id, version_number, source, snapshot_json, created_at) values ($1, $2, $3, $4, $5, $6)",
+    'insert into agent_package_versions (id, package_id, version_number, source, snapshot_json, created_at) values ($1, $2, $3, $4, $5, $6)',
     [versionId, packageId, 1, source, JSON.stringify(fixedSnapshot), now],
   );
 
   await query(
-    "insert into agent_packages (id, user_id, name, description, current_version_id, created_at, updated_at) values ($1, $2, $3, $4, $5, $6, $7)",
-    [packageId, userId, fixedSnapshot.name, fixedSnapshot.description, versionId, now, now],
+    'insert into agent_packages (id, user_id, name, description, current_version_id, created_at, updated_at) values ($1, $2, $3, $4, $5, $6, $7)',
+    [
+      packageId,
+      userId,
+      fixedSnapshot.name,
+      fixedSnapshot.description,
+      versionId,
+      now,
+      now,
+    ],
   );
 
   return getPackage(userId, packageId);
@@ -669,14 +1223,23 @@ export async function generatePackage(
 ) {
   const startedAt = Date.now();
   const docParts = buildDocumentContext(documents, MAX_BASE_DOCUMENT_CHARS);
-  const skillDocParts = buildDocumentContext(documents, MAX_SKILL_DOCUMENT_CHARS);
+  const skillDocParts = buildDocumentContext(
+    documents,
+    MAX_SKILL_DOCUMENT_CHARS,
+  );
+  const sourceRubricExcerpt = buildSourceRubricExcerpt(documents);
   const hasInstruction = instruction.trim().length > 0;
 
-  console.log("[packages.generate] base start", {
+  getLogger({ component: 'package-generation' }).info({
+    event: 'packages.generate.base.start',
     userId,
     instructionLength: instruction.length,
     documentCount: documents?.length || 0,
-    documentChars: documents?.reduce((sum, doc) => sum + String(doc?.content || "").length, 0) || 0,
+    documentChars:
+      documents?.reduce(
+        (sum, doc) => sum + String(doc?.content || '').length,
+        0,
+      ) || 0,
     model,
   });
 
@@ -685,174 +1248,131 @@ export async function generatePackage(
   try {
     const baseJson = await generateJson<Partial<PackageBaseGenerationResult>>({
       model,
-      systemPrompt: [
-        "You are an agent-package generation assistant.",
-        "Return strict JSON only.",
-        "Generate only compact metadata for one reusable prompt package.",
-        "Prefer Chinese content when the user instruction is Chinese.",
-        "When documents are provided without explicit instructions, deeply analyze the documents to extract domain knowledge, workflows, and rules, then build the agent and skills entirely from the document content.",
-        "Do not generate agent.md, rubric.md, or full SKILL.md content in this step.",
-        "Do not include long Markdown content in JSON fields.",
-      ].join("\n"),
-      userPrompt: hasInstruction
-        ? [
-            "Create a prompt package from this instruction:",
-            instruction,
-            docParts,
-            "",
-            getBaseOutputSchemaPrompt(),
-          ].join("\n")
-        : [
-            "Analyze the following documents and create a compact prompt package base based entirely on their content.",
-            "Infer the agent's role, workflow, core skills, and evaluation criteria directly from the document content.",
-            docParts,
-            "",
-            getBaseOutputSchemaPrompt(),
-          ].join("\n"),
+      systemPrompt: buildBaseMetadataSystemPrompt(),
+      userPrompt: buildBaseMetadataUserPrompt({
+        hasInstruction,
+        instruction,
+        documentContext: docParts,
+        outputSchemaPrompt: getBaseOutputSchemaPrompt(),
+      }),
       temperature: 0.4,
       maxTokens: 2000,
     });
     base = normalizeBaseMetadataJson(baseJson, fallbackBase);
   } catch (error) {
-    console.warn("[packages.generate] base metadata JSON failed; using structured backend fallback", {
-      error: error instanceof Error ? error.message : String(error),
+    getLogger({ component: 'package-generation' }).warn({
+      event: 'packages.generate.base.fallback',
+      error: safeError(error),
     });
     base = fallbackBase;
   }
 
   validateBaseGenerationResult(base);
   const skillMetas = normalizeSkillMetadata(base.skills);
-  console.log("[packages.generate] base done", {
+  getLogger({ component: 'package-generation' }).info({
+    event: 'packages.generate.base.done',
     durationMs: Date.now() - startedAt,
     skillCount: skillMetas.length,
   });
 
-  const agentMd = stripMarkdownFence(await collectStreamedText({
-    model,
-    systemPrompt: [
-      "You are an expert agent.md author.",
-      "Return plain Markdown only.",
-      "Do not wrap the answer in Markdown fences.",
-      "Prefer Chinese content when the source content is Chinese.",
-    ].join("\n"),
-    userPrompt: [
-      "Create a complete but concise agent.md for this package.",
-      "",
-      `Package name: ${base.name}`,
-      `Package description: ${base.description}`,
-      "",
-      "Core skills metadata:",
-      JSON.stringify(skillMetas, null, 2),
-      "",
-      hasInstruction ? "User instruction:" : "Source documents:",
-      hasInstruction ? instruction : docParts,
-      "",
-      "The agent.md should define role, workflow, boundaries, and output style.",
-      "Add a concise skill routing table. For each skill, describe:",
-      "- typical user request that should use this skill",
-      "- requests that should be routed to another skill",
-      "- high-risk cases that require safety guidance or referral before continuing",
-      "Keep each skill responsibility narrow; avoid assigning the same scenario to multiple skills.",
-      "Return only the Markdown file content.",
-    ].join("\n"),
-    temperature: 0.35,
-    maxTokens: 3500,
-  }, (delta) => onPreviewDelta?.({ type: "agent", name: "agent.md", delta })));
+  const agentMd = stripMarkdownFence(
+    await collectStreamedText(
+      {
+        model,
+        systemPrompt: buildAgentSystemPrompt(),
+        userPrompt: buildAgentUserPrompt({
+          packageName: base.name,
+          packageDescription: base.description,
+          skillMetasJson: JSON.stringify(skillMetas, null, 2),
+          hasInstruction,
+          sourceContext: hasInstruction ? instruction : docParts,
+        }),
+        temperature: 0.35,
+        maxTokens: 3500,
+      },
+      (delta) => onPreviewDelta?.({ type: 'agent', name: 'agent.md', delta }),
+    ),
+  );
 
-  let rubricMd = "";
-  try {
-    rubricMd = stripMarkdownFence(await collectStreamedText({
+  const resolvedRubricMd = await generateRubricWithRepair(
+    {
       model,
-      systemPrompt: [
-        "You are an evaluation rubric author.",
-        "Return plain Markdown only.",
-        "Do not wrap the answer in Markdown fences.",
-        "Prefer Chinese content when the source content is Chinese.",
-      ].join("\n"),
-      userPrompt: [
-        "Create a rubric.md for this package with 3-5 scoring dimensions.",
-        "The rubric must include dimensions for document fidelity and safety/referral boundaries.",
-        "Document fidelity should check whether outputs stay grounded in uploaded materials and avoid unsupported invention.",
-        "Safety/referral boundaries should check whether high-risk cases such as severe harm, self-harm, medical/legal crisis, or imminent danger receive appropriate escalation guidance.",
-        "",
-        `Package name: ${base.name}`,
-        `Package description: ${base.description}`,
-        "",
-        "agent.md 摘要：",
-        agentMd.slice(0, 1800),
-        "",
-        "Return only the Markdown file content.",
-      ].join("\n"),
-      temperature: 0.25,
-      maxTokens: 2000,
-    }, (delta) => onPreviewDelta?.({ type: "rubric", name: "rubric.md", delta })));
-  } catch (error) {
-    console.warn("[packages.generate] rubric generation failed; continuing without rubric", {
-      error: error instanceof Error ? error.message : String(error),
+      packageName: base.name,
+      packageDescription: base.description,
+      agentExcerpt: agentMd.slice(0, 1800),
+      sourceRubricExcerpt,
+    },
+    onPreviewDelta,
+  );
+
+  onPreview?.({
+    type: 'agent',
+    name: 'agent.md',
+    content: agentMd.trim().slice(0, 1200),
+  });
+  if (resolvedRubricMd.trim()) {
+    onPreview?.({
+      type: 'rubric',
+      name: 'rubric.md',
+      content: resolvedRubricMd.trim().slice(0, 800),
     });
   }
 
-  onPreview?.({ type: "agent", name: "agent.md", content: agentMd.trim().slice(0, 1200) });
-  if (rubricMd.trim()) {
-    onPreview?.({ type: "rubric", name: "rubric.md", content: rubricMd.trim().slice(0, 800) });
-  }
-
-  const skills: PackageGenerationResult["skills"] = [];
+  const skills: PackageGenerationResult['skills'] = [];
   for (let index = 0; index < skillMetas.length; index += 1) {
     const skillMeta = skillMetas[index];
     const skillStartedAt = Date.now();
-    console.log("[packages.generate] skill start", {
+    getLogger({ component: 'package-generation' }).info({
+      event: 'packages.generate.skill.start',
       index: index + 1,
       total: skillMetas.length,
       dirName: skillMeta.dirName,
       model,
     });
 
-    const skillMdRaw = await collectStreamedText({
-      model,
-      systemPrompt: [
-        "You are a concise SKILL.md author.",
-        "Return plain Markdown only.",
-        "Do not wrap the answer in Markdown fences.",
-        "Prefer Chinese content when the source content is Chinese.",
-        "Generate only the requested SKILL.md content; do not regenerate agent.md or rubric.md.",
-      ].join("\n"),
-      userPrompt: [
-        "Create one compact SKILL.md for this package.",
-        "",
-        `Package name: ${base.name}`,
-        `Package description: ${base.description}`,
-        "",
-        "agent.md 摘要：",
-        agentMd.slice(0, 1800),
-        "",
-        "rubric.md 摘要：",
-        rubricMd.slice(0, 1200),
-        skillDocParts,
-        "",
-        "Skill metadata:",
-        JSON.stringify(skillMeta),
-        "",
-        "Sibling skills metadata, used only for boundary clarity:",
-        JSON.stringify(skillMetas.filter((meta) => meta.dirName !== skillMeta.dirName), null, 2),
-        "",
-        getCompactSkillTemplatePrompt(),
-        "",
-        "Keep this skill focused on its own trigger. If a request belongs to a sibling skill, say so in When not to use instead of covering that workflow here.",
-      ].join("\n"),
-      temperature: 0.35,
-      maxTokens: 4000,
-    }, (delta) => onPreviewDelta?.({ type: "skill", name: skillMeta.name, delta }));
+    const skillMdRaw = await collectStreamedText(
+      {
+        model,
+        systemPrompt: buildSkillSystemPrompt(),
+        userPrompt: buildSkillUserPrompt({
+          packageName: base.name,
+          packageDescription: base.description,
+          agentExcerpt: agentMd.slice(0, 1800),
+          rubricExcerpt: resolvedRubricMd.slice(0, 1200),
+          documentContext: skillDocParts,
+          skillMetaJson: JSON.stringify(skillMeta),
+          siblingSkillsJson: JSON.stringify(
+            skillMetas.filter((meta) => meta.dirName !== skillMeta.dirName),
+            null,
+            2,
+          ),
+          skillTemplatePrompt: getCompactSkillTemplatePrompt(),
+        }),
+        temperature: 0.35,
+        maxTokens: 4000,
+      },
+      (delta) =>
+        onPreviewDelta?.({ type: 'skill', name: skillMeta.name, delta }),
+    );
 
     const skillMd = normalizeSkillMdMissingSections(
-      normalizeSkillMdFrontmatter(skillMdRaw || "", skillMeta.dirName, skillMeta.description),
+      normalizeSkillMdFrontmatter(
+        skillMdRaw || '',
+        skillMeta.dirName,
+        skillMeta.description,
+      ),
       skillMeta.name,
       skillMeta.description,
     );
     const skill = { ...skillMeta, skillMd };
     skills.push(skill);
-    onPreview?.({ type: "skill", name: skill.name, content: skill.skillMd.slice(0, 800) });
-    console.log("[packages.generate] skill done", {
+    onPreview?.({
+      type: 'skill',
+      name: skill.name,
+      content: skill.skillMd.slice(0, 800),
+    });
+    getLogger({ component: 'package-generation' }).info({
+      event: 'packages.generate.skill.done',
       index: index + 1,
       dirName: skill.dirName,
       durationMs: Date.now() - skillStartedAt,
@@ -863,43 +1383,66 @@ export async function generatePackage(
     name: base.name,
     description: base.description,
     agentMd,
-    rubricMd,
+    rubricMd: resolvedRubricMd,
     skills,
   };
+
+  if (resolvedRubricMd.trim() && !hasConfiguredRubricText(resolvedRubricMd)) {
+    getLogger({ component: 'package-generation' }).warn({
+      event: 'packages.generate.rubric.invalid',
+      reason: sourceRubricExcerpt.trim()
+        ? 'rubric repair failed and the extracted document rubric was preserved'
+        : 'generated rubric remained incomplete after repair',
+    });
+  }
 
   validateGenerationResult(generated);
 
   const snapshot = normalizeSnapshot(generated);
-  onPreview?.({ type: "json", name: "snapshot.json", content: buildSnapshotJson(snapshot).slice(0, 4000) });
-  console.log("[packages.generate] validate done", { durationMs: Date.now() - startedAt });
-  return createPackageWithSnapshot(userId, snapshot, "generated");
+  onPreview?.({
+    type: 'json',
+    name: 'snapshot.json',
+    content: buildSnapshotJson(snapshot).slice(0, 4000),
+  });
+  getLogger({ component: 'package-generation' }).info({
+    event: 'packages.generate.validate.done',
+    durationMs: Date.now() - startedAt,
+  });
+  return createPackageWithSnapshot(userId, snapshot, 'generated');
 }
 
 async function importPackageWithVersions(
   userId: string,
-  versions: Array<{ versionNumber: number; source: string; snapshot: AgentPackageSnapshot; createdAt: string }>,
+  versions: Array<{
+    versionNumber: number;
+    source: string;
+    snapshot: AgentPackageSnapshot;
+    createdAt: string;
+  }>,
 ) {
-  if (versions.length === 0) throw new Error("版本历史为空");
+  if (versions.length === 0) throw new Error('版本历史为空');
 
   const packageId = newId();
   const now = new Date().toISOString();
 
   // Sort by versionNumber ascending to ensure correct insertion order
-  const sortedVersions = [...versions].sort((a, b) => a.versionNumber - b.versionNumber);
+  const sortedVersions = [...versions].sort(
+    (a, b) => a.versionNumber - b.versionNumber,
+  );
 
   // Derive package name/description from any version that has it
-  let packageName = "";
-  let packageDescription = "";
+  let packageName = '';
+  let packageDescription = '';
   for (const v of sortedVersions) {
     if (v.snapshot.name) packageName = v.snapshot.name;
     if (v.snapshot.description) packageDescription = v.snapshot.description;
     if (packageName && packageDescription) break;
   }
-  if (!packageName) packageName = "导入的智能体";
-  if (!packageDescription) packageDescription = "导入的智能体";
+  if (!packageName) packageName = '导入的智能体';
+  if (!packageDescription) packageDescription = '导入的智能体';
 
   // 创建所有版本记录（确保每个 snapshot 都有 name/description）
-  let currentVersionId = "";
+  let currentVersionId = '';
   let maxVersionNumber = 0;
   for (const v of sortedVersions) {
     const versionId = newId();
@@ -909,8 +1452,15 @@ async function importPackageWithVersions(
       description: v.snapshot.description || packageDescription,
     });
     await query(
-      "insert into agent_package_versions (id, package_id, version_number, source, snapshot_json, created_at) values ($1, $2, $3, $4, $5, $6)",
-      [versionId, packageId, v.versionNumber, v.source, JSON.stringify(enrichedSnapshot), v.createdAt || now],
+      'insert into agent_package_versions (id, package_id, version_number, source, snapshot_json, created_at) values ($1, $2, $3, $4, $5, $6)',
+      [
+        versionId,
+        packageId,
+        v.versionNumber,
+        v.source,
+        JSON.stringify(enrichedSnapshot),
+        v.createdAt || now,
+      ],
     );
     if (v.versionNumber >= maxVersionNumber) {
       maxVersionNumber = v.versionNumber;
@@ -919,8 +1469,16 @@ async function importPackageWithVersions(
   }
 
   await query(
-    "insert into agent_packages (id, user_id, name, description, current_version_id, created_at, updated_at) values ($1, $2, $3, $4, $5, $6, $7)",
-    [packageId, userId, packageName, packageDescription, currentVersionId, now, now],
+    'insert into agent_packages (id, user_id, name, description, current_version_id, created_at, updated_at) values ($1, $2, $3, $4, $5, $6, $7)',
+    [
+      packageId,
+      userId,
+      packageName,
+      packageDescription,
+      currentVersionId,
+      now,
+      now,
+    ],
   );
 
   return getPackage(userId, packageId);
@@ -929,15 +1487,27 @@ async function importPackageWithVersions(
 export async function importPackageZip(userId: string, zipBuffer: Buffer) {
   const zip = new AdmZip(zipBuffer);
   const entries = zip.getEntries();
-  const manifestEntry = entries.find((entry: IZipEntry) => entry.entryName.endsWith("manifest.json"));
-  const snapshotEntry = entries.find((entry: IZipEntry) => entry.entryName.endsWith("snapshot.json"));
-  const agentEntry = entries.find((entry: IZipEntry) => entry.entryName.endsWith("agent.md"));
-  const rubricEntry = entries.find((entry: IZipEntry) => entry.entryName.endsWith("rubric.md"));
-  const versionsEntry = entries.find((entry: IZipEntry) => entry.entryName.endsWith("versions.json"));
+  const manifestEntry = entries.find((entry: IZipEntry) =>
+    entry.entryName.endsWith('manifest.json'),
+  );
+  const snapshotEntry = entries.find((entry: IZipEntry) =>
+    entry.entryName.endsWith('snapshot.json'),
+  );
+  const agentEntry = entries.find((entry: IZipEntry) =>
+    entry.entryName.endsWith('agent.md'),
+  );
+  const rubricEntry = entries.find((entry: IZipEntry) =>
+    entry.entryName.endsWith('rubric.md'),
+  );
+  const versionsEntry = entries.find((entry: IZipEntry) =>
+    entry.entryName.endsWith('versions.json'),
+  );
 
   if (versionsEntry) {
     try {
-      const versions = JSON.parse(zip.readAsText(versionsEntry, "utf8")) as Array<{
+      const versions = JSON.parse(
+        zip.readAsText(versionsEntry, 'utf8'),
+      ) as Array<{
         versionNumber: number;
         source: string;
         snapshot: AgentPackageSnapshot;
@@ -953,15 +1523,24 @@ export async function importPackageZip(userId: string, zipBuffer: Buffer) {
 
   if (snapshotEntry) {
     try {
-      const snapshot = JSON.parse(zip.readAsText(snapshotEntry, "utf8")) as AgentPackageSnapshot;
+      const snapshot = JSON.parse(
+        zip.readAsText(snapshotEntry, 'utf8'),
+      ) as AgentPackageSnapshot;
       if (snapshot?.agentMd && Array.isArray(snapshot.skills)) {
-        return createPackageWithSnapshot(userId, {
-          ...snapshot,
-          name: snapshot.name?.trim() || "导入的智能体",
-          description: snapshot.description?.trim() || "导入的智能体",
-          versionLabel: snapshot.versionLabel || "v1",
-          rubricMd: typeof snapshot.rubricMd === "string" ? snapshot.rubricMd.trim() : "",
-        }, "imported");
+        return createPackageWithSnapshot(
+          userId,
+          {
+            ...snapshot,
+            name: snapshot.name?.trim() || '导入的智能体',
+            description: snapshot.description?.trim() || '导入的智能体',
+            versionLabel: snapshot.versionLabel || 'v1',
+            rubricMd:
+              typeof snapshot.rubricMd === 'string'
+                ? snapshot.rubricMd.trim()
+                : '',
+          },
+          'imported',
+        );
       }
     } catch {
       // fallback to normal import
@@ -969,21 +1548,29 @@ export async function importPackageZip(userId: string, zipBuffer: Buffer) {
   }
 
   if (!manifestEntry || !agentEntry) {
-    throw new Error("导入的 ZIP 文件中缺少 snapshot.json，或缺少 manifest.json / agent.md");
+    throw new Error(
+      '导入的 ZIP 文件中缺少 snapshot.json，或缺少 manifest.json / agent.md',
+    );
   }
 
-  const manifest = JSON.parse(zip.readAsText(manifestEntry, "utf8")) as {
+  const manifest = JSON.parse(zip.readAsText(manifestEntry, 'utf8')) as {
     name?: string;
     description?: string;
   };
 
   // 普通导入（兼容旧格式或没有版本历史的 ZIP）
-  const skillEntries = entries.filter((entry: IZipEntry) => /skills\/[^/]+\/SKILL\.md$/.test(entry.entryName));
+  const skillEntries = entries.filter((entry: IZipEntry) =>
+    /skills\/[^/]+\/SKILL\.md$/.test(entry.entryName),
+  );
   const skills: PackageSkill[] = skillEntries.map((entry: IZipEntry) => {
-    const parts = entry.entryName.split("/");
+    const parts = entry.entryName.split('/');
     const dirName = parts[parts.length - 2]!;
-    const content = zip.readAsText(entry, "utf8");
-    const title = content.split("\n").find((line: string) => line.startsWith("# "))?.replace(/^#\s+/, "") || dirName;
+    const content = zip.readAsText(entry, 'utf8');
+    const title =
+      content
+        .split('\n')
+        .find((line: string) => line.startsWith('# '))
+        ?.replace(/^#\s+/, '') || dirName;
     return {
       id: newId(),
       dirName,
@@ -994,17 +1581,15 @@ export async function importPackageZip(userId: string, zipBuffer: Buffer) {
   });
 
   const snapshot: AgentPackageSnapshot = {
-    name: manifest.name?.trim() || "导入的智能体",
-    description: manifest.description?.trim() || "导入的智能体",
-    versionLabel: "v1",
-    agentMd: zip.readAsText(agentEntry, "utf8").trim(),
-    rubricMd: rubricEntry
-      ? zip.readAsText(rubricEntry, "utf8").trim()
-      : "",
+    name: manifest.name?.trim() || '导入的智能体',
+    description: manifest.description?.trim() || '导入的智能体',
+    versionLabel: 'v1',
+    agentMd: zip.readAsText(agentEntry, 'utf8').trim(),
+    rubricMd: rubricEntry ? zip.readAsText(rubricEntry, 'utf8').trim() : '',
     skills,
   };
 
-  return createPackageWithSnapshot(userId, snapshot, "imported");
+  return createPackageWithSnapshot(userId, snapshot, 'imported');
 }
 
 export async function exportPackageZip(userId: string, packageId: string) {
@@ -1012,33 +1597,47 @@ export async function exportPackageZip(userId: string, packageId: string) {
   const versions = await listVersions(userId, packageId);
   const zip = new AdmZip();
 
-  zip.addFile("manifest.json", Buffer.from(JSON.stringify({
-    name: pkg.snapshot.name,
-    description: pkg.snapshot.description,
-    versionLabel: pkg.snapshot.versionLabel,
-    versionCount: versions.length,
-    hasVersionHistory: versions.length > 1,
-    exportedAt: new Date().toISOString(),
-  }, null, 2)));
-  zip.addFile("snapshot.json", Buffer.from(buildSnapshotJson(pkg.snapshot)));
+  zip.addFile(
+    'manifest.json',
+    Buffer.from(
+      JSON.stringify(
+        {
+          name: pkg.snapshot.name,
+          description: pkg.snapshot.description,
+          versionLabel: pkg.snapshot.versionLabel,
+          versionCount: versions.length,
+          hasVersionHistory: versions.length > 1,
+          exportedAt: new Date().toISOString(),
+        },
+        null,
+        2,
+      ),
+    ),
+  );
+  zip.addFile('snapshot.json', Buffer.from(buildSnapshotJson(pkg.snapshot)));
 
-  zip.addFile("agent.md", Buffer.from(pkg.snapshot.agentMd));
-  zip.addFile("rubric.md", Buffer.from(pkg.snapshot.rubricMd));
+  zip.addFile('agent.md', Buffer.from(pkg.snapshot.agentMd));
+  zip.addFile('rubric.md', Buffer.from(pkg.snapshot.rubricMd));
   for (const skill of pkg.snapshot.skills) {
     zip.addFile(`skills/${skill.dirName}/SKILL.md`, Buffer.from(skill.skillMd));
   }
 
   if (versions.length > 0) {
-    zip.addFile("versions.json", Buffer.from(JSON.stringify(
-      versions.map((v) => ({
-        versionNumber: v.versionNumber,
-        source: v.source,
-        snapshot: v.snapshot,
-        createdAt: v.createdAt,
-      })),
-      null,
-      2,
-    )));
+    zip.addFile(
+      'versions.json',
+      Buffer.from(
+        JSON.stringify(
+          versions.map((v) => ({
+            versionNumber: v.versionNumber,
+            source: v.source,
+            snapshot: v.snapshot,
+            createdAt: v.createdAt,
+          })),
+          null,
+          2,
+        ),
+      ),
+    );
   }
 
   return zip.toBuffer();
@@ -1046,30 +1645,39 @@ export async function exportPackageZip(userId: string, packageId: string) {
 
 export async function deletePackage(userId: string, packageId: string) {
   const pkg = await query<DbRowPackage>(
-    "select * from agent_packages where id = $1 and user_id = $2",
+    'select * from agent_packages where id = $1 and user_id = $2',
     [packageId, userId],
   );
-  if (!pkg.rows[0]) throw new Error("\u667a\u80fd\u4f53\u5305\u4e0d\u5b58\u5728");
+  if (!pkg.rows[0])
+    throw new Error('\u667a\u80fd\u4f53\u5305\u4e0d\u5b58\u5728');
 
   await query(
-    "delete from arena_messages where thread_id in (select id from arena_threads where package_id = $1 and user_id = $2)",
+    'delete from arena_messages where thread_id in (select id from arena_threads where package_id = $1 and user_id = $2)',
     [packageId, userId],
   );
-  await query("delete from arena_threads where package_id = $1 and user_id = $2", [packageId, userId]);
-  await query("delete from agent_package_versions where package_id = $1", [packageId]);
-  await query("delete from agent_packages where id = $1 and user_id = $2", [packageId, userId]);
+  await query(
+    'delete from arena_threads where package_id = $1 and user_id = $2',
+    [packageId, userId],
+  );
+  await query('delete from agent_package_versions where package_id = $1', [
+    packageId,
+  ]);
+  await query('delete from agent_packages where id = $1 and user_id = $2', [
+    packageId,
+    userId,
+  ]);
 }
 
 export async function applyOptimizedSnapshot(
   userId: string,
   packageId: string,
   snapshot: AgentPackageSnapshot,
-  source: PackageVersion["source"],
+  source: PackageVersion['source'],
   note?: string,
 ) {
   const pkg = await getPackage(userId, packageId);
   const versions = await query<DbRowPackageVersion>(
-    "select * from agent_package_versions where package_id = $1 order by version_number desc limit 1",
+    'select * from agent_package_versions where package_id = $1 order by version_number desc limit 1',
     [packageId],
   );
   const nextVersion = (versions.rows[0]?.version_number || 0) + 1;
@@ -1085,66 +1693,143 @@ export async function applyOptimizedSnapshot(
   });
 
   await query(
-    "insert into agent_package_versions (id, package_id, version_number, source, snapshot_json, note, created_at) values ($1, $2, $3, $4, $5, $6, $7)",
-    [versionId, packageId, nextVersion, source, JSON.stringify(nextSnapshot), note || "", now],
+    'insert into agent_package_versions (id, package_id, version_number, source, snapshot_json, note, created_at) values ($1, $2, $3, $4, $5, $6, $7)',
+    [
+      versionId,
+      packageId,
+      nextVersion,
+      source,
+      JSON.stringify(nextSnapshot),
+      note || '',
+      now,
+    ],
   );
 
   await query(
-    "update agent_packages set name = $1, description = $2, current_version_id = $3, updated_at = $4 where id = $5 and user_id = $6",
+    'update agent_packages set name = $1, description = $2, current_version_id = $3, updated_at = $4 where id = $5 and user_id = $6',
     [pkg.name, pkg.description, versionId, now, pkg.id, userId],
   );
 
   return getPackage(userId, packageId);
 }
 
+export async function repairPackageRubric(
+  userId: string,
+  packageId: string,
+  model?: string,
+) {
+  const pkg = await getPackage(userId, packageId);
+  const currentRubric = normalizeRubricMarkdown(pkg.snapshot.rubricMd);
+
+  if (!currentRubric) {
+    throw new Error('当前还没有可修复的 rubric。请先导入或填写 rubric 内容。');
+  }
+
+  if (hasConfiguredRubricText(currentRubric)) {
+    return pkg;
+  }
+
+  const repairedRubric = await generateRubricWithRepair({
+    model,
+    packageName: pkg.snapshot.name,
+    packageDescription: pkg.snapshot.description,
+    agentExcerpt: pkg.snapshot.agentMd.slice(0, 1800),
+    sourceRubricExcerpt: currentRubric,
+    useStream: false,
+  });
+
+  if (!hasConfiguredRubricText(repairedRubric)) {
+    throw new Error(
+      'AI 未能把当前 rubric 修复成可评分格式，请稍后重试或手动补充。',
+    );
+  }
+
+  if (normalizeRubricMarkdown(repairedRubric) === currentRubric) {
+    throw new Error('AI 没有产出新的 rubric 内容，请稍后重试。');
+  }
+
+  const nextSnapshot: AgentPackageSnapshot = {
+    ...pkg.snapshot,
+    rubricMd: normalizeRubricMarkdown(repairedRubric),
+    skills: pkg.snapshot.skills.map((skill) => ({ ...skill })),
+  };
+
+  return applyOptimizedSnapshot(
+    userId,
+    packageId,
+    nextSnapshot,
+    'optimized',
+    'AI 修复 rubric.md',
+  );
+}
+
 export async function applyManualMarkdownEdit(
   userId: string,
   packageId: string,
   input: {
-    target: "agent" | "rubric" | "skill";
+    target: 'agent' | 'rubric' | 'skill';
     content: string;
     skillId?: string;
     note?: string;
   },
 ) {
   const pkg = await getPackage(userId, packageId);
-  const content = String(input.content || "").trim();
-  if (!content) throw new Error("编辑内容不能为空");
+  const content = String(input.content || '').trim();
+  if (!content) throw new Error('编辑内容不能为空');
 
   const nextSnapshot: AgentPackageSnapshot = {
     ...pkg.snapshot,
     skills: pkg.snapshot.skills.map((skill) => ({ ...skill })),
   };
 
-  if (input.target === "agent") {
-    if (content === pkg.snapshot.agentMd.trim()) throw new Error("内容没有变化，无需保存新版本");
+  if (input.target === 'agent') {
+    if (content === pkg.snapshot.agentMd.trim())
+      throw new Error('内容没有变化，无需保存新版本');
     nextSnapshot.agentMd = content;
-    return applyOptimizedSnapshot(userId, packageId, nextSnapshot, "manual", input.note || "手动编辑 agent.md");
+    return applyOptimizedSnapshot(
+      userId,
+      packageId,
+      nextSnapshot,
+      'manual',
+      input.note || '手动编辑 agent.md',
+    );
   }
 
-  if (input.target === "rubric") {
+  if (input.target === 'rubric') {
     const rubricErrors = validateRubricMarkdown(content);
     if (rubricErrors.length > 0) {
-      throw new Error(rubricErrors.join("\n"));
+      throw new Error(rubricErrors.join('\n'));
     }
-    if (content === pkg.snapshot.rubricMd.trim()) throw new Error("内容没有变化，无需保存新版本");
+    if (content === pkg.snapshot.rubricMd.trim())
+      throw new Error('内容没有变化，无需保存新版本');
     nextSnapshot.rubricMd = content;
-    return applyOptimizedSnapshot(userId, packageId, nextSnapshot, "manual", input.note || "手动编辑 rubric.md");
+    return applyOptimizedSnapshot(
+      userId,
+      packageId,
+      nextSnapshot,
+      'manual',
+      input.note || '手动编辑 rubric.md',
+    );
   }
 
-  const skillId = String(input.skillId || "");
-  if (!skillId) throw new Error("缺少要编辑的技能");
-  const skillIndex = nextSnapshot.skills.findIndex((skill) => skill.id === skillId || skill.dirName === skillId);
-  if (skillIndex === -1) throw new Error("技能不存在");
+  const skillId = String(input.skillId || '');
+  if (!skillId) throw new Error('缺少要编辑的技能');
+  const skillIndex = nextSnapshot.skills.findIndex(
+    (skill) => skill.id === skillId || skill.dirName === skillId,
+  );
+  if (skillIndex === -1) throw new Error('技能不存在');
 
-  const fmName = extractFrontmatterValue(content, "name");
-  const fmDescription = extractFrontmatterValue(content, "description");
-  if (!content.startsWith("---") || !fmName || !fmDescription) {
-    throw new Error("SKILL.md 必须保留 YAML frontmatter，并包含 name 和 description");
+  const fmName = extractFrontmatterValue(content, 'name');
+  const fmDescription = extractFrontmatterValue(content, 'description');
+  if (!content.startsWith('---') || !fmName || !fmDescription) {
+    throw new Error(
+      'SKILL.md 必须保留 YAML frontmatter，并包含 name 和 description',
+    );
   }
 
   const currentSkill = nextSnapshot.skills[skillIndex]!;
-  if (content === currentSkill.skillMd.trim()) throw new Error("内容没有变化，无需保存新版本");
+  if (content === currentSkill.skillMd.trim())
+    throw new Error('内容没有变化，无需保存新版本');
   nextSnapshot.skills[skillIndex] = {
     ...currentSkill,
     name: fmName,
@@ -1152,13 +1837,19 @@ export async function applyManualMarkdownEdit(
     skillMd: content,
   };
 
-  return applyOptimizedSnapshot(userId, packageId, nextSnapshot, "manual", input.note || `手动编辑 ${currentSkill.dirName}/SKILL.md`);
+  return applyOptimizedSnapshot(
+    userId,
+    packageId,
+    nextSnapshot,
+    'manual',
+    input.note || `手动编辑 ${currentSkill.dirName}/SKILL.md`,
+  );
 }
 
 /* ── version compare ── */
 
 export interface LineDiff {
-  type: "same" | "removed" | "added";
+  type: 'same' | 'removed' | 'added';
   text: string;
 }
 
@@ -1169,8 +1860,18 @@ export interface SkillDiff {
 }
 
 export interface VersionCompareResult {
-  baseVersion: { id: string; versionNumber: number; source: string; createdAt: string };
-  targetVersion: { id: string; versionNumber: number; source: string; createdAt: string };
+  baseVersion: {
+    id: string;
+    versionNumber: number;
+    source: string;
+    createdAt: string;
+  };
+  targetVersion: {
+    id: string;
+    versionNumber: number;
+    source: string;
+    createdAt: string;
+  };
   diffs: {
     agentMd: LineDiff[];
     rubricMd: LineDiff[];
@@ -1180,43 +1881,52 @@ export interface VersionCompareResult {
 }
 
 function computeDiff(oldText: string, newText: string): LineDiff[] {
-  const oldLines = oldText.split("\n");
-  const newLines = newText.split("\n");
+  const oldLines = oldText.split('\n');
+  const newLines = newText.split('\n');
   const result: LineDiff[] = [];
-  let i = 0, j = 0;
+  let i = 0,
+    j = 0;
 
   while (i < oldLines.length || j < newLines.length) {
     const oldLine = i < oldLines.length ? oldLines[i] : undefined;
     const newLine = j < newLines.length ? newLines[j] : undefined;
 
     if (oldLine === newLine) {
-      result.push({ type: "same", text: oldLine || "" });
-      i++; j++;
+      result.push({ type: 'same', text: oldLine || '' });
+      i++;
+      j++;
     } else if (oldLine !== undefined && newLine !== undefined) {
       // Check if old line appears later in new (removed)
       const newIndexAhead = newLines.slice(j + 1).indexOf(oldLine);
       // Check if new line appeared earlier in old (added)
       const oldIndexAhead = oldLines.slice(i + 1).indexOf(newLine);
 
-      if (newIndexAhead !== -1 && (oldIndexAhead === -1 || newIndexAhead <= oldIndexAhead)) {
+      if (
+        newIndexAhead !== -1 &&
+        (oldIndexAhead === -1 || newIndexAhead <= oldIndexAhead)
+      ) {
         // oldLine is removed, skip it
-        result.push({ type: "removed", text: oldLine });
+        result.push({ type: 'removed', text: oldLine });
         i++;
-      } else if (oldIndexAhead !== -1 && (newIndexAhead === -1 || oldIndexAhead < newIndexAhead)) {
+      } else if (
+        oldIndexAhead !== -1 &&
+        (newIndexAhead === -1 || oldIndexAhead < newIndexAhead)
+      ) {
         // newLine is added
-        result.push({ type: "added", text: newLine });
+        result.push({ type: 'added', text: newLine });
         j++;
       } else {
         // Both changed
-        result.push({ type: "removed", text: oldLine });
-        result.push({ type: "added", text: newLine });
-        i++; j++;
+        result.push({ type: 'removed', text: oldLine });
+        result.push({ type: 'added', text: newLine });
+        i++;
+        j++;
       }
     } else if (oldLine !== undefined) {
-      result.push({ type: "removed", text: oldLine });
+      result.push({ type: 'removed', text: oldLine });
       i++;
     } else if (newLine !== undefined) {
-      result.push({ type: "added", text: newLine });
+      result.push({ type: 'added', text: newLine });
       j++;
     }
   }
@@ -1230,12 +1940,17 @@ function compactDiff(diffs: LineDiff[], contextLines = 2): LineDiff[] {
 
   for (let i = 0; i < diffs.length; i++) {
     const d = diffs[i];
-    if (d.type !== "same") {
+    if (d.type !== 'same') {
       if (sameRunStart !== -1) {
         const runLen = i - sameRunStart;
         if (runLen > contextLines * 2) {
-          result.push(...diffs.slice(sameRunStart, sameRunStart + contextLines));
-          result.push({ type: "same", text: `... (${runLen - contextLines * 2} 行未变更) ...` });
+          result.push(
+            ...diffs.slice(sameRunStart, sameRunStart + contextLines),
+          );
+          result.push({
+            type: 'same',
+            text: `... (${runLen - contextLines * 2} 行未变更) ...`,
+          });
           result.push(...diffs.slice(i - contextLines, i));
         } else {
           result.push(...diffs.slice(sameRunStart, i));
@@ -1252,7 +1967,10 @@ function compactDiff(diffs: LineDiff[], contextLines = 2): LineDiff[] {
     const runLen = diffs.length - sameRunStart;
     if (runLen > contextLines * 2) {
       result.push(...diffs.slice(sameRunStart, sameRunStart + contextLines));
-      result.push({ type: "same", text: `... (${runLen - contextLines * 2} 行未变更) ...` });
+      result.push({
+        type: 'same',
+        text: `... (${runLen - contextLines * 2} 行未变更) ...`,
+      });
       result.push(...diffs.slice(diffs.length - contextLines, diffs.length));
     } else {
       result.push(...diffs.slice(sameRunStart, diffs.length));
@@ -1262,27 +1980,31 @@ function compactDiff(diffs: LineDiff[], contextLines = 2): LineDiff[] {
   return result;
 }
 
-export async function getVersion(userId: string, packageId: string, versionId: string): Promise<PackageVersion> {
+export async function getVersion(
+  userId: string,
+  packageId: string,
+  versionId: string,
+): Promise<PackageVersion> {
   const packageResult = await query<DbRowPackage>(
-    "select * from agent_packages where id = $1 and user_id = $2",
+    'select * from agent_packages where id = $1 and user_id = $2',
     [packageId, userId],
   );
-  if (!packageResult.rows[0]) throw new Error("智能体不存在");
+  if (!packageResult.rows[0]) throw new Error('智能体不存在');
 
   const versionResult = await query<DbRowPackageVersion>(
-    "select * from agent_package_versions where id = $1 and package_id = $2",
+    'select * from agent_package_versions where id = $1 and package_id = $2',
     [versionId, packageId],
   );
   const row = versionResult.rows[0];
-  if (!row) throw new Error("版本不存在");
+  if (!row) throw new Error('版本不存在');
 
   return {
     id: row.id,
     packageId: row.package_id,
     versionNumber: row.version_number,
     createdAt: row.created_at,
-    source: row.source as PackageVersion["source"],
-    note: row.note || "",
+    source: row.source as PackageVersion['source'],
+    note: row.note || '',
     snapshot: JSON.parse(row.snapshot_json) as AgentPackageSnapshot,
   };
 }
@@ -1297,8 +2019,12 @@ export async function compareVersions(
   const base = await getVersion(userId, packageId, baseVersionId);
   const target = await getVersion(userId, packageId, targetVersionId);
 
-  const agentMdDiff = compactDiff(computeDiff(base.snapshot.agentMd, target.snapshot.agentMd));
-  const rubricMdDiff = compactDiff(computeDiff(base.snapshot.rubricMd, target.snapshot.rubricMd));
+  const agentMdDiff = compactDiff(
+    computeDiff(base.snapshot.agentMd, target.snapshot.agentMd),
+  );
+  const rubricMdDiff = compactDiff(
+    computeDiff(base.snapshot.rubricMd, target.snapshot.rubricMd),
+  );
 
   const skillDiffs: SkillDiff[] = [];
   const allDirNames = new Set([
@@ -1308,24 +2034,36 @@ export async function compareVersions(
 
   for (const dirName of allDirNames) {
     const baseSkill = base.snapshot.skills.find((s) => s.dirName === dirName);
-    const targetSkill = target.snapshot.skills.find((s) => s.dirName === dirName);
+    const targetSkill = target.snapshot.skills.find(
+      (s) => s.dirName === dirName,
+    );
     const name = targetSkill?.name || baseSkill?.name || dirName;
 
     if (!baseSkill && targetSkill) {
       skillDiffs.push({
         dirName,
         name,
-        diff: compactDiff(targetSkill.skillMd.split("\n").map((text) => ({ type: "added" as const, text }))),
+        diff: compactDiff(
+          targetSkill.skillMd
+            .split('\n')
+            .map((text) => ({ type: 'added' as const, text })),
+        ),
       });
     } else if (baseSkill && !targetSkill) {
       skillDiffs.push({
         dirName,
         name,
-        diff: compactDiff(baseSkill.skillMd.split("\n").map((text) => ({ type: "removed" as const, text }))),
+        diff: compactDiff(
+          baseSkill.skillMd
+            .split('\n')
+            .map((text) => ({ type: 'removed' as const, text })),
+        ),
       });
     } else if (baseSkill && targetSkill) {
-      const diff = compactDiff(computeDiff(baseSkill.skillMd, targetSkill.skillMd));
-      if (diff.some((d) => d.type !== "same")) {
+      const diff = compactDiff(
+        computeDiff(baseSkill.skillMd, targetSkill.skillMd),
+      );
+      if (diff.some((d) => d.type !== 'same')) {
         skillDiffs.push({ dirName, name, diff });
       }
     }
@@ -1334,74 +2072,108 @@ export async function compareVersions(
   // AI summary
   const diffSummary = [
     `## agent.md`,
-    agentMdDiff.filter((d) => d.type !== "same").slice(0, 40).map((d) => `${d.type === "removed" ? "-" : "+"} ${d.text}`).join("\n"),
+    agentMdDiff
+      .filter((d) => d.type !== 'same')
+      .slice(0, 40)
+      .map((d) => `${d.type === 'removed' ? '-' : '+'} ${d.text}`)
+      .join('\n'),
     ``,
     `## rubric.md`,
-    rubricMdDiff.filter((d) => d.type !== "same").slice(0, 40).map((d) => `${d.type === "removed" ? "-" : "+"} ${d.text}`).join("\n"),
+    rubricMdDiff
+      .filter((d) => d.type !== 'same')
+      .slice(0, 40)
+      .map((d) => `${d.type === 'removed' ? '-' : '+'} ${d.text}`)
+      .join('\n'),
     ``,
     `## skills`,
-    skillDiffs.map((s) => {
-      const changes = s.diff.filter((d) => d.type !== "same").slice(0, 20);
-      return `### ${s.name} (${s.dirName})\n${changes.map((d) => `${d.type === "removed" ? "-" : "+"} ${d.text}`).join("\n")}`;
-    }).join("\n\n"),
-  ].join("\n");
+    skillDiffs
+      .map((s) => {
+        const changes = s.diff.filter((d) => d.type !== 'same').slice(0, 20);
+        return `### ${s.name} (${s.dirName})\n${changes.map((d) => `${d.type === 'removed' ? '-' : '+'} ${d.text}`).join('\n')}`;
+      })
+      .join('\n\n'),
+  ].join('\n');
 
   const summaryPrompt = [
-    "你是智能体版本对比专家。请根据以下两个版本的 diff，用中文总结改动内容。",
-    "",
+    '你是智能体版本对比专家。请根据以下两个版本的 diff，用中文总结改动内容。',
+    '',
     `基准版本：v${base.versionNumber} (${base.source})`,
     `目标版本：v${target.versionNumber} (${target.source})`,
-    "",
-    "## Diff 内容",
-    diffSummary.split("\n").slice(0, 200).join("\n").slice(0, 6000),
-    "",
-    "## 要求",
-    "1. 总结每个文件（agent.md、rubric.md、skills）的主要改动",
-    "2. 用 markdown 表格格式返回，表格包含以下列：",
-    "   | 文件 | 改动类型 | 变化内容 | 作用/影响 |",
-    "   - 文件：agent.md / rubric.md / skill 名称",
-    "   - 改动类型：新增 / 删除 / 修改 / 重构 / 优化 / 无变更",
-    "   - 变化内容：具体改了什么（1-2句话，精炼）",
-    "   - 作用/影响：这个改动带来了什么效果（1句话）",
-    "3. 表格下方用 1-2 句话总结整体改动趋势",
+    '',
+    '## Diff 内容',
+    diffSummary.split('\n').slice(0, 200).join('\n').slice(0, 6000),
+    '',
+    '## 要求',
+    '1. 总结每个文件（agent.md、rubric.md、skills）的主要改动',
+    '2. 用 markdown 表格格式返回，表格包含以下列：',
+    '   | 文件 | 改动类型 | 变化内容 | 作用/影响 |',
+    '   - 文件：agent.md / rubric.md / skill 名称',
+    '   - 改动类型：新增 / 删除 / 修改 / 重构 / 优化 / 无变更',
+    '   - 变化内容：具体改了什么（1-2句话，精炼）',
+    '   - 作用/影响：这个改动带来了什么效果（1句话）',
+    '3. 表格下方用 1-2 句话总结整体改动趋势',
     "4. 如果无改动，表格里写'无变更'，总结写'两个版本一致'",
-    "5. 必须返回包含 summary 字段的 JSON，summary 内容为 markdown 表格",
-  ].join("\n");
+    '5. 必须返回包含 summary 字段的 JSON，summary 内容为 markdown 表格',
+  ].join('\n');
 
-  let summary = "";
+  let summary: string | undefined;
   try {
     const result = await generateJson<{ summary: string }>({
       model,
-      systemPrompt: '你是智能体版本对比专家。根据 diff 内容总结改动。必须严格返回 JSON 格式：{"summary": "总结内容"}。summary 不能为空，必须包含实质性的总结内容。不要返回其他内容。',
+      systemPrompt:
+        '你是智能体版本对比专家。根据 diff 内容总结改动。必须严格返回 JSON 格式：{"summary": "总结内容"}。summary 不能为空，必须包含实质性的总结内容。不要返回其他内容。',
       userPrompt: summaryPrompt,
       temperature: 0.3,
     });
-    summary = result.summary?.trim() || "";
+    summary = result.summary?.trim();
   } catch {
-    summary = "";
+    // Fall through to the plain-text summary fallback.
   }
 
   // Fallback: if JSON parsing fails or summary is empty, try plain text
   if (!summary) {
     try {
-      const chatResult = await generateChat([
-        { role: "system", content: "你是智能体版本对比专家。根据 diff 内容用中文总结改动。直接输出总结文本，不要返回 JSON。" },
-        { role: "user", content: summaryPrompt },
-      ], model, 0.3);
+      const chatResult = await generateChat(
+        [
+          {
+            role: 'system',
+            content:
+              '你是智能体版本对比专家。根据 diff 内容用中文总结改动。直接输出总结文本，不要返回 JSON。',
+          },
+          { role: 'user', content: summaryPrompt },
+        ],
+        model,
+        0.3,
+      );
       summary = chatResult.trim();
     } catch {
-      summary = "";
+      // Fall through to the static summary fallback.
     }
   }
 
   if (!summary) {
-    const hasChanges = agentMdDiff.some((d) => d.type !== "same") || rubricMdDiff.some((d) => d.type !== "same") || skillDiffs.length > 0;
-    summary = hasChanges ? "AI 总结生成失败，请直接查看下方的 diff 详情。" : "两个版本无差异。";
+    const hasChanges =
+      agentMdDiff.some((d) => d.type !== 'same') ||
+      rubricMdDiff.some((d) => d.type !== 'same') ||
+      skillDiffs.length > 0;
+    summary = hasChanges
+      ? 'AI 总结生成失败，请直接查看下方的 diff 详情。'
+      : '两个版本无差异。';
   }
 
   return {
-    baseVersion: { id: base.id, versionNumber: base.versionNumber, source: base.source, createdAt: base.createdAt },
-    targetVersion: { id: target.id, versionNumber: target.versionNumber, source: target.source, createdAt: target.createdAt },
+    baseVersion: {
+      id: base.id,
+      versionNumber: base.versionNumber,
+      source: base.source,
+      createdAt: base.createdAt,
+    },
+    targetVersion: {
+      id: target.id,
+      versionNumber: target.versionNumber,
+      source: target.source,
+      createdAt: target.createdAt,
+    },
     diffs: { agentMd: agentMdDiff, rubricMd: rubricMdDiff, skills: skillDiffs },
     summary,
   };
