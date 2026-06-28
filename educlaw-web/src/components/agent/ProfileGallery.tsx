@@ -1,5 +1,37 @@
-import { useState, useMemo, useCallback, useRef, useLayoutEffect, useEffect } from 'react';
-import { Search, ArrowLeft, Wrench, BookOpen, Users, Plus, FileText, ChevronRight, Sparkles, Trash2, Lock, User, Pencil, X, Save, Globe, AlertTriangle, Settings, CheckSquare, Square, Copy, Download, Upload, Layers } from 'lucide-react';
+﻿import {
+  useState,
+  useMemo,
+  useCallback,
+  useRef,
+  useLayoutEffect,
+  useEffect,
+} from 'react';
+import {
+  Search,
+  ArrowLeft,
+  Wrench,
+  BookOpen,
+  Users,
+  Plus,
+  FileText,
+  ChevronRight,
+  Sparkles,
+  Trash2,
+  Lock,
+  User,
+  Pencil,
+  X,
+  Save,
+  Globe,
+  AlertTriangle,
+  Settings,
+  CheckSquare,
+  Square,
+  Copy,
+  Download,
+  Upload,
+  Layers,
+} from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -8,12 +40,26 @@ import { useAgentStore, type AgentProfile } from '../../stores/agent';
 import { useLibraryStore } from '../../stores/library';
 import { useUIStore } from '../../stores/ui';
 import { useChatStore } from '../../stores/chat';
-import { deleteUserProfile, updateUserProfile, createUserProfile, copyProfileToUser, exportProfile, importProfile, publishProfile, unpublishProfile, listRuntimes } from '../../api/manager';
+import {
+  deleteUserProfile,
+  updateUserProfile,
+  createUserProfile,
+  copyProfileToUser,
+  exportProfile,
+  importProfile,
+  publishProfile,
+  unpublishProfile,
+  listRuntimes,
+} from '../../api/manager';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { matchAgentIcon, matchAgentCategory, categories } from '@/lib/agent-icons';
+import {
+  matchAgentIcon,
+  matchAgentCategory,
+  categories,
+} from '@/lib/agent-icons';
 import { useT, type MessageKey } from '../../i18n';
 import { useOptimizeStore } from '../../stores/optimize';
 
@@ -21,7 +67,10 @@ import { useOptimizeStore } from '../../stores/optimize';
 
 const SOURCE_BADGE_STYLES: Record<string, { icon: LucideIcon; cls: string }> = {
   preset: { icon: Lock, cls: 'bg-muted/60 text-muted-foreground' },
-  public: { icon: Globe, cls: 'bg-blue-500/8 text-blue-600 dark:text-blue-400' },
+  public: {
+    icon: Globe,
+    cls: 'bg-blue-500/8 text-blue-600 dark:text-blue-400',
+  },
   user: { icon: User, cls: 'bg-primary/8 text-primary/80' },
 };
 
@@ -31,7 +80,19 @@ const SOURCE_LABEL_KEYS: Record<'preset' | 'public' | 'user', MessageKey> = {
   user: 'gallery.user',
 };
 
-function TagGrid({ items, icon: TagIcon, color, sourceMap, onItemClick }: { items: string[]; icon: LucideIcon; color: string; sourceMap?: Map<string, string>; onItemClick?: (item: string) => void }) {
+function TagGrid({
+  items,
+  icon: TagIcon,
+  color,
+  sourceMap,
+  onItemClick,
+}: {
+  items: string[];
+  icon: LucideIcon;
+  color: string;
+  sourceMap?: Map<string, string>;
+  onItemClick?: (item: string) => void;
+}) {
   const t = useT();
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -46,12 +107,20 @@ function TagGrid({ items, icon: TagIcon, color, sourceMap, onItemClick }: { item
             onClick={clickable ? () => onItemClick(item) : undefined}
             className={`flex items-center gap-2.5 rounded-[18px] border border-border bg-card px-3.5 py-3 text-sm shadow-sm dark:bg-card ${clickable ? 'cursor-pointer transition-colors hover:border-primary/30 hover:bg-muted/70 dark:hover:bg-muted/60' : ''}`}
           >
-            <div className={`flex size-6 items-center justify-center rounded-md ${color}`}>
+            <div
+              className={`flex size-6 items-center justify-center rounded-md ${color}`}
+            >
               <TagIcon className="size-3" />
             </div>
-            <span className={`truncate flex-1 ${clickable ? 'text-primary/80 hover:text-primary' : 'text-foreground/90'}`}>{item}</span>
+            <span
+              className={`truncate flex-1 ${clickable ? 'text-primary/80 hover:text-primary' : 'text-foreground/90'}`}
+            >
+              {item}
+            </span>
             {badge && BadgeIcon && (
-              <span className={`inline-flex items-center gap-1 rounded-full border border-border/70 px-2 py-0.5 text-[10px] font-medium shadow-sm shrink-0 ${badge.cls}`}>
+              <span
+                className={`inline-flex items-center gap-1 rounded-full border border-border/70 px-2 py-0.5 text-[10px] font-medium shadow-sm shrink-0 ${badge.cls}`}
+              >
                 <BadgeIcon className="size-2.5" />
                 {t(SOURCE_LABEL_KEYS[src as keyof typeof SOURCE_LABEL_KEYS])}
               </span>
@@ -63,19 +132,35 @@ function TagGrid({ items, icon: TagIcon, color, sourceMap, onItemClick }: { item
   );
 }
 
-function Marquee({ text, hovered, direction, className }: { text: string; hovered: boolean; direction: 'h' | 'v'; className?: string }) {
+function Marquee({
+  text,
+  hovered,
+  direction,
+  className,
+}: {
+  text: string;
+  hovered: boolean;
+  direction: 'h' | 'v';
+  className?: string;
+}) {
   const outerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
   const [dist, setDist] = useState(0);
 
   useLayoutEffect(() => {
-    const o = outerRef.current, i = innerRef.current;
+    const o = outerRef.current,
+      i = innerRef.current;
     if (!o || !i) return;
-    setDist(direction === 'h' ? i.scrollWidth - o.clientWidth : i.scrollHeight - o.clientHeight);
+    setDist(
+      direction === 'h'
+        ? i.scrollWidth - o.clientWidth
+        : i.scrollHeight - o.clientHeight,
+    );
   }, [text, direction]);
 
   const overflows = dist > 2;
-  const duration = direction === 'h' ? Math.max(dist / 30, 2) : Math.max(dist / 20, 2.5);
+  const duration =
+    direction === 'h' ? Math.max(dist / 30, 2) : Math.max(dist / 20, 2.5);
   const animName = direction === 'h' ? 'marquee-h' : 'marquee-v';
   const pad = direction === 'h' ? 12 : 8;
 
@@ -84,10 +169,14 @@ function Marquee({ text, hovered, direction, className }: { text: string; hovere
       <div
         ref={innerRef}
         className={`will-change-transform ${direction === 'h' ? 'inline-block whitespace-nowrap' : ''}`}
-        style={hovered && overflows ? {
-          animation: `${animName} ${duration}s linear infinite`,
-          '--marquee-dist': `-${dist + pad}px`,
-        } as React.CSSProperties : undefined}
+        style={
+          hovered && overflows
+            ? ({
+                animation: `${animName} ${duration}s linear infinite`,
+                '--marquee-dist': `-${dist + pad}px`,
+              } as React.CSSProperties)
+            : undefined
+        }
       >
         {text}
       </div>
@@ -97,7 +186,11 @@ function Marquee({ text, hovered, direction, className }: { text: string; hovere
 
 /* useProfileEdit hook */
 
-function useProfileEdit(profile: AgentProfile, displaySkills: string[], isCreateMode: boolean) {
+function useProfileEdit(
+  profile: AgentProfile,
+  displaySkills: string[],
+  isCreateMode: boolean,
+) {
   const [editing, setEditing] = useState(isCreateMode);
   const [saving, setSaving] = useState(false);
   const [editName, setEditName] = useState(profile.name);
@@ -105,8 +198,12 @@ function useProfileEdit(profile: AgentProfile, displaySkills: string[], isCreate
   const [editDetails, setEditDetails] = useState(profile.details || '');
   const [editTools, setEditTools] = useState<string[]>(profile.tools || []);
   const [editSkills, setEditSkills] = useState<string[]>(profile.skills || []);
-  const [editSubagents, setEditSubagents] = useState<string[]>(profile.subagents || []);
-  const [editRuntime, setEditRuntime] = useState(profile.agent_runtime || profile.agent_template || 'micro-learning');
+  const [editSubagents, setEditSubagents] = useState<string[]>(
+    profile.subagents || [],
+  );
+  const [editRuntime, setEditRuntime] = useState(
+    profile.agent_runtime || profile.agent_template || 'micro-learning',
+  );
 
   const startEditing = () => {
     setEditName(profile.name);
@@ -115,16 +212,31 @@ function useProfileEdit(profile: AgentProfile, displaySkills: string[], isCreate
     setEditTools(profile.tools || []);
     setEditSkills(displaySkills);
     setEditSubagents(profile.subagents || []);
-    setEditRuntime(profile.agent_runtime || profile.agent_template || 'micro-learning');
+    setEditRuntime(
+      profile.agent_runtime || profile.agent_template || 'micro-learning',
+    );
     setEditing(true);
   };
 
   return {
-    editing, setEditing, saving, setSaving,
-    editName, setEditName, editDesc, setEditDesc,
-    editDetails, setEditDetails, editTools, setEditTools,
-    editSkills, setEditSkills, editSubagents, setEditSubagents,
-    editRuntime, setEditRuntime,
+    editing,
+    setEditing,
+    saving,
+    setSaving,
+    editName,
+    setEditName,
+    editDesc,
+    setEditDesc,
+    editDetails,
+    setEditDetails,
+    editTools,
+    setEditTools,
+    editSkills,
+    setEditSkills,
+    editSubagents,
+    setEditSubagents,
+    editRuntime,
+    setEditRuntime,
     startEditing,
   };
 }
@@ -165,7 +277,10 @@ function EditableTagList({
   // Close dropdown on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+      if (
+        wrapperRef.current &&
+        !wrapperRef.current.contains(e.target as Node)
+      ) {
         setShowSuggestions(false);
       }
     };
@@ -174,13 +289,21 @@ function EditableTagList({
   }, []);
 
   // Reset highlight when filtered list changes
-  useEffect(() => { setHighlightIdx(-1); }, [filtered.length]);
+  useEffect(() => {
+    setHighlightIdx(-1);
+  }, [filtered.length]);
 
   const addTag = (value?: string) => {
     const v = (value ?? input).trim();
-    if (!v || tags.includes(v)) { setInput(''); setShowSuggestions(false); return; }
+    if (!v || tags.includes(v)) {
+      setInput('');
+      setShowSuggestions(false);
+      return;
+    }
     // When suggestions are provided, only allow values from the list
-    if (suggestions && !suggestions.includes(v)) { return; }
+    if (suggestions && !suggestions.includes(v)) {
+      return;
+    }
     onChange([...tags, v]);
     setInput('');
     setShowSuggestions(false);
@@ -212,36 +335,51 @@ function EditableTagList({
         const badge = src ? SOURCE_BADGE_STYLES[src] : undefined;
         const BadgeIcon = badge?.icon;
         return (
-        <span key={tag} className={`inline-flex items-center gap-1.5 rounded-lg border border-border/30 bg-card/40 px-3 py-1.5 text-sm`}>
-          <div className={`flex size-5 items-center justify-center rounded-md ${color}`}>
-            <TagIcon className="size-3" />
-          </div>
-          <span className="text-foreground/90">{tag}</span>
-          {badge && BadgeIcon && (
-            <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-medium ${badge.cls}`}>
-              <BadgeIcon className="size-2" />
-              {t(SOURCE_LABEL_KEYS[src as keyof typeof SOURCE_LABEL_KEYS])}
-            </span>
-          )}
-          <button
-            onClick={() => onChange(tags.filter((t) => t !== tag))}
-            className="ml-1 text-muted-foreground hover:text-red-500 transition-colors"
+          <span
+            key={tag}
+            className={`inline-flex items-center gap-1.5 rounded-lg border border-border/30 bg-card/40 px-3 py-1.5 text-sm`}
           >
-            <X className="size-3" />
-          </button>
-        </span>
+            <div
+              className={`flex size-5 items-center justify-center rounded-md ${color}`}
+            >
+              <TagIcon className="size-3" />
+            </div>
+            <span className="text-foreground/90">{tag}</span>
+            {badge && BadgeIcon && (
+              <span
+                className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-medium ${badge.cls}`}
+              >
+                <BadgeIcon className="size-2" />
+                {t(SOURCE_LABEL_KEYS[src as keyof typeof SOURCE_LABEL_KEYS])}
+              </span>
+            )}
+            <button
+              onClick={() => onChange(tags.filter((t) => t !== tag))}
+              className="ml-1 text-muted-foreground hover:text-red-500 transition-colors"
+            >
+              <X className="size-3" />
+            </button>
+          </span>
         );
       })}
       <div ref={wrapperRef} className="relative inline-flex items-center gap-1">
         <Input
           value={input}
-          onChange={(e) => { setInput(e.target.value); setShowSuggestions(true); }}
+          onChange={(e) => {
+            setInput(e.target.value);
+            setShowSuggestions(true);
+          }}
           onFocus={() => setShowSuggestions(true)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           className="h-8 w-32 text-xs"
         />
-        <Button variant="ghost" size="sm" onClick={() => addTag()} className="h-8 px-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => addTag()}
+          className="h-8 px-2"
+        >
           <Plus className="size-3" />
         </Button>
         {showSuggestions && filtered.length > 0 && (
@@ -250,12 +388,19 @@ function EditableTagList({
               <button
                 key={item}
                 className={`flex w-full items-center gap-2 px-3 py-1.5 text-xs transition-colors ${
-                  i === highlightIdx ? 'bg-accent text-accent-foreground' : 'text-popover-foreground hover:bg-accent/60'
+                  i === highlightIdx
+                    ? 'bg-accent text-accent-foreground'
+                    : 'text-popover-foreground hover:bg-accent/60'
                 }`}
                 onMouseEnter={() => setHighlightIdx(i)}
-                onMouseDown={(e) => { e.preventDefault(); addTag(item); }}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  addTag(item);
+                }}
               >
-                <div className={`flex size-4 items-center justify-center rounded ${color}`}>
+                <div
+                  className={`flex size-4 items-center justify-center rounded ${color}`}
+                >
                   <TagIcon className="size-2.5" />
                 </div>
                 <span className="flex-1 truncate text-left">{item}</span>
@@ -264,9 +409,15 @@ function EditableTagList({
                   const badge = src ? SOURCE_BADGE_STYLES[src] : undefined;
                   const BadgeIcon = badge?.icon;
                   return badge && BadgeIcon ? (
-                    <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-medium shrink-0 ${badge.cls}`}>
+                    <span
+                      className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-medium shrink-0 ${badge.cls}`}
+                    >
                       <BadgeIcon className="size-2" />
-                      {t(SOURCE_LABEL_KEYS[src as keyof typeof SOURCE_LABEL_KEYS])}
+                      {t(
+                        SOURCE_LABEL_KEYS[
+                          src as keyof typeof SOURCE_LABEL_KEYS
+                        ],
+                      )}
                     </span>
                   ) : null;
                 })()}
@@ -310,7 +461,10 @@ function ProfileDetail({
 
   // Determine if this user profile is already published (exists in public list)
   const allProfiles = useAgentStore((s) => s.profiles);
-  const publicProfiles = useMemo(() => allProfiles.filter((p) => p.source === 'public'), [allProfiles]);
+  const publicProfiles = useMemo(
+    () => allProfiles.filter((p) => p.source === 'public'),
+    [allProfiles],
+  );
   const isPublished = useMemo(
     () => isUser && publicProfiles.some((p) => p.fileName === profile.fileName),
     [isUser, publicProfiles, profile.fileName],
@@ -319,7 +473,9 @@ function ProfileDetail({
   // Fetch available skill names for autocomplete
   const skillSummaries = useLibraryStore((s) => s.skills);
   const fetchSkillSummaries = useLibraryStore((s) => s.fetchSkills);
-  useEffect(() => { fetchSkillSummaries(); }, [fetchSkillSummaries]);
+  useEffect(() => {
+    fetchSkillSummaries();
+  }, [fetchSkillSummaries]);
   const availableSkillDirNames = useMemo(
     () => skillSummaries.map((s) => s.dirName),
     [skillSummaries],
@@ -328,7 +484,9 @@ function ProfileDetail({
   // Fetch available tool names for autocomplete
   const toolSummaries = useLibraryStore((s) => s.tools);
   const fetchToolSummaries = useLibraryStore((s) => s.fetchTools);
-  useEffect(() => { fetchToolSummaries(); }, [fetchToolSummaries]);
+  useEffect(() => {
+    fetchToolSummaries();
+  }, [fetchToolSummaries]);
   const availableToolDirNames = useMemo(
     () => toolSummaries.map((t) => t.dirName),
     [toolSummaries],
@@ -337,7 +495,9 @@ function ProfileDetail({
   // Fetch available runtime names
   const [runtimes, setRuntimes] = useState<string[]>([]);
   useEffect(() => {
-    listRuntimes().then(setRuntimes).catch(() => {});
+    listRuntimes()
+      .then(setRuntimes)
+      .catch(() => {});
   }, []);
 
   // Build source lookup maps for display badges
@@ -354,7 +514,9 @@ function ProfileDetail({
   }, [toolSummaries]);
 
   const [removedSkills, setRemovedSkills] = useState<string[]>([]);
-  const [displaySkills, setDisplaySkills] = useState<string[]>(profile.skills || []);
+  const [displaySkills, setDisplaySkills] = useState<string[]>(
+    profile.skills || [],
+  );
 
   // Sync display state when profile prop changes (e.g. after save + refetch)
   useEffect(() => {
@@ -413,7 +575,9 @@ function ProfileDetail({
         onUpdated?.();
       }
     } catch (err) {
-      toast.error(t('gallery.save'), { description: err instanceof Error ? err.message : undefined });
+      toast.error(t('gallery.save'), {
+        description: err instanceof Error ? err.message : undefined,
+      });
     } finally {
       edit.setSaving(false);
     }
@@ -426,7 +590,9 @@ function ProfileDetail({
       toast.success(t('gallery.copyToUser'));
       onUpdated?.();
     } catch (err) {
-      toast.error(t('gallery.copyToUser'), { description: err instanceof Error ? err.message : undefined });
+      toast.error(t('gallery.copyToUser'), {
+        description: err instanceof Error ? err.message : undefined,
+      });
     } finally {
       setCopying(false);
     }
@@ -438,7 +604,9 @@ function ProfileDetail({
       await exportProfile(profile.fileName);
       toast.success(t('gallery.exportSuccess'));
     } catch (err) {
-      toast.error(t('gallery.export'), { description: err instanceof Error ? err.message : undefined });
+      toast.error(t('gallery.export'), {
+        description: err instanceof Error ? err.message : undefined,
+      });
     } finally {
       setExporting(false);
     }
@@ -456,7 +624,9 @@ function ProfileDetail({
       }
       onUpdated?.();
     } catch (err) {
-      toast.error(isPublished ? t('shared.unpublish') : t('shared.publish'), { description: err instanceof Error ? err.message : undefined });
+      toast.error(isPublished ? t('shared.unpublish') : t('shared.publish'), {
+        description: err instanceof Error ? err.message : undefined,
+      });
     } finally {
       setPublishing(false);
     }
@@ -480,69 +650,156 @@ function ProfileDetail({
   const setPendingArenaTarget = useUIStore((s) => s.setPendingArenaTarget);
 
   const tagSections = [
-    { key: 'skills', items: edit.editing ? edit.editSkills : displaySkills, setItems: edit.setEditSkills, icon: BookOpen, color: 'bg-emerald-500/10 text-emerald-500', iconColor: 'text-emerald-500', label: t('gallery.skillsList'), suggestions: availableSkillDirNames, sourceMap: skillSourceMap, onItemClick: navigateToSkill },
-    { key: 'tools', items: edit.editing ? edit.editTools : (profile.tools || []), setItems: edit.setEditTools, icon: Wrench, color: 'bg-sky-500/10 text-sky-500', iconColor: 'text-sky-500', label: t('gallery.toolsList'), suggestions: availableToolDirNames, sourceMap: toolSourceMap, onItemClick: navigateToTool },
-    { key: 'subagents', items: edit.editing ? edit.editSubagents : (profile.subagents || []), setItems: edit.setEditSubagents, icon: Users, color: 'bg-violet-500/10 text-violet-500', iconColor: 'text-violet-500', label: t('gallery.subagentsList'), suggestions: undefined, sourceMap: undefined, onItemClick: undefined },
+    {
+      key: 'skills',
+      items: edit.editing ? edit.editSkills : displaySkills,
+      setItems: edit.setEditSkills,
+      icon: BookOpen,
+      color: 'bg-emerald-500/10 text-emerald-500',
+      iconColor: 'text-emerald-500',
+      label: t('gallery.skillsList'),
+      suggestions: availableSkillDirNames,
+      sourceMap: skillSourceMap,
+      onItemClick: navigateToSkill,
+    },
+    {
+      key: 'tools',
+      items: edit.editing ? edit.editTools : profile.tools || [],
+      setItems: edit.setEditTools,
+      icon: Wrench,
+      color: 'bg-sky-500/10 text-sky-500',
+      iconColor: 'text-sky-500',
+      label: t('gallery.toolsList'),
+      suggestions: availableToolDirNames,
+      sourceMap: toolSourceMap,
+      onItemClick: navigateToTool,
+    },
+    {
+      key: 'subagents',
+      items: edit.editing ? edit.editSubagents : profile.subagents || [],
+      setItems: edit.setEditSubagents,
+      icon: Users,
+      color: 'bg-violet-500/10 text-violet-500',
+      iconColor: 'text-violet-500',
+      label: t('gallery.subagentsList'),
+      suggestions: undefined,
+      sourceMap: undefined,
+      onItemClick: undefined,
+    },
   ] as const;
 
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-3 border-b border-border/70 px-6 py-4">
-        <Button variant="outline" size="sm" onClick={onBack} className="gap-1.5 rounded-full">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onBack}
+          className="gap-1.5 rounded-full"
+        >
           <ArrowLeft className="size-4" />
           {t('gallery.backToList')}
         </Button>
         <div className="flex-1" />
         {!isCreateMode && !edit.editing && (
           <>
-            <Button variant="outline" size="sm" onClick={() => { setPendingArenaTarget({ kind: 'profile', ref: profile.fileName, label: profile.name }); setMainView('deep-study'); setDeepStudyTab('arena'); }} className="gap-1.5 rounded-full">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setPendingArenaTarget({
+                  kind: 'profile',
+                  ref: profile.fileName,
+                  label: profile.name,
+                });
+                setMainView('deep-study');
+                setDeepStudyTab('arena');
+              }}
+              className="gap-1.5 rounded-full"
+            >
               <Layers className="size-3.5" />
               Arena
             </Button>
-            <Button variant="outline" size="sm" onClick={() => void createProfileRun(profile.fileName)} disabled={optimizationCreating} className="gap-1.5 rounded-full">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void createProfileRun(profile.fileName)}
+              disabled={optimizationCreating}
+              className="gap-1.5 rounded-full"
+            >
               <Sparkles className="size-3.5" />
               {t('optimize.action')}
             </Button>
           </>
         )}
         {canCopy && (
-            <Button variant="outline" size="sm" onClick={handleCopyToUser} disabled={copying} className="gap-1.5 rounded-full">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleCopyToUser}
+            disabled={copying}
+            className="gap-1.5 rounded-full"
+          >
             <Copy className="size-3.5" />
             {t('gallery.copyToUser')}
           </Button>
         )}
         {isUser && !edit.editing && (
           <>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleTogglePublish}
-            disabled={publishing}
-            className={`gap-1.5 rounded-full ${isPublished ? 'border-emerald-500/30 text-emerald-600 dark:text-emerald-400' : ''}`}
-          >
-            <Globe className="size-3.5" />
-            {publishing
-              ? (isPublished ? t('shared.unpublishing') : t('shared.publishing'))
-              : (isPublished ? t('shared.unpublish') : t('shared.publish'))
-            }
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleExport} disabled={exporting} className="gap-1.5 rounded-full">
-            <Download className="size-3.5" />
-            {exporting ? t('gallery.exporting') : t('gallery.export')}
-          </Button>
-          <Button variant="outline" size="sm" onClick={edit.startEditing} className="gap-1.5 rounded-full">
-            <Pencil className="size-3.5" />
-            {t('gallery.edit')}
-          </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleTogglePublish}
+              disabled={publishing}
+              className={`gap-1.5 rounded-full ${isPublished ? 'border-emerald-500/30 text-emerald-600 dark:text-emerald-400' : ''}`}
+            >
+              <Globe className="size-3.5" />
+              {publishing
+                ? isPublished
+                  ? t('shared.unpublishing')
+                  : t('shared.publishing')
+                : isPublished
+                  ? t('shared.unpublish')
+                  : t('shared.publish')}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExport}
+              disabled={exporting}
+              className="gap-1.5 rounded-full"
+            >
+              <Download className="size-3.5" />
+              {exporting ? t('gallery.exporting') : t('gallery.export')}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={edit.startEditing}
+              className="gap-1.5 rounded-full"
+            >
+              <Pencil className="size-3.5" />
+              {t('gallery.edit')}
+            </Button>
           </>
         )}
         {edit.editing && (
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={cancelEditing} className="gap-1.5 rounded-full">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={cancelEditing}
+              className="gap-1.5 rounded-full"
+            >
               <X className="size-3.5" />
               {t('gallery.cancel')}
             </Button>
-            <Button size="sm" onClick={handleSave} disabled={edit.saving} className="gap-1.5 rounded-full">
+            <Button
+              size="sm"
+              onClick={handleSave}
+              disabled={edit.saving}
+              className="gap-1.5 rounded-full"
+            >
               <Save className="size-3.5" />
               {t('gallery.save')}
             </Button>
@@ -553,10 +810,14 @@ function ProfileDetail({
       <div className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-4xl px-6 py-8">
           <div className="card-premium relative mb-8 overflow-hidden rounded-[30px] p-6 sm:p-7">
-            <div className={`absolute -top-8 left-8 size-32 rounded-full ${color.replace('text-', 'bg-')}/8 blur-3xl`} />
+            <div
+              className={`absolute -top-8 left-8 size-32 rounded-full ${color.replace('text-', 'bg-')}/8 blur-3xl`}
+            />
 
             <div className="relative flex items-start gap-5">
-              <div className={`flex size-16 shrink-0 items-center justify-center rounded-[24px] bg-gradient-to-br from-white to-muted/80 border border-border/70 shadow-md dark:from-muted/60 dark:to-muted/30 ${color}`}>
+              <div
+                className={`flex size-16 shrink-0 items-center justify-center rounded-[24px] bg-gradient-to-br from-white to-muted/80 border border-border/70 shadow-md dark:from-muted/60 dark:to-muted/30 ${color}`}
+              >
                 <Icon className="size-8" />
               </div>
               <div className="min-w-0 flex-1">
@@ -588,8 +849,12 @@ function ProfileDetail({
                   </>
                 ) : (
                   <>
-                    <h1 className="text-3xl font-semibold tracking-[-0.04em] text-foreground">{profile.name}</h1>
-                    <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{profile.description}</p>
+                    <h1 className="text-3xl font-semibold tracking-[-0.04em] text-foreground">
+                      {profile.name}
+                    </h1>
+                    <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                      {profile.description}
+                    </p>
                   </>
                 )}
 
@@ -615,47 +880,60 @@ function ProfileDetail({
               <AlertTriangle className="size-4 text-amber-500 shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-amber-700 dark:text-amber-400">
-                  {t('gallery.skillsRemoved').replace('{skills}', removedSkills.join(', '))}
+                  {t('gallery.skillsRemoved').replace(
+                    '{skills}',
+                    removedSkills.join(', '),
+                  )}
                 </p>
               </div>
-              <button onClick={() => setRemovedSkills([])} className="shrink-0 text-amber-500/60 hover:text-amber-500 transition-colors">
+              <button
+                onClick={() => setRemovedSkills([])}
+                className="shrink-0 text-amber-500/60 hover:text-amber-500 transition-colors"
+              >
                 <X className="size-3.5" />
               </button>
             </div>
           )}
 
           {/* Meta badges row (read-only mode only) */}
-          {!edit.editing && ((profile.agent_runtime || profile.agent_template) || profile.tools?.length || displaySkills.length || profile.subagents?.length) && (
-            <div className="flex flex-wrap gap-2 mb-6">
-              {(profile.agent_runtime || profile.agent_template) && (
-                <div className="inline-flex items-center gap-1.5 rounded-full border border-orange-500/15 bg-orange-500/8 px-3 py-1.5 text-xs font-medium text-orange-600 dark:text-orange-400">
-                  <Layers className="size-3.5" />
-                  {profile.agent_runtime || profile.agent_template}
-                </div>
-              )}
-              {displaySkills.length > 0 && (
-                <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/15 bg-emerald-500/8 px-3 py-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                  <BookOpen className="size-3.5" />
-                  {displaySkills.length} {t('gallery.skills')}
-                </div>
-              )}
-              {profile.tools && profile.tools.length > 0 && (
-                <div className="inline-flex items-center gap-1.5 rounded-full border border-sky-500/15 bg-sky-500/8 px-3 py-1.5 text-xs font-medium text-sky-600 dark:text-sky-400">
-                  <Wrench className="size-3.5" />
-                  {profile.tools.length} {t('gallery.tools')}
-                </div>
-              )}
-              {profile.subagents && profile.subagents.length > 0 && (
-                <div className="inline-flex items-center gap-1.5 rounded-full border border-violet-500/15 bg-violet-500/8 px-3 py-1.5 text-xs font-medium text-violet-600 dark:text-violet-400">
-                  <Users className="size-3.5" />
-                  {profile.subagents.length} {t('gallery.subagents')}
-                </div>
-              )}
-            </div>
-          )}
+          {!edit.editing &&
+            (profile.agent_runtime ||
+              profile.agent_template ||
+              profile.tools?.length ||
+              displaySkills.length ||
+              profile.subagents?.length) && (
+              <div className="flex flex-wrap gap-2 mb-6">
+                {(profile.agent_runtime || profile.agent_template) && (
+                  <div className="inline-flex items-center gap-1.5 rounded-full border border-orange-500/15 bg-orange-500/8 px-3 py-1.5 text-xs font-medium text-orange-600 dark:text-orange-400">
+                    <Layers className="size-3.5" />
+                    {profile.agent_runtime || profile.agent_template}
+                  </div>
+                )}
+                {displaySkills.length > 0 && (
+                  <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/15 bg-emerald-500/8 px-3 py-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                    <BookOpen className="size-3.5" />
+                    {displaySkills.length} {t('gallery.skills')}
+                  </div>
+                )}
+                {profile.tools && profile.tools.length > 0 && (
+                  <div className="inline-flex items-center gap-1.5 rounded-full border border-sky-500/15 bg-sky-500/8 px-3 py-1.5 text-xs font-medium text-sky-600 dark:text-sky-400">
+                    <Wrench className="size-3.5" />
+                    {profile.tools.length} {t('gallery.tools')}
+                  </div>
+                )}
+                {profile.subagents && profile.subagents.length > 0 && (
+                  <div className="inline-flex items-center gap-1.5 rounded-full border border-violet-500/15 bg-violet-500/8 px-3 py-1.5 text-xs font-medium text-violet-600 dark:text-violet-400">
+                    <Users className="size-3.5" />
+                    {profile.subagents.length} {t('gallery.subagents')}
+                  </div>
+                )}
+              </div>
+            )}
 
           {/* Template selector */}
-          {(edit.editing || (profile.agent_runtime || profile.agent_template)) && (
+          {(edit.editing ||
+            profile.agent_runtime ||
+            profile.agent_template) && (
             <section className="mb-6">
               <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground mb-3">
                 <Layers className="size-4 text-muted-foreground" />
@@ -668,7 +946,9 @@ function ProfileDetail({
                   className="w-full rounded-[18px] border border-border bg-card px-3.5 py-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring dark:bg-card"
                 >
                   {runtimes.map((rt) => (
-                    <option key={rt} value={rt}>{rt}</option>
+                    <option key={rt} value={rt}>
+                      {rt}
+                    </option>
                   ))}
                 </select>
               ) : (
@@ -707,29 +987,49 @@ function ProfileDetail({
             </section>
           )}
 
-          {/* Skills / Tools / Subagents 闂?rendered from tagSections config */}
-          {tagSections.map(({ key, items, setItems, icon: SectionIcon, color: sectionColor, iconColor, label, suggestions, sourceMap, onItemClick }) =>
-            (edit.editing || items.length > 0) ? (
-              <section key={key} className="mb-6">
-                <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground mb-3">
-                  <SectionIcon className={`size-4 ${iconColor}`} />
-                  {label}
-                </h2>
-                {edit.editing ? (
-                  <EditableTagList
-                    tags={items as string[]}
-                    onChange={setItems}
-                    icon={SectionIcon}
-                    color={sectionColor}
-                    placeholder={t('gallery.addTag')}
-                    suggestions={suggestions as string[] | undefined}
-                    sourceMap={sourceMap as Map<string, string> | undefined}
-                  />
-                ) : (
-                  <TagGrid items={items as string[]} icon={SectionIcon} color={sectionColor} sourceMap={sourceMap as Map<string, string> | undefined} onItemClick={onItemClick as ((item: string) => void) | undefined} />
-                )}
-              </section>
-            ) : null,
+          {/* Skills / Tools / Subagents - rendered from tagSections config */}
+          {tagSections.map(
+            ({
+              key,
+              items,
+              setItems,
+              icon: SectionIcon,
+              color: sectionColor,
+              iconColor,
+              label,
+              suggestions,
+              sourceMap,
+              onItemClick,
+            }) =>
+              edit.editing || items.length > 0 ? (
+                <section key={key} className="mb-6">
+                  <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground mb-3">
+                    <SectionIcon className={`size-4 ${iconColor}`} />
+                    {label}
+                  </h2>
+                  {edit.editing ? (
+                    <EditableTagList
+                      tags={items as string[]}
+                      onChange={setItems}
+                      icon={SectionIcon}
+                      color={sectionColor}
+                      placeholder={t('gallery.addTag')}
+                      suggestions={suggestions as string[] | undefined}
+                      sourceMap={sourceMap as Map<string, string> | undefined}
+                    />
+                  ) : (
+                    <TagGrid
+                      items={items as string[]}
+                      icon={SectionIcon}
+                      color={sectionColor}
+                      sourceMap={sourceMap as Map<string, string> | undefined}
+                      onItemClick={
+                        onItemClick as ((item: string) => void) | undefined
+                      }
+                    />
+                  )}
+                </section>
+              ) : null,
           )}
         </div>
       </div>
@@ -774,7 +1074,9 @@ function ProfileCard({
       className={`group relative h-[190px] cursor-pointer gap-0 overflow-hidden rounded-[26px] border p-0 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/8 ${batchMode && selected ? 'border-primary/40 ring-2 ring-primary' : 'border-border bg-card dark:bg-card'}`}
     >
       {/* Top color accent bar */}
-      <div className={`h-1 w-full bg-gradient-to-r ${color.replace('text-', 'from-')}/60 to-transparent`} />
+      <div
+        className={`h-1 w-full bg-gradient-to-r ${color.replace('text-', 'from-')}/60 to-transparent`}
+      />
 
       {/* Batch mode checkbox */}
       {batchMode && (
@@ -798,10 +1100,13 @@ function ProfileCard({
         </button>
       )}
 
-      {/* Published badge 闂?clickable to unpublish */}
+      {/* Published badge - clickable to unpublish */}
       {!batchMode && published && (
         <button
-          onClick={(e) => { e.stopPropagation(); onUnpublish?.(e); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onUnpublish?.(e);
+          }}
           className="absolute top-3 left-3 z-10 inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400 transition-colors hover:border-red-500/20 hover:bg-red-500/10 hover:text-red-500"
           title={t('shared.unpublish')}
         >
@@ -813,7 +1118,9 @@ function ProfileCard({
       <div className="flex h-[calc(100%-4px)] flex-col p-5">
         {/* Row 1 (fixed): icon + name + category + arrow */}
         <div className="flex items-center gap-3 min-w-0 h-10 shrink-0">
-          <div className={`flex size-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-white to-muted/80 border border-border/70 shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:shadow-md dark:from-muted/60 dark:to-muted/30 ${color}`}>
+          <div
+            className={`flex size-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-white to-muted/80 border border-border/70 shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:shadow-md dark:from-muted/60 dark:to-muted/30 ${color}`}
+          >
             <Icon className="size-5" />
           </div>
           <div className="flex-1 min-w-0">
@@ -823,12 +1130,14 @@ function ProfileCard({
               direction="h"
               className="text-sm font-bold text-foreground leading-tight"
             />
-            <span className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/60">{category}</span>
+            <span className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/60">
+              {category}
+            </span>
           </div>
           <ChevronRight className="size-4 text-muted-foreground/30 shrink-0 transition-all duration-200 group-hover:text-primary/60 group-hover:translate-x-0.5" />
         </div>
 
-        {/* Row 2 (flexible): description 闂?fills middle space */}
+        {/* Row 2 (flexible): description - fills middle space */}
         <Marquee
           text={profile.description}
           hovered={hovered}
@@ -892,7 +1201,9 @@ export default function ProfileGallery() {
   const fetchToolSummaries = useLibraryStore((s) => s.fetchTools);
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
-  const [selectedProfile, setSelectedProfile] = useState<AgentProfile | null>(null);
+  const [selectedProfile, setSelectedProfile] = useState<AgentProfile | null>(
+    null,
+  );
   const [sourceTab, setSourceTab] = useState<SourceTab>('preset');
   const [creating, setCreating] = useState(false);
   const [batchMode, setBatchMode] = useState(false);
@@ -903,17 +1214,23 @@ export default function ProfileGallery() {
   // Sync selectedProfile with latest store data after fetchProfiles
   useEffect(() => {
     if (selectedProfile) {
-      const updated = profiles.find((p) => p.fileName === selectedProfile.fileName);
+      const updated = profiles.find(
+        (p) => p.fileName === selectedProfile.fileName,
+      );
       if (updated) setSelectedProfile(updated);
     }
   }, [profiles]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Handle pending profile navigation from deep study dialog
   const pendingProfileFileName = useUIStore((s) => s.pendingProfileFileName);
-  const setPendingProfileFileName = useUIStore((s) => s.setPendingProfileFileName);
+  const setPendingProfileFileName = useUIStore(
+    (s) => s.setPendingProfileFileName,
+  );
   useEffect(() => {
     if (pendingProfileFileName && profiles.length > 0) {
-      const target = profiles.find((p) => p.fileName === pendingProfileFileName);
+      const target = profiles.find(
+        (p) => p.fileName === pendingProfileFileName,
+      );
       if (target) {
         setSelectedProfile(target);
       }
@@ -922,13 +1239,30 @@ export default function ProfileGallery() {
   }, [pendingProfileFileName, profiles, setPendingProfileFileName]);
 
   // Split by source
-  const presetProfiles = useMemo(() => profiles.filter((p) => p.source === 'preset' || (!p.source)), [profiles]);
-  const publicProfiles = useMemo(() => profiles.filter((p) => p.source === 'public'), [profiles]);
-  const userProfiles = useMemo(() => profiles.filter((p) => p.source === 'user'), [profiles]);
-  const currentProfiles = sourceTab === 'preset' ? presetProfiles : sourceTab === 'public' ? publicProfiles : userProfiles;
+  const presetProfiles = useMemo(
+    () => profiles.filter((p) => p.source === 'preset' || !p.source),
+    [profiles],
+  );
+  const publicProfiles = useMemo(
+    () => profiles.filter((p) => p.source === 'public'),
+    [profiles],
+  );
+  const userProfiles = useMemo(
+    () => profiles.filter((p) => p.source === 'user'),
+    [profiles],
+  );
+  const currentProfiles =
+    sourceTab === 'preset'
+      ? presetProfiles
+      : sourceTab === 'public'
+        ? publicProfiles
+        : userProfiles;
 
   // Published profile lookup (user profiles that also exist in public)
-  const publishedFileNames = useMemo(() => new Set(publicProfiles.map((p) => p.fileName)), [publicProfiles]);
+  const publishedFileNames = useMemo(
+    () => new Set(publicProfiles.map((p) => p.fileName)),
+    [publicProfiles],
+  );
 
   const availableCategories = useMemo(() => {
     const catSet = new Set<string>();
@@ -939,7 +1273,8 @@ export default function ProfileGallery() {
   }, [currentProfiles]);
 
   const filtered = currentProfiles.filter((p: AgentProfile) => {
-    if (activeCategory && matchAgentCategory(p.name) !== activeCategory) return false;
+    if (activeCategory && matchAgentCategory(p.name) !== activeCategory)
+      return false;
     if (search) {
       const keywords = search.toLowerCase().split(/\s+/).filter(Boolean);
       const text = `${p.name} ${p.description}`.toLowerCase();
@@ -948,42 +1283,66 @@ export default function ProfileGallery() {
     return true;
   });
 
-  const handleCreate = useCallback(async (profile: AgentProfile) => {
-    const agent = await createAgent(profile.fileName);
-    openTab(agent.id, agent.name);
-    setMainView(null);
-  }, [createAgent, openTab, setMainView]);
+  const handleCreate = useCallback(
+    async (profile: AgentProfile) => {
+      const agent = await createAgent(profile.fileName);
+      openTab(agent.id, agent.name);
+      setMainView(null);
+    },
+    [createAgent, openTab, setMainView],
+  );
 
-  const handleDelete = useCallback(async (profile: AgentProfile) => {
-    if (!confirm(t('gallery.confirmDelete').replace('{name}', profile.name))) return;
-    try {
-      await deleteUserProfile(profile.fileName);
-      toast.success(t('agent.delete'));
-      fetchProfiles(true);
-    } catch (err) {
-      toast.error(t('agent.delete'), { description: err instanceof Error ? err.message : undefined });
-    }
-  }, [fetchProfiles, t]);
+  const handleDelete = useCallback(
+    async (profile: AgentProfile) => {
+      if (!confirm(t('gallery.confirmDelete').replace('{name}', profile.name)))
+        return;
+      try {
+        await deleteUserProfile(profile.fileName);
+        toast.success(t('agent.delete'));
+        fetchProfiles(true);
+      } catch (err) {
+        toast.error(t('agent.delete'), {
+          description: err instanceof Error ? err.message : undefined,
+        });
+      }
+    },
+    [fetchProfiles, t],
+  );
 
-  const handleUnpublishProfile = useCallback(async (profile: AgentProfile) => {
-    try {
-      await unpublishProfile(profile.fileName);
-      toast.success(t('shared.unpublish'));
-      fetchProfiles(true);
-    } catch (err) {
-      toast.error(t('shared.unpublish'), { description: err instanceof Error ? err.message : undefined });
-    }
-  }, [fetchProfiles, t]);
+  const handleUnpublishProfile = useCallback(
+    async (profile: AgentProfile) => {
+      try {
+        await unpublishProfile(profile.fileName);
+        toast.success(t('shared.unpublish'));
+        fetchProfiles(true);
+      } catch (err) {
+        toast.error(t('shared.unpublish'), {
+          description: err instanceof Error ? err.message : undefined,
+        });
+      }
+    },
+    [fetchProfiles, t],
+  );
 
   const handleBatchDelete = useCallback(async () => {
     if (selectedItems.size === 0) return;
-    if (!confirm(t('gallery.confirmBatchDelete').replace('{n}', String(selectedItems.size)))) return;
+    if (
+      !confirm(
+        t('gallery.confirmBatchDelete').replace(
+          '{n}',
+          String(selectedItems.size),
+        ),
+      )
+    )
+      return;
     const items = Array.from(selectedItems);
     try {
       await Promise.all(items.map((fileName) => deleteUserProfile(fileName)));
       toast.success(t('gallery.batchDelete'));
     } catch (err) {
-      toast.error(t('gallery.batchDelete'), { description: err instanceof Error ? err.message : undefined });
+      toast.error(t('gallery.batchDelete'), {
+        description: err instanceof Error ? err.message : undefined,
+      });
     }
     setBatchMode(false);
     setSelectedItems(new Set());
@@ -1004,25 +1363,30 @@ export default function ProfileGallery() {
     setSelectedItems(new Set());
   }, []);
 
-  const handleImport = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    e.target.value = ''; // reset so same file can be re-selected
-    setImporting(true);
-    try {
-      const result = await importProfile(file);
-      await fetchProfiles(true);
-      // Refresh skill/tool caches so newly imported items are visible
-      if (result.skillsImported > 0) fetchSkillSummaries();
-      if (result.toolsImported > 0) fetchToolSummaries();
-      toast.success(t('gallery.importSuccess'));
-      setSourceTab('user');
-    } catch (err) {
-      toast.error(t('gallery.importError'), { description: err instanceof Error ? err.message : undefined });
-    } finally {
-      setImporting(false);
-    }
-  }, [fetchProfiles, fetchSkillSummaries, fetchToolSummaries, t]);
+  const handleImport = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      e.target.value = ''; // reset so same file can be re-selected
+      setImporting(true);
+      try {
+        const result = await importProfile(file);
+        await fetchProfiles(true);
+        // Refresh skill/tool caches so newly imported items are visible
+        if (result.skillsImported > 0) fetchSkillSummaries();
+        if (result.toolsImported > 0) fetchToolSummaries();
+        toast.success(t('gallery.importSuccess'));
+        setSourceTab('user');
+      } catch (err) {
+        toast.error(t('gallery.importError'), {
+          description: err instanceof Error ? err.message : undefined,
+        });
+      } finally {
+        setImporting(false);
+      }
+    },
+    [fetchProfiles, fetchSkillSummaries, fetchToolSummaries, t],
+  );
 
   // Create new profile view
   if (creating) {
@@ -1041,17 +1405,43 @@ export default function ProfileGallery() {
         profile={emptyProfile}
         onBack={() => setCreating(false)}
         onCreate={handleCreate}
-        onUpdated={() => { fetchProfiles(true); setSourceTab('user'); }}
+        onUpdated={() => {
+          fetchProfiles(true);
+          setSourceTab('user');
+        }}
         loading={loading}
         mode="create"
       />
     );
   }
 
-  const sourceTabs: { key: SourceTab; icon: LucideIcon; label: string; count: number; exitBatch?: boolean }[] = [
-    { key: 'preset', icon: Lock, label: t('gallery.preset'), count: presetProfiles.length, exitBatch: true },
-    { key: 'public', icon: Globe, label: t('gallery.public'), count: publicProfiles.length, exitBatch: true },
-    { key: 'user', icon: User, label: t('gallery.user'), count: userProfiles.length },
+  const sourceTabs: {
+    key: SourceTab;
+    icon: LucideIcon;
+    label: string;
+    count: number;
+    exitBatch?: boolean;
+  }[] = [
+    {
+      key: 'preset',
+      icon: Lock,
+      label: t('gallery.preset'),
+      count: presetProfiles.length,
+      exitBatch: true,
+    },
+    {
+      key: 'public',
+      icon: Globe,
+      label: t('gallery.public'),
+      count: publicProfiles.length,
+      exitBatch: true,
+    },
+    {
+      key: 'user',
+      icon: User,
+      label: t('gallery.user'),
+      count: userProfiles.length,
+    },
   ];
 
   // Detail view
@@ -1075,40 +1465,69 @@ export default function ProfileGallery() {
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex items-center gap-2">
                 <div className="flex items-center gap-0.5 rounded-full border border-border/70 bg-card p-1 shadow-sm dark:bg-card">
-            {sourceTabs.map((tab) => {
-              const TabIcon = tab.icon;
-              return (
-                <button
-                  key={tab.key}
-                  onClick={() => { setSourceTab(tab.key); setActiveCategory(null); if (tab.exitBatch) exitBatchMode(); }}
-                          className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-medium transition-all duration-200 ${
-                    sourceTab === tab.key
-                              ? 'bg-primary text-primary-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  <TabIcon className="size-3" />
-                  {tab.label}
-                  <span className="text-[10px] tabular-nums text-muted-foreground/50">{tab.count}</span>
-                </button>
-              );
-            })}
+                  {sourceTabs.map((tab) => {
+                    const TabIcon = tab.icon;
+                    return (
+                      <button
+                        key={tab.key}
+                        onClick={() => {
+                          setSourceTab(tab.key);
+                          setActiveCategory(null);
+                          if (tab.exitBatch) exitBatchMode();
+                        }}
+                        className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-medium transition-all duration-200 ${
+                          sourceTab === tab.key
+                            ? 'bg-primary text-primary-foreground shadow-sm'
+                            : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        <TabIcon className="size-3" />
+                        {tab.label}
+                        <span className="text-[10px] tabular-nums text-muted-foreground/50">
+                          {tab.count}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
-                {sourceTab === 'user' && !batchMode && userProfiles.length > 0 && (
-                  <Button variant="outline" size="sm" onClick={() => setBatchMode(true)} className="h-9 gap-1.5 rounded-full text-xs">
-                    <Settings className="size-3" />
-                    {t('gallery.manage')}
-                  </Button>
-                )}
-                <Button size="sm" onClick={() => setCreating(true)} className="h-9 gap-1.5 rounded-full text-xs bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-sm hover:shadow-md hover:shadow-amber-500/20 dark:from-amber-400 dark:to-amber-500">
+                {sourceTab === 'user' &&
+                  !batchMode &&
+                  userProfiles.length > 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setBatchMode(true)}
+                      className="h-9 gap-1.5 rounded-full text-xs"
+                    >
+                      <Settings className="size-3" />
+                      {t('gallery.manage')}
+                    </Button>
+                  )}
+                <Button
+                  size="sm"
+                  onClick={() => setCreating(true)}
+                  className="h-9 gap-1.5 rounded-full text-xs bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-sm hover:shadow-md hover:shadow-amber-500/20 dark:from-amber-400 dark:to-amber-500"
+                >
                   <Plus className="size-3.5" />
                   {t('gallery.new')}
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => importInputRef.current?.click()} disabled={importing} className="h-9 gap-1.5 rounded-full text-xs">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => importInputRef.current?.click()}
+                  disabled={importing}
+                  className="h-9 gap-1.5 rounded-full text-xs"
+                >
                   <Upload className="size-3.5" />
                   {importing ? t('gallery.importing') : t('gallery.import')}
                 </Button>
-                <input ref={importInputRef} type="file" accept=".zip" className="hidden" onChange={handleImport} />
+                <input
+                  ref={importInputRef}
+                  type="file"
+                  accept=".zip"
+                  className="hidden"
+                  onChange={handleImport}
+                />
               </div>
             </div>
 
@@ -1139,7 +1558,9 @@ export default function ProfileGallery() {
               }}
               className="text-xs text-primary hover:text-primary/80 transition-colors shrink-0"
             >
-              {selectedItems.size === filtered.length && filtered.length > 0 ? t('gallery.deselectAll') : t('gallery.selectAll')}
+              {selectedItems.size === filtered.length && filtered.length > 0
+                ? t('gallery.deselectAll')
+                : t('gallery.selectAll')}
             </button>
             <span className="text-xs text-muted-foreground">
               {t('gallery.selected').replace('{n}', String(selectedItems.size))}
@@ -1155,7 +1576,12 @@ export default function ProfileGallery() {
               <Trash2 className="size-3" />
               {t('gallery.batchDelete')}
             </Button>
-            <Button variant="ghost" size="sm" onClick={exitBatchMode} className="h-7 text-xs">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={exitBatchMode}
+              className="h-7 text-xs"
+            >
               {t('gallery.cancelManage')}
             </Button>
           </div>
@@ -1173,13 +1599,17 @@ export default function ProfileGallery() {
             onClick={() => setActiveCategory(null)}
           >
             {t('gallery.all')}
-            <span className={`text-[10px] ${activeCategory === null ? 'text-white/70' : 'text-muted-foreground/50'}`}>
+            <span
+              className={`text-[10px] ${activeCategory === null ? 'text-white/70' : 'text-muted-foreground/50'}`}
+            >
               {currentProfiles.length}
             </span>
           </button>
           {availableCategories.map((cat) => {
             const CatIcon = cat.icon;
-            const count = currentProfiles.filter((p) => matchAgentCategory(p.name) === cat.name).length;
+            const count = currentProfiles.filter(
+              (p) => matchAgentCategory(p.name) === cat.name,
+            ).length;
             const isActive = activeCategory === cat.name;
             return (
               <button
@@ -1193,7 +1623,9 @@ export default function ProfileGallery() {
               >
                 <CatIcon className="size-3" />
                 {cat.name}
-                <span className={`text-[10px] ${isActive ? 'text-white/70' : 'text-muted-foreground/50'}`}>
+                <span
+                  className={`text-[10px] ${isActive ? 'text-white/70' : 'text-muted-foreground/50'}`}
+                >
                   {count}
                 </span>
               </button>
@@ -1220,27 +1652,43 @@ export default function ProfileGallery() {
                 if (batchMode) return;
                 handleCreate(p);
               }}
-              onDelete={p.source === 'user' ? (e) => {
-                e.stopPropagation();
-                handleDelete(p);
-              } : undefined}
+              onDelete={
+                p.source === 'user'
+                  ? (e) => {
+                      e.stopPropagation();
+                      handleDelete(p);
+                    }
+                  : undefined
+              }
               loading={loading}
               batchMode={batchMode && p.source === 'user'}
               selected={selectedItems.has(p.fileName)}
-              published={p.source === 'user' && publishedFileNames.has(p.fileName)}
-              onUnpublish={p.source === 'user' && publishedFileNames.has(p.fileName) ? (e) => {
-                e.stopPropagation();
-                handleUnpublishProfile(p);
-              } : undefined}
+              published={
+                p.source === 'user' && publishedFileNames.has(p.fileName)
+              }
+              onUnpublish={
+                p.source === 'user' && publishedFileNames.has(p.fileName)
+                  ? (e) => {
+                      e.stopPropagation();
+                      handleUnpublishProfile(p);
+                    }
+                  : undefined
+              }
             />
           ))}
           {filtered.length === 0 && (
             <div className="col-span-full py-16 text-center">
               <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-2xl bg-card shadow-sm dark:bg-card">
-                {sourceTab === 'user' ? <User className="size-5 text-muted-foreground/30" /> : <Search className="size-5 text-muted-foreground/30" />}
+                {sourceTab === 'user' ? (
+                  <User className="size-5 text-muted-foreground/30" />
+                ) : (
+                  <Search className="size-5 text-muted-foreground/30" />
+                )}
               </div>
               <p className="text-sm text-muted-foreground/60">
-                {sourceTab === 'user' ? t('gallery.noUserProfiles') : t('gallery.noMatch')}
+                {sourceTab === 'user'
+                  ? t('gallery.noUserProfiles')
+                  : t('gallery.noMatch')}
               </p>
             </div>
           )}
@@ -1249,4 +1697,3 @@ export default function ProfileGallery() {
     </div>
   );
 }
-

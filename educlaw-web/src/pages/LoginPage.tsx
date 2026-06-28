@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+﻿import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { ShieldCheck, Sparkles, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -21,29 +21,33 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const copy = useMemo(() => ({
-    pageDescription: 'Skill 管理与成长工作台',
-    loginSubtitle: '登录到 EduSkill',
-    registerSubtitle: '创建 EduSkill 账号',
-    loginHint: '登录后继续使用你的工作区。',
-    registerHint: '注册后将直接进入工作区。',
-    infoWorkspace: '在一个工作台中完成 Skill 的创建、整理、评估与持续优化，让好用的能力能够被沉淀、复用和共享。',
-    infoAccount: '注册后可以继续管理工作区中的账号、资料与使用记录。',
-    accountAccess: '账户访问',
-    username: '用户名',
-    password: '密码',
-    confirmPassword: '确认密码',
-    inviteCode: '邀请码',
-    login: '登录',
-    register: '注册',
-    loggingIn: '登录中...',
-    registering: '注册中...',
-    usernameLength: '用户名需要 3-32 个字符',
-    passwordLength: '密码至少需要 6 个字符',
-    passwordMismatch: '两次密码输入不一致',
-    inviteCodeRequired: '请输入邀请码',
-    unknownError: '发生未知错误，请重试',
-  }), []);
+  const copy = useMemo(
+    () => ({
+      pageDescription: 'Skill 管理与成长工作台',
+      loginSubtitle: '登录到 EduSkill',
+      registerSubtitle: '创建 EduSkill 账号',
+      loginHint: '登录后继续使用你的工作区。',
+      registerHint: '注册后将直接进入工作区。',
+      infoWorkspace:
+        '在一个工作台中完成 Skill 的创建、整理、评估与持续优化，让好用的能力能够被沉淀、复用和共享。',
+      infoAccount: '注册后可以继续管理工作区中的账号、资料与使用记录。',
+      accountAccess: '账户访问',
+      username: '用户名',
+      password: '密码',
+      confirmPassword: '确认密码',
+      inviteCode: '邀请码',
+      login: '登录',
+      register: '注册',
+      loggingIn: '登录中...',
+      registering: '注册中...',
+      usernameLength: '用户名需要 3-32 个字符',
+      passwordLength: '密码至少需要 6 个字符',
+      passwordMismatch: '两次密码输入不一致',
+      inviteCodeRequired: '请输入邀请码',
+      unknownError: '发生未知错误，请重试',
+    }),
+    [],
+  );
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -103,10 +107,18 @@ export default function LoginPage() {
             </div>
 
             <div className="mt-8 flex items-center gap-4">
-              <img src={`${BASE}/logo.png`} alt="EduSkill" className="size-16 rounded-[18px] shadow-[var(--shadow-sm)]" />
+              <img
+                src={`${BASE}/logo.png`}
+                alt="EduSkill"
+                className="size-16 rounded-[18px] shadow-[var(--shadow-sm)]"
+              />
               <div>
-                <div className="text-[28px] font-semibold tracking-[-0.03em] text-foreground">EduSkill</div>
-                <div className="mt-1 text-sm leading-6 text-muted-foreground">{copy.pageDescription}</div>
+                <div className="text-[28px] font-semibold tracking-[-0.03em] text-foreground">
+                  EduSkill
+                </div>
+                <div className="mt-1 text-sm leading-6 text-muted-foreground">
+                  {copy.pageDescription}
+                </div>
               </div>
             </div>
 
@@ -122,11 +134,16 @@ export default function LoginPage() {
 
           <div className="grid gap-4">
             {highlights.map((item) => (
-              <div key={item.text} className="flex items-start gap-3 rounded-[16px] border border-border bg-card px-4 py-4 shadow-[var(--shadow-sm)]">
+              <div
+                key={item.text}
+                className="flex items-start gap-3 rounded-[16px] border border-border bg-card px-4 py-4 shadow-[var(--shadow-sm)]"
+              >
                 <div className="flex size-10 shrink-0 items-center justify-center rounded-[12px] bg-primary-soft text-primary">
                   <item.icon className="size-4.5" />
                 </div>
-                <div className="text-sm leading-6 text-muted-foreground">{item.text}</div>
+                <div className="text-sm leading-6 text-muted-foreground">
+                  {item.text}
+                </div>
               </div>
             ))}
           </div>
@@ -136,10 +153,18 @@ export default function LoginPage() {
           <div className="mx-auto flex w-full max-w-md flex-col gap-6">
             <div className="xl:hidden">
               <div className="flex items-center gap-3">
-                <img src={`${BASE}/logo.png`} alt="EduSkill" className="size-12 rounded-[14px] shadow-[var(--shadow-sm)]" />
+                <img
+                  src={`${BASE}/logo.png`}
+                  alt="EduSkill"
+                  className="size-12 rounded-[14px] shadow-[var(--shadow-sm)]"
+                />
                 <div>
-                  <div className="text-xl font-semibold tracking-[-0.03em] text-foreground">EduSkill</div>
-                  <div className="text-sm text-muted-foreground">{copy.pageDescription}</div>
+                  <div className="text-xl font-semibold tracking-[-0.03em] text-foreground">
+                    EduSkill
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    {copy.pageDescription}
+                  </div>
                 </div>
               </div>
             </div>
@@ -181,7 +206,12 @@ export default function LoginPage() {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <label htmlFor="auth-username" className="text-sm font-medium text-foreground">{copy.username}</label>
+                <label
+                  htmlFor="auth-username"
+                  className="text-sm font-medium text-foreground"
+                >
+                  {copy.username}
+                </label>
                 <div className="input-glow rounded-[12px] border border-border bg-card p-1">
                   <Input
                     id="auth-username"
@@ -197,7 +227,12 @@ export default function LoginPage() {
               </div>
 
               <div className="space-y-2">
-                <label htmlFor="auth-password" className="text-sm font-medium text-foreground">{copy.password}</label>
+                <label
+                  htmlFor="auth-password"
+                  className="text-sm font-medium text-foreground"
+                >
+                  {copy.password}
+                </label>
                 <div className="input-glow rounded-[12px] border border-border bg-card p-1">
                   <Input
                     id="auth-password"
@@ -206,7 +241,9 @@ export default function LoginPage() {
                     placeholder={copy.password}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    autoComplete={isRegister ? 'new-password' : 'current-password'}
+                    autoComplete={
+                      isRegister ? 'new-password' : 'current-password'
+                    }
                     className="border-0 bg-transparent shadow-none focus-visible:ring-0"
                   />
                 </div>
@@ -215,7 +252,12 @@ export default function LoginPage() {
               {isRegister && (
                 <>
                   <div className="space-y-2">
-                    <label htmlFor="auth-confirm-password" className="text-sm font-medium text-foreground">{copy.confirmPassword}</label>
+                    <label
+                      htmlFor="auth-confirm-password"
+                      className="text-sm font-medium text-foreground"
+                    >
+                      {copy.confirmPassword}
+                    </label>
                     <div className="input-glow rounded-[12px] border border-border bg-card p-1">
                       <Input
                         id="auth-confirm-password"
@@ -231,7 +273,12 @@ export default function LoginPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <label htmlFor="auth-invite-code" className="text-sm font-medium text-foreground">{copy.inviteCode}</label>
+                    <label
+                      htmlFor="auth-invite-code"
+                      className="text-sm font-medium text-foreground"
+                    >
+                      {copy.inviteCode}
+                    </label>
                     <div className="input-glow rounded-[12px] border border-border bg-card p-1">
                       <Input
                         id="auth-invite-code"
@@ -253,8 +300,18 @@ export default function LoginPage() {
                 </div>
               )}
 
-              <Button type="submit" disabled={loading} className="h-10 w-full rounded-[10px] text-sm">
-                {loading ? (isRegister ? copy.registering : copy.loggingIn) : (isRegister ? copy.register : copy.login)}
+              <Button
+                type="submit"
+                disabled={loading}
+                className="h-10 w-full rounded-[10px] text-sm"
+              >
+                {loading
+                  ? isRegister
+                    ? copy.registering
+                    : copy.loggingIn
+                  : isRegister
+                    ? copy.register
+                    : copy.login}
               </Button>
             </form>
           </div>

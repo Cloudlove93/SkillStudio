@@ -7,7 +7,12 @@ import { getLogger } from '../lib/request-context.js';
 import { safeError } from '../lib/logger.js';
 import { requireAuth } from '../middleware/auth.js';
 import { one } from '../utils/http.js';
-import { initSse, writeSseEvent } from '../utils/sse.js';
+import {
+  initSse,
+  startSseHeartbeat,
+  stopSseHeartbeat,
+  writeSseEvent,
+} from '../utils/sse.js';
 import {
   deletePackage,
   exportPackageZip,
@@ -21,6 +26,7 @@ import {
   applyManualMarkdownEdit,
   updateVersionNote,
   repairPackageRubric,
+  optimizePackageRubric,
 } from '../services/package-service.js';
 import { optimizePackage } from '../services/optimization-service.js';
 import {
@@ -80,13 +86,10 @@ router.post(
         ) || 0,
       model: typeof req.body?.model === 'string' ? req.body.model : undefined,
     });
-    const heartbeat = setInterval(() => {
-      try {
-        writeSseEvent(res, 'ping', {});
-      } catch {
-        /* ignore */
-      }
-    }, 5000);
+    const heartbeat = startSseHeartbeat(
+      res,
+      Number(process.env.PACKAGE_STREAM_HEARTBEAT_MS || '5000'),
+    );
     try {
       writeSseEvent(res, 'phase', { label: '整理需求，准备生成智能体' });
       writeSseEvent(res, 'phase', { label: '调用模型生成智能体内容' });
@@ -116,7 +119,7 @@ router.post(
       writeSseEvent(res, 'error', { error: message });
       writeSseEvent(res, 'stream_end', { ok: false });
     } finally {
-      clearInterval(heartbeat);
+      stopSseHeartbeat(heartbeat);
       res.end();
     }
   },
@@ -314,6 +317,25 @@ router.post(
   },
 );
 
+router.post(
+  '/packages/:packageId/rubric/optimize',
+  requireAuth,
+  async (req, res) => {
+    try {
+      const result = await optimizePackageRubric(
+        (req as AuthedRequest).userId || '',
+        one(req.params.packageId),
+        typeof req.body?.model === 'string' ? req.body.model : undefined,
+      );
+      res.json(result);
+    } catch (error) {
+      res.status(400).json({
+        error: error instanceof Error ? error.message : '优化 rubric 失败',
+      });
+    }
+  },
+);
+
 router.post('/packages/:packageId/optimize', requireAuth, async (req, res) => {
   try {
     const result = await optimizePackage(
@@ -335,13 +357,10 @@ router.post(
   requireAuth,
   async (req: Request, res: Response) => {
     initSse(res);
-    const heartbeat = setInterval(() => {
-      try {
-        writeSseEvent(res, 'ping', {});
-      } catch {
-        /* ignore */
-      }
-    }, 5000);
+    const heartbeat = startSseHeartbeat(
+      res,
+      Number(process.env.PACKAGE_STREAM_HEARTBEAT_MS || '5000'),
+    );
     try {
       const result = await optimizePackage(
         (req as AuthedRequest).userId || '',
@@ -357,7 +376,7 @@ router.post(
         error: error instanceof Error ? error.message : '优化失败',
       });
     } finally {
-      clearInterval(heartbeat);
+      stopSseHeartbeat(heartbeat);
       res.end();
     }
   },

@@ -1,20 +1,37 @@
 import type { NextFunction, Response } from "express";
 import type { AuthedRequest } from "../types.js";
-import { verifyToken } from "../services/auth-service.js";
+
+export interface GatewayAuthedRequest extends AuthedRequest {
+  username?: string;
+  email?: string;
+}
+
+function firstHeaderValue(value: string | string[] | undefined): string | undefined {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const trimmed = item.trim();
+      if (trimmed.length > 0) {
+        return trimmed;
+      }
+    }
+  }
+  return undefined;
+}
 
 export function requireAuth(req: AuthedRequest, res: Response, next: NextFunction) {
-  const header = req.headers.authorization || "";
-  const token = header.startsWith("Bearer ") ? header.slice(7) : "";
-  if (!token) {
-    res.status(401).json({ error: "未登录或登录状态已失效" });
+  const userId = firstHeaderValue(req.headers["x-user-id"]);
+  if (!userId) {
+    res.status(401).json({ error: "Authentication required" });
     return;
   }
 
-  try {
-    const payload = verifyToken(token);
-    req.userId = payload.sub;
-    next();
-  } catch {
-    res.status(401).json({ error: "未登录或登录状态已失效" });
-  }
+  const gatewayReq = req as GatewayAuthedRequest;
+  gatewayReq.userId = userId;
+  gatewayReq.username = firstHeaderValue(req.headers["x-user-username"]) || userId;
+  gatewayReq.email = firstHeaderValue(req.headers["x-user-email"]);
+  next();
 }

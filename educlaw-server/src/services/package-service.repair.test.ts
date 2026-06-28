@@ -216,6 +216,20 @@ afterEach(() => {
 });
 
 describe('repairPackageRubric', () => {
+  it('generates a rubric when the current package has no rubric yet', async () => {
+    const state = createSeedState('');
+    generateTextMock.mockResolvedValue(completeRubric);
+
+    const { hasConfiguredRubricText, repairPackageRubric } =
+      await loadService(state);
+    const detail = await repairPackageRubric('user-1', 'package-1');
+
+    expect(generateTextMock).toHaveBeenCalledTimes(1);
+    expect(detail.versionNumber).toBe(2);
+    expect(detail.snapshot.rubricMd).toContain('# Rubric');
+    expect(hasConfiguredRubricText(detail.snapshot.rubricMd)).toBe(true);
+  });
+
   it('repairs an incomplete stored rubric with non-stream generation', async () => {
     const state = createSeedState();
     generateTextMock.mockResolvedValue(completeRubric);
@@ -269,6 +283,38 @@ describe('repairPackageRubric', () => {
     expect(generateTextMock.mock.calls[1]?.[0]?.userPrompt).toContain(
       'Existing rubric draft:',
     );
+    expect(detail.versionNumber).toBe(2);
+    expect(detail.snapshot.rubricMd).toContain('# Rubric');
+  });
+});
+
+describe('optimizePackageRubric', () => {
+  it('optimizes an existing scorable rubric without entering interactive optimization', async () => {
+    const state = createSeedState(completeRubric);
+    const optimizedRubric = `${completeRubric}\n- Keep scoring language even tighter.`;
+    generateTextMock.mockResolvedValue(optimizedRubric);
+
+    const { optimizePackageRubric } = await loadService(state);
+    const detail = await optimizePackageRubric('user-1', 'package-1');
+
+    expect(generateTextMock).toHaveBeenCalledTimes(1);
+    expect(generateTextMock.mock.calls[0]?.[0]?.userPrompt).toContain(
+      'Optimize the existing rubric.md',
+    );
+    expect(detail.versionNumber).toBe(2);
+    expect(detail.snapshot.rubricMd).toContain(
+      'Keep scoring language even tighter.',
+    );
+  });
+
+  it('falls back to repair when the current rubric is still incomplete', async () => {
+    const state = createSeedState(incompleteRubric);
+    generateTextMock.mockResolvedValue(completeRubric);
+
+    const { optimizePackageRubric } = await loadService(state);
+    const detail = await optimizePackageRubric('user-1', 'package-1');
+
+    expect(generateTextMock).toHaveBeenCalledTimes(1);
     expect(detail.versionNumber).toBe(2);
     expect(detail.snapshot.rubricMd).toContain('# Rubric');
   });

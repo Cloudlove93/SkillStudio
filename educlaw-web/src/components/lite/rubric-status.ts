@@ -1,16 +1,47 @@
+import { extractDisplayRubricContent } from './rubric-display.ts';
+
 const RUBRIC_REQUIRED_HEADINGS = [
   '# Rubric',
-  '## \u8bc4\u5206\u76ee\u6807',
-  '## \u8bc4\u5206\u7ef4\u5ea6',
-  '### \u89d2\u8272\u8d34\u5408',
-  '### Skill \u9075\u5faa',
-  '### \u56de\u7b54\u8d28\u91cf',
-  '### \u5b89\u5168\u8fb9\u754c',
-  '## \u4f7f\u7528\u8bf4\u660e',
+  '## 评分目标',
+  '## 评分维度',
+  '## 使用说明',
 ];
 
 function normalizeRubricMarkdown(rubricMd: string | null | undefined): string {
-  return String(rubricMd || '').trim();
+  const normalized = String(rubricMd || '').trim();
+  if (!normalized) return '';
+  return extractDisplayRubricContent(normalized);
+}
+
+function normalizeLegacyDimensionHeading(line: string): string {
+  return line
+    .trim()
+    .replace(/^(?:###\s*)?/, '')
+    .replace(/^(?:[①②③④⑤⑥⑦⑧⑨⑩]|\d+[.)、])\s*/, '')
+    .replace(/[:：].*$/, '')
+    .trim()
+    .toLowerCase();
+}
+
+function isSupportOnlyLegacyHeading(line: string): boolean {
+  const normalized = normalizeLegacyDimensionHeading(line);
+  if (!normalized) return false;
+
+  return (
+    /^(?:整体评价|具体评价)$/i.test(normalized) ||
+    /(?:案例对比|案例参考|测试情景|测试场景|规范依据|政策依据|参考依据|法规依据|case comparison|scenarios?|guidelines?|references?|appendix|notes?)/i.test(
+      normalized,
+    )
+  );
+}
+
+function countScorableLegacyDimensionLines(content: string): number {
+  const matches =
+    content.match(
+      /^\s*(?:###\s*)?(?:[①②③④⑤⑥⑦⑧⑨⑩]|\d+[.)、]|维度[一二三四五六七八九十百0-9]+[:：]?)[^\n]*$/gmu,
+    ) || [];
+
+  return matches.filter((line) => !isSupportOnlyLegacyHeading(line)).length;
 }
 
 function hasTemplateRubricStructure(content: string): boolean {
@@ -22,55 +53,67 @@ function hasTemplateRubricStructure(content: string): boolean {
 }
 
 function hasLegacyRubricStructure(content: string): boolean {
-  const numberedSections = content.match(/^\s*\d+[.)\u3001]\s+/gm) || [];
-  const hasScoringLanguage =
-    /(?:\u8bc4\u4f30\u8981\u70b9|\u8bc4\u5206\u8981\u70b9|\u8bc4\u5206\u6807\u51c6|\u7b49\u7ea7|\u4f18\u79c0|\u826f\u597d|\u5f85\u6539\u8fdb|\u4e0d\u5408\u683c)/.test(
+  const numberedSections = countScorableLegacyDimensionLines(content);
+  const hasHeaderSignals =
+    /(?:评价准则|评估标准|评分标准|评价标准|Evaluation Criteria|Rubric)/i.test(
       content,
     );
-  return numberedSections.length >= 4 && hasScoringLanguage;
+  const hasStructuredScores =
+    /(?:\d{1,3}\s*%)|(?:权重)|(?:等级)|(?:优秀)|(?:良好)|(?:合格)|(?:待改进)|(?:不合格)|(?:分值)|(?:评级标准)|(?:满分标准)/.test(
+      content,
+    );
+  const hasNarrativeRubricShape =
+    numberedSections >= 3 &&
+    /(?:整体评价|具体评价|应提供|评估要点|评分要点)/.test(content);
+
+  return (
+    hasHeaderSignals &&
+    numberedSections >= 1 &&
+    (hasStructuredScores || hasNarrativeRubricShape)
+  );
 }
 
 function hasWeightedLegacyRubricStructure(content: string): boolean {
-  const numberedSections =
-    content.match(/^\s*(?:\d+[.)\u3001]|[\u2460-\u2468])\s*/gm) || [];
-  const hasScoringLanguage =
-    /(?:\u6574\u4f53\u8bc4\u4ef7|\u5177\u4f53\u8bc4\u4ef7|\u6743\u91cd|\u4f18\u79c0|\u826f\u597d|\u5408\u683c|\u5f85\u6539\u8fdb|\u4e0d\u5408\u683c)/.test(
+  const numberedSections = countScorableLegacyDimensionLines(content);
+  const hasHeaderSignals =
+    /(?:评价准则|评估标准|评分标准|评价标准|Evaluation Criteria|Rubric)/i.test(
       content,
     );
-  return numberedSections.length >= 4 && hasScoringLanguage;
+  const hasScoringLanguage =
+    /(?:整体评价|具体评价|权重|优秀|良好|合格|待改进|不合格)/.test(content);
+
+  return hasHeaderSignals && numberedSections >= 1 && hasScoringLanguage;
 }
 
 function looksLikeWeightedRubric(content: string): boolean {
-  const dimensionHeadings =
-    content.match(/^\s*(?:[\u2460-\u2468]|\d+[.)\u3001])\s*[^\n]+$/gm) || [];
-  const hasWeights =
-    /(?:\d{1,3}\s*%)|(?:\u6743\u91cd)|(?:\u6bd4\u4f8b)|(?:\u5360\u6bd4)/.test(
+  const dimensionHeadings = countScorableLegacyDimensionLines(content);
+  const hasHeaderSignals =
+    /(?:评价准则|评估标准|评分标准|评价标准|Evaluation Criteria|Rubric)/i.test(
       content,
     );
-  const hasEvaluationShape =
-    /(?:\u6574\u4f53\u8bc4\u4ef7|\u5177\u4f53\u8bc4\u4ef7|\u8bc4\u4ef7\u51c6\u5219|\u8bc4\u4f30\u6807\u51c6|\u8bc4\u5206\u6807\u51c6|Evaluation Criteria|Rubric)/i.test(
-      content,
-    );
-  return dimensionHeadings.length >= 4 && (hasWeights || hasEvaluationShape);
+  const hasWeights = /(?:\d{1,3}\s*%)|(?:权重)|(?:比例)|(?:占比)/.test(content);
+  const hasEvaluationShape = /(?:整体评价|具体评价|应提供)/i.test(content);
+
+  return (
+    hasHeaderSignals &&
+    dimensionHeadings >= 1 &&
+    (hasWeights || hasEvaluationShape)
+  );
 }
 
 function hasTabularLegacyRubricStructure(content: string): boolean {
   const percentMatches = content.match(/\b\d{1,3}\s*%/g) || [];
   const hasHeaderSignals =
-    /(?:\u8bc4\u4ef7\u51c6\u5219|\u8bc4\u4f30\u6807\u51c6|\u8bc4\u5206\u6807\u51c6|Evaluation Criteria|Rubric)/i.test(
-      content,
-    );
-  const hasTableColumns = /(?:\u7ef4\u5ea6|\u6743\u91cd)/.test(content);
-  const hasGradeSignals =
-    /(?:\u4f18\u79c0|\u826f\u597d|\u5408\u683c|\u5f85\u6539\u8fdb|\u4e0d\u5408\u683c)/.test(
-      content,
-    );
+    /(?:评价准则|评估标准|评分标准|Evaluation Criteria|Rubric)/i.test(content);
+  const hasTableColumns = /(?:维度|权重)/.test(content);
+  const hasGradeSignals = /(?:优秀|良好|合格|待改进|不合格)/.test(content);
+
   return (
     hasHeaderSignals &&
     hasTableColumns &&
     hasGradeSignals &&
-    percentMatches.length >= 3 &&
-    content.length >= 120
+    percentMatches.length >= 1 &&
+    content.length >= 60
   );
 }
 
@@ -78,49 +121,39 @@ function hasCompactScorableRubricStructure(content: string): boolean {
   const markdownDimensions = content.match(/^###\s+[^\n]+$/gm) || [];
   const numberedDimensions =
     content.match(
-      /^\s*(?:###\s*)?(?:\d+[.)\u3001]\s*[^\d\s][^\n]*|\u7ef4\u5ea6[\u4e00-\u5341]?[^\n]*)$/gm,
+      /^\s*(?:###\s*)?(?:\d+[.)、]\s*[^\d\s][^\n]*|维度[一二三四五六七八九十百0-9]+[^\n]*)$/gmu,
     ) || [];
   const hasDimensionSection =
-    /(?:##\s*(?:\u8bc4\u5206\u7ef4\u5ea6|\u8bc4\u4f30\u7ef4\u5ea6)|\u8bc4\u4ef7\u51c6\u5219|\u8bc4\u4f30\u6807\u51c6|\u8bc4\u5206\u6807\u51c6|Evaluation Criteria|Rubric)/i.test(
+    /(?:##\s*(?:评分维度|评估维度)|评价准则|评估标准|评分标准|Evaluation Criteria|Rubric)/i.test(
       content,
     );
   const hasScoringSignals =
-    /(?:\u4f18\u79c0|\u826f\u597d|\u5408\u683c|\u5f85\u6539\u8fdb|\u4e0d\u5408\u683c|\u6ee1\u5206\u6807\u51c6|\u8bc4\u5206|score|Full score)/i.test(
+    /(?:优秀|良好|合格|待改进|不合格|满分标准|评分|score|Full score)/i.test(
       content,
     );
   const hasSummaryGoal =
-    /(?:Overall evaluation|\u6574\u4f53\u8bc4\u4ef7|\u8bc4\u5206\u76ee\u6807|\u8bc4\u4f30\u76ee\u6807|\u8bc4\u4ef7\u76ee\u6807)/i.test(
-      content,
-    );
+    /(?:Overall evaluation|整体评价|评分目标|评估目标|评价目标)/i.test(content);
+  const hasWeightSignals =
+    /(?:\d{1,3}\s*%)|(?:权重)|(?:分值)|(?:评级标准)/.test(content);
   const hasStructuredBody = /[-*]\s+/.test(content) || hasScoringSignals;
+
   return (
     hasDimensionSection &&
-    (markdownDimensions.length >= 2 ||
-      numberedDimensions.length >= 3 ||
-      (numberedDimensions.length >= 2 && hasSummaryGoal)) &&
-    hasStructuredBody
+    ((markdownDimensions.length >= 1 && hasStructuredBody) ||
+      (numberedDimensions.length >= 2 &&
+        (hasScoringSignals || hasSummaryGoal || hasWeightSignals)))
   );
 }
 
 function hasScoreBandWeightedRubricStructure(content: string): boolean {
   const dimensionHeadings =
     content.match(/^\s*维度[一二三四五六七八九十百0-9]+[:：]?[^\n]*$/gmu) || [];
-  const hasHeaderSignals =
-    /(?:\u8bc4\u4f30\u91cf\u8868|\u8bc4\u4f30\u6807\u51c6|\u8bc4\u5206\u6807\u51c6|\u8bc4\u4ef7\u51c6\u5219|Evaluation Criteria|Rubric)/i.test(
-      content,
-    );
-  const hasWeights =
-    /(?:\u6743\u91cd)|(?:\d{1,3}\s*%)/.test(content);
-  const hasScoreBands =
-    /(?:\u5206\u503c|\u8bc4\u7ea7\u6807\u51c6|(?:^|\s)[1-5]\u5206(?:\s|$))/m.test(
-      content,
-    );
-  return (
-    dimensionHeadings.length >= 4 &&
-    hasHeaderSignals &&
-    hasWeights &&
-    hasScoreBands
+  const hasWeights = /(?:权重)|(?:\d{1,3}\s*%)/.test(content);
+  const hasScoreBands = /(?:分值|评级标准|(?:^|\s)[1-5]分(?:\s|$))/m.test(
+    content,
   );
+
+  return dimensionHeadings.length >= 1 && hasWeights && hasScoreBands;
 }
 
 export function hasRubricContent(rubricMd: string | null | undefined): boolean {
@@ -130,6 +163,7 @@ export function hasRubricContent(rubricMd: string | null | undefined): boolean {
 export function isRubricUsable(rubricMd: string | null | undefined): boolean {
   const content = normalizeRubricMarkdown(rubricMd);
   if (!content) return false;
+
   return (
     hasTemplateRubricStructure(content) ||
     hasLegacyRubricStructure(content) ||
@@ -147,5 +181,6 @@ export function getRubricEditValidationError(
   const content = normalizeRubricMarkdown(rubricMd);
   if (!content) return '编辑内容不能为空';
   if (isRubricUsable(content)) return '';
-  return '当前 rubric 还不能直接用于评分。请补充评分维度、分值或评分说明，或先点“修复 rubric”让 AI 补全。';
+
+  return '当前 rubric 结构较松，但仍可保存。生成报告会尽量基于现有内容打分；如需更稳定的评分，可继续补充评分维度、权重或等级说明。';
 }

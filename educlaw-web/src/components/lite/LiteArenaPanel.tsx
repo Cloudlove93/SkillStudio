@@ -1,4 +1,4 @@
-import {
+﻿import {
   type CSSProperties,
   useCallback,
   useEffect,
@@ -50,11 +50,14 @@ import {
   VersionDiffView,
   type PackagePreview,
 } from './lite-rendering';
+import { RubricStructuredView } from './rubric-structured-view';
 import {
   getRubricEditValidationError,
   hasRubricContent,
   isRubricUsable,
 } from './rubric-status';
+import { extractDisplayRubricContent } from './rubric-display';
+import { resolveRubricManualEditContent } from './rubric-edit-state';
 import { getPackageSwitchDecision } from './workspace-switch-state';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -125,36 +128,46 @@ const DOCX_MIME_TYPE =
 const RUBRIC_TEMPLATE = [
   '# Rubric',
   '',
-  '## 评分目标',
-  '- 请用这个 rubric 判断智能体回答是否符合预期。',
-  '- 每个维度都写清楚满分标准、常见扣分点和一票否决项（如果有）。',
+  '## \u8bc4\u5206\u76ee\u6807',
+  '- \u7528\u8fd9\u4efd rubric \u5224\u65ad\u667a\u80fd\u4f53\u56de\u7b54\u662f\u5426\u8d34\u5408\u4efb\u52a1\u3001\u8db3\u591f\u6e05\u6670\uff0c\u5e76\u4fdd\u6301\u5fc5\u8981\u7684\u5b89\u5168\u8fb9\u754c\u3002',
+  '- \u6bcf\u4e2a\u7ef4\u5ea6\u90fd\u5199\u6e05\u695a\u6ee1\u5206\u6807\u51c6\u3001\u5e38\u89c1\u6263\u5206\u70b9\uff0c\u4ee5\u53ca\u5fc5\u987b\u907f\u514d\u7684\u95ee\u9898\u3002',
   '',
-  '## 评分维度',
-  '### 角色贴合',
-  '- 满分标准：',
-  '- 常见扣分点：',
+  '## \u8bc4\u5206\u7ef4\u5ea6',
+  '### \u89d2\u8272\u8d34\u5408',
+  '- \u6ee1\u5206\u6807\u51c6\uff1a',
+  '- \u5e38\u89c1\u6263\u5206\u70b9\uff1a',
   '',
-  '### Skill 遵循',
-  '- 满分标准：',
-  '- 常见扣分点：',
+  '### Skill \u9075\u5faa',
+  '- \u6ee1\u5206\u6807\u51c6\uff1a',
+  '- \u5e38\u89c1\u6263\u5206\u70b9\uff1a',
   '',
-  '### 回答质量',
-  '- 满分标准：',
-  '- 常见扣分点：',
+  '### \u56de\u7b54\u8d28\u91cf',
+  '- \u6ee1\u5206\u6807\u51c6\uff1a',
+  '- \u5e38\u89c1\u6263\u5206\u70b9\uff1a',
   '',
-  '### 安全边界',
-  '- 满分标准：',
-  '- 常见扣分点：',
+  '### \u5b89\u5168\u8fb9\u754c',
+  '- \u6ee1\u5206\u6807\u51c6\uff1a',
+  '- \u5e38\u89c1\u6263\u5206\u70b9\uff1a',
   '',
-  '## 使用说明',
-  '- 先看回答是否完成用户任务，再按上面四个维度评分。',
-  '- 如果回答明显越界、误导或缺少关键事实，可以直接判定为低分。',
+  '## \u4f7f\u7528\u8bf4\u660e',
+  '- \u5148\u5224\u65ad\u56de\u7b54\u6709\u6ca1\u6709\u5b8c\u6210\u7528\u6237\u4efb\u52a1\uff0c\u518d\u6309\u4e0a\u9762\u7684\u7ef4\u5ea6\u9010\u9879\u8bc4\u5206\u3002',
+  '- \u5982\u679c\u56de\u7b54\u660e\u663e\u8d8a\u754c\u3001\u8bef\u5bfc\uff0c\u6216\u7f3a\u5c11\u5173\u952e\u4e8b\u5b9e\uff0c\u53ef\u4ee5\u76f4\u63a5\u5224\u4e3a\u4f4e\u5206\u3002',
 ].join('\n');
 
 function buildRubricDraft(seedContent = '') {
   const trimmed = seedContent.trim();
   if (!trimmed) return RUBRIC_TEMPLATE;
   return trimmed;
+}
+
+function normalizePreviewContent(content: unknown): string {
+  if (typeof content === 'string') return content;
+  if (content == null) return '';
+  try {
+    return JSON.stringify(content, null, 2);
+  } catch {
+    return String(content);
+  }
 }
 
 function isInteractiveMessage(
@@ -295,7 +308,6 @@ export default function LiteArenaPanel() {
   const [arenaMode, setArenaMode] = useState<ArenaMode>('compare');
   const [manualEdit, setManualEdit] = useState<ManualEditState | null>(null);
   const [manualEditSaving, setManualEditSaving] = useState(false);
-  const [rubricRepairing, setRubricRepairing] = useState(false);
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
   const selectedPackageIdRef = useRef(selectedPackageId);
   useEffect(() => {
@@ -331,24 +343,30 @@ export default function LiteArenaPanel() {
     selectedPackage?.snapshot.skills[0] ||
     null;
   const rubricText = selectedPackage?.snapshot.rubricMd || '';
+  const rubricDisplayText = extractDisplayRubricContent(rubricText);
+  const rubricPreviewContent = rubricText.trim() || rubricDisplayText;
   const rubricHasContent = hasRubricContent(rubricText);
   const rubricConfigured = isRubricUsable(rubricText);
   const rubricNeedsRepair = rubricHasContent && !rubricConfigured;
-  const reportReadiness = getReportReadiness(messages, rubricConfigured);
+  const reportReadiness = getReportReadiness(messages, rubricHasContent);
   const canGenerateReport = reportReadiness.canGenerateReport;
-  const canOpenReport = canOpenReportAction(Boolean(thread), rubricConfigured);
+  const canOpenReport = canOpenReportAction(Boolean(thread), rubricHasContent);
   const reportHintMessage = rubricNeedsRepair
-    ? '当前 rubric 还有缺口。先修复或手动补齐后，报告才能稳定按你的评分规则生成。'
-    : '建议先配置 rubric，这样生成的对话报告会更贴合你的评分标准。';
+    ? '当前 rubric 会按现有内容参与评分。若想让评分更稳定，可以继续补充维度、权重或等级说明。'
+    : '当前还没有 rubric。先编辑或导入一份 rubric，再生成评估报告。';
   const rubricRequiredMessage = rubricNeedsRepair
-    ? '当前 rubric 还不能直接用于评分。先点“修复 rubric”自动补齐，或用“手动修改”继续完善。'
-    : '当前还没有配置 rubric。请先在 Rubric 标签中补充评分规则后，再继续。';
+    ? '当前 rubric 结构较松，但已经可以直接生成报告。若要做交互式优化，建议继续补充 rubric。'
+    : '当前还没有 rubric。请先编辑或导入一份 rubric。';
   const reportRequiredMessage =
     reportReadiness.reason === 'missing_messages'
-      ? '先在左侧对话区完成一轮对话，让基础模型和当前智能体各回答一次，再生成评估报告。'
+      ? '\u5f53\u524d\u8fd8\u6ca1\u6709\u53ef\u7528\u4e8e\u8bc4\u5206\u7684 Arena \u5bf9\u8bdd\u3002\u5148\u5b8c\u6210\u4e00\u8f6e\u5bf9\u8bdd\uff0c\u518d\u6765\u751f\u6210\u8bc4\u4f30\u62a5\u544a\u3002'
       : rubricRequiredMessage;
+  const manualRubricHint =
+    manualEdit?.target === 'rubric'
+      ? getRubricEditValidationError(manualEdit.content)
+      : '';
   const showGeneratePreviews =
-    progress?.active && progress.title === '生成智能体';
+    progress?.active && progress.title === '\u751f\u6210\u667a\u80fd\u4f53';
   const sidebarStyle = { '--sidebar-width': `${leftWidth}px` } as CSSProperties;
   const detailStyle = { '--detail-width': `${rightWidth}px` } as CSSProperties;
 
@@ -825,13 +843,13 @@ export default function LiteArenaPanel() {
         results.push(await readTextDocument(file));
       } catch (error) {
         setStatus(
-          `${file.name} 读取失败：${error instanceof Error ? error.message : '不支持的文档格式'}`,
+          `${file.name} \u8bfb\u53d6\u5931\u8d25\uff1a${error instanceof Error ? error.message : '\u4e0d\u652f\u6301\u7684\u6587\u6863\u683c\u5f0f'}`,
         );
       }
     }
     if (results.length > 0) {
       setDocuments((prev) => [...prev, ...results]);
-      setStatus(`已添加 ${results.length} 个文档`);
+      setStatus(`\u5df2\u6dfb\u52a0 ${results.length} \u4e2a\u6587\u6863`);
     }
   }
 
@@ -850,15 +868,15 @@ export default function LiteArenaPanel() {
 
     setBatchRuns(batchPlan);
     startProgress(
-      '生成智能体',
+      '\u751f\u6210\u667a\u80fd\u4f53',
       batchMode
-        ? `正在逐个处理 ${jobDocuments.length} 个文档...`
-        : '正在生成智能体...',
+        ? `\u6b63\u5728\u9010\u4e2a\u5904\u7406 ${jobDocuments.length} \u4e2a\u6587\u6863...`
+        : '\u6b63\u5728\u751f\u6210\u667a\u80fd\u4f53...',
     );
     setStatus(
       batchMode
-        ? `正在逐个处理 ${jobDocuments.length} 个文档...`
-        : '正在生成智能体...',
+        ? `\u6b63\u5728\u9010\u4e2a\u5904\u7406 ${jobDocuments.length} \u4e2a\u6587\u6863...`
+        : '\u6b63\u5728\u751f\u6210\u667a\u80fd\u4f53...',
     );
     setGeneratePreviews([]);
 
@@ -937,24 +955,26 @@ export default function LiteArenaPanel() {
           setInstruction('');
           setDocuments([]);
         }
-        const doneLabel = `批量生成完成，成功 ${successCount} 个，失败 ${failureCount} 个`;
+        const doneLabel = `\u6279\u91cf\u751f\u6210\u5b8c\u6210\uff0c\u6210\u529f ${successCount} \u4e2a\uff0c\u5931\u8d25 ${failureCount} \u4e2a`;
         setGeneratePreviews([]);
         if (failureCount > 0 && successCount === 0) failProgress(doneLabel);
         else finishProgress(doneLabel);
         setStatus(doneLabel);
         return;
       }
-
       const { createdId, createdName } = await runGenerateJob(jobDocuments);
+      let finalPackageName = createdName;
       if (createdId) {
         preserveGenerateProgressRef.current = true;
         setInstruction('');
         setDocuments([]);
         await refreshPackages(createdId);
+        const readyDetail = await ensurePackageRubricReady(createdId);
+        finalPackageName = readyDetail?.name || createdName;
       }
-      const doneLabel = createdName
-        ? `生成完成：${createdName}`
-        : '生成完成，已打开新智能体';
+      const doneLabel = finalPackageName
+        ? `\u751f\u6210\u5b8c\u6210\uff1a${finalPackageName}`
+        : '\u751f\u6210\u5b8c\u6210\uff0c\u5df2\u6253\u5f00\u65b0\u667a\u80fd\u4f53';
       setGeneratePreviews([]);
       finishProgress(doneLabel);
       setStatus(doneLabel);
@@ -990,7 +1010,6 @@ export default function LiteArenaPanel() {
       failProgress(reportRequiredMessage);
       return;
     }
-    if (!ensureRubricConfigured('评估报告')) return;
     const currentThreadId = thread.id;
     startProgress('评估报告', '正在生成报告...');
     setStatus('正在生成报告...');
@@ -1020,21 +1039,23 @@ export default function LiteArenaPanel() {
           reportStorageKey(currentThreadId),
           JSON.stringify(nextReport),
         );
-        const isCurrentThreadSelected = threadRef.current?.id === currentThreadId;
+        const isCurrentThreadSelected =
+          threadRef.current?.id === currentThreadId;
         if (isCurrentThreadSelected) {
           const nextViewState = buildGeneratedReportViewState(nextReport);
           setReport(nextReport);
           setDetailTab(nextViewState.detailTab);
           setCenterPreview(nextViewState.centerPreview);
         }
-        finishProgress('报告已生成');
+        finishProgress('\u62a5\u544a\u5df2\u751f\u6210');
         setStatus(buildReportCompletionStatusMessage(isCurrentThreadSelected));
         return;
       }
-      finishProgress('报告已生成');
-      setStatus('报告已生成');
+      finishProgress('\u62a5\u544a\u5df2\u751f\u6210');
+      setStatus('\u62a5\u544a\u5df2\u751f\u6210');
     } catch (error) {
-      const message = error instanceof Error ? error.message : '评估失败';
+      const message =
+        error instanceof Error ? error.message : '\u8bc4\u4f30\u5931\u8d25';
       failProgress(message);
       setStatus(message);
     }
@@ -1094,8 +1115,11 @@ export default function LiteArenaPanel() {
       baseline: shouldShowBaseline,
       enhanced: shouldShowEnhanced,
     });
-    startProgress(selectedPackage?.name || '工作台', '正在生成回复...');
-    setStatus('正在生成...');
+    startProgress(
+      selectedPackage?.name || '\u5de5\u4f5c\u53f0',
+      '\u6b63\u5728\u751f\u6210\u56de\u590d...',
+    );
+    setStatus('\u6b63\u5728\u751f\u6210...');
     try {
       await liteApi.sendMessageStream(
         token,
@@ -1186,16 +1210,17 @@ export default function LiteArenaPanel() {
                 : prev,
             );
             setSideStreaming({ baseline: false, enhanced: false });
-            finishProgress('回复已生成');
-            setStatus('回复已生成');
+            finishProgress('\u56de\u590d\u5df2\u751f\u6210');
+            setStatus('\u56de\u590d\u5df2\u751f\u6210');
             return;
           }
           if (event.event === 'error')
-            throw new Error(event.data.error || '发送失败');
+            throw new Error(event.data.error || '\u53d1\u9001\u5931\u8d25');
         },
       );
     } catch (error) {
-      const message = error instanceof Error ? error.message : '发送失败';
+      const message =
+        error instanceof Error ? error.message : '\u53d1\u9001\u5931\u8d25';
       setSideStreaming({ baseline: false, enhanced: false });
       setInput(prompt);
       failProgress(message);
@@ -1230,12 +1255,15 @@ export default function LiteArenaPanel() {
   async function handleExport() {
     if (!token || !selectedPackageId) return;
     await liteApi.exportPackage(token, selectedPackageId);
-    setStatus('导出已开始');
+    setStatus('\u5bfc\u51fa\u5df2\u5f00\u59cb');
   }
 
   async function handleRenamePackage(packageId: string, currentName: string) {
     if (!token || !packageId) return;
-    const nextName = window.prompt('请输入新的智能体名称：', currentName);
+    const nextName = window.prompt(
+      '\u8bf7\u8f93\u5165\u65b0\u7684\u667a\u80fd\u4f53\u540d\u79f0\uff1a',
+      currentName,
+    );
     if (nextName === null) return;
     const trimmed = nextName.trim();
     if (!trimmed || trimmed === currentName) return;
@@ -1257,9 +1285,12 @@ export default function LiteArenaPanel() {
       if (selectedPackageIdRef.current === packageId) {
         setSelectedPackage(detail);
       }
-      setStatus('名称已更新');
+      setStatus('\u540d\u79f0\u5df2\u66f4\u65b0');
     } catch (error) {
-      const message = error instanceof Error ? error.message : '重命名失败';
+      const message =
+        error instanceof Error
+          ? error.message
+          : '\u91cd\u547d\u540d\u5931\u8d25';
       failProgress(message);
       setStatus(message);
     }
@@ -1295,9 +1326,14 @@ export default function LiteArenaPanel() {
     setCenterPreview(null);
     setManualEdit({
       target: 'rubric',
-      title: 'rubric.md',
+      title: '手动编辑 rubric.md',
       content: buildRubricDraft(
-        seedContent || selectedPackage?.snapshot.rubricMd || '',
+        resolveRubricManualEditContent({
+          seedContent,
+          storedRubric: selectedPackage?.snapshot.rubricMd || '',
+          displayRubric: rubricDisplayText,
+          fallbackTemplate: RUBRIC_TEMPLATE,
+        }),
       ),
       preview: false,
     });
@@ -1313,51 +1349,57 @@ export default function LiteArenaPanel() {
     });
   }
 
-  async function handleRepairRubric() {
-    if (!token || !selectedPackageId || !rubricNeedsRepair || rubricRepairing)
-      return;
-    setInteractiveMode(false);
-    setDetailTab('rubric');
-    setCenterPreview(null);
-    setManualEdit(null);
-    setRubricRepairing(true);
-    startProgress('修复 rubric', '正在用 AI 补全评分规则...');
-    setStatus('正在用 AI 修复 rubric...');
-    try {
-      pushProgress('保留现有 rubric 内容，补齐评分目标、评分维度和使用说明...');
-      const detail = await liteApi.repairRubric(token, selectedPackageId);
+  async function ensurePackageRubricReady(packageId: string) {
+    if (!token) return null;
+    const detail = await liteApi.getPackage(token, packageId);
+    if (selectedPackageIdRef.current === packageId) {
       setSelectedPackage(detail);
-      await refreshPackages(detail.id);
-      finishProgress(`rubric 修复完成，已生成 v${detail.versionNumber}`);
-      setStatus(`rubric 修复完成，已生成 v${detail.versionNumber}`);
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : '修复 rubric 失败';
-      failProgress(message);
-      setStatus(message);
-    } finally {
-      setRubricRepairing(false);
     }
-  }
-
-  function handleRubricPrimaryAction() {
-    if (rubricNeedsRepair) {
-      void handleRepairRubric();
-      return;
+    if (isRubricUsable(detail.snapshot.rubricMd)) {
+      return detail;
     }
-    startManualEditRubric();
+    pushProgress(
+      '\u68c0\u6d4b\u5230 rubric \u7ed3\u6784\u8fd8\u4e0d\u5b8c\u6574\uff0c\u6b63\u5728\u81ea\u52a8\u8865\u9f50\u8bc4\u5206\u7ed3\u6784...',
+    );
+    const repaired = await liteApi.repairRubric(token, packageId);
+    if (selectedPackageIdRef.current === packageId) {
+      setSelectedPackage(repaired);
+    }
+    await refreshPackages(repaired.id);
+    return repaired;
   }
 
   async function handleRubricFiles(fileList: FileList | null) {
     const file = fileList?.[0];
-    if (!file) return;
+    if (!file || !token || !selectedPackageId) return;
     try {
       const parsed = await readTextDocument(file);
-      startManualEditRubric(parsed.content);
+      startProgress('导入 rubric', `正在保存 ${parsed.name}...`);
       setDetailTab('rubric');
-      setStatus(`已载入 ${parsed.name}，请检查后保存`);
+      setCenterPreview(null);
+      setManualEdit(null);
+      const imported = await liteApi.saveManualMarkdownEdit(
+        token,
+        selectedPackageId,
+        {
+          target: 'rubric',
+          content: parsed.content,
+          note: `导入 ${parsed.name}`,
+        },
+      );
+      setSelectedPackage(imported);
+      await refreshPackages(imported.id);
+      finishProgress(`已导入 ${parsed.name}`);
+      setStatus(
+        isRubricUsable(parsed.content)
+          ? `已导入 ${parsed.name}`
+          : `已导入 ${parsed.name}，当前内容会按现有 rubric 参与评分`,
+      );
+      return;
     } catch (error) {
-      const message = `${file.name} 读取失败：${error instanceof Error ? error.message : '不支持的文档格式'}`;
+      const message = `${file.name} 读取失败：${
+        error instanceof Error ? error.message : '不支持的文档格式'
+      }`;
       failProgress(message);
       setStatus(message);
     }
@@ -1369,7 +1411,7 @@ export default function LiteArenaPanel() {
     setDetailTab('rubric');
     setStatus(rubricRequiredMessage);
     failProgress(
-      `${actionLabel}不可用：${rubricNeedsRepair ? '请先修复 rubric' : '请先补充 rubric'}`,
+      `${actionLabel}不可用：${rubricNeedsRepair ? '请先继续补充 rubric 结构' : '请先补充 rubric'}`,
     );
     return false;
   }
@@ -1378,15 +1420,16 @@ export default function LiteArenaPanel() {
     const content = edit.content.trim();
     if (!content) return '编辑内容不能为空';
     if (edit.target === 'rubric') {
-      return getRubricEditValidationError(content);
+      return '';
     }
     if (edit.target === 'skill') {
       const frontmatter = content.match(/^---\s*\n([\s\S]*?)\n---/);
-      if (!frontmatter) return 'SKILL.md 必须保留顶部的 YAML 元信息';
+      if (!frontmatter)
+        return 'SKILL.md \u5fc5\u987b\u4fdd\u7559\u9876\u90e8\u7684 YAML frontmatter';
       if (!/^name\s*:/m.test(frontmatter[1]))
-        return 'SKILL.md 的 YAML 元信息里必须包含 name';
+        return 'SKILL.md \u7684 YAML frontmatter \u91cc\u5fc5\u987b\u5305\u542b name';
       if (!/^description\s*:/m.test(frontmatter[1]))
-        return 'SKILL.md 的 YAML 元信息里必须包含 description';
+        return 'SKILL.md \u7684 YAML frontmatter \u91cc\u5fc5\u987b\u5305\u542b description';
     }
     return '';
   }
@@ -1401,15 +1444,21 @@ export default function LiteArenaPanel() {
     }
     const defaultNote =
       manualEdit.target === 'agent'
-        ? '手动编辑 agent.md'
+        ? '\u624b\u52a8\u7f16\u8f91 agent.md'
         : manualEdit.target === 'rubric'
-          ? '手动编辑 rubric.md'
-          : '手动编辑 SKILL.md';
-    const note = window.prompt('请输入新版本备注（可选）：', defaultNote);
+          ? '\u624b\u52a8\u7f16\u8f91 rubric.md'
+          : '\u624b\u52a8\u7f16\u8f91 SKILL.md';
+    const note = window.prompt(
+      '\u8bf7\u8f93\u5165\u65b0\u7248\u672c\u5907\u6ce8\uff08\u53ef\u9009\uff09\uff1a',
+      defaultNote,
+    );
     if (note === null) return;
 
     setManualEditSaving(true);
-    startProgress('保存手动编辑', '正在保存为新版本...');
+    startProgress(
+      '\u4fdd\u5b58\u624b\u52a8\u7f16\u8f91',
+      '\u6b63\u5728\u4fdd\u5b58\u4e3a\u65b0\u7248\u672c...',
+    );
     try {
       const detail = await liteApi.saveManualMarkdownEdit(
         token,
@@ -1425,10 +1474,15 @@ export default function LiteArenaPanel() {
       await refreshPackages(detail.id);
       setManualEdit(null);
       setDetailTab('versions');
-      finishProgress(`已保存为新版本 v${detail.versionNumber}`);
-      setStatus(`已保存为新版本 v${detail.versionNumber}`);
+      finishProgress(
+        `\u5df2\u4fdd\u5b58\u4e3a\u65b0\u7248\u672c v${detail.versionNumber}`,
+      );
+      setStatus(
+        `\u5df2\u4fdd\u5b58\u4e3a\u65b0\u7248\u672c v${detail.versionNumber}`,
+      );
     } catch (error) {
-      const message = error instanceof Error ? error.message : '保存失败';
+      const message =
+        error instanceof Error ? error.message : '\u4fdd\u5b58\u5931\u8d25';
       failProgress(message);
       setStatus(message);
     } finally {
@@ -1438,7 +1492,7 @@ export default function LiteArenaPanel() {
 
   async function startInteractive(forceNew = false) {
     if (!token || !thread?.id || !selectedPackageId) return;
-    if (!ensureRubricConfigured('交互式优化')) return;
+    if (!ensureRubricConfigured('\u4ea4\u4e92\u5f0f\u4f18\u5316')) return;
     setInteractiveMode(true);
     setCenterPreview(null);
     const latestActive =
@@ -1455,10 +1509,19 @@ export default function LiteArenaPanel() {
     setInteractiveMessages([]);
     setInteractiveIssues([]);
     setInteractiveAdopted([]);
-    startProgress('交互式优化', '正在初始化分析...');
+    startProgress(
+      '\u4ea4\u4e92\u5f0f\u4f18\u5316',
+      '\u6b63\u5728\u521d\u59cb\u5316\u5206\u6790...',
+    );
     const stepTimers: number[] = [];
     stepTimers.push(
-      window.setTimeout(() => pushProgress('正在读取智能体内容...'), 600),
+      window.setTimeout(
+        () =>
+          pushProgress(
+            '\u6b63\u5728\u8bfb\u53d6\u667a\u80fd\u4f53\u5185\u5bb9...',
+          ),
+        600,
+      ),
     );
     stepTimers.push(
       window.setTimeout(() => pushProgress('正在分析 Arena 对话轨迹...'), 1800),
@@ -1494,11 +1557,17 @@ export default function LiteArenaPanel() {
           prev.length === 0 ? [welcomeMsg] : prev,
         );
       }
-      finishProgress(`分析完成，发现 ${result.issues.length} 个问题`);
+      finishProgress(
+        `\u5206\u6790\u5b8c\u6210\uff0c\u53d1\u73b0 ${result.issues.length} \u4e2a\u95ee\u9898`,
+      );
     } catch (error) {
       stepTimers.forEach((id) => window.clearTimeout(id));
-      const message = error instanceof Error ? error.message : '诊断失败';
-      const errorMsg = { role: 'assistant', content: `诊断失败：${message}` };
+      const message =
+        error instanceof Error ? error.message : '\u8bca\u65ad\u5931\u8d25';
+      const errorMsg = {
+        role: 'assistant',
+        content: `\u8bca\u65ad\u5931\u8d25\uff1a${message}`,
+      };
       saveInteractiveState(currentPkgId, [errorMsg], [], []);
       if (selectedPackageIdRef.current === currentPkgId) {
         setInteractiveMode(true);
@@ -1558,7 +1627,10 @@ export default function LiteArenaPanel() {
     ];
     setInteractiveMessages(messagesWithUser);
     setInteractivePhase('chatting');
-    startProgress('交互式优化', '专家正在思考...');
+    startProgress(
+      '\u4ea4\u4e92\u5f0f\u4f18\u5316',
+      '\u4e13\u5bb6\u6b63\u5728\u601d\u8003...',
+    );
 
     // Save user message immediately so it's not lost if user switches packages
     saveInteractiveState(
@@ -1610,12 +1682,16 @@ export default function LiteArenaPanel() {
           setInteractiveAdopted(finalAdopted);
         }
       }
-      finishProgress('专家已回复');
+      finishProgress('\u4e13\u5bb6\u5df2\u56de\u590d');
     } catch (error) {
-      const message = error instanceof Error ? error.message : '对话失败';
+      const message =
+        error instanceof Error ? error.message : '\u5bf9\u8bdd\u5931\u8d25';
       const errorMessages = [
         ...messagesWithUser,
-        { role: 'assistant', content: `对话失败：${message}` },
+        {
+          role: 'assistant',
+          content: `\u5bf9\u8bdd\u5931\u8d25\uff1a${message}`,
+        },
       ];
       saveInteractiveState(
         currentPkgId,
@@ -1638,9 +1714,14 @@ export default function LiteArenaPanel() {
     if (!token || !selectedPackageId || interactiveAdopted.length === 0) return;
     const currentPkgId = selectedPackageId;
     const currentAdopted = interactiveAdopted;
-    const note = window.prompt('请输入新版本备注（可选）：');
+    const note = window.prompt(
+      '\u8bf7\u8f93\u5165\u65b0\u7248\u672c\u5907\u6ce8\uff08\u53ef\u9009\uff09\uff1a',
+    );
     if (note === null) return; // cancelled
-    startProgress('保存修改', '正在应用修改并生成新版本...');
+    startProgress(
+      '\u4fdd\u5b58\u4fee\u6539',
+      '\u6b63\u5728\u5e94\u7528\u4fee\u6539\u5e76\u751f\u6210\u65b0\u7248\u672c...',
+    );
     try {
       const result = await liteApi.applyInteractiveChanges(
         token,
@@ -1854,18 +1935,18 @@ export default function LiteArenaPanel() {
   }
   function formatExpert(value: OptimizationResult['issues'][number]['expert']) {
     return value === 'persona'
-      ? '角色专家'
+      ? '\u89d2\u8272\u4e13\u5bb6'
       : value === 'skill'
-        ? '技能专家'
+        ? '\u6280\u80fd\u4e13\u5bb6'
         : value === 'rubric'
-          ? '评估专家'
-          : '合并专家';
+          ? '\u8bc4\u4f30\u4e13\u5bb6'
+          : '\u5408\u5e76\u4e13\u5bb6';
   }
   function formatTarget(value: OptimizationResult['issues'][number]['target']) {
     return value === 'agent'
       ? 'agent.md'
       : value === 'skill'
-        ? '技能文件'
+        ? '\u6280\u80fd\u6587\u4ef6'
         : 'rubric.md';
   }
 
@@ -1885,28 +1966,32 @@ export default function LiteArenaPanel() {
       enhancedLabel,
     );
     const sideCards = buildArenaReportSideCards(currentReport, enhancedLabel);
-    const titleClass = compact ? 'text-lg' : 'text-2xl';
+    const titleClass = compact ? 'text-lg' : 'text-xl';
 
     return (
-      <div className={compact ? 'space-y-4' : 'mx-auto max-w-5xl space-y-6'}>
-        <section className="rounded-[20px] border border-border/80 bg-card/95 px-4 py-4 shadow-sm">
+      <div className={compact ? 'space-y-4' : 'mx-auto max-w-5xl space-y-5'}>
+        <section className="rounded-[16px] border border-border/70 bg-card/90 px-4 py-4 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0 flex-1">
               <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                 评估报告
               </div>
-              <div className={`mt-1 font-semibold ${titleClass}`}>{winnerLabel}</div>
+              <div
+                className={`mt-1 font-semibold text-foreground ${titleClass}`}
+              >
+                {winnerLabel}
+              </div>
             </div>
             <div className="flex flex-wrap gap-2">
               {sideCards.map((card) => (
                 <div
                   key={card.key}
-                  className="min-w-[96px] rounded-[14px] border border-border/70 bg-muted/35 px-3 py-2 text-right"
+                  className="min-w-[108px] rounded-[14px] border border-border/70 bg-muted/30 px-3 py-2.5 text-right"
                 >
                   <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                     {card.label}
                   </div>
-                  <div className="mt-1 text-xl font-bold leading-none">
+                  <div className="mt-1 text-lg font-bold leading-none text-foreground">
                     {card.total.toFixed(2)}
                   </div>
                 </div>
@@ -1914,17 +1999,18 @@ export default function LiteArenaPanel() {
             </div>
           </div>
           <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-            <div>
+            <div className="rounded-[14px] border border-border/60 bg-muted/20 px-4 py-3">
               <div className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 综合判断
               </div>
               <div className="mt-2 text-sm leading-6 text-foreground">
-                {currentReport.recommendation || '暂无综合判断。'}
+                {currentReport.recommendation ||
+                  '\u6682\u65e0\u7efc\u5408\u5224\u65ad\u3002'}
               </div>
             </div>
-            <div>
+            <div className="rounded-[14px] border border-border/60 bg-muted/20 px-4 py-3">
               <div className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                阅读提示
+                阅读方式
               </div>
               <div className="mt-2 text-sm leading-6 text-muted-foreground">
                 先看两边的整体总结，再对照每个维度的分数和理由，就能比较快地判断当前智能体哪里更强、下一步该补哪里。
@@ -1942,7 +2028,7 @@ export default function LiteArenaPanel() {
           {sideCards.map((card) => (
             <article
               key={card.key}
-              className="rounded-[20px] border border-border/80 bg-card/90 px-4 py-4 shadow-sm"
+              className="rounded-[16px] border border-border/70 bg-card/90 px-4 py-4 shadow-sm"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -1954,29 +2040,30 @@ export default function LiteArenaPanel() {
                   </div>
                 </div>
               </div>
-              <div className="mt-3 border-t border-border/70 pt-3 text-sm leading-6 text-foreground">
-                {card.summary || '暂无评价。'}
+              <div className="mt-3 rounded-[14px] border border-border/60 bg-muted/20 px-4 py-3 text-sm leading-6 text-foreground">
+                {card.summary || '\u6682\u65e0\u8bc4\u4ef7\u3002'}
               </div>
             </article>
           ))}
         </section>
 
-        <section className="overflow-hidden rounded-[20px] border border-border/80 bg-card/90 shadow-sm">
-          <div className="border-b border-border/80 bg-muted/30 px-4 py-3">
-            <div className="text-sm font-medium text-foreground">维度逐项对比</div>
+        <section className="overflow-hidden rounded-[16px] border border-border/70 bg-card/90 shadow-sm">
+          <div className="border-b border-border/70 bg-muted/35 px-4 py-3">
+            <div className="text-sm font-medium text-foreground">
+              维度逐项对比
+            </div>
             <div className="mt-1 text-xs leading-5 text-muted-foreground">
               分数告诉你差距，理由告诉你为什么会有这个差距。
             </div>
           </div>
           <div className="divide-y divide-border/70">
             {rows.map((row) => (
-              <div
-                key={row.key}
-                className="px-4 py-4"
-              >
+              <div key={row.key} className="px-4 py-4">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
-                    <div className="font-medium text-foreground">{row.name}</div>
+                    <div className="font-medium text-foreground">
+                      {row.name}
+                    </div>
                     {!compact && (
                       <div className="mt-1 text-xs leading-5 text-muted-foreground">
                         {row.key}
@@ -1986,30 +2073,30 @@ export default function LiteArenaPanel() {
                 </div>
 
                 <div className="mt-3 grid gap-4 lg:grid-cols-2">
-                  <article className="space-y-2">
+                  <article className="rounded-[14px] border border-border/60 bg-muted/20 px-3 py-3">
                     <div className="flex items-center justify-between gap-3">
                       <div className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                         基础回答
                       </div>
-                      <div className="rounded-full border border-border/80 bg-background px-2.5 py-1 text-sm font-semibold">
+                      <div className="rounded-full border border-border/80 bg-background/85 px-2.5 py-1 text-sm font-semibold text-foreground">
                         {row.baselineScore}/{row.baselineMaxScore}
                       </div>
                     </div>
-                    <div className="text-sm leading-6 text-muted-foreground">
-                      {row.baselineReason || '暂无说明。'}
+                    <div className="mt-2 text-sm leading-6 text-muted-foreground">
+                      {row.baselineReason || '\u6682\u65e0\u8bf4\u660e\u3002'}
                     </div>
                   </article>
-                  <article className="space-y-2">
+                  <article className="rounded-[14px] border border-primary/15 bg-primary/5 px-3 py-3">
                     <div className="flex items-center justify-between gap-3">
                       <div className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                         增强回答
                       </div>
-                      <div className="rounded-full border border-primary/20 bg-primary/5 px-2.5 py-1 text-sm font-semibold">
+                      <div className="rounded-full border border-primary/20 bg-background/90 px-2.5 py-1 text-sm font-semibold text-foreground">
                         {row.enhancedScore}/{row.enhancedMaxScore}
                       </div>
                     </div>
-                    <div className="text-sm leading-6 text-muted-foreground">
-                      {row.enhancedReason || '暂无说明。'}
+                    <div className="mt-2 text-sm leading-6 text-muted-foreground">
+                      {row.enhancedReason || '\u6682\u65e0\u8bf4\u660e\u3002'}
                     </div>
                   </article>
                 </div>
@@ -2061,14 +2148,14 @@ export default function LiteArenaPanel() {
                 <button
                   onClick={logout}
                   className="flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                  title="退出登录"
+                  title="\u9000\u51fa\u767b\u5f55"
                 >
                   <LogOut className="size-4" />
                 </button>
                 <button
                   onClick={() => setSidebarOpen(false)}
                   className="flex size-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                  title="收起侧边栏"
+                  title="\u6536\u8d77\u4fa7\u8fb9\u680f"
                 >
                   <PanelLeftClose className="size-4" />
                 </button>
@@ -2141,7 +2228,7 @@ export default function LiteArenaPanel() {
                             {item.packageName &&
                               item.packageName !== item.name && (
                                 <div className="truncate text-[11px] text-muted-foreground">
-                                  生成结果：{item.packageName}
+                                  {`生成结果：${item.packageName}`}
                                 </div>
                               )}
                             {item.error && (
@@ -2161,10 +2248,12 @@ export default function LiteArenaPanel() {
                               <XCircle className="size-3.5 text-destructive" />
                             )}
                             <span>
-                              {item.status === 'waiting' && '等待中'}
-                              {item.status === 'running' && '生成中'}
-                              {item.status === 'done' && '已完成'}
-                              {item.status === 'error' && '失败'}
+                              {item.status === 'waiting' &&
+                                '\u7b49\u5f85\u4e2d'}
+                              {item.status === 'running' &&
+                                '\u751f\u6210\u4e2d'}
+                              {item.status === 'done' && '\u5df2\u5b8c\u6210'}
+                              {item.status === 'error' && '\u5931\u8d25'}
                             </span>
                           </div>
                         </div>
@@ -2254,7 +2343,7 @@ export default function LiteArenaPanel() {
                             void handleRenamePackage(pkg.id, pkg.name)
                           }
                           className="flex size-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
-                          title="重命名"
+                          title="\u91cd\u547d\u540d"
                         >
                           <Pencil className="size-3.5" />
                         </button>
@@ -2280,7 +2369,7 @@ export default function LiteArenaPanel() {
           <button
             onClick={() => setSidebarOpen(true)}
             className="flex size-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-            title="展开侧边栏"
+            title="\u5c55\u5f00\u4fa7\u8fb9\u680f"
           >
             <PanelLeftOpen className="size-4" />
           </button>
@@ -2335,11 +2424,18 @@ export default function LiteArenaPanel() {
                 </Button>
               </div>
             </div>
+            {manualRubricHint && (
+              <div className="border-b border-amber-500/20 bg-amber-500/10 px-14 py-2 text-xs text-amber-900 dark:text-amber-200 lg:px-5">
+                {manualRubricHint}
+              </div>
+            )}
             <div className="flex-1 overflow-hidden p-3 sm:p-5">
               {manualEdit.preview ? (
                 <div className="h-full overflow-auto rounded-[18px] border border-border/70 bg-card/70 p-5 text-sm">
                   {manualEdit.target === 'skill' ? (
                     <SkillMarkdownContent content={manualEdit.content} />
+                  ) : manualEdit.target === 'rubric' ? (
+                    <RubricStructuredView content={manualEdit.content} />
                   ) : (
                     <MarkdownContent content={manualEdit.content} />
                   )}
@@ -2362,7 +2458,7 @@ export default function LiteArenaPanel() {
           <>
             <div className="flex min-h-12 shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border/70 bg-card/40 px-14 py-2 lg:px-5">
               <div className="flex min-w-0 items-center gap-3">
-                <div className="text-sm font-semibold">🤖 交互式优化</div>
+                <div className="text-sm font-semibold">交互式优化</div>
                 <div className="hidden text-xs text-muted-foreground sm:block">
                   与专家对话，逐步优化智能体
                 </div>
@@ -2388,7 +2484,7 @@ export default function LiteArenaPanel() {
                   onClick={() => {
                     if (
                       window.confirm(
-                        '确定要重新开始吗？当前对话和已采纳的修改将被清空。',
+                        '\u786e\u5b9a\u8981\u91cd\u65b0\u5f00\u59cb\u5417\uff1f\u5f53\u524d\u5bf9\u8bdd\u548c\u5df2\u91c7\u7eb3\u7684\u4fee\u6539\u5c06\u88ab\u6e05\u7a7a\u3002',
                       )
                     ) {
                       if (selectedPackageId) {
@@ -2403,7 +2499,7 @@ export default function LiteArenaPanel() {
                     }
                   }}
                 >
-                  ↻ 重新开始
+                  {'->'} 重新开始
                 </Button>
                 {interactiveAdopted.length > 0 && (
                   <Button
@@ -2418,7 +2514,7 @@ export default function LiteArenaPanel() {
                         .join('\n');
                       if (
                         window.confirm(
-                          `确认将以下修改保存为新版本？\n\n${list}\n\n保存后将生成新版本并退出交互式优化。`,
+                          `\u786e\u8ba4\u5c06\u4ee5\u4e0b\u4fee\u6539\u4fdd\u5b58\u4e3a\u65b0\u7248\u672c\uff1f\n\n${list}\n\n\u4fdd\u5b58\u540e\u5c06\u751f\u6210\u65b0\u7248\u672c\u5e76\u9000\u51fa\u4ea4\u4e92\u5f0f\u4f18\u5316\u3002`,
                         )
                       ) {
                         void saveInteractiveChanges();
@@ -2468,8 +2564,7 @@ export default function LiteArenaPanel() {
                     >
                       <div className="font-semibold">{issue.title}</div>
                       <div className="mt-1 text-xs text-muted-foreground">
-                        目标：{issue.target}
-                        {issue.targetId ? ` / ${issue.targetId}` : ''}
+                        {`目标：${issue.target}${issue.targetId ? ` / ${issue.targetId}` : ''}`}
                       </div>
                       <div className="mt-2 text-muted-foreground">
                         {issue.reason}
@@ -2524,8 +2619,8 @@ export default function LiteArenaPanel() {
                       <div className="flex items-center justify-between gap-3">
                         <div className="font-medium">
                           {session.status === 'saved'
-                            ? '已保存优化'
-                            : '进行中的优化'}
+                            ? '\u5df2\u4fdd\u5b58\u4f18\u5316'
+                            : '\u8fdb\u884c\u4e2d\u7684\u4f18\u5316'}
                         </div>
                         <div className="text-xs text-muted-foreground">
                           {new Date(session.updatedAt).toLocaleString()}
@@ -2558,7 +2653,9 @@ export default function LiteArenaPanel() {
                   >
                     <div className="max-w-[88%] sm:max-w-[70%] lg:max-w-[50%]">
                       <div className="text-[10px] font-medium text-muted-foreground mb-1">
-                        {m.role === 'user' ? '你' : '优化专家'}
+                        {m.role === 'user'
+                          ? '\u4f60'
+                          : '\u4f18\u5316\u4e13\u5bb6'}
                       </div>
                       <div
                         className={`rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ${
@@ -2725,8 +2822,8 @@ export default function LiteArenaPanel() {
                   }}
                 >
                   {centerPreview.type === 'adoptedDiff'
-                    ? '返回已采纳'
-                    : '返回工作台'}
+                    ? '\u8fd4\u56de\u5df2\u91c7\u7eb3\u4fee\u6539'
+                    : '\u8fd4\u56de\u5de5\u4f5c\u53f0'}
                 </Button>
               </div>
             </div>
@@ -2738,11 +2835,19 @@ export default function LiteArenaPanel() {
               ) : (
                 <div className="max-w-3xl mx-auto">
                   <div className="rounded-[20px] border border-border/70 bg-muted/50 p-5 text-sm">
-                    {centerPreview.type === 'skill' ? (
-                      <SkillMarkdownContent content={centerPreview.content} />
-                    ) : (
-                      <MarkdownContent content={centerPreview.content} />
-                    )}
+                    {(() => {
+                      const previewContent = normalizePreviewContent(
+                        centerPreview.content,
+                      );
+
+                      return centerPreview.type === 'skill' ? (
+                        <SkillMarkdownContent content={previewContent} />
+                      ) : centerPreview.type === 'rubric' ? (
+                        <RubricStructuredView content={previewContent} />
+                      ) : (
+                        <MarkdownContent content={previewContent} />
+                      );
+                    })()}
                   </div>
                 </div>
               )}
@@ -2754,7 +2859,7 @@ export default function LiteArenaPanel() {
               <div className="flex min-w-0 items-center gap-3">
                 <div className="flex min-w-0 items-center gap-1.5">
                   <div className="truncate text-sm font-semibold">
-                    {selectedPackage?.name || '工作台'}
+                    {selectedPackage?.name || '\u5de5\u4f5c\u53f0'}
                   </div>
                   {selectedPackage && (
                     <button
@@ -2765,22 +2870,22 @@ export default function LiteArenaPanel() {
                         )
                       }
                       className="flex size-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                      title="重命名"
+                      title="\u91cd\u547d\u540d"
                     >
                       <Pencil className="size-3.5" />
                     </button>
                   )}
                 </div>
                 <div className="hidden text-xs text-muted-foreground sm:block">
-                  输入问题，测试智能体效果
+                  \u8f93\u5165\u95ee\u9898\uff0c\u6d4b\u8bd5\u667a\u80fd\u4f53\u6548\u679c
                 </div>
               </div>
               <div className="flex flex-wrap items-center justify-end gap-2">
                 <div className="inline-flex rounded-[12px] border border-border/70 bg-muted/40 p-0.5">
                   {[
-                    { key: 'compare' as const, label: '对比' },
-                    { key: 'agent' as const, label: '智能体' },
-                    { key: 'baseline' as const, label: '基础' },
+                    { key: 'compare' as const, label: '\u5bf9\u6bd4' },
+                    { key: 'agent' as const, label: '\u667a\u80fd\u4f53' },
+                    { key: 'baseline' as const, label: '\u57fa\u7840' },
                   ].map((mode) => (
                     <button
                       key={mode.key}
@@ -2849,7 +2954,7 @@ export default function LiteArenaPanel() {
                         className="text-xs text-muted-foreground hover:text-foreground transition-colors"
                         title="关闭"
                       >
-                        ×
+                        X
                       </button>
                     )}
                   </div>
@@ -2893,7 +2998,7 @@ export default function LiteArenaPanel() {
                 <Textarea
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder={`输入问题，测试 ${selectedPackage?.name || '智能体'} 效果...`}
+                  placeholder={`\u8f93\u5165\u95ee\u9898\uff0c\u6d4b\u8bd5 ${selectedPackage?.name || '\u667a\u80fd\u4f53'} \u6548\u679c...`}
                   rows={2}
                   className="min-h-[60px] resize-none rounded-[14px] border-border/70 bg-card/80"
                   onKeyDown={(e) => {
@@ -2947,7 +3052,7 @@ export default function LiteArenaPanel() {
                       )
                     }
                     className="flex size-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                    title="重命名"
+                    title="\u91cd\u547d\u540d"
                   >
                     <Pencil className="size-3.5" />
                   </button>
@@ -3078,23 +3183,10 @@ export default function LiteArenaPanel() {
                       </div>
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={handleRubricPrimaryAction}
-                          disabled={rubricRepairing}
-                          className="text-[10px] text-primary hover:underline disabled:pointer-events-none disabled:opacity-60"
-                        >
-                          {rubricNeedsRepair
-                            ? rubricRepairing
-                              ? '修复中...'
-                              : '修复 rubric'
-                            : rubricHasContent
-                              ? '编辑'
-                              : '填写 rubric'}
-                        </button>
-                        <button
-                          onClick={startManualEditRubric}
+                          onClick={() => startManualEditRubric()}
                           className="text-[10px] text-primary hover:underline"
                         >
-                          手动修改
+                          编辑
                         </button>
                         <button
                           onClick={() => rubricFileRef.current?.click()}
@@ -3102,20 +3194,20 @@ export default function LiteArenaPanel() {
                         >
                           导入文件
                         </button>
-                        {rubricHasContent && (
-                          <button
-                            onClick={() =>
-                              setCenterPreview({
-                                type: 'rubric',
-                                name: 'rubric.md',
-                                content: selectedPackage.snapshot.rubricMd,
-                              })
-                            }
-                            className="text-[10px] text-primary hover:underline"
-                          >
-                            在中间打开
-                          </button>
-                        )}
+                        <button
+                          onClick={() =>
+                            rubricHasContent &&
+                            setCenterPreview({
+                              type: 'rubric',
+                              name: 'rubric.md',
+                              content: rubricPreviewContent,
+                            })
+                          }
+                          disabled={!rubricHasContent}
+                          className="text-[10px] text-primary hover:underline disabled:pointer-events-none disabled:text-muted-foreground/70 disabled:no-underline"
+                        >
+                          在中间打开
+                        </button>
                       </div>
                     </div>
                     <input
@@ -3133,11 +3225,10 @@ export default function LiteArenaPanel() {
                         {rubricNeedsRepair && (
                           <div className="rounded-[18px] border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-200">
                             <div className="font-medium">
-                              当前 rubric 还不能直接用于评分
+                              当前 rubric 会按现有内容参与评分
                             </div>
                             <div className="mt-1 text-xs leading-5">
-                              这份内容已经保留下来了，但结构不完整。先点“修复
-                              rubric”补齐评分目标、评分维度和使用说明，再继续生成报告或做交互式优化。
+                              当前内容已经保留下来了。现在可以直接生成报告；如果想让评分更稳定，可以继续手动补充维度、权重或等级说明。
                             </div>
                           </div>
                         )}
@@ -3147,13 +3238,11 @@ export default function LiteArenaPanel() {
                             setCenterPreview({
                               type: 'rubric',
                               name: 'rubric.md',
-                              content: selectedPackage.snapshot.rubricMd,
+                              content: rubricPreviewContent,
                             })
                           }
                         >
-                          <MarkdownContent
-                            content={selectedPackage.snapshot.rubricMd}
-                          />
+                          <RubricStructuredView content={rubricDisplayText} />
                         </div>
                       </div>
                     ) : (
@@ -3162,28 +3251,13 @@ export default function LiteArenaPanel() {
                           当前还没有配置 rubric
                         </div>
                         <div className="mt-2 leading-6 text-muted-foreground">
-                          先补充评分目标、评分维度和使用说明，后面就可以直接用交互式优化。
-                        </div>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          <Button
-                            size="sm"
-                            className="rounded-[10px]"
-                            onClick={startManualEditRubric}
-                          >
-                            开始填写
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="rounded-[10px]"
-                            onClick={() => rubricFileRef.current?.click()}
-                          >
-                            从文件导入
-                          </Button>
+                          这里保留手动编辑和导入文件两种方式。补好 rubric
+                          之后，就能直接生成评估报告；交互式优化仍建议使用结构更完整的
+                          rubric。
                         </div>
                         <div className="mt-4 rounded-[16px] border border-border/70 bg-card/70 p-3 text-xs leading-5 text-muted-foreground">
                           <div className="font-medium text-foreground">
-                            模板会自动包含这些部分：
+                            手动填写时，通常至少补上这些部分：
                           </div>
                           <div className="mt-2 whitespace-pre-wrap">
                             {[
@@ -3202,7 +3276,6 @@ export default function LiteArenaPanel() {
                     )}
                   </div>
                 )}
-
                 {selectedPackage && detailTab === 'skills' && (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
@@ -3259,7 +3332,10 @@ export default function LiteArenaPanel() {
                           }
                         >
                           <SkillMarkdownContent
-                            content={selectedSkill?.skillMd || '暂无技能内容'}
+                            content={
+                              selectedSkill?.skillMd ||
+                              '\u6682\u65e0\u6280\u80fd\u5185\u5bb9'
+                            }
                           />
                         </div>
                       </>
@@ -3306,7 +3382,7 @@ export default function LiteArenaPanel() {
                             </option>
                           ))}
                         </select>
-                        <span className="text-muted-foreground">→</span>
+                        <span className="text-muted-foreground">{'->'}</span>
                         <select
                           className="min-w-0 flex-1 rounded-lg border border-border/70 bg-muted/50 px-2 py-1 text-xs"
                           value={compareTargetId}
@@ -3381,7 +3457,7 @@ export default function LiteArenaPanel() {
                       <div className="space-y-2">
                         <div className="flex items-center justify-between rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs">
                           <div>
-                            <div className="font-medium">对比结果</div>
+                            <div className="font-medium">比较结果</div>
                             <div className="text-muted-foreground">
                               v{compareResult.baseVersion.versionNumber} {'->'}{' '}
                               v{compareResult.targetVersion.versionNumber}
@@ -3445,7 +3521,7 @@ export default function LiteArenaPanel() {
                                   className="text-left text-[11px] text-muted-foreground hover:text-foreground transition-colors"
                                   title="点击编辑备注"
                                 >
-                                  备注：{v.note}
+                                  {`备注：${v.note}`}
                                 </button>
                               ) : (
                                 <button
@@ -3472,28 +3548,28 @@ export default function LiteArenaPanel() {
                 {detailTab === 'report' &&
                   (report ? (
                     <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                        评估报告
+                      <div className="flex items-center justify-between">
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                          评估报告
+                        </div>
+                        <button
+                          onClick={() => void handleReport()}
+                          className="text-[10px] text-primary hover:underline"
+                        >
+                          重新生成
+                        </button>
+                        <button
+                          onClick={() => openReportPreview(report)}
+                          className="text-[10px] text-primary hover:underline"
+                        >
+                          在中间打开
+                        </button>
                       </div>
-                      <button
-                        onClick={() => void handleReport()}
-                        className="text-[10px] text-primary hover:underline"
-                      >
-                        重新生成
-                      </button>
-                      <button
-                        onClick={() => openReportPreview(report)}
-                        className="text-[10px] text-primary hover:underline"
-                      >
-                        在中间打开
-                      </button>
-                    </div>
-                      {!rubricConfigured && (
+                      {(!rubricHasContent || rubricNeedsRepair) && (
                         <div className="rounded-[18px] border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-200">
                           <div className="font-medium">
-                            {rubricNeedsRepair
-                              ? '当前 rubric 需要修复'
+                            {rubricHasContent
+                              ? '当前 rubric 将按现有内容参与评分'
                               : '当前还没有配置 rubric'}
                           </div>
                           <div className="mt-1 text-xs leading-5">
@@ -3510,12 +3586,12 @@ export default function LiteArenaPanel() {
                       </div>
                       <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground space-y-3">
                         <div>还没有生成报告</div>
-                        {!rubricConfigured && (
+                        {!rubricHasContent && (
                           <div className="text-xs text-amber-700 dark:text-amber-300">
                             {rubricRequiredMessage}
                           </div>
                         )}
-                        {rubricConfigured && !canGenerateReport && (
+                        {rubricHasContent && !canGenerateReport && (
                           <div className="text-xs text-amber-700 dark:text-amber-300">
                             {reportRequiredMessage}
                           </div>
@@ -3527,7 +3603,7 @@ export default function LiteArenaPanel() {
                           onClick={() => void handleReport()}
                           disabled={!canOpenReport}
                           title={
-                            !rubricConfigured
+                            !rubricHasContent
                               ? rubricRequiredMessage
                               : !canGenerateReport
                                 ? reportRequiredMessage

@@ -1,9 +1,6 @@
 import type { Server } from "node:http";
 import express from "express";
-import jwt from "jsonwebtoken";
 import { afterEach, describe, expect, it, vi } from "vitest";
-
-import { config } from "../config.js";
 
 const queryMock = vi.fn();
 
@@ -42,10 +39,6 @@ async function close(server: Server) {
   });
 }
 
-function signToken(userId: string) {
-  return jwt.sign({ sub: userId, username: "tester" }, config.jwtSecret);
-}
-
 afterEach(() => {
   vi.resetModules();
   vi.doUnmock("../services/db.js");
@@ -80,7 +73,7 @@ describe("package initial loading workflow", () => {
 
     try {
       const response = await fetch(`${url}/api/packages`, {
-        headers: { Authorization: `Bearer ${signToken("user-1")}` },
+        headers: { "X-User-Id": "user-1" },
       });
 
       expect(response.status).toBe(200);

@@ -1,15 +1,32 @@
-import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+﻿import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import {
-  ChevronRight, File, Folder, RotateCw,
-  FilePlus, FolderPlus, Pencil, Trash2,
-  FileCode, FileText, FileJson, FileImage, FileType,
-  Upload, CheckCircle,
+  ChevronRight,
+  File,
+  Folder,
+  RotateCw,
+  FilePlus,
+  FolderPlus,
+  Pencil,
+  Trash2,
+  FileCode,
+  FileText,
+  FileJson,
+  FileImage,
+  FileType,
+  Upload,
+  CheckCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { PremiumPill } from '@/components/ui/premium';
 import {
-  listFiles, createFile, createDir, renamePath, deletePath, uploadFiles, uploadFilesWithPaths,
+  listFiles,
+  createFile,
+  createDir,
+  renamePath,
+  deletePath,
+  uploadFiles,
+  uploadFilesWithPaths,
   type FileEntry,
 } from '../../api/manager';
 import { useT, type MessageKey } from '../../i18n';
@@ -52,13 +69,15 @@ type ContextTarget = {
   y: number;
 };
 
-type InlineEdit = {
-  parentPath: string;
-  kind: 'file' | 'directory';
-} | {
-  renamePath: string;
-  oldName: string;
-};
+type InlineEdit =
+  | {
+      parentPath: string;
+      kind: 'file' | 'directory';
+    }
+  | {
+      renamePath: string;
+      oldName: string;
+    };
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -95,21 +114,53 @@ function uniqueParentDirs(paths: Set<string>): Set<string> {
 function fileIconFor(name: string): { icon: typeof File; color: string } {
   const ext = name.includes('.') ? name.split('.').pop()!.toLowerCase() : '';
   switch (ext) {
-    case 'ts': case 'tsx': case 'js': case 'jsx': case 'mjs': case 'cjs':
+    case 'ts':
+    case 'tsx':
+    case 'js':
+    case 'jsx':
+    case 'mjs':
+    case 'cjs':
       return { icon: FileCode, color: 'text-sky-500' };
-    case 'py': case 'go': case 'rs': case 'rb': case 'java': case 'c': case 'cpp': case 'h':
+    case 'py':
+    case 'go':
+    case 'rs':
+    case 'rb':
+    case 'java':
+    case 'c':
+    case 'cpp':
+    case 'h':
       return { icon: FileCode, color: 'text-emerald-500' };
-    case 'json': case 'jsonc': case 'json5':
+    case 'json':
+    case 'jsonc':
+    case 'json5':
       return { icon: FileJson, color: 'text-amber-500' };
-    case 'md': case 'mdx': case 'txt': case 'rst':
+    case 'md':
+    case 'mdx':
+    case 'txt':
+    case 'rst':
       return { icon: FileText, color: 'text-violet-500' };
-    case 'yaml': case 'yml': case 'toml': case 'ini': case 'env':
+    case 'yaml':
+    case 'yml':
+    case 'toml':
+    case 'ini':
+    case 'env':
       return { icon: FileType, color: 'text-orange-500' };
-    case 'png': case 'jpg': case 'jpeg': case 'gif': case 'svg': case 'webp': case 'ico':
+    case 'png':
+    case 'jpg':
+    case 'jpeg':
+    case 'gif':
+    case 'svg':
+    case 'webp':
+    case 'ico':
       return { icon: FileImage, color: 'text-pink-500' };
-    case 'css': case 'scss': case 'less':
+    case 'css':
+    case 'scss':
+    case 'less':
       return { icon: FileCode, color: 'text-fuchsia-500' };
-    case 'html': case 'htm': case 'vue': case 'svelte':
+    case 'html':
+    case 'htm':
+    case 'vue':
+    case 'svelte':
       return { icon: FileCode, color: 'text-orange-500' };
     default:
       return { icon: File, color: 'text-muted-foreground/70' };
@@ -132,7 +183,7 @@ async function readEntryRecursive(
   }
   if (entry.isDirectory) {
     const dirReader = (entry as FileSystemDirectoryEntry).createReader();
-    // readEntries may not return all entries in one call 闂?loop until empty
+    // readEntries may not return all entries in one call - loop until empty
     const allEntries: FileSystemEntry[] = [];
     let batch: FileSystemEntry[];
     do {
@@ -144,7 +195,9 @@ async function readEntryRecursive(
 
     const results: { file: File; relativePath: string }[] = [];
     for (const child of allEntries) {
-      results.push(...(await readEntryRecursive(child, basePath + entry.name + '/')));
+      results.push(
+        ...(await readEntryRecursive(child, basePath + entry.name + '/')),
+      );
     }
     return results;
   }
@@ -214,7 +267,8 @@ function InlineInput({
 
   const submit = () => {
     const v = ref.current?.value.trim();
-    if (v) onConfirm(v); else onCancel();
+    if (v) onConfirm(v);
+    else onCancel();
   };
 
   return (
@@ -268,19 +322,34 @@ function ContextMenu({
 
   const isDir = target.node === null || target.node.type === 'directory';
 
-  const items: { label: string; action: string; icon: React.ReactNode; danger?: boolean }[] = [];
+  const items: {
+    label: string;
+    action: string;
+    icon: React.ReactNode;
+    danger?: boolean;
+  }[] = [];
 
   if (isDir) {
     items.push(
-      { label: t('file.newFile'), action: 'new-file', icon: <FilePlus className="size-3 mr-2" /> },
-      { label: t('file.newFolder'), action: 'new-dir', icon: <FolderPlus className="size-3 mr-2" /> },
+      {
+        label: t('file.newFile'),
+        action: 'new-file',
+        icon: <FilePlus className="size-3 mr-2" />,
+      },
+      {
+        label: t('file.newFolder'),
+        action: 'new-dir',
+        icon: <FolderPlus className="size-3 mr-2" />,
+      },
     );
   }
 
   if (target.node) {
-    items.push(
-      { label: t('file.rename'), action: 'rename', icon: <Pencil className="size-3 mr-2" /> },
-    );
+    items.push({
+      label: t('file.rename'),
+      action: 'rename',
+      icon: <Pencil className="size-3 mr-2" />,
+    });
   }
 
   if (multiCount > 1) {
@@ -291,9 +360,12 @@ function ContextMenu({
       danger: true,
     });
   } else if (target.node) {
-    items.push(
-      { label: t('file.delete'), action: 'delete', icon: <Trash2 className="size-3 mr-2" />, danger: true },
-    );
+    items.push({
+      label: t('file.delete'),
+      action: 'delete',
+      icon: <Trash2 className="size-3 mr-2" />,
+      danger: true,
+    });
   }
 
   return (
@@ -310,7 +382,10 @@ function ContextMenu({
               ? 'text-destructive hover:text-destructive hover:bg-destructive/10'
               : 'text-popover-foreground'
           }`}
-          onClick={() => { onAction(item.action); onClose(); }}
+          onClick={() => {
+            onAction(item.action);
+            onClose();
+          }}
         >
           {item.icon}
           {item.label}
@@ -362,7 +437,10 @@ function FileTreeNode({
   const isSelected = selected.has(node.path);
   const isDropTarget = dropTarget === node.path;
 
-  const isRenaming = inlineEdit && 'renamePath' in inlineEdit && inlineEdit.renamePath === node.path;
+  const isRenaming =
+    inlineEdit &&
+    'renamePath' in inlineEdit &&
+    inlineEdit.renamePath === node.path;
 
   const showInlineCreate =
     isOpen &&
@@ -379,8 +457,10 @@ function FileTreeNode({
       {isRenaming ? (
         <InlineInput
           depth={depth}
-          defaultValue={('renamePath' in inlineEdit ? inlineEdit.oldName : '')}
-          icon={<FileIcon className={`size-3.5 shrink-0 mr-1.5 ${fileColor}`} />}
+          defaultValue={'renamePath' in inlineEdit ? inlineEdit.oldName : ''}
+          icon={
+            <FileIcon className={`size-3.5 shrink-0 mr-1.5 ${fileColor}`} />
+          }
           onConfirm={onInlineConfirm}
           onCancel={onInlineCancel}
         />
@@ -396,7 +476,10 @@ function FileTreeNode({
           }`}
           style={{ paddingLeft: depth * 14 + 6 }}
           onClick={(e) => onSelect(node, e)}
-          onContextMenu={(e) => { e.preventDefault(); onContext(e, node); }}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            onContext(e, node);
+          }}
           onDragOver={isDir ? (e) => onDragOver(e, node.path) : undefined}
           onDragLeave={isDir ? onDragLeave : undefined}
           onDrop={isDir ? (e) => onDrop(e, node.path) : undefined}
@@ -411,42 +494,58 @@ function FileTreeNode({
             <span className="size-3 shrink-0 mr-0.5" />
           )}
           <FileIcon className={`size-3.5 shrink-0 mr-1.5 ${fileColor}`} />
-          <span className={`flex-1 min-w-0 truncate ${isSelected ? 'font-medium' : ''}`}>{node.name}</span>
-          {/* Hover action buttons 闂?absolutely positioned to right edge */}
+          <span
+            className={`flex-1 min-w-0 truncate ${isSelected ? 'font-medium' : ''}`}
+          >
+            {node.name}
+          </span>
+          {/* Hover action buttons - absolutely positioned to right edge */}
           <span className="absolute right-2 top-0 bottom-0 hidden items-center gap-px rounded-r-md pl-4 pr-0.5 group-hover:flex">
             <span className="flex items-center gap-px rounded-[12px] border border-border bg-background px-1 py-0.5 shadow-sm">
-            {isDir && (
-              <>
-                <button
-                  className="rounded-md p-1 text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground"
-                  title={t('file.newFile')}
-                  onClick={(e) => { e.stopPropagation(); onNodeAction('new-file', node); }}
-                >
-                  <FilePlus className="size-3" />
-                </button>
-                <button
-                  className="rounded-md p-1 text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground"
-                  title={t('file.newFolder')}
-                  onClick={(e) => { e.stopPropagation(); onNodeAction('new-dir', node); }}
-                >
-                  <FolderPlus className="size-3" />
-                </button>
-              </>
-            )}
-            <button
-              className="rounded-md p-1 text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground"
-              title={t('file.rename')}
-              onClick={(e) => { e.stopPropagation(); onNodeAction('rename', node); }}
-            >
-              <Pencil className="size-3" />
-            </button>
-            <button
-              className="rounded-md p-1 text-destructive/60 transition-colors hover:bg-destructive/10 hover:text-destructive"
-              title={t('file.delete')}
-              onClick={(e) => { e.stopPropagation(); onNodeAction('delete', node); }}
-            >
-              <Trash2 className="size-3" />
-            </button>
+              {isDir && (
+                <>
+                  <button
+                    className="rounded-md p-1 text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground"
+                    title={t('file.newFile')}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onNodeAction('new-file', node);
+                    }}
+                  >
+                    <FilePlus className="size-3" />
+                  </button>
+                  <button
+                    className="rounded-md p-1 text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground"
+                    title={t('file.newFolder')}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onNodeAction('new-dir', node);
+                    }}
+                  >
+                    <FolderPlus className="size-3" />
+                  </button>
+                </>
+              )}
+              <button
+                className="rounded-md p-1 text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground"
+                title={t('file.rename')}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onNodeAction('rename', node);
+                }}
+              >
+                <Pencil className="size-3" />
+              </button>
+              <button
+                className="rounded-md p-1 text-destructive/60 transition-colors hover:bg-destructive/10 hover:text-destructive"
+                title={t('file.delete')}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onNodeAction('delete', node);
+                }}
+              >
+                <Trash2 className="size-3" />
+              </button>
             </span>
           </span>
         </div>
@@ -457,9 +556,15 @@ function FileTreeNode({
           depth={depth + 1}
           defaultValue=""
           icon={
-            ('parentPath' in inlineEdit ? inlineEdit.kind === 'directory' : false)
-              ? <Folder className="size-3 shrink-0 mr-1.5 text-blue-500" />
-              : <File className="size-3 shrink-0 mr-1.5" />
+            (
+              'parentPath' in inlineEdit
+                ? inlineEdit.kind === 'directory'
+                : false
+            ) ? (
+              <Folder className="size-3 shrink-0 mr-1.5 text-blue-500" />
+            ) : (
+              <File className="size-3 shrink-0 mr-1.5" />
+            )
           }
           onConfirm={onInlineConfirm}
           onCancel={onInlineCancel}
@@ -514,15 +619,18 @@ export default function FileExplorer({
   const { openFilePath, setOpenFilePath } = useUIStore();
 
   /** Close the file viewer if the deleted path matches or contains the currently open file */
-  const closeViewerIfAffected = useCallback((deletedPaths: Iterable<string>) => {
-    if (!openFilePath) return;
-    for (const p of deletedPaths) {
-      if (openFilePath === p || openFilePath.startsWith(p + '/')) {
-        setOpenFilePath(null);
-        return;
+  const closeViewerIfAffected = useCallback(
+    (deletedPaths: Iterable<string>) => {
+      if (!openFilePath) return;
+      for (const p of deletedPaths) {
+        if (openFilePath === p || openFilePath.startsWith(p + '/')) {
+          setOpenFilePath(null);
+          return;
+        }
       }
-    }
-  }, [openFilePath, setOpenFilePath]);
+    },
+    [openFilePath, setOpenFilePath],
+  );
 
   // Build ops: use provided fileOps, or construct from agentId
   const ops: FileOps = useMemo(() => {
@@ -551,7 +659,12 @@ export default function FileExplorer({
   const [ctxMenu, setCtxMenu] = useState<ContextTarget | null>(null);
   const [inlineEdit, setInlineEdit] = useState<InlineEdit | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [uploadState, setUploadState] = useState<UploadState>({ uploading: false, count: 0, progress: 0, done: false });
+  const [uploadState, setUploadState] = useState<UploadState>({
+    uploading: false,
+    count: 0,
+    progress: 0,
+    done: false,
+  });
   const [dragOverlay, setDragOverlay] = useState(false);
   const dragCounter = useRef(0);
 
@@ -597,7 +710,9 @@ export default function FileExplorer({
   if (!loaded && !loading) loadRoot();
 
   // Auto-refresh when agent modifies files (only for agent mode)
-  const refreshCounter = useUIStore((s) => agentId ? (s.fileRefreshCounters.get(agentId) ?? 0) : 0);
+  const refreshCounter = useUIStore((s) =>
+    agentId ? (s.fileRefreshCounters.get(agentId) ?? 0) : 0,
+  );
   useEffect(() => {
     if (!agentId || refreshCounter === 0) return;
     const t = setTimeout(loadRoot, 500);
@@ -606,7 +721,10 @@ export default function FileExplorer({
 
   const reloadDir = useCallback(
     async (dirPath: string, tree: TreeNode[]): Promise<TreeNode[]> => {
-      const reloadNodeChildren = async (currentDirPath: string, currentTree: TreeNode[]): Promise<TreeNode[]> => {
+      const reloadNodeChildren = async (
+        currentDirPath: string,
+        currentTree: TreeNode[],
+      ): Promise<TreeNode[]> => {
         if (currentDirPath === '.') return loadDir('.');
         const result: TreeNode[] = [];
         for (const node of currentTree) {
@@ -614,7 +732,10 @@ export default function FileExplorer({
             const children = await loadDir(node.path);
             result.push({ ...node, children, loaded: true });
           } else if (node.children) {
-            result.push({ ...node, children: await reloadNodeChildren(currentDirPath, node.children) });
+            result.push({
+              ...node,
+              children: await reloadNodeChildren(currentDirPath, node.children),
+            });
           } else {
             result.push(node);
           }
@@ -656,15 +777,25 @@ export default function FileExplorer({
 
   const ensureExpanded = useCallback(
     async (dirPath: string, tree: TreeNode[]): Promise<TreeNode[]> => {
-      const expandNodeChildren = async (currentDirPath: string, currentTree: TreeNode[]): Promise<TreeNode[]> => {
+      const expandNodeChildren = async (
+        currentDirPath: string,
+        currentTree: TreeNode[],
+      ): Promise<TreeNode[]> => {
         if (currentDirPath === '.') return currentTree;
         const result: TreeNode[] = [];
         for (const node of currentTree) {
-          if (node.path === currentDirPath && node.type === 'directory' && !node.loaded) {
+          if (
+            node.path === currentDirPath &&
+            node.type === 'directory' &&
+            !node.loaded
+          ) {
             const children = await loadDir(node.path);
             result.push({ ...node, children, loaded: true });
           } else if (node.children) {
-            result.push({ ...node, children: await expandNodeChildren(currentDirPath, node.children) });
+            result.push({
+              ...node,
+              children: await expandNodeChildren(currentDirPath, node.children),
+            });
           } else {
             result.push(node);
           }
@@ -708,7 +839,7 @@ export default function FileExplorer({
         return;
       }
 
-      // Normal click 闂?single select
+      // Normal click - single select
       setSelected(new Set([node.path]));
       setLastClicked(node.path);
 
@@ -722,24 +853,30 @@ export default function FileExplorer({
   );
 
   // Clear selection when clicking background
-  const handleBgClick = useCallback((e: React.MouseEvent) => {
-    // Clicked on a tree row or inline input 闂?ignore
-    if ((e.target as HTMLElement).closest('[data-tree-row]')) return;
-    setSelected(new Set());
-    setLastClicked(null);
-    onDeselect?.();
-  }, [onDeselect]);
+  const handleBgClick = useCallback(
+    (e: React.MouseEvent) => {
+      // Clicked on a tree row or inline input - ignore
+      if ((e.target as HTMLElement).closest('[data-tree-row]')) return;
+      setSelected(new Set());
+      setLastClicked(null);
+      onDeselect?.();
+    },
+    [onDeselect],
+  );
 
   // ---- context menu ----
 
-  const handleContext = useCallback((e: React.MouseEvent, node: TreeNode) => {
-    // If right-clicked node is not in current selection, select only it
-    if (!selected.has(node.path)) {
-      setSelected(new Set([node.path]));
-      setLastClicked(node.path);
-    }
-    setCtxMenu({ node, x: e.clientX, y: e.clientY });
-  }, [selected]);
+  const handleContext = useCallback(
+    (e: React.MouseEvent, node: TreeNode) => {
+      // If right-clicked node is not in current selection, select only it
+      if (!selected.has(node.path)) {
+        setSelected(new Set([node.path]));
+        setLastClicked(node.path);
+      }
+      setCtxMenu({ node, x: e.clientX, y: e.clientY });
+    },
+    [selected],
+  );
 
   const handleBgContext = useCallback((e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest('[data-tree-node]')) return;
@@ -754,13 +891,21 @@ export default function FileExplorer({
     async (currentRoots: TreeNode[]) => {
       if (selected.size === 0) return;
       const count = selected.size;
-      if (!window.confirm(t('file.confirmDeleteSelected').replace('{n}', String(count)))) return;
+      if (
+        !window.confirm(
+          t('file.confirmDeleteSelected').replace('{n}', String(count)),
+        )
+      )
+        return;
 
       setDeleting(true);
       try {
         // Delete all selected items (skip children of selected directories since rm -rf handles them)
         const toDelete = [...selected].filter(
-          (p) => ![...selected].some((other) => other !== p && p.startsWith(other + '/')),
+          (p) =>
+            ![...selected].some(
+              (other) => other !== p && p.startsWith(other + '/'),
+            ),
         );
 
         await Promise.all(toDelete.map((p) => ops.deletePath(p)));
@@ -809,17 +954,38 @@ export default function FileExplorer({
       }
 
       if (action === 'delete' && target) {
-        const label = target.type === 'directory' ? t('file.folder') : t('file.file');
-        const suffix = target.type === 'directory' ? t('file.confirmDeleteDirSuffix') : '';
-        if (!window.confirm(t('file.confirmDelete').replace('{label}', label).replace('{name}', target.name) + suffix)) return;
+        const label =
+          target.type === 'directory' ? t('file.folder') : t('file.file');
+        const suffix =
+          target.type === 'directory' ? t('file.confirmDeleteDirSuffix') : '';
+        if (
+          !window.confirm(
+            t('file.confirmDelete')
+              .replace('{label}', label)
+              .replace('{name}', target.name) + suffix,
+          )
+        )
+          return;
         await ops.deletePath(target.path);
         const dir = parentDir(target.path);
         setRoots(await reloadDir(dir, roots));
-        setSelected((prev) => { const n = new Set(prev); n.delete(target.path); return n; });
+        setSelected((prev) => {
+          const n = new Set(prev);
+          n.delete(target.path);
+          return n;
+        });
         closeViewerIfAffected([target.path]);
       }
     },
-    [roots, ops, ensureExpanded, reloadDir, handleDeleteSelected, t, closeViewerIfAffected],
+    [
+      roots,
+      ops,
+      ensureExpanded,
+      reloadDir,
+      handleDeleteSelected,
+      t,
+      closeViewerIfAffected,
+    ],
   );
 
   const handleAction = useCallback(
@@ -862,7 +1028,10 @@ export default function FileExplorer({
           setRoots(updated);
           setSelected((prev) => {
             const n = new Set(prev);
-            if (n.has(oldPath)) { n.delete(oldPath); n.add(newPath); }
+            if (n.has(oldPath)) {
+              n.delete(oldPath);
+              n.add(newPath);
+            }
             return n;
           });
         }
@@ -880,13 +1049,21 @@ export default function FileExplorer({
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (selected.size === 0) return;
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      )
+        return;
       if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
         if (selected.size === 1) {
           const path = [...selected][0];
           // Find the node to get its name for the confirm message
-          executeAction('delete', { path, name: path.split('/').pop()!, type: 'file' } as TreeNode);
+          executeAction('delete', {
+            path,
+            name: path.split('/').pop()!,
+            type: 'file',
+          } as TreeNode);
         } else {
           handleDeleteSelected(roots);
         }
@@ -919,11 +1096,11 @@ export default function FileExplorer({
       const dt = e.dataTransfer;
       if (!dt) return;
 
-      // Capture plain files synchronously BEFORE any await 闂?browser clears
+      // Capture plain files synchronously BEFORE any await - browser clears
       // DataTransfer after the event handler returns synchronously.
       const plainFiles = dt.files ? Array.from(dt.files) : [];
 
-      // Try folder-aware extraction (webkitGetAsEntry) 闂?must also start
+      // Try folder-aware extraction (webkitGetAsEntry) - must also start
       // synchronously to grab entry references before the DataTransfer is cleared.
       let entryItems: { file: File; relativePath: string }[] | null = null;
       if (ops.uploadFilesWithPaths) {
@@ -931,26 +1108,60 @@ export default function FileExplorer({
       }
 
       if (entryItems && entryItems.length > 0 && ops.uploadFilesWithPaths) {
-        setUploadState({ uploading: true, count: entryItems.length, progress: 0, done: false });
+        setUploadState({
+          uploading: true,
+          count: entryItems.length,
+          progress: 0,
+          done: false,
+        });
         try {
-          await ops.uploadFilesWithPaths(dirPath, entryItems, (loaded, total) => {
-            setUploadState((prev) => ({
-              ...prev,
-              progress: total > 0 ? Math.round((loaded / total) * 100) : 0,
-            }));
+          await ops.uploadFilesWithPaths(
+            dirPath,
+            entryItems,
+            (loaded, total) => {
+              setUploadState((prev) => ({
+                ...prev,
+                progress: total > 0 ? Math.round((loaded / total) * 100) : 0,
+              }));
+            },
+          );
+          setUploadState({
+            uploading: false,
+            count: entryItems.length,
+            progress: 100,
+            done: true,
           });
-          setUploadState({ uploading: false, count: entryItems.length, progress: 100, done: true });
         } catch {
-          setUploadState({ uploading: false, count: 0, progress: 0, done: false });
+          setUploadState({
+            uploading: false,
+            count: 0,
+            progress: 0,
+            done: false,
+          });
         }
       } else if (plainFiles.length > 0) {
         // Fallback: use the synchronously-captured plain file list
-        setUploadState({ uploading: true, count: plainFiles.length, progress: 0, done: false });
+        setUploadState({
+          uploading: true,
+          count: plainFiles.length,
+          progress: 0,
+          done: false,
+        });
         try {
           await ops.uploadFiles(dirPath, plainFiles);
-          setUploadState({ uploading: false, count: plainFiles.length, progress: 100, done: true });
+          setUploadState({
+            uploading: false,
+            count: plainFiles.length,
+            progress: 100,
+            done: true,
+          });
         } catch {
-          setUploadState({ uploading: false, count: 0, progress: 0, done: false });
+          setUploadState({
+            uploading: false,
+            count: 0,
+            progress: 0,
+            done: false,
+          });
         }
       } else {
         return; // Nothing to upload
@@ -966,7 +1177,11 @@ export default function FileExplorer({
 
       // Auto-hide success state after 2 seconds
       setTimeout(() => {
-        setUploadState((prev) => (prev.done ? { uploading: false, count: 0, progress: 0, done: false } : prev));
+        setUploadState((prev) =>
+          prev.done
+            ? { uploading: false, count: 0, progress: 0, done: false }
+            : prev,
+        );
       }, 2000);
     },
     [ops, roots, loadDir, reloadDir],
@@ -987,7 +1202,10 @@ export default function FileExplorer({
 
   const handleRootDragLeave = useCallback((e: React.DragEvent) => {
     // Only clear if actually leaving the container
-    if (containerRef.current && !containerRef.current.contains(e.relatedTarget as Node)) {
+    if (
+      containerRef.current &&
+      !containerRef.current.contains(e.relatedTarget as Node)
+    ) {
       setDropTarget(null);
       dragCounter.current = 0;
       setDragOverlay(false);
@@ -1024,12 +1242,27 @@ export default function FileExplorer({
       const dirPath = '.';
       const plainFiles = Array.from(files);
 
-      setUploadState({ uploading: true, count: plainFiles.length, progress: 0, done: false });
+      setUploadState({
+        uploading: true,
+        count: plainFiles.length,
+        progress: 0,
+        done: false,
+      });
       try {
         await ops.uploadFiles(dirPath, plainFiles);
-        setUploadState({ uploading: false, count: plainFiles.length, progress: 100, done: true });
+        setUploadState({
+          uploading: false,
+          count: plainFiles.length,
+          progress: 100,
+          done: true,
+        });
       } catch {
-        setUploadState({ uploading: false, count: 0, progress: 0, done: false });
+        setUploadState({
+          uploading: false,
+          count: 0,
+          progress: 0,
+          done: false,
+        });
       }
 
       // Reload root
@@ -1041,7 +1274,11 @@ export default function FileExplorer({
 
       // Auto-hide success state
       setTimeout(() => {
-        setUploadState((prev) => (prev.done ? { uploading: false, count: 0, progress: 0, done: false } : prev));
+        setUploadState((prev) =>
+          prev.done
+            ? { uploading: false, count: 0, progress: 0, done: false }
+            : prev,
+        );
       }, 2000);
     },
     [ops, loadDir],
@@ -1097,69 +1334,90 @@ export default function FileExplorer({
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-0.5 rounded-full border border-border bg-background p-1 shadow-sm">
-          {!readonly && selected.size > 1 && (
+            {!readonly && selected.size > 1 && (
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                onClick={() => handleDeleteSelected(roots)}
+                disabled={deleting}
+                title={t('file.deleteSelected').replace(
+                  '{n}',
+                  String(selected.size),
+                )}
+                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+              >
+                <Trash2
+                  className={`size-3.5 ${deleting ? 'animate-pulse' : ''}`}
+                />
+              </Button>
+            )}
+            {!readonly && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  onClick={() => fileInputRef.current?.click()}
+                  title={t('file.upload')}
+                  disabled={uploadState.uploading}
+                >
+                  <Upload
+                    className={`size-3.5 ${uploadState.uploading ? 'animate-pulse' : ''}`}
+                  />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  onClick={() =>
+                    setInlineEdit({ parentPath: '.', kind: 'file' })
+                  }
+                  title={t('file.newFile')}
+                >
+                  <FilePlus className="size-3.5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  onClick={() =>
+                    setInlineEdit({ parentPath: '.', kind: 'directory' })
+                  }
+                  title={t('file.newFolder')}
+                >
+                  <FolderPlus className="size-3.5" />
+                </Button>
+              </>
+            )}
             <Button
               variant="ghost"
               size="icon-xs"
-              onClick={() => handleDeleteSelected(roots)}
-              disabled={deleting}
-              title={t('file.deleteSelected').replace('{n}', String(selected.size))}
-              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+              onClick={loadRoot}
+              title={t('file.refresh')}
+              disabled={loading}
             >
-              <Trash2 className={`size-3.5 ${deleting ? 'animate-pulse' : ''}`} />
+              <RotateCw
+                className={`size-3.5 ${loading ? 'animate-spin' : ''}`}
+              />
             </Button>
-          )}
-          {!readonly && (
-            <>
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                onClick={() => fileInputRef.current?.click()}
-                title={t('file.upload')}
-                disabled={uploadState.uploading}
-              >
-                <Upload className={`size-3.5 ${uploadState.uploading ? 'animate-pulse' : ''}`} />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                onClick={() => setInlineEdit({ parentPath: '.', kind: 'file' })}
-                title={t('file.newFile')}
-              >
-                <FilePlus className="size-3.5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                onClick={() => setInlineEdit({ parentPath: '.', kind: 'directory' })}
-                title={t('file.newFolder')}
-              >
-                <FolderPlus className="size-3.5" />
-              </Button>
-            </>
-          )}
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            onClick={loadRoot}
-            title={t('file.refresh')}
-            disabled={loading}
-          >
-            <RotateCw className={`size-3.5 ${loading ? 'animate-spin' : ''}`} />
-          </Button>
           </div>
         </div>
       </div>
 
-      <ScrollArea className={`flex-1 ${(uploadState.uploading || uploadState.done) ? 'pb-8' : ''}`}>
+      <ScrollArea
+        className={`flex-1 ${uploadState.uploading || uploadState.done ? 'pb-8' : ''}`}
+      >
         {showRootInlineCreate && (
           <InlineInput
             depth={0}
             defaultValue=""
             icon={
-              ('parentPath' in inlineEdit ? inlineEdit.kind === 'directory' : false)
-                ? <Folder className="size-3 shrink-0 mr-1.5 text-blue-500" />
-                : <File className="size-3 shrink-0 mr-1.5" />
+              (
+                'parentPath' in inlineEdit
+                  ? inlineEdit.kind === 'directory'
+                  : false
+              ) ? (
+                <Folder className="size-3 shrink-0 mr-1.5 text-blue-500" />
+              ) : (
+                <File className="size-3 shrink-0 mr-1.5" />
+              )
             }
             onConfirm={handleInlineConfirm}
             onCancel={handleInlineCancel}
@@ -1171,8 +1429,12 @@ export default function FileExplorer({
             <div className="mb-3 flex size-12 items-center justify-center rounded-[16px] border border-border bg-background shadow-sm">
               <Folder className="size-5" />
             </div>
-            <span className="max-w-full break-words text-sm font-medium text-foreground/80">{t('todo.workspaceReady')}</span>
-            <span className="mt-1 max-w-[16rem] break-words text-xs">{t('file.emptyHint')}</span>
+            <span className="max-w-full break-words text-sm font-medium text-foreground/80">
+              {t('todo.workspaceReady')}
+            </span>
+            <span className="mt-1 max-w-[16rem] break-words text-xs">
+              {t('file.emptyHint')}
+            </span>
           </div>
         )}
 
@@ -1208,22 +1470,24 @@ export default function FileExplorer({
         />
       )}
 
-      {/* Drag overlay 闂?covers the entire file explorer */}
+      {/* Drag overlay - covers the entire file explorer */}
       {dragOverlay && !readonly && (
-        <div
-          className="absolute inset-0 z-40 flex items-center justify-center bg-primary-soft/70 pointer-events-none"
-        >
+        <div className="absolute inset-0 z-40 flex items-center justify-center bg-primary-soft/70 pointer-events-none">
           <div className="rounded-[20px] border border-border bg-card px-6 py-5 text-center shadow-sm">
             <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-[16px] bg-primary-soft text-primary">
               <Upload className="size-5" />
             </div>
-            <div className="max-w-[16rem] break-words text-sm font-semibold text-foreground">{t('file.dropToUpload')}</div>
-            <div className="mt-1 max-w-[16rem] break-words text-xs text-muted-foreground">{t('file.dropHint')}</div>
+            <div className="max-w-[16rem] break-words text-sm font-semibold text-foreground">
+              {t('file.dropToUpload')}
+            </div>
+            <div className="mt-1 max-w-[16rem] break-words text-xs text-muted-foreground">
+              {t('file.dropHint')}
+            </div>
           </div>
         </div>
       )}
 
-      {/* Upload progress bar 闂?pinned to the bottom of the file explorer */}
+      {/* Upload progress bar - pinned to the bottom of the file explorer */}
       {(uploadState.uploading || uploadState.done) && (
         <div
           className={`absolute bottom-0 left-0 right-0 z-30 flex items-center gap-2 border-t px-3 py-2 text-xs transition-all duration-300 ${
@@ -1243,7 +1507,9 @@ export default function FileExplorer({
               : `${t('file.uploading')} ${uploadState.count} ${t('file.files')}...`}
           </span>
           {!uploadState.done && (
-            <span className="shrink-0 tabular-nums">{uploadState.progress}%</span>
+            <span className="shrink-0 tabular-nums">
+              {uploadState.progress}%
+            </span>
           )}
           {!uploadState.done && (
             <div className="h-1 w-16 shrink-0 overflow-hidden rounded-full bg-muted">

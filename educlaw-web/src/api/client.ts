@@ -1,3 +1,5 @@
+import { getStoredAccessToken } from './token-storage';
+
 /**
  * Derive the path prefix so the app works behind reverse proxies with sub-paths.
  *
@@ -28,21 +30,23 @@ const API_BASE = (() => {
 
 function resolveUrl(url: string): string {
   if (url.startsWith('http')) return url;
-  if (API_BASE && (url === API_BASE || url.startsWith(`${API_BASE}/`))) return url;
+  if (API_BASE && (url === API_BASE || url.startsWith(`${API_BASE}/`)))
+    return url;
   return `${API_BASE}${url}`;
 }
 
-const TOKEN_KEY = 'educlaw-token';
-
 function createRequestId(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+  if (
+    typeof crypto !== 'undefined' &&
+    typeof crypto.randomUUID === 'function'
+  ) {
     return crypto.randomUUID();
   }
   return `req-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
 export function getToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY);
+  return getStoredAccessToken();
 }
 
 /** Low-level fetch with Authorization header */
@@ -62,7 +66,13 @@ async function readResponseError(res: Response): Promise<string> {
   const contentType = res.headers.get('content-type') || '';
   if (contentType.includes('application/json')) {
     const body = await res.json().catch(() => null);
-    if (body && typeof body === 'object' && 'error' in body && typeof body.error === 'string' && body.error.trim()) {
+    if (
+      body &&
+      typeof body === 'object' &&
+      'error' in body &&
+      typeof body.error === 'string' &&
+      body.error.trim()
+    ) {
       return body.error;
     }
   }
@@ -76,14 +86,19 @@ async function readResponseError(res: Response): Promise<string> {
 }
 
 /** Fetch JSON with automatic error handling */
-export async function apiFetchJson<T>(url: string, init?: RequestInit): Promise<T> {
+export async function apiFetchJson<T>(
+  url: string,
+  init?: RequestInit,
+): Promise<T> {
   const res = await apiFetch(url, init);
   if (!res.ok) {
     throw new Error(await readResponseError(res));
   }
   const contentType = res.headers.get('content-type') || '';
   if (!contentType.includes('application/json')) {
-    throw new Error(`Expected JSON response but received ${contentType || 'unknown content type'}`);
+    throw new Error(
+      `Expected JSON response but received ${contentType || 'unknown content type'}`,
+    );
   }
   return res.json();
 }
@@ -118,8 +133,14 @@ export { BASE, API_BASE };
 
 /** Match agent profiles against query text using BM25 */
 export function matchProfiles(text: string) {
-  return apiPost<{ profiles: Array<{ fileName: string; name: string; description: string; details?: string; source?: string; score: number }> }>(
-    `${API_BASE}/profiles/match`,
-    { text },
-  );
+  return apiPost<{
+    profiles: Array<{
+      fileName: string;
+      name: string;
+      description: string;
+      details?: string;
+      source?: string;
+      score: number;
+    }>;
+  }>(`${API_BASE}/profiles/match`, { text });
 }

@@ -31,7 +31,7 @@ services:
       - LLM_BASELINE_MODEL=${LLM_BASELINE_MODEL}
       - CONVERSATION_EVAL_BASE_URL=${CONVERSATION_EVAL_BASE_URL:-http://host.docker.internal:8090}
       - CONVERSATION_EVAL_SCENES_DIR=${CONVERSATION_EVAL_SCENES_DIR:-/data/educlaw-eval-scenes}
-      - APP_ORIGIN=${APP_ORIGIN:-http://app.localhost}
+      - APP_ORIGIN=${APP_ORIGIN:-http://eduskill.localhost}
       - SEED_USERS=${SEED_USERS:-false}
       - SEED_USER_NAMES=${SEED_USER_NAMES:-}
       - SEED_USER_PASSWORD=${SEED_USER_PASSWORD:-}
@@ -53,8 +53,6 @@ services:
       context: .
       dockerfile: educlaw-web/Dockerfile
     image: educlaw-web:latest
-    ports:
-      - "4173:80"
     environment:
       - API_UPSTREAM=http://educlaw-server:3000
     depends_on:
@@ -66,7 +64,7 @@ services:
 
 networks:
   auth-net:
-    name: auth-service-initial-upload_internal-net
+    name: ${AUTH_NETWORK_NAME:-auth-service_internal-net}
     external: true
 
 volumes:

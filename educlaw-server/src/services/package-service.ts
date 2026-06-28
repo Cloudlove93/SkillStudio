@@ -19,6 +19,8 @@ import {
   buildAgentUserPrompt,
   buildBaseMetadataSystemPrompt,
   buildBaseMetadataUserPrompt,
+  buildRubricBoundaryReviewSystemPrompt,
+  buildRubricBoundaryReviewUserPrompt,
   buildRubricSystemPrompt,
   buildRubricUserPrompt,
   buildSkillSystemPrompt,
@@ -62,10 +64,18 @@ interface PackageGeneratePreviewDelta {
   delta: string;
 }
 
+interface RubricBoundaryReviewResult {
+  decision: 'keep' | 'expand_up' | 'expand_down' | 'expand_both';
+  reason?: string;
+  linesUp?: number;
+  linesDown?: number;
+}
+
 const MAX_BASE_DOCUMENT_CHARS = 12_000;
 const MAX_SKILL_DOCUMENT_CHARS = 8_000;
 const MAX_GENERATED_SKILLS = 2;
-const MAX_SOURCE_RUBRIC_CHARS = 4_000;
+const MAX_SOURCE_RUBRIC_CHARS = 12_000;
+const MAX_GENERATED_PACKAGE_NAME_CHARS = 24;
 const RUBRIC_SECTION_KEYWORDS = [
   'rubric',
   'evaluation criteria',
@@ -80,6 +90,27 @@ const RUBRIC_SECTION_KEYWORDS = [
   '评价量表',
   '评分量表',
 ];
+
+const RUBRIC_SUPPORT_BOUNDARY_PATTERNS = [
+  /^(?:#{1,6}\s*)?分级描述(?:（.*?）|\(.*?\))?(?:[:：\s]|$)/i,
+  /^(?:#{1,6}\s*)?(?:案例对比|案例参考|正面案例|反面案例)(?:[:：\s]|$)/i,
+  /^(?:#{1,6}\s*)?(?:测试情景|测试场景|情景测试)(?:[:：\s]|$)/i,
+  /^(?:#{1,6}\s*)?(?:规范依据|政策依据|参考依据|法规依据)(?:[:：\s]|$)/i,
+  /^(?:#{1,6}\s*)?(?:附录|参考资料|参考文献|references?|appendix)(?:[:：\s]|$)/i,
+  /^\s*[6789]\s*[、.)）]\s*(?:案例对比|案例参考|测试情景|测试场景|规范依据|附录|参考资料)/i,
+];
+
+const RAW_RUBRIC_SECTION_PATTERNS = [
+  /^\s*##\s*原始\s*rubric\s*要点\s*$/i,
+  /^\s*原始\s*rubric\s*要点\s*$/i,
+  /^\s*##\s*原始\s*rubric\s*内容\s*$/i,
+  /^\s*原始\s*rubric\s*内容\s*$/i,
+  /^\s*##\s*原始评分内容\s*$/i,
+  /^\s*原始评分内容\s*$/i,
+];
+
+const RUBRIC_SIGNAL_PATTERN =
+  /(?:权重|占比|比例|分值|评分等级|评级标准|关键检查点|评估要点|评分要点|优秀|良好|合格|待改进|不合格|严重失误|满分标准|\d{1,3}\s*%|\|)/g;
 
 function ensureSkillIds(snapshot: AgentPackageSnapshot): AgentPackageSnapshot {
   const skills = Array.isArray(snapshot.skills) ? snapshot.skills : [];
@@ -159,30 +190,75 @@ function isRubricSectionHeading(line: string): boolean {
 function isLikelyNumberedSectionHeading(line: string): boolean {
   const trimmed = line.trim();
   if (!trimmed || trimmed.length > 50) return false;
-  if (trimmed.includes('。')) return false;
   return /^\d+[、.)）]\s*[\u4e00-\u9fffA-Za-z]/.test(trimmed);
+}
+
+function isRubricSupportBoundary(line: string): boolean {
+  const trimmed = line.trim();
+  if (!trimmed) return false;
+  return RUBRIC_SUPPORT_BOUNDARY_PATTERNS.some((pattern) =>
+    pattern.test(trimmed),
+  );
 }
 
 function isLikelyRubricBodyLine(line: string): boolean {
   const trimmed = line.trim();
   if (!trimmed) return false;
+  if (
+    isSupportOnlyLegacyHeading(line) ||
+    isLikelyRubricSupportSectionHeading(line) ||
+    isRubricSupportBoundary(line)
+  ) {
+    return false;
+  }
 
   return (
     /^(?:#{1,6}\s*)?(?:维度[一二三四五六七八九十百0-9]+|[①-⑨]|\d+[、.)）])/.test(
       trimmed,
     ) ||
-    /(?:权重|分值|评分等级|评级标准|关键检查点|评估要点|评分要点|优秀|良好|合格|待改进|不合格|严重失误|\b[1-5]分\b|\d{1,3}\s*%)/.test(
+    /(?:权重|占比|比例|分值|评分等级|评级标准|关键检查点|评估要点|评分要点|优秀|良好|合格|待改进|不合格|严重失误|\b[1-5]分\b|\d{1,3}\s*%|\|)/.test(
       trimmed,
     )
   );
 }
 
 function isLikelyRubricBoundaryLine(line: string): boolean {
-  const trimmed = line.trim();
-  if (!trimmed) return false;
-  return /^(?:#{1,6}\s*)?(?:附录|参考资料|参考文献|案例对比|其他部分|references?|appendix)\b/i.test(
-    trimmed,
+  return isRubricSupportBoundary(line);
+}
+
+function truncateByCodePoints(value: string, maxChars: number): string {
+  const chars = Array.from(value);
+  if (chars.length <= maxChars) return value;
+  return chars.slice(0, maxChars).join('');
+}
+
+function sanitizeGeneratedPackageName(name: string): string {
+  const normalized = name
+    .replace(/\s+/g, ' ')
+    .replace(/[：:;；，,。.!！?？]+$/u, '')
+    .trim();
+  if (!normalized) return '智能体助手';
+  return truncateByCodePoints(normalized, MAX_GENERATED_PACKAGE_NAME_CHARS).trim();
+}
+
+function isLikelyRubricSupportSectionHeading(line: string): boolean {
+  const normalized = normalizeSectionHeading(line);
+  if (!normalized) return false;
+  return (
+    /(?:案例对比|案例参考|正面案例|反面案例|对比案例|case comparison|case studies?|cases?)/i.test(
+      normalized,
+    ) ||
+    /(?:测试情景|测试场景|情景测试|应用情景|scenarios?|test cases?)/i.test(
+      normalized,
+    ) ||
+    /(?:规范依据|政策依据|参考依据|法规依据|课程标准|行动计划|standards?|policy basis|guidelines?)/i.test(
+      normalized,
+    )
   );
+}
+
+function isLikelyRubricContinuationHeading(line: string): boolean {
+  return isLikelyStandaloneRubricStart(line);
 }
 
 function isLikelyStandaloneRubricStart(line: string): boolean {
@@ -197,6 +273,37 @@ function isLikelyStandaloneRubricStart(line: string): boolean {
   );
 }
 
+function isStrongRubricCandidateStart(line: string): boolean {
+  const normalized = normalizeSectionHeading(line);
+  if (!normalized) return false;
+  return (
+    /^\d+\s*[、.)）]\s*(?:评价|评估|评分)(?:准则|标准|量表)/.test(line.trim()) ||
+    /^维度[一二三四五六七八九十百0-9]+[:：.]/.test(line.trim()) ||
+    /(?:^|[\s-])(evaluation criteria|rubric)(?:$|[\s-])/i.test(normalized) ||
+    /(?:评分|评估|评价)(?:标准|准则|量表)/.test(normalized)
+  );
+}
+
+function countRubricSignals(value: string): number {
+  return (value.match(RUBRIC_SIGNAL_PATTERN) || []).length;
+}
+
+function scoreRubricCandidate(headingLine: string, extracted: string): number {
+  let score = countRubricSignals(extracted);
+  const trimmedHeading = headingLine.trim();
+  if (/^\d+\s*[、.)）]\s*(?:评价|评估|评分)(?:准则|标准|量表)/.test(trimmedHeading)) {
+    score += 140;
+  } else if (isRubricSectionHeading(headingLine)) {
+    score += /^#{1,6}\s*rubric$/i.test(trimmedHeading) ? 40 : 110;
+  }
+  score += Math.min(
+    24,
+    (extracted.match(/^\s*(?:#{1,6}\s*)?(?:\d+[.)、]|[①-⑨]|维度)/gmu) || [])
+      .length * 4,
+  );
+  return score;
+}
+
 function collectRubricBlock(lines: string[], startIndex: number): string {
   const headingLevel = getMarkdownHeadingLevel(lines[startIndex] ?? '');
   const sectionLines: string[] = [];
@@ -206,9 +313,14 @@ function collectRubricBlock(lines: string[], startIndex: number): string {
     const currentLine = lines[cursor] ?? '';
     const currentHeadingLevel = getMarkdownHeadingLevel(currentLine);
     const rubricBodyLine = isLikelyRubricBodyLine(currentLine);
+    const rubricExampleHeading =
+      /^(?:#{1,6}\s*)?分级描述(?:（.*?）|\(.*?\))?(?:[:：\s]|$)/i.test(
+        currentLine.trim(),
+      );
 
     if (cursor > startIndex) {
-      if (isLikelyRubricBoundaryLine(currentLine)) break;
+      if (isLikelyRubricBoundaryLine(currentLine) || rubricExampleHeading)
+        break;
 
       if (
         headingLevel !== null &&
@@ -225,7 +337,7 @@ function collectRubricBlock(lines: string[], startIndex: number): string {
           rubricSignalCount > 0 &&
           isLikelyNumberedSectionHeading(currentLine) &&
           !rubricBodyLine &&
-          !isLikelyStandaloneRubricStart(currentLine)
+          !isLikelyRubricContinuationHeading(currentLine)
         ) {
           break;
         }
@@ -239,11 +351,47 @@ function collectRubricBlock(lines: string[], startIndex: number): string {
   return sectionLines.join('\n').trim();
 }
 
-function extractRubricSectionFromContent(content: string): string {
+function extractRawRubricSection(content: string): string {
+  const lines = content.split(/\r?\n/);
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index] ?? '';
+    if (!RAW_RUBRIC_SECTION_PATTERNS.some((pattern) => pattern.test(line))) {
+      continue;
+    }
+
+    return lines.slice(index + 1).join('\n').trim();
+  }
+
+  return '';
+}
+
+function extractRubricSectionFromText(content: string): string {
   const normalizedContent = content.trim();
   if (!normalizedContent) return '';
 
-  const lines = content.split(/\r?\n/);
+  const lines = normalizedContent.split(/\r?\n/);
+  const candidates: Array<{ extracted: string; score: number }> = [];
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index] ?? '';
+    if (!isRubricSectionHeading(line) && !isStrongRubricCandidateStart(line)) {
+      continue;
+    }
+
+    const extracted = collectRubricBlock(lines, index);
+    if (!extracted) continue;
+
+    const score = scoreRubricCandidate(line, extracted);
+    if (score > 0) {
+      candidates.push({ extracted, score });
+    }
+  }
+
+  if (candidates.length > 0) {
+    candidates.sort((left, right) => right.score - left.score);
+    return candidates[0]!.extracted;
+  }
 
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index] ?? '';
@@ -267,12 +415,50 @@ function extractRubricSectionFromContent(content: string): string {
     }
   }
 
-  if (hasConfiguredRubricText(normalizedContent)) return normalizedContent;
+  if (
+    countRubricSignals(normalizedContent) >= 2 &&
+    /(?:rubric|evaluation criteria|评分|评估|评价)/i.test(normalizedContent)
+  ) {
+    return normalizedContent;
+  }
 
   return '';
 }
 
-function buildSourceRubricExcerpt(
+function stripRubricSupportTail(content: string): string {
+  const normalized = content.trim();
+  if (!normalized) return '';
+
+  const lines = normalized.split(/\r?\n/);
+  const kept: string[] = [];
+
+  for (const line of lines) {
+    if (isRubricSupportBoundary(line)) break;
+    kept.push(line);
+  }
+
+  return kept.join('\n').trim() || normalized;
+}
+
+export function extractRubricSectionFromContent(content: string): string {
+  const normalizedContent = content.trim();
+  if (!normalizedContent) return '';
+
+  const rawRubricSection = extractRawRubricSection(normalizedContent);
+  if (rawRubricSection) {
+    const extractedRawRubric = extractRubricSectionFromText(rawRubricSection);
+    if (extractedRawRubric && countRubricSignals(extractedRawRubric) >= 2) {
+      return stripRubricSupportTail(extractedRawRubric);
+    }
+  }
+
+  const extracted = extractRubricSectionFromText(normalizedContent);
+  if (extracted) return stripRubricSupportTail(extracted);
+
+  return '';
+}
+
+export function buildSourceRubricExcerpt(
   documents?: Array<{ name: string; content: string }>,
   maxChars = MAX_SOURCE_RUBRIC_CHARS,
 ): string {
@@ -294,6 +480,168 @@ function buildSourceRubricExcerpt(
     remaining -= chunk.length;
     const truncated =
       chunk.length < extracted.length ? '\n[Rubric excerpt truncated]' : '';
+    parts.push(`${chunk}${truncated}`.trim());
+  }
+
+  return parts.join('\n\n').trim();
+}
+
+const CLEAN_RUBRIC_SUPPORT_BOUNDARIES = [...RUBRIC_SUPPORT_BOUNDARY_PATTERNS];
+
+function trimStoredRubricSupportSections(content: string): string {
+  const normalized = content.trim();
+  if (!normalized) return '';
+
+  const extracted = extractRubricSectionFromContent(normalized);
+  if (extracted && extracted !== normalized) {
+    return stripRubricSupportTail(extracted);
+  }
+
+  return stripRubricSupportTail(normalized);
+}
+
+function clampReviewLineCount(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(6, Math.floor(value)));
+}
+
+function locateExcerptLineRange(
+  content: string,
+  excerpt: string,
+): { start: number; end: number } | null {
+  const sourceLines = content.split(/\r?\n/);
+  const excerptLines = excerpt.split(/\r?\n/);
+  if (excerptLines.length === 0) return null;
+
+  for (let start = 0; start <= sourceLines.length - excerptLines.length; start += 1) {
+    let matched = true;
+    for (let offset = 0; offset < excerptLines.length; offset += 1) {
+      if ((sourceLines[start + offset] ?? '') !== excerptLines[offset]) {
+        matched = false;
+        break;
+      }
+    }
+    if (matched) {
+      return { start, end: start + excerptLines.length - 1 };
+    }
+  }
+
+  return null;
+}
+
+function applyBoundaryReviewExpansion(
+  content: string,
+  excerpt: string,
+  review: RubricBoundaryReviewResult,
+): string {
+  if (review.decision === 'keep') return excerpt;
+  const range = locateExcerptLineRange(content, excerpt);
+  if (!range) return excerpt;
+
+  const sourceLines = content.split(/\r?\n/);
+  const up = clampReviewLineCount(review.linesUp);
+  const down = clampReviewLineCount(review.linesDown);
+  const start = Math.max(0, range.start - up);
+  const end = Math.min(sourceLines.length - 1, range.end + down);
+  return sourceLines.slice(start, end + 1).join('\n').trim() || excerpt;
+}
+
+async function reviewRubricExtractionBoundary(
+  documentName: string,
+  content: string,
+  extracted: string,
+): Promise<string> {
+  if (!extracted) return '';
+
+  const range = locateExcerptLineRange(content, extracted);
+  if (!range) return extracted;
+
+  const sourceLines = content.split(/\r?\n/);
+  const leadingContext = sourceLines
+    .slice(Math.max(0, range.start - 4), range.start)
+    .join('\n')
+    .trim();
+  const trailingContext = sourceLines
+    .slice(range.end + 1, Math.min(sourceLines.length, range.end + 5))
+    .join('\n')
+    .trim();
+
+  if (!leadingContext && !trailingContext) return extracted;
+
+  try {
+    const raw = await generateChat(
+      [
+        {
+          role: 'system',
+          content: buildRubricBoundaryReviewSystemPrompt(),
+        },
+        {
+          role: 'user',
+          content: buildRubricBoundaryReviewUserPrompt({
+            documentName,
+            extractedRubric: extracted,
+            leadingContext,
+            trailingContext,
+          }),
+        },
+      ],
+      undefined,
+      0,
+    );
+    if (typeof raw !== 'string' || !raw.trim()) return extracted;
+    const parsed = JSON.parse(raw) as Partial<RubricBoundaryReviewResult>;
+    const decision = parsed.decision;
+    if (
+      decision !== 'keep' &&
+      decision !== 'expand_up' &&
+      decision !== 'expand_down' &&
+      decision !== 'expand_both'
+    ) {
+      return extracted;
+    }
+    const reviewed = applyBoundaryReviewExpansion(content, extracted, {
+      decision,
+      linesUp: parsed.linesUp,
+      linesDown: parsed.linesDown,
+      reason: parsed.reason,
+    });
+    return extractRubricSectionFromContent(reviewed) || reviewed || extracted;
+  } catch (error) {
+    getLogger({ component: 'package-generation' }).warn({
+      event: 'packages.generate.rubric.boundary_review_failed',
+      documentName,
+      error: safeError(error),
+    });
+    return extracted;
+  }
+}
+
+async function buildReviewedSourceRubricExcerpt(
+  documents?: Array<{ name: string; content: string }>,
+  maxChars = MAX_SOURCE_RUBRIC_CHARS,
+): Promise<string> {
+  if (!documents || documents.length === 0) return '';
+
+  const parts: string[] = [];
+  let remaining = maxChars;
+
+  for (let index = 0; index < documents.length; index += 1) {
+    if (remaining <= 0) break;
+
+    const document = documents[index];
+    const content = String(document?.content || '');
+    const extracted = extractRubricSectionFromContent(content);
+    if (!extracted) continue;
+
+    const reviewed = await reviewRubricExtractionBoundary(
+      String(document?.name || `Document ${index + 1}`),
+      content,
+      extracted,
+    );
+    const chunk = reviewed.slice(0, remaining);
+    remaining -= chunk.length;
+    const truncated =
+      chunk.length < reviewed.length ? '\n[Rubric excerpt truncated]' : '';
     parts.push(`${chunk}${truncated}`.trim());
   }
 
@@ -338,14 +686,10 @@ function stripMarkdownFence(value: string | undefined | null): string {
   return (match ? match[1] : trimmed).trim();
 }
 
-const RUBRIC_REQUIRED_HEADINGS = [
+const RUBRIC_REQUIRED_SECTIONS = [
   '# Rubric',
   '## 评分目标',
   '## 评分维度',
-  '### 角色贴合',
-  '### Skill 遵循',
-  '### 回答质量',
-  '### 安全边界',
   '## 使用说明',
 ];
 
@@ -353,30 +697,106 @@ function normalizeRubricMarkdown(rubricMd: string | undefined | null): string {
   return stripMarkdownFence(String(rubricMd || '')).trim();
 }
 
+function countCleanRubricDimensions(content: string): number {
+  const lines = content.split(/\r?\n/);
+  let count = 0;
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    if (CLEAN_RUBRIC_SUPPORT_BOUNDARIES.some((pattern) => pattern.test(line))) {
+      break;
+    }
+    if (
+      /^###\s+/.test(line) ||
+      /^(?:维度[一二三四五六七八九十百0-9]+|[①②③④⑤⑥⑦⑧⑨]|\d+\s*[、.)）])/.test(line)
+    ) {
+      count += 1;
+    }
+  }
+
+  return count;
+}
+
+function hasCleanScorableRubricStructure(content: string): boolean {
+  const trimmed = trimStoredRubricSupportSections(content);
+  const hasHeading =
+    /(?:评分|评估|评价)(?:标准|准则|量表)|rubric|evaluation criteria/i.test(
+      trimmed,
+    );
+  const hasDimensionSection =
+    /##\s*(评分维度|评估维度)/.test(trimmed) ||
+    /(?:^|\n)\s*(?:维度[一二三四五六七八九十百0-9]+|[①②③④⑤⑥⑦⑧⑨]|\d+\s*[、.)）])/.test(
+      trimmed,
+    );
+  const hasScoreSignals =
+    /(?:权重|占比|比例|分值|评分等级|评级标准|关键检查点|评估要点|评分要点|优秀|良好|合格|待改进|不合格|严重失误|满分标准|\d{1,3}\s*%|\|)/.test(
+      trimmed,
+    );
+
+  return (
+    hasHeading &&
+    hasDimensionSection &&
+    hasScoreSignals &&
+    countCleanRubricDimensions(trimmed) >= 1
+  );
+}
+
+export function normalizeStoredRubricMarkdown(
+  rubricMd: string | undefined | null,
+): string {
+  const normalized = normalizeRubricMarkdown(rubricMd);
+  if (!normalized) return '';
+  return trimStoredRubricSupportSections(normalized);
+}
+
 function hasLegacyRubricStructure(content: string): boolean {
-  const numberedSections = content.match(/^\s*\d+[.)、]\s+/gm) || [];
-  const hasScoringLanguage =
-    /评估要点|评分要点|评分标准|等级|优秀|良好|待改进|不合格/.test(content);
-  return numberedSections.length >= 4 && hasScoringLanguage;
+  const numberedSections = countScorableLegacyDimensionLines(content);
+  const hasHeaderSignals =
+    /评价准则|评估标准|评分标准|评价标准|Evaluation Criteria|Rubric/i.test(
+      content,
+    );
+  const hasStructuredScores =
+    /(?:\d{1,3}\s*%)|权重|等级|优秀|良好|合格|待改进|不合格|分值|评级标准|满分标准/.test(
+      content,
+    );
+  const hasNarrativeRubricShape =
+    numberedSections >= 3 &&
+    /整体评价|具体评价|应提供|评估要点|评分要点/.test(content);
+  return (
+    hasHeaderSignals &&
+    numberedSections >= 1 &&
+    (hasStructuredScores || hasNarrativeRubricShape)
+  );
 }
 
 function hasWeightedLegacyRubricStructure(content: string): boolean {
-  const numberedSections =
-    content.match(/^\s*(?:\d+[.)、]|[①②③④⑤⑥⑦⑧⑨⑩])\s*/gm) || [];
+  const numberedSections = countScorableLegacyDimensionLines(content);
+  const hasHeaderSignals =
+    /评价准则|评估标准|评分标准|评价标准|Evaluation Criteria|Rubric/i.test(
+      content,
+    );
   const hasScoringLanguage =
     /璇勪及瑕佺偣|璇勫垎瑕佺偣|璇勫垎鏍囧噯|璇勪环鍑嗗垯|璇勪及鏍囧噯|鏁翠綋璇勪环|鍏蜂綋璇勪环|鏉冮噸|绛夌骇|浼樼|鑹ソ|鍚堟牸|寰呮敼杩泑涓嶅悎鏍?|涓ラ噸澶辫|搴旀彁渚?/.test(
       content,
     );
-  return numberedSections.length >= 4 && hasScoringLanguage;
+  return hasHeaderSignals && numberedSections >= 1 && hasScoringLanguage;
 }
 
 function looksLikeWeightedRubric(content: string): boolean {
-  const dimensionHeadings =
-    content.match(/^\s*(?:[①②③④⑤⑥⑦⑧⑨⑩]|\d+[.)、])\s*[^\n]+$/gm) || [];
+  const dimensionHeadings = countScorableLegacyDimensionLines(content);
+  const hasHeaderSignals =
+    /评价准则|评估标准|评分标准|评价标准|Evaluation Criteria|Rubric/i.test(
+      content,
+    );
   const hasWeights = /(?:\d{1,3}\s*%)|权重|比例|占比/.test(content);
   const hasEvaluationShape =
-    /整体评价|具体评价|评价准则|评估标准|评分标准|应提供/.test(content);
-  return dimensionHeadings.length >= 4 && (hasWeights || hasEvaluationShape);
+    /整体评价|具体评价|应提供/.test(content);
+  return (
+    hasHeaderSignals &&
+    dimensionHeadings >= 1 &&
+    (hasWeights || hasEvaluationShape)
+  );
 }
 
 function hasTabularLegacyRubricStructure(content: string): boolean {
@@ -394,8 +814,8 @@ function hasTabularLegacyRubricStructure(content: string): boolean {
     hasHeaderSignals &&
     hasTableColumns &&
     hasGradeSignals &&
-    percentMatches.length >= 3 &&
-    content.length >= 120
+    percentMatches.length >= 1 &&
+    content.length >= 60
   );
 }
 
@@ -413,13 +833,13 @@ function hasCompactScorableRubricStructure(content: string): boolean {
     /优秀|良好|合格|待改进|不合格|满分标准|评分|score|Full score/i.test(content);
   const hasSummaryGoal =
     /Overall evaluation|整体评价|评分目标|评估目标|评价目标/i.test(content);
+  const hasWeightSignals = /(?:\d{1,3}\s*%)|权重|分值|评级标准/.test(content);
   const hasStructuredBody = /[-*]\s+/.test(content) || hasScoringSignals;
   return (
     hasDimensionSection &&
-    (markdownDimensions.length >= 2 ||
-      numberedDimensions.length >= 3 ||
-      (numberedDimensions.length >= 2 && hasSummaryGoal)) &&
-    hasStructuredBody
+    ((markdownDimensions.length >= 1 && hasStructuredBody) ||
+      (numberedDimensions.length >= 2 &&
+        (hasScoringSignals || hasSummaryGoal || hasWeightSignals)))
   );
 }
 
@@ -433,11 +853,39 @@ function hasScoreBandWeightedRubricStructure(content: string): boolean {
   const hasWeights = /权重|(?:\d{1,3}\s*%)/.test(content);
   const hasScoreBands = /分值|评级标准|(?:^|\s)[1-5]分(?:\s|$)/m.test(content);
   return (
-    dimensionHeadings.length >= 4 &&
+    dimensionHeadings.length >= 1 &&
     hasHeaderSignals &&
     hasWeights &&
     hasScoreBands
   );
+}
+
+function normalizeLegacyDimensionHeading(line: string): string {
+  return line
+    .trim()
+    .replace(/^(?:###\s*)?/, '')
+    .replace(/^(?:[①②③④⑤⑥⑦⑧⑨⑩]|\d+[.)、])\s*/, '')
+    .replace(/[:：].*$/, '')
+    .trim()
+    .toLowerCase();
+}
+
+function isSupportOnlyLegacyHeading(line: string): boolean {
+  const normalized = normalizeLegacyDimensionHeading(line);
+  if (!normalized) return false;
+  return (
+    /^(?:整体评价|具体评价)$/i.test(normalized) ||
+    isLikelyRubricSupportSectionHeading(line) ||
+    /(?:附录|参考资料|参考文献|注释|备注|其他说明|references?|appendix|notes?)/i.test(
+      normalized,
+    )
+  );
+}
+
+function countScorableLegacyDimensionLines(content: string): number {
+  const matches =
+    content.match(/^\s*(?:[①②③④⑤⑥⑦⑧⑨⑩]|\d+[.)、])\s*[^\n]+$/gm) || [];
+  return matches.filter((line) => !isSupportOnlyLegacyHeading(line)).length;
 }
 
 export function hasConfiguredRubricText(
@@ -446,6 +894,7 @@ export function hasConfiguredRubricText(
   const content = normalizeRubricMarkdown(rubricMd);
   if (!content) return false;
   return (
+    hasCleanScorableRubricStructure(content) ||
     validateRubricMarkdown(content).length === 0 ||
     hasLegacyRubricStructure(content) ||
     hasWeightedLegacyRubricStructure(content) ||
@@ -459,6 +908,8 @@ export function hasConfiguredRubricText(
 export function validateRubricMarkdown(rubricMd: string): string[] {
   const content = normalizeRubricMarkdown(rubricMd);
   if (!content) return ['rubric.md 不能为空'];
+  if (hasCleanScorableRubricStructure(content)) return [];
+  if (!content) return ['rubric.md 不能为空'];
   if (
     hasLegacyRubricStructure(content) ||
     hasWeightedLegacyRubricStructure(content) ||
@@ -471,7 +922,7 @@ export function validateRubricMarkdown(rubricMd: string): string[] {
   }
 
   const errors: string[] = [];
-  for (const heading of RUBRIC_REQUIRED_HEADINGS) {
+  for (const heading of RUBRIC_REQUIRED_SECTIONS) {
     if (!content.includes(heading)) {
       errors.push(`rubric.md 缺少必要章节：${heading}`);
     }
@@ -484,10 +935,107 @@ export function validateRubricMarkdown(rubricMd: string): string[] {
   return errors;
 }
 
+function extractRubricDimensionTitles(content: string): string[] {
+  const titles = new Set<string>();
+  const lines = content.split(/\r?\n/);
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) continue;
+
+    const markdownHeading = line.match(/^#{1,6}\s+(.+)$/);
+    if (markdownHeading) {
+      const title = markdownHeading[1]!.trim();
+      if (
+        title &&
+        !/^rubric$/i.test(title) &&
+        !/^评分(目标|维度)$/i.test(title) &&
+        !/^使用说明$/i.test(title)
+      ) {
+        titles.add(title.replace(/\s*\([^)]*\)\s*$/, '').trim());
+      }
+      continue;
+    }
+
+    const weightedTitle = line.match(
+      /^(?:维度[一二三四五六七八九十百0-9]+[:：]?\s*|[①②③④⑤⑥⑦⑧⑨⑩]|\d+[.)、]\s*)([^：:\n]+?)(?:\s*[（(].*?(?:权重|占比|%)?.*?[）)])?\s*$/,
+    );
+    if (weightedTitle?.[1]) {
+      titles.add(weightedTitle[1].trim());
+      continue;
+    }
+
+    const tableTitle = line.match(/^([^|]{2,60})\s+\d{1,3}%\s+/);
+    if (tableTitle?.[1]) {
+      titles.add(tableTitle[1].trim());
+    }
+  }
+
+  return [...titles].filter((title) => title.length >= 2).slice(0, 6);
+}
+
+function buildFallbackRubricMarkdown(input: {
+  packageName: string;
+  packageDescription: string;
+  sourceRubricExcerpt?: string;
+  rubricDraft?: string;
+}): string {
+  const source = normalizeRubricMarkdown(input.sourceRubricExcerpt);
+  const draft = normalizeRubricMarkdown(input.rubricDraft);
+  const preservedSource = source || draft;
+  const dimensionTitles = extractRubricDimensionTitles(preservedSource);
+  const fallbackTitles = [
+    '角色贴合',
+    'Skill 遵循',
+    '回答质量',
+    '安全边界',
+  ];
+  const mergedTitles = [...dimensionTitles];
+  for (const title of fallbackTitles) {
+    if (mergedTitles.length >= 4) break;
+    if (!mergedTitles.includes(title)) {
+      mergedTitles.push(title);
+    }
+  }
+  const finalTitles = mergedTitles.slice(0, 4);
+
+  const dimensionBlocks = finalTitles.flatMap((title, index) => {
+    const emphasis =
+      index === 0
+        ? '优先检查回答是否真正贴合当前智能体的任务场景、对象和目标。'
+        : index === finalTitles.length - 1
+          ? '如原始 rubric 涉及风险边界、转介、禁区或不可越界事项，应优先遵循这些要求。'
+          : '优先遵循原始 rubric 中与该维度相关的权重、等级描述、案例和限制条件。';
+    return [`### ${title}`, `- ${emphasis}`, '- 如原始 rubric 中有更细规则，评分时以原文为准。', ''];
+  });
+
+  const preservedSection = preservedSource
+    ? ['', '## 原始 rubric 要点', preservedSource]
+    : [];
+
+  return [
+    '# Rubric',
+    '',
+    '## 评分目标',
+    `- 用于评估 ${input.packageName} 的回答是否贴合任务、可执行并保持必要的安全边界。`,
+    `- 结合智能体定位“${input.packageDescription}”进行评分，优先保留用户原始 rubric 的维度与要求。`,
+    '',
+    '## 评分维度',
+    ...dimensionBlocks,
+    '## 使用说明',
+    '- 先判断回答是否完成用户任务，再逐项评分并给出简短结论。',
+    '- 如果原始 rubric 中包含权重、等级、案例、规范依据或禁止事项，评分时优先遵循这些内容。',
+    '- 当原始 rubric 结构不完整时，可先按本页结构评分，再参考下方原始内容补充判断。',
+    ...preservedSection,
+  ]
+    .join('\n')
+    .trim();
+}
+
 export function sanitizeGeneratedRubricMarkdown(
   rubricMd: string | undefined | null,
 ): string {
-  const content = normalizeRubricMarkdown(rubricMd);
+  const content = normalizeStoredRubricMarkdown(rubricMd);
   if (!content) return '';
   return validateRubricMarkdown(content).length === 0 ? content : '';
 }
@@ -566,6 +1114,7 @@ async function generateRubricWithRepair(
     agentExcerpt: string;
     sourceRubricExcerpt: string;
     useStream?: boolean;
+    mode?: 'repair' | 'optimize';
   },
   onPreviewDelta?: (delta: PackageGeneratePreviewDelta) => void,
 ): Promise<string> {
@@ -576,11 +1125,12 @@ async function generateRubricWithRepair(
     agentExcerpt,
     sourceRubricExcerpt,
     useStream = true,
+    mode = 'repair',
   } = input;
   const normalizedSource = normalizeRubricMarkdown(sourceRubricExcerpt);
   const hasUsableSource = hasConfiguredRubricText(normalizedSource);
 
-  if (hasUsableSource) {
+  if (hasUsableSource && mode === 'repair') {
     return normalizedSource;
   }
 
@@ -592,9 +1142,11 @@ async function generateRubricWithRepair(
       agentExcerpt,
       sourceRubricExcerpt: normalizedSource,
       rubricDraft:
-        normalizedDraftInput && normalizedDraftInput !== normalizedSource
+        normalizedDraftInput &&
+        (mode === 'optimize' || normalizedDraftInput !== normalizedSource)
           ? normalizedDraftInput
           : undefined,
+      mode,
     });
     const request = {
       model,
@@ -604,7 +1156,9 @@ async function generateRubricWithRepair(
         : [
             userPrompt,
             '',
-            'Keep the repaired rubric concise.',
+            mode === 'optimize'
+              ? 'Keep the optimized rubric concise and directly scorable.'
+              : 'Keep the repaired rubric concise.',
             'Preserve the original dimensions and constraints, but summarize long prose instead of repeating it verbatim.',
             'Limit each scoring dimension to a short heading plus up to 3 compact bullets.',
           ].join('\n'),
@@ -627,7 +1181,9 @@ async function generateRubricWithRepair(
 
   let rubricDraft = '';
   try {
-    rubricDraft = await requestRubricText(normalizedSource || undefined);
+    rubricDraft = await requestRubricText(
+      mode === 'optimize' ? normalizedSource : normalizedSource || undefined,
+    );
   } catch (error) {
     getLogger({ component: 'package-generation' }).warn({
       event: 'packages.generate.rubric.skipped',
@@ -640,7 +1196,7 @@ async function generateRubricWithRepair(
     return normalizedDraft;
   }
 
-  if (normalizedDraft && !normalizedSource) {
+  if (normalizedDraft && (mode === 'optimize' || !normalizedSource)) {
     try {
       const repaired = await requestRubricText(normalizedDraft);
       if (hasConfiguredRubricText(repaired)) {
@@ -668,6 +1224,21 @@ async function generateRubricWithRepair(
         error: safeError(error),
       });
     }
+  }
+
+  const fallbackRubric = buildFallbackRubricMarkdown({
+    packageName,
+    packageDescription,
+    sourceRubricExcerpt: normalizedSource,
+    rubricDraft: rubricDraft || normalizedDraft,
+  });
+  if (hasConfiguredRubricText(fallbackRubric)) {
+    getLogger({ component: 'package-generation' }).info({
+      event: 'packages.generate.rubric.fallback_used',
+      hasSourceRubric: Boolean(normalizedSource),
+      hasDraftRubric: Boolean(normalizedDraft),
+    });
+    return fallbackRubric;
   }
 
   return resolveRubricMarkdown(rubricDraft, normalizedSource);
@@ -740,7 +1311,7 @@ function normalizeSnapshot(
     description: input.description.trim(),
     versionLabel: 'v1',
     agentMd: input.agentMd.trim(),
-    rubricMd: normalizeRubricMarkdown(input.rubricMd),
+    rubricMd: normalizeStoredRubricMarkdown(input.rubricMd),
     skills: input.skills.map((skill) => ({
       id: newId(),
       dirName: slugify(skill.dirName || skill.name),
@@ -799,7 +1370,7 @@ function createFallbackBase(
     : '用于根据用户需求和上传资料完成分析、生成与答疑任务。';
 
   return {
-    name,
+    name: sanitizeGeneratedPackageName(name),
     description,
     skills: [
       {
@@ -826,8 +1397,8 @@ function normalizeBaseMetadataJson(
   return {
     name:
       typeof parsed.name === 'string' && parsed.name.trim()
-        ? parsed.name
-        : fallback.name,
+        ? sanitizeGeneratedPackageName(parsed.name)
+        : sanitizeGeneratedPackageName(fallback.name),
     description:
       typeof parsed.description === 'string' && parsed.description.trim()
         ? parsed.description
@@ -1227,7 +1798,7 @@ export async function generatePackage(
     documents,
     MAX_SKILL_DOCUMENT_CHARS,
   );
-  const sourceRubricExcerpt = buildSourceRubricExcerpt(documents);
+  const sourceRubricExcerpt = await buildReviewedSourceRubricExcerpt(documents);
   const hasInstruction = instruction.trim().length > 0;
 
   getLogger({ component: 'package-generation' }).info({
@@ -1689,6 +2260,7 @@ export async function applyOptimizedSnapshot(
     ...snapshot,
     name: snapshot.name || pkg.name,
     description: snapshot.description || pkg.description,
+    rubricMd: normalizeStoredRubricMarkdown(snapshot.rubricMd),
     versionLabel: `v${nextVersion}`,
   });
 
@@ -1719,13 +2291,26 @@ export async function repairPackageRubric(
   model?: string,
 ) {
   const pkg = await getPackage(userId, packageId);
-  const currentRubric = normalizeRubricMarkdown(pkg.snapshot.rubricMd);
+  const currentRawRubric = normalizeRubricMarkdown(pkg.snapshot.rubricMd);
+  const currentRubric = normalizeStoredRubricMarkdown(pkg.snapshot.rubricMd);
 
-  if (!currentRubric) {
-    throw new Error('当前还没有可修复的 rubric。请先导入或填写 rubric 内容。');
-  }
+  if (currentRubric && hasConfiguredRubricText(currentRubric)) {
+    if (currentRubric !== currentRawRubric) {
+      const nextSnapshot: AgentPackageSnapshot = {
+        ...pkg.snapshot,
+        rubricMd: currentRubric,
+        skills: pkg.snapshot.skills.map((skill) => ({ ...skill })),
+      };
 
-  if (hasConfiguredRubricText(currentRubric)) {
+      return applyOptimizedSnapshot(
+        userId,
+        packageId,
+        nextSnapshot,
+        'optimized',
+        'AI 修复 rubric.md',
+      );
+    }
+
     return pkg;
   }
 
@@ -1744,13 +2329,13 @@ export async function repairPackageRubric(
     );
   }
 
-  if (normalizeRubricMarkdown(repairedRubric) === currentRubric) {
+  if (normalizeStoredRubricMarkdown(repairedRubric) === currentRubric) {
     throw new Error('AI 没有产出新的 rubric 内容，请稍后重试。');
   }
 
   const nextSnapshot: AgentPackageSnapshot = {
     ...pkg.snapshot,
-    rubricMd: normalizeRubricMarkdown(repairedRubric),
+    rubricMd: normalizeStoredRubricMarkdown(repairedRubric),
     skills: pkg.snapshot.skills.map((skill) => ({ ...skill })),
   };
 
@@ -1760,6 +2345,71 @@ export async function repairPackageRubric(
     nextSnapshot,
     'optimized',
     'AI 修复 rubric.md',
+  );
+}
+
+export async function optimizePackageRubric(
+  userId: string,
+  packageId: string,
+  model?: string,
+) {
+  const pkg = await getPackage(userId, packageId);
+  const currentRawRubric = normalizeRubricMarkdown(pkg.snapshot.rubricMd);
+  const currentRubric = normalizeStoredRubricMarkdown(pkg.snapshot.rubricMd);
+
+  if (currentRubric && hasConfiguredRubricText(currentRubric)) {
+    if (currentRubric !== currentRawRubric) {
+      const nextSnapshot: AgentPackageSnapshot = {
+        ...pkg.snapshot,
+        rubricMd: currentRubric,
+        skills: pkg.snapshot.skills.map((skill) => ({ ...skill })),
+      };
+
+      return applyOptimizedSnapshot(
+        userId,
+        packageId,
+        nextSnapshot,
+        'optimized',
+        'AI 优化 rubric.md',
+      );
+    }
+  } else {
+    return repairPackageRubric(userId, packageId, model);
+  }
+
+  const optimizedRubric = await generateRubricWithRepair({
+    model,
+    packageName: pkg.snapshot.name,
+    packageDescription: pkg.snapshot.description,
+    agentExcerpt: pkg.snapshot.agentMd.slice(0, 1800),
+    sourceRubricExcerpt: currentRubric,
+    useStream: false,
+    mode: 'optimize',
+  });
+
+  if (!hasConfiguredRubricText(optimizedRubric)) {
+    throw new Error(
+      'AI 未能把当前 rubric 优化成可评分格式，请稍后重试或手动编辑。',
+    );
+  }
+
+  const normalizedOptimized = normalizeStoredRubricMarkdown(optimizedRubric);
+  if (normalizedOptimized === currentRubric) {
+    throw new Error('AI 没有产出新的 rubric 内容，请稍后重试。');
+  }
+
+  const nextSnapshot: AgentPackageSnapshot = {
+    ...pkg.snapshot,
+    rubricMd: normalizedOptimized,
+    skills: pkg.snapshot.skills.map((skill) => ({ ...skill })),
+  };
+
+  return applyOptimizedSnapshot(
+    userId,
+    packageId,
+    nextSnapshot,
+    'optimized',
+    'AI 优化 rubric.md',
   );
 }
 
@@ -1796,13 +2446,19 @@ export async function applyManualMarkdownEdit(
   }
 
   if (input.target === 'rubric') {
-    const rubricErrors = validateRubricMarkdown(content);
-    if (rubricErrors.length > 0) {
-      throw new Error(rubricErrors.join('\n'));
-    }
-    if (content === pkg.snapshot.rubricMd.trim())
+    const currentRawRubric = pkg.snapshot.rubricMd.trim();
+    const normalizedCurrentRubric = normalizeStoredRubricMarkdown(
+      pkg.snapshot.rubricMd,
+    );
+    const normalizedNextRubric =
+      normalizeStoredRubricMarkdown(content) || content;
+    if (
+      normalizedNextRubric === normalizedCurrentRubric &&
+      currentRawRubric === normalizedNextRubric
+    ) {
       throw new Error('内容没有变化，无需保存新版本');
-    nextSnapshot.rubricMd = content;
+    }
+    nextSnapshot.rubricMd = normalizedNextRubric;
     return applyOptimizedSnapshot(
       userId,
       packageId,

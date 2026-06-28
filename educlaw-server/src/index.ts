@@ -6,7 +6,6 @@ import { getLogger } from "./lib/request-context.js";
 import { safeError } from "./lib/logger.js";
 import { withRequestContext } from "./middleware/request-context.js";
 import { initDb } from "./services/db.js";
-import { seedUsers } from "./services/auth-service.js";
 import apiRoutes from "./routes/index.js";
 import compatRoutes from "./routes/compat.js";
 
@@ -45,7 +44,6 @@ app.use((err: unknown, req: express.Request, res: express.Response, next: expres
 });
 
 await initDb();
-await seedUsers();
 app.listen(config.port, () => {
   getLogger({ port: config.port }).info("server.listen");
 });

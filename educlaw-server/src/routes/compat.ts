@@ -6,7 +6,12 @@ import { listPackages, getPackage, generatePackage, deletePackage, exportPackage
 import { listThreads, createThread, getThreadDetail, sendMessage, streamMessage, generateReport } from "../services/arena-service.js";
 import { optimizePackage } from "../services/optimization-service.js";
 import { config } from "../config.js";
-import { initSse, writeSseEvent } from "../utils/sse.js";
+import {
+  initSse,
+  startSseHeartbeat,
+  stopSseHeartbeat,
+  writeSseEvent,
+} from "../utils/sse.js";
 
 const router: import("express").Router = Router();
 
@@ -334,6 +339,14 @@ router.post("/arena/chat/sessions/:sessionId/messages", requireAuth, async (req,
 
 router.post("/arena/chat/sessions/:sessionId/messages/stream", requireAuth, async (req: Request, res: Response) => {
   initSse(res);
+  const heartbeat = startSseHeartbeat(
+    res,
+    Number(
+      process.env.COMPAT_ARENA_STREAM_HEARTBEAT_MS ||
+        process.env.ARENA_STREAM_HEARTBEAT_MS ||
+        "15000",
+    ),
+  );
   try {
     const userId = pickUserId(req);
     const content = String(req.body?.content || "").trim();
@@ -376,6 +389,7 @@ router.post("/arena/chat/sessions/:sessionId/messages/stream", requireAuth, asyn
   } catch (error) {
     writeSseEvent(res, "error", { error: error instanceof Error ? error.message : "Stream failed" });
   } finally {
+    stopSseHeartbeat(heartbeat);
     res.end();
   }
 });

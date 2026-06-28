@@ -1,4 +1,4 @@
-import type { ArenaReport } from "@educlaw/shared";
+﻿import type { ArenaReport } from '@educlaw/shared';
 
 export interface ArenaReportRow {
   key: string;
@@ -13,31 +13,35 @@ export interface ArenaReportRow {
 }
 
 export interface ArenaReportSideCard {
-  key: "baseline" | "enhanced";
+  key: 'baseline' | 'enhanced';
   label: string;
   total: number;
   summary: string;
 }
 
 export function formatArenaReportWinner(
-  winningSide: ArenaReport["winningSide"],
+  winningSide: ArenaReport['winningSide'],
   packageName: string,
 ): string {
-  if (winningSide === "baseline") {
-    return "基础模型";
+  if (winningSide === 'baseline') {
+    return '基础模型';
   }
-  if (winningSide === "enhanced") {
+  if (winningSide === 'enhanced') {
     return packageName;
   }
-  return "平局";
+  return '平局';
 }
 
 export function buildArenaReportRows(report: ArenaReport): ArenaReportRow[] {
   const baselineByKey = new Map(
-    report.baseline.dimensions.map((dimension) => [dimension.key, dimension] as const),
+    report.baseline.dimensions.map(
+      (dimension) => [dimension.key, dimension] as const,
+    ),
   );
   const enhancedByKey = new Map(
-    report.enhanced.dimensions.map((dimension) => [dimension.key, dimension] as const),
+    report.enhanced.dimensions.map(
+      (dimension) => [dimension.key, dimension] as const,
+    ),
   );
   const orderedKeys = [
     ...report.baseline.dimensions.map((dimension) => dimension.key),
@@ -59,10 +63,10 @@ export function buildArenaReportRows(report: ArenaReport): ArenaReportRow[] {
       name,
       baselineScore,
       baselineMaxScore: baseline?.maxScore ?? fallbackMaxScore,
-      baselineReason: baseline?.reason ?? "",
+      baselineReason: baseline?.reason ?? '',
       enhancedScore,
       enhancedMaxScore: enhanced?.maxScore ?? fallbackMaxScore,
-      enhancedReason: enhanced?.reason ?? "",
+      enhancedReason: enhanced?.reason ?? '',
       diff: enhancedScore - baselineScore,
     };
   });
@@ -74,13 +78,13 @@ export function buildArenaReportSideCards(
 ): ArenaReportSideCard[] {
   return [
     {
-      key: "baseline",
-      label: "Baseline",
+      key: 'baseline',
+      label: 'Baseline',
       total: report.baseline.total,
       summary: report.baseline.summary,
     },
     {
-      key: "enhanced",
+      key: 'enhanced',
       label: enhancedLabel,
       total: report.enhanced.total,
       summary: report.enhanced.summary,

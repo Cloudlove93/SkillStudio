@@ -1,4 +1,4 @@
-import type { AgentPackageSnapshot } from "@educlaw/shared";
+﻿import type { AgentPackageSnapshot } from "@educlaw/shared";
 import { generateChat, type ChatMessage } from "./llm-service.js";
 import { getPackage, applyOptimizedSnapshot } from "./package-service.js";
 import { getThreadDetail } from "./arena-service.js";
@@ -368,6 +368,44 @@ function extractFrontmatterValue(text: string, key: string): string | null {
   return value.replace(/^["']|["']$/g, "");
 }
 
+function normalizeAdoptedSkillMarkdown(
+  modified: string,
+  currentSkill: AgentPackageSnapshot["skills"][number],
+): { skillMd: string; frontmatterName: string; frontmatterDescription: string } {
+  const trimmed = modified.trim();
+  const currentFrontmatterMatch = currentSkill.skillMd.match(/^---\s*\n[\s\S]*?\n---\s*\n?/);
+  const currentName = extractFrontmatterValue(currentSkill.skillMd, "name");
+  const currentDescription = extractFrontmatterValue(currentSkill.skillMd, "description");
+
+  const modifiedFrontmatterMatch = trimmed.match(/^---\s*\n[\s\S]*?\n---\s*\n?/);
+  const modifiedBody = modifiedFrontmatterMatch
+    ? trimmed.slice(modifiedFrontmatterMatch[0].length).trimStart()
+    : trimmed;
+  const modifiedName = extractFrontmatterValue(trimmed, "name");
+  const modifiedDescription = extractFrontmatterValue(trimmed, "description");
+
+  const frontmatterName = modifiedName || currentName;
+  const frontmatterDescription = modifiedDescription || currentDescription;
+  if (!frontmatterName || !frontmatterDescription) {
+    throw new Error("SKILL.md 必须保留 YAML frontmatter，并包含 name 和 description");
+  }
+
+  const frontmatter = `---\nname: ${frontmatterName}\ndescription: ${frontmatterDescription}\n---`;
+  const skillMd = (modifiedFrontmatterMatch || currentFrontmatterMatch)
+    ? `${frontmatter}\n\n${modifiedBody}`.trim()
+    : trimmed;
+
+  if (!skillMd.startsWith("---")) {
+    throw new Error("SKILL.md 必须保留 YAML frontmatter，并包含 name 和 description");
+  }
+
+  return {
+    skillMd,
+    frontmatterName,
+    frontmatterDescription,
+  };
+}
+
 function buildInteractiveSnapshotFromAdoptions(
   pkg: Awaited<ReturnType<typeof getPackage>>,
   adoptedChanges: AdoptedChange[],
@@ -408,17 +446,13 @@ function buildInteractiveSnapshotFromAdoptions(
       const currentSkill = nextSnapshot.skills[skillIndex]!;
       if (modified === currentSkill.skillMd.trim()) continue;
 
-      const fmName = extractFrontmatterValue(modified, "name");
-      const fmDescription = extractFrontmatterValue(modified, "description");
-      if (!modified.startsWith("---") || !fmName || !fmDescription) {
-        throw new Error("SKILL.md 必须保留 YAML frontmatter，并包含 name 和 description");
-      }
+      const normalized = normalizeAdoptedSkillMarkdown(modified, currentSkill);
 
       nextSnapshot.skills[skillIndex] = {
         ...currentSkill,
-        name: fmName,
-        description: fmDescription,
-        skillMd: modified,
+        name: normalized.frontmatterName,
+        description: normalized.frontmatterDescription,
+        skillMd: normalized.skillMd,
       };
       changed = true;
     }

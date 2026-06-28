@@ -1,4 +1,4 @@
-const zh = {
+﻿const zh = {
   // ─── sidebar / AgentList ───
   'sidebar.platform': 'AI 教育智能体平台',
   'sidebar.agentRepo': '智能体仓库',
@@ -19,7 +19,8 @@ const zh = {
   'sidebar.workspaceConsole': '工作台总览',
   'sidebar.workspaceConsoleReadonly': '只读工作台',
   'sidebar.workspaceConsoleLiveDesc': '会话记录与工作区文件已接入实时浏览。',
-  'sidebar.workspaceConsoleIdleDesc': '启动智能体后，这里会解锁会话与文件工作区。',
+  'sidebar.workspaceConsoleIdleDesc':
+    '启动智能体后，这里会解锁会话与文件工作区。',
   'sidebar.liveData': '实时数据',
   'sidebar.standby': '待命中',
   'sidebar.settingsHint': '语言、工作流与平台偏好。',
@@ -35,7 +36,8 @@ const zh = {
   'session.unshare': '取消分享',
   'session.share.title': '分享对话',
   'session.share.descShared': '该对话已公开发布，任何拥有链接的人都可以查看。',
-  'session.share.descUnshared': '将对话公开发布到网络，任何拥有链接的人都可以查看。',
+  'session.share.descUnshared':
+    '将对话公开发布到网络，任何拥有链接的人都可以查看。',
   'session.share.publish': '发布',
   'session.share.publishing': '发布中...',
   'session.share.unpublish': '取消发布',
@@ -99,14 +101,17 @@ const zh = {
   // ─── AgentSettings ───
   'agentSettings.title': '项目设置',
   'agentSettings.public': '公开项目',
-  'agentSettings.publicDesc': '开启后，同服务器所有用户可浏览文件和对话历史（只读）',
+  'agentSettings.publicDesc':
+    '开启后，同服务器所有用户可浏览文件和对话历史（只读）',
 
   // ─── BuildAgentDialog ───
   'build.title': '生成 Agent / Skill',
-  'build.description': '描述你的需求，AI 会先判断更适合生成独立 skill 还是完整 agent。',
+  'build.description':
+    '描述你的需求，AI 会先判断更适合生成独立 skill 还是完整 agent。',
   'build.model': '模型',
   'build.scenarioLabel': '任务/需求描述',
-  'build.scenarioPlaceholder': '例如：初中物理浮力实验指导，帮助学生理解阿基米德原理...',
+  'build.scenarioPlaceholder':
+    '例如：初中物理浮力实验指导，帮助学生理解阿基米德原理...',
   'build.waitingLLM': '正在等待模型响应...',
   'build.selectingSkills': 'AI 正在选择技能...',
   'build.generatingProfile': 'AI 正在生成内容...',
@@ -118,7 +123,8 @@ const zh = {
   'build.back': '返回',
   'build.confirm': '确认',
   'build.done': '构建完成！',
-  'build.networkError': '无法连接到服务器，请检查网络连接或服务端是否正常运行。',
+  'build.networkError':
+    '无法连接到服务器，请检查网络连接或服务端是否正常运行。',
   'build.unknownError': '发生未知错误，请重试。',
   'build.nameLabel': '名称',
   'build.descLabel': '描述',
@@ -138,7 +144,8 @@ const zh = {
   'build.viewDetails': '查看技术详情',
   'build.modeQuick': '一句话',
   'build.modeDetailed': '文件',
-  'build.detailedHint': '上传任务描述文件，AI 会先判断更适合生成独立 skill 还是完整 agent，再继续构建',
+  'build.detailedHint':
+    '上传任务描述文件，AI 会先判断更适合生成独立 skill 还是完整 agent，再继续构建',
   'build.dropFile': '拖拽或点击上传任务描述文件',
   'build.acceptedFormats': '支持 .txt、.md 格式',
   'build.fileSelected': '已选择文件',
@@ -154,7 +161,8 @@ const zh = {
   'build.batchPending': '等待构建',
   'build.batchSelectFile': '选择左侧文件查看详情',
   'build.batchCreateProject': '创建项目',
-  'build.autoDecisionHint': '系统会先分析你的输入，再决定这次更适合生成独立 skill，还是带多个 skill 的 agent。',
+  'build.autoDecisionHint':
+    '系统会先分析你的输入，再决定这次更适合生成独立 skill，还是带多个 skill 的 agent。',
   'build.autoDecisionTitle': '自动判断产物类型',
   'build.openSkill': '打开技能',
 
@@ -427,7 +435,8 @@ const zh = {
   'home.slogan': '你的学习智能体平台',
   'home.heroBadge': 'IAIE 工作台首页',
   'home.focusTitle': '工作台聚焦',
-  'home.focusDesc': '打开学习与资源工作台、管理已有智能体，并在同一个清晰工作台中完成核心操作',
+  'home.focusDesc':
+    '打开学习与资源工作台、管理已有智能体，并在同一个清晰工作台中完成核心操作',
   'home.startChat': '开始对话',
   'home.moduleEntry': '功能入口',
   'home.frequentWorkbench': '常用工作台',
@@ -471,16 +480,19 @@ const zh = {
   'home.saveToDiaryFail': '保存失败，请重试',
   'home.savingToDiary': '正在总结...',
   'home.suggestionsLoading': '正在生成推荐问题',
-  'home.suggestionsLoadingHint': 'AI 正在整理接下来最适合继续追问的方向，请稍候片刻。',
+  'home.suggestionsLoadingHint':
+    'AI 正在整理接下来最适合继续追问的方向，请稍候片刻。',
 
   // ─── AgentProfileWorkflow page ───
   'workflow.header': 'AgentProfile 工作流',
   'workflow.heroTitle': '一句话创建 Agent',
-  'workflow.heroSubtitle': '描述你的教学场景，Agent 构造器自动生成完整、结构化的 AgentProfile，匹配教学工具与技能，即刻投入使用。',
+  'workflow.heroSubtitle':
+    '描述你的教学场景，Agent 构造器自动生成完整、结构化的 AgentProfile，匹配教学工具与技能，即刻投入使用。',
   'workflow.viewSpec': '查看 AgentProfile 开源规范',
   'workflow.step1Title': '一句话指令',
   'workflow.step1Subtitle': '用自然语言描述你需要的 Agent',
-  'workflow.step1Example': '"一个高中数学辅导助手，擅长函数与导数、概率统计，能根据学生水平自适应讲解难度。"',
+  'workflow.step1Example':
+    '"一个高中数学辅导助手，擅长函数与导数、概率统计，能根据学生水平自适应讲解难度。"',
   'workflow.step2Title': 'Agent 构造器',
   'workflow.step2Subtitle': '分析指令，自动生成 Profile 并匹配资源',
   'workflow.step2a': '生成身份',
@@ -503,8 +515,10 @@ const zh = {
   'workflow.outputTitle': '输出格式',
   'workflow.outputDesc': '讲解步骤、反馈结构',
   'workflow.step4Title': '多 Agent 协作',
-  'workflow.step4Subtitle': '通过 subagents 字段将复杂工作流拆分给专业化的 subagent',
-  'workflow.step4Desc': 'Subagent 也是完整的 AgentProfile 文档，拥有独立的工具、技能和行为规范。主 Agent 根据任务类型自动委派。',
+  'workflow.step4Subtitle':
+    '通过 subagents 字段将复杂工作流拆分给专业化的 subagent',
+  'workflow.step4Desc':
+    'Subagent 也是完整的 AgentProfile 文档，拥有独立的工具、技能和行为规范。主 Agent 根据任务类型自动委派。',
   'workflow.mainAgent': '课程辅导 Agent',
   'workflow.mainAgentDesc': '主 Agent \u00b7 统一接收学生问题并分发',
   'workflow.subQuiz': '出题 subagent',
@@ -520,8 +534,10 @@ const zh = {
 
   // ─── JSON preview in workflow (left untranslated — demo content) ───
   'workflow.jsonName': '高中数学辅导助手',
-  'workflow.jsonDesc': '专注高中数学辅导的 AI 助手，覆盖函数与导数、概率统计等核心模块，支持自适应难度讲解。',
-  'workflow.jsonDetails': '## 角色定位\\n\\n作为高中数学辅导专家，以耐心引导的方式帮助学生...',
+  'workflow.jsonDesc':
+    '专注高中数学辅导的 AI 助手，覆盖函数与导数、概率统计等核心模块，支持自适应难度讲解。',
+  'workflow.jsonDetails':
+    '## 角色定位\\n\\n作为高中数学辅导专家，以耐心引导的方式帮助学生...',
 
   // ─── Auth ───
   'auth.loginSubtitle': '登录到 EduClaw',
@@ -610,7 +626,8 @@ const zh = {
   'optimize.history': '历史记录',
   'optimize.refresh': '刷新',
   'optimize.empty': '暂无优化记录',
-  'optimize.emptyHint': '可从 profile、skill、agent 详情页发起，或在聊天中使用 /optimize-* 指令。',
+  'optimize.emptyHint':
+    '可从 profile、skill、agent 详情页发起，或在聊天中使用 /optimize-* 指令。',
   'optimize.generating': '正在生成优化建议，请稍候...',
   'optimize.noSelection': '请选择左侧的一条记录查看详情。',
   'optimize.noSuggestions': '本次运行没有产出可应用的建议。',

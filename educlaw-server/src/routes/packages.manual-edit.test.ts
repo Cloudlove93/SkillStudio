@@ -3,7 +3,6 @@ import express from "express";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const applyManualMarkdownEditMock = vi.fn();
-const verifyTokenMock = vi.fn(() => ({ sub: "user-1" }));
 
 async function createApp() {
   vi.resetModules();
@@ -29,9 +28,6 @@ async function createApp() {
     diagnosePackage: vi.fn(),
     getInteractiveSession: vi.fn(),
     listInteractiveSessions: vi.fn(),
-  }));
-  vi.doMock("../services/auth-service.js", () => ({
-    verifyToken: verifyTokenMock,
   }));
   const router = (await import("./packages.js")).default;
   const app = express();
@@ -66,10 +62,7 @@ afterEach(() => {
   vi.doUnmock("../services/package-service.js");
   vi.doUnmock("../services/optimization-service.js");
   vi.doUnmock("../services/interactive-optimization-service.js");
-  vi.doUnmock("../services/auth-service.js");
   applyManualMarkdownEditMock.mockReset();
-  verifyTokenMock.mockReset();
-  verifyTokenMock.mockReturnValue({ sub: "user-1" });
 });
 
 describe("POST /packages/:packageId/manual-edit", () => {
@@ -81,7 +74,7 @@ describe("POST /packages/:packageId/manual-edit", () => {
       const response = await fetch(`${url}/packages/pkg-1/manual-edit`, {
         method: "POST",
         headers: {
-          Authorization: "Bearer test-token",
+          "X-User-Id": "user-1",
           "Content-Type": "application/json",
         },
         body: JSON.stringify({

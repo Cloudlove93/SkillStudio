@@ -19,6 +19,14 @@ interface RubricPromptInput {
   agentExcerpt: string;
   sourceRubricExcerpt?: string;
   rubricDraft?: string;
+  mode?: "repair" | "optimize";
+}
+
+interface RubricBoundaryReviewPromptInput {
+  documentName: string;
+  extractedRubric: string;
+  leadingContext: string;
+  trailingContext: string;
 }
 
 interface SkillPromptInput {
@@ -44,7 +52,9 @@ export function buildBaseMetadataSystemPrompt(): string {
   ].join("\n");
 }
 
-export function buildBaseMetadataUserPrompt(input: BaseMetadataPromptInput): string {
+export function buildBaseMetadataUserPrompt(
+  input: BaseMetadataPromptInput,
+): string {
   const intro = input.hasInstruction
     ? ["Create a prompt package from this instruction:", input.instruction]
     : [
@@ -52,12 +62,9 @@ export function buildBaseMetadataUserPrompt(input: BaseMetadataPromptInput): str
         "Infer the agent's role, workflow, core skills, and evaluation criteria directly from the document content.",
       ];
 
-  return [
-    ...intro,
-    input.documentContext,
-    "",
-    input.outputSchemaPrompt,
-  ].filter(Boolean).join("\n");
+  return [...intro, input.documentContext, "", input.outputSchemaPrompt]
+    .filter(Boolean)
+    .join("\n");
 }
 
 export function buildAgentSystemPrompt(): string {
@@ -101,36 +108,99 @@ export function buildRubricSystemPrompt(): string {
   ].join("\n");
 }
 
+export function buildRubricBoundaryReviewSystemPrompt(): string {
+  return [
+    "You are a rubric extraction boundary reviewer.",
+    "Return strict JSON only.",
+    "You are a boundary judge, not a rubric writer.",
+    "You only judge whether the current rubric excerpt missed nearby rubric lines.",
+    "Do not rewrite the rubric.",
+    "Do not summarize the document.",
+    "Only inspect the extracted rubric and the nearby context above and below it.",
+    "Be conservative: keep the current excerpt unless the nearby lines clearly belong to the same scoring body.",
+  ].join("\n");
+}
+
+export function buildRubricBoundaryReviewUserPrompt(
+  input: RubricBoundaryReviewPromptInput,
+): string {
+  return [
+    "Review whether the current rubric extraction boundary is complete.",
+    "You are a boundary judge around the current excerpt.",
+    "Your job is only to judge boundary completeness around the current excerpt.",
+    "Do not generate a new rubric and do not improve wording.",
+    "",
+    `Document: ${input.documentName}`,
+    "",
+    "Current extracted rubric:",
+    input.extractedRubric,
+    "",
+    "Nearby context above the excerpt:",
+    input.leadingContext || "[none]",
+    "",
+    "Nearby context below the excerpt:",
+    input.trailingContext || "[none]",
+    "",
+    "Return one JSON object with this schema:",
+    `{"decision":"keep"|"expand_up"|"expand_down"|"expand_both","reason":"short reason","linesUp":0,"linesDown":0}`,
+    "",
+    "Rules:",
+    "- Do not rewrite the rubric.",
+    "- Judge only whether the nearby lines belong to the actual scoring body of the rubric.",
+    "- Include nearby lines only when they are clearly part of the same rubric section, such as a missing heading, weight line, score band line, dimension title, or scoring note immediately attached to the extracted excerpt.",
+    "- Exclude nearby lines when they begin a different support section, for example 分级描述, 案例对比, 测试情景, 规范依据, 附录, references, appendix, examples, scenarios, or policy references.",
+    "- If the nearby lines are ambiguous, choose keep.",
+    "- If the current excerpt already covers the scoring body, return keep with 0 lines.",
+    "- If only nearby omitted lines belong to the rubric, expand just enough to include them.",
+    "- Never request expansion just to make the rubric better, longer, or more polished.",
+    "- linesUp and linesDown must be integers from 0 to 6.",
+  ].join("\n");
+}
+
 export function buildRubricUserPrompt(input: RubricPromptInput): string {
-  const sourceRubricSection = input.sourceRubricExcerpt
+  const mode = input.mode ?? "repair";
+  const normalizedSource = input.sourceRubricExcerpt?.trim() || "";
+  const normalizedDraft = input.rubricDraft?.trim() || "";
+  const includeSourceSection =
+    Boolean(normalizedSource) && normalizedSource !== normalizedDraft;
+
+  const sourceRubricSection = includeSourceSection
     ? [
         "",
-        "Uploaded documents already contain a rubric-related section. 优先复用这部分内容作为主依据，再在不改变原意的前提下补齐成更完整的 rubric.md。",
+        "Uploaded documents already contain a rubric-related section. Reuse that content as the primary source, and only add the minimum completion needed to make rubric.md directly scorable.",
         "If the source rubric is already specific, preserve its dimensions, wording, and domain constraints instead of replacing them with generic dimensions.",
         "",
         "Source rubric excerpt:",
-        input.sourceRubricExcerpt,
+        normalizedSource,
       ]
     : [];
-  const rubricDraftSection = input.rubricDraft
+  const rubricDraftSection = normalizedDraft
     ? [
         "",
-        "There is already an incomplete rubric draft. Keep every user-provided dimension, weight, example, and domain constraint that is still valid.",
-        "Do not delete user-provided criteria just because the structure is incomplete. Reorganize and supplement it into a complete rubric.md that can be scored directly.",
-        "When details are missing, add only the minimum necessary completion content so the rubric becomes usable.",
+        mode === "optimize"
+          ? "There is already a scorable rubric draft. Preserve its task focus, dimensions, weights, and domain constraints while improving clarity and direct scoreability."
+          : "There is already an incomplete rubric draft. Keep every user-provided dimension, weight, example, and domain constraint that is still valid.",
+        mode === "optimize"
+          ? "Tighten wording, remove duplication, and make the scoring bands easier to use, but do not change the task domain or replace the rubric with a generic template."
+          : "Do not delete user-provided criteria just because the structure is incomplete. Reorganize and supplement it into a complete rubric.md that can be scored directly.",
+        mode === "optimize"
+          ? "Keep the rubric concise and practical. This is a rubric optimization pass only, not an interactive optimization request."
+          : "When details are missing, add only the minimum necessary completion content so the rubric becomes usable.",
         "",
-        "Existing rubric draft:",
-        input.rubricDraft,
+        mode === "optimize" ? "Existing scorable rubric:" : "Existing rubric draft:",
+        normalizedDraft,
       ]
     : [];
 
   return [
-    "Create a rubric.md for this package with 3-5 scoring dimensions.",
+    mode === "optimize"
+      ? "Optimize the existing rubric.md for this package so it stays directly scorable and easier to use."
+      : "Create a rubric.md for this package with 3-5 scoring dimensions.",
     "The rubric must include dimensions for document fidelity and safety/referral boundaries.",
     "Document fidelity should check whether outputs stay grounded in uploaded materials and avoid unsupported invention.",
     "Safety/referral boundaries should check whether high-risk cases such as severe harm, self-harm, medical/legal crisis, or imminent danger receive appropriate escalation guidance.",
     "Output a complete rubric.md with clear sections, while preserving uploaded rubric content whenever it already exists.",
-    "If the uploaded rubric already uses a legacy but scorable structure such as 维度一/权重/5分到1分/关键检查点, preserve that structure and only补齐缺失部分 instead of rewriting it into a generic template.",
+    "If the uploaded rubric already uses a legacy but scorable structure such as 维度 / 权重 / 分档描述 / 关键检查点, preserve that structure and only fill in the missing pieces instead of rewriting it into a generic template.",
     "",
     `Package name: ${input.packageName}`,
     `Package description: ${input.packageDescription}`,

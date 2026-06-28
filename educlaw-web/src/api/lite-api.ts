@@ -183,6 +183,7 @@ export type ArenaMode = 'compare' | 'agent' | 'baseline';
 
 export type ReportStreamEvent =
   | { event: 'phase'; data: { label: string } }
+  | { event: 'ping'; data: Record<string, never> }
   | { event: 'done'; data: ArenaReport }
   | { event: 'error'; data: { error: string } }
   | { event: 'stream_end'; data: { ok: boolean } };
@@ -293,6 +294,12 @@ export const liteApi = {
   repairRubric: (token: string, packageId: string, model?: string) =>
     request<AgentPackageDetail>(
       `/packages/${packageId}/rubric/repair`,
+      { method: 'POST', body: JSON.stringify({ model }) },
+      token,
+    ),
+  optimizeRubric: (token: string, packageId: string, model?: string) =>
+    request<AgentPackageDetail>(
+      `/packages/${packageId}/rubric/optimize`,
       { method: 'POST', body: JSON.stringify({ model }) },
       token,
     ),

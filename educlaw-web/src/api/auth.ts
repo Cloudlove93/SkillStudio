@@ -1,35 +1,75 @@
-import { AUTH_ROUTES } from '@educlaw/shared';
 import { apiFetchJson } from './client';
-
-export interface AuthResponse {
-  token: string;
-  user: { id: string; username: string; isAdmin?: boolean };
-}
+import {
+  buildPasswordAuthRequest,
+  type PasswordAuthMode,
+} from './auth-gateway';
+import {
+  clearStoredTokens,
+  persistTokens,
+  type StoredTokenResponse,
+} from './token-storage';
 
 export interface AuthUser {
   id: string;
   username: string;
-  isAdmin?: boolean;
+  email?: string;
+  roles?: string[];
 }
 
-export async function login(username: string, password: string): Promise<AuthResponse> {
-  return apiFetchJson<AuthResponse>(`/api/auth${AUTH_ROUTES.LOGIN}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password }),
-  });
+function persistPasswordAuth(tokens: StoredTokenResponse): StoredTokenResponse {
+  persistTokens(tokens);
+  return tokens;
 }
 
-export async function register(username: string, password: string, inviteCode: string): Promise<AuthResponse> {
-  return apiFetchJson<AuthResponse>(`/api/auth${AUTH_ROUTES.REGISTER}`, {
+async function submitPasswordAuth(
+  mode: PasswordAuthMode,
+  username: string,
+  password: string,
+): Promise<StoredTokenResponse> {
+  const tokens = await apiFetchJson<StoredTokenResponse>(`/auth/password`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password, inviteCode }),
+    body: JSON.stringify(buildPasswordAuthRequest(mode, username, password)),
   });
+
+  return persistPasswordAuth(tokens);
+}
+
+export async function login(
+  username: string,
+  password: string,
+): Promise<StoredTokenResponse> {
+  return submitPasswordAuth('login', username, password);
+}
+
+export async function register(
+  username: string,
+  password: string,
+): Promise<StoredTokenResponse> {
+  return submitPasswordAuth('register', username, password);
 }
 
 export async function getMe(token: string): Promise<AuthUser> {
-  return apiFetchJson<AuthUser>(`/api/auth${AUTH_ROUTES.ME}`, {
+  return apiFetchJson<AuthUser>(`/auth/me`, {
     headers: { Authorization: `Bearer ${token}` },
   });
+}
+
+export async function logout(): Promise<void> {
+  const accessToken = localStorage.getItem('access_token');
+  const refreshToken = localStorage.getItem('refresh_token');
+  clearStoredTokens();
+
+  if (!accessToken && !refreshToken) {
+    return;
+  }
+
+  void apiFetchJson<{ ok: boolean }>(`/auth/logout`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    }),
+  }).catch(() => undefined);
 }

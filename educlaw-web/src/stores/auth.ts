@@ -1,8 +1,11 @@
 import { create } from 'zustand';
 import * as authApi from '../api/auth';
 import type { AuthUser } from '../api/auth';
+import { clearStoredTokens, getStoredAccessToken } from '../api/token-storage';
 
-const TOKEN_KEY = 'educlaw-token';
+function hasAdminRole(user: AuthUser | null): boolean {
+  return !!user?.roles?.some((role) => /admin/i.test(role));
+}
 
 interface AuthStore {
   token: string | null;
@@ -10,51 +13,62 @@ interface AuthStore {
   isAuthenticated: boolean;
   isAdmin: boolean;
   login: (username: string, password: string) => Promise<void>;
-  register: (username: string, password: string, inviteCode: string) => Promise<void>;
+  register: (
+    username: string,
+    password: string,
+    inviteCode: string,
+  ) => Promise<void>;
   logout: () => void;
   checkAuth: () => Promise<boolean>;
 }
 
 export const useAuthStore = create<AuthStore>((set, get) => ({
-  token: localStorage.getItem(TOKEN_KEY),
+  token: getStoredAccessToken(),
   user: null,
   isAuthenticated: false,
   isAdmin: false,
 
   async login(username: string, password: string) {
-    const { token, user } = await authApi.login(username, password);
-    localStorage.setItem(TOKEN_KEY, token);
-    set({ token, user, isAuthenticated: true, isAdmin: !!user.isAdmin });
-    // Fetch full user info (including isAdmin) from /auth/me
-    try {
-      const me = await authApi.getMe(token);
-      set({ user: me, isAdmin: !!me.isAdmin });
-    } catch { /* ignore */ }
+    const tokens = await authApi.login(username, password);
+    const me = await authApi.getMe(tokens.access_token);
+    set({
+      token: tokens.access_token,
+      user: me,
+      isAuthenticated: true,
+      isAdmin: hasAdminRole(me),
+    });
   },
 
   async register(username: string, password: string, inviteCode: string) {
-    const { token, user } = await authApi.register(username, password, inviteCode);
-    localStorage.setItem(TOKEN_KEY, token);
-    set({ token, user, isAuthenticated: true, isAdmin: !!user.isAdmin });
+    void inviteCode;
+    const tokens = await authApi.register(username, password);
+    const me = await authApi.getMe(tokens.access_token);
+    set({
+      token: tokens.access_token,
+      user: me,
+      isAuthenticated: true,
+      isAdmin: hasAdminRole(me),
+    });
   },
 
   logout() {
-    localStorage.removeItem(TOKEN_KEY);
+    void authApi.logout();
     set({ token: null, user: null, isAuthenticated: false, isAdmin: false });
   },
 
   async checkAuth(): Promise<boolean> {
-    const token = get().token;
+    const token = getStoredAccessToken() ?? get().token;
     if (!token) {
+      clearStoredTokens();
       set({ isAuthenticated: false, isAdmin: false });
       return false;
     }
     try {
       const user = await authApi.getMe(token);
-      set({ user, isAuthenticated: true, isAdmin: !!user.isAdmin });
+      set({ token, user, isAuthenticated: true, isAdmin: hasAdminRole(user) });
       return true;
     } catch {
-      localStorage.removeItem(TOKEN_KEY);
+      clearStoredTokens();
       set({ token: null, user: null, isAuthenticated: false, isAdmin: false });
       return false;
     }

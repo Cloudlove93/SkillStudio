@@ -3,7 +3,12 @@ import { ARENA_ROUTES } from "@educlaw/shared";
 import type { AuthedRequest } from "../types.js";
 import { requireAuth } from "../middleware/auth.js";
 import { one } from "../utils/http.js";
-import { initSse, writeSseEvent } from "../utils/sse.js";
+import {
+  initSse,
+  startSseHeartbeat,
+  stopSseHeartbeat,
+  writeSseEvent,
+} from "../utils/sse.js";
 import {
   createThread,
   generateReport,
@@ -31,22 +36,31 @@ router.get(ARENA_ROUTES.THREADS, requireAuth, async (req, res) => {
 
 router.post(ARENA_ROUTES.CREATE_THREAD, requireAuth, async (req, res) => {
   try {
-    res.json(await createThread(
-      (req as AuthedRequest).userId || "",
-      String(req.body?.packageId || ""),
-      typeof req.body?.model === "string" ? req.body.model : undefined,
-    ));
+    res.json(
+      await createThread(
+        (req as AuthedRequest).userId || "",
+        String(req.body?.packageId || ""),
+        typeof req.body?.model === "string" ? req.body.model : undefined,
+      ),
+    );
   } catch (error) {
-    res.status(400).json({ error: error instanceof Error ? error.message : "创建 Arena 对话失败" });
+    res
+      .status(400)
+      .json({ error: error instanceof Error ? error.message : "创建 Arena 对话失败" });
   }
 });
 
 router.get(ARENA_ROUTES.THREAD_DETAIL, requireAuth, async (req, res) => {
   try {
-    const arenaThreadDetail = await getThreadDetail((req as AuthedRequest).userId || "", one(req.query.threadId as string | string[] | undefined));
+    const arenaThreadDetail = await getThreadDetail(
+      (req as AuthedRequest).userId || "",
+      one(req.query.threadId as string | string[] | undefined),
+    );
     res.json(arenaThreadDetail);
   } catch (error) {
-    res.status(404).json({ error: error instanceof Error ? error.message : "找不到 Arena 对话" });
+    res
+      .status(404)
+      .json({ error: error instanceof Error ? error.message : "找不到 Arena 对话" });
   }
 });
 
@@ -58,13 +72,15 @@ router.post("/arena/threads/:threadId/messages", requireAuth, async (req, res) =
   }
 
   try {
-    res.json(await sendMessage(
-      (req as AuthedRequest).userId || "",
-      one(req.params.threadId),
-      content,
-      typeof req.body?.model === "string" ? req.body.model : undefined,
-      parseArenaMode(req.body?.mode),
-    ));
+    res.json(
+      await sendMessage(
+        (req as AuthedRequest).userId || "",
+        one(req.params.threadId),
+        content,
+        typeof req.body?.model === "string" ? req.body.model : undefined,
+        parseArenaMode(req.body?.mode),
+      ),
+    );
   } catch (error) {
     res.status(400).json({ error: error instanceof Error ? error.message : "发送消息失败" });
   }
@@ -78,6 +94,10 @@ router.post(ARENA_ROUTES.MESSAGE_STREAM, requireAuth, async (req: Request, res: 
   }
 
   initSse(res);
+  const heartbeat = startSseHeartbeat(
+    res,
+    Number(process.env.ARENA_STREAM_HEARTBEAT_MS || "15000"),
+  );
   try {
     for await (const event of streamMessage(
       (req as AuthedRequest).userId || "",
@@ -90,26 +110,42 @@ router.post(ARENA_ROUTES.MESSAGE_STREAM, requireAuth, async (req: Request, res: 
     }
     writeSseEvent(res, "stream_end", { ok: true });
   } catch (error) {
-    writeSseEvent(res, "error", { error: error instanceof Error ? error.message : "发送消息失败" });
+    writeSseEvent(res, "error", {
+      error: error instanceof Error ? error.message : "发送消息失败",
+    });
   } finally {
+    stopSseHeartbeat(heartbeat);
     res.end();
   }
 });
 
 router.post("/arena/threads/:threadId/report", requireAuth, async (req, res) => {
   try {
-    res.json(await generateReport(
-      (req as AuthedRequest).userId || "",
-      one(req.params.threadId),
-      typeof req.body?.model === "string" ? req.body.model : undefined,
-    ));
+    res.json(
+      await generateReport(
+        (req as AuthedRequest).userId || "",
+        one(req.params.threadId),
+        typeof req.body?.model === "string" ? req.body.model : undefined,
+      ),
+    );
   } catch (error) {
-    res.status(400).json({ error: error instanceof Error ? error.message : "生成评估报告失败" });
+    res
+      .status(400)
+      .json({ error: error instanceof Error ? error.message : "生成评估报告失败" });
   }
 });
 
 router.post("/arena/threads/:threadId/report/stream", requireAuth, async (req: Request, res: Response) => {
   initSse(res);
+  const heartbeat = startSseHeartbeat(
+    res,
+    Number(
+      process.env.ARENA_REPORT_STREAM_HEARTBEAT_MS ||
+        process.env.ARENA_STREAM_HEARTBEAT_MS ||
+        "15000",
+    ),
+  );
+
   try {
     writeSseEvent(res, "phase", { label: "读取最新一轮 Arena 对话" });
     writeSseEvent(res, "phase", { label: "调用评估模型生成报告" });
@@ -121,8 +157,11 @@ router.post("/arena/threads/:threadId/report/stream", requireAuth, async (req: R
     writeSseEvent(res, "done", report);
     writeSseEvent(res, "stream_end", { ok: true });
   } catch (error) {
-    writeSseEvent(res, "error", { error: error instanceof Error ? error.message : "生成评估报告失败" });
+    writeSseEvent(res, "error", {
+      error: error instanceof Error ? error.message : "生成评估报告失败",
+    });
   } finally {
+    stopSseHeartbeat(heartbeat);
     res.end();
   }
 });

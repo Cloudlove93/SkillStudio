@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+﻿import { afterEach, describe, expect, it, vi } from "vitest";
 
 const getPackageMock = vi.fn();
 const applyOptimizedSnapshotMock = vi.fn();
@@ -82,5 +82,47 @@ describe("interactive-optimization-service", () => {
     expect(snapshot.skills[0].name).toBe("skill-one");
     expect(snapshot.skills[0].description).toBe("仅补充触发条件");
     expect(snapshot.skills[0].skillMd).toContain("更新后的技能正文");
+  });
+
+  it("preserves existing skill frontmatter when adopted change only provides body content", async () => {
+    getPackageMock.mockResolvedValue({
+      snapshot: {
+        name: "原始智能体",
+        description: "原始 package description",
+        versionLabel: "v2",
+        agentMd: "---\nname: original-agent\n---\n\n# Agent\n原始内容",
+        rubricMd: "# Rubric\n原始评分标准",
+        skills: [
+          {
+            id: "skill-1",
+            dirName: "skill-one",
+            name: "skill-one",
+            description: "原始技能描述",
+            skillMd: "---\nname: skill-one\ndescription: 原始技能描述\n---\n\n# Skill\n原始技能正文",
+          },
+        ],
+      },
+    });
+    listVersionsMock.mockResolvedValue([{ id: "version-10", versionNumber: 10 }]);
+
+    const { applyInteractiveChanges } = await loadService();
+
+    await applyInteractiveChanges("user-1", "package-1", [
+      {
+        id: "adopt-2",
+        target: "skill",
+        targetId: "skill-one",
+        original: "---\nname: skill-one\ndescription: 原始技能描述\n---\n\n# Skill\n原始技能正文",
+        modified: "# Skill\n更新后的正文\n\n## Workflow\n- 新增步骤",
+        reason: "补充 workflow",
+      },
+    ]);
+
+    const snapshot = applyOptimizedSnapshotMock.mock.calls[0]![2];
+    expect(snapshot.skills[0].name).toBe("skill-one");
+    expect(snapshot.skills[0].description).toBe("原始技能描述");
+    expect(snapshot.skills[0].skillMd).toContain("name: skill-one");
+    expect(snapshot.skills[0].skillMd).toContain("description: 原始技能描述");
+    expect(snapshot.skills[0].skillMd).toContain("更新后的正文");
   });
 });

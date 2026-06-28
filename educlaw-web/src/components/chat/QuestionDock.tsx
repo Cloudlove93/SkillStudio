@@ -1,5 +1,15 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { Check, ChevronLeft, ChevronRight, X, Send, Pencil, MessageCircleQuestion, ChevronDown, ChevronUp } from 'lucide-react';
+﻿import { useState, useEffect, useRef, useCallback } from 'react';
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  X,
+  Send,
+  Pencil,
+  MessageCircleQuestion,
+  ChevronDown,
+  ChevronUp,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { agentRuntimeApi } from '../../api/runtime';
 import type { QuestionRequest } from '../../stores/interaction-queue';
@@ -12,15 +22,25 @@ import { PremiumPill } from '@/components/ui/premium';
  * Follows the same UX pattern as the runtime question dock:
  * multi-question tabs, single/multi select options, custom text input.
  */
-export default function QuestionDock({ request }: { request: QuestionRequest }) {
+export default function QuestionDock({
+  request,
+}: {
+  request: QuestionRequest;
+}) {
   const t = useT();
   const questions = request.questions;
   const total = questions.length;
 
   const [tab, setTab] = useState(0);
-  const [answers, setAnswers] = useState<string[][]>(() => questions.map(() => []));
-  const [customTexts, setCustomTexts] = useState<string[]>(() => questions.map(() => ''));
-  const [customOn, setCustomOn] = useState<boolean[]>(() => questions.map(() => false));
+  const [answers, setAnswers] = useState<string[][]>(() =>
+    questions.map(() => []),
+  );
+  const [customTexts, setCustomTexts] = useState<string[]>(() =>
+    questions.map(() => ''),
+  );
+  const [customOn, setCustomOn] = useState<boolean[]>(() =>
+    questions.map(() => false),
+  );
   const [editing, setEditing] = useState(false);
   const [sending, setSending] = useState(false);
   const [minimized, setMinimized] = useState(false);
@@ -45,36 +65,41 @@ export default function QuestionDock({ request }: { request: QuestionRequest }) 
     }
   }, [editing, tab]);
 
-  const updateCustom = useCallback((value: string, selected?: boolean) => {
-    const sel = selected ?? customOn[tab];
-    setCustomTexts((prev) => {
-      const next = [...prev];
-      next[tab] = value;
-      return next;
-    });
-    if (!sel) return;
-    const trimmed = value.trim();
-    if (isMulti) {
-      setAnswers((prev) => {
+  const updateCustom = useCallback(
+    (value: string, selected?: boolean) => {
+      const sel = selected ?? customOn[tab];
+      setCustomTexts((prev) => {
         const next = [...prev];
-        const current = [...(next[tab] ?? [])];
-        // Remove old custom value, add new one
-        const oldCustom = customTexts[tab]?.trim();
-        const filtered = oldCustom ? current.filter((a) => a !== oldCustom) : current;
-        if (trimmed && !filtered.includes(trimmed)) {
-          filtered.push(trimmed);
-        }
-        next[tab] = filtered;
+        next[tab] = value;
         return next;
       });
-    } else {
-      setAnswers((prev) => {
-        const next = [...prev];
-        next[tab] = trimmed ? [trimmed] : [];
-        return next;
-      });
-    }
-  }, [tab, isMulti, customOn, customTexts]);
+      if (!sel) return;
+      const trimmed = value.trim();
+      if (isMulti) {
+        setAnswers((prev) => {
+          const next = [...prev];
+          const current = [...(next[tab] ?? [])];
+          // Remove old custom value, add new one
+          const oldCustom = customTexts[tab]?.trim();
+          const filtered = oldCustom
+            ? current.filter((a) => a !== oldCustom)
+            : current;
+          if (trimmed && !filtered.includes(trimmed)) {
+            filtered.push(trimmed);
+          }
+          next[tab] = filtered;
+          return next;
+        });
+      } else {
+        setAnswers((prev) => {
+          const next = [...prev];
+          next[tab] = trimmed ? [trimmed] : [];
+          return next;
+        });
+      }
+    },
+    [tab, isMulti, customOn, customTexts],
+  );
 
   function pick(label: string) {
     if (sending) return;
@@ -214,7 +239,7 @@ export default function QuestionDock({ request }: { request: QuestionRequest }) 
 
   return (
     <div className="overflow-hidden rounded-[20px] border border-border bg-card shadow-sm animate-fade-in">
-      {/* Header 闂?always visible, clickable to toggle */}
+      {/* Header - always visible, clickable to toggle */}
       <button
         type="button"
         onClick={() => setMinimized((v) => !v)}
@@ -240,8 +265,9 @@ export default function QuestionDock({ request }: { request: QuestionRequest }) 
           {total > 1 && (
             <div className="flex items-center gap-1 mr-2">
               {questions.map((_, i) => {
-                const answered = (answers[i]?.length ?? 0) > 0
-                  || (customOn[i] && (customTexts[i] ?? '').trim().length > 0);
+                const answered =
+                  (answers[i]?.length ?? 0) > 0 ||
+                  (customOn[i] && (customTexts[i] ?? '').trim().length > 0);
                 return (
                   <span
                     key={i}
@@ -274,7 +300,9 @@ export default function QuestionDock({ request }: { request: QuestionRequest }) 
                 {question.header}
               </div>
             )}
-            <p className="text-sm font-medium leading-6 text-foreground">{question?.question}</p>
+            <p className="text-sm font-medium leading-6 text-foreground">
+              {question?.question}
+            </p>
             <p className="mt-1 text-[11px] text-muted-foreground/65">
               {isMulti ? t('question.multiHint') : t('question.singleHint')}
             </p>
@@ -298,25 +326,39 @@ export default function QuestionDock({ request }: { request: QuestionRequest }) 
                   {/* Radio/Checkbox indicator */}
                   <span className="mt-0.5 shrink-0">
                     {isMulti ? (
-                      <span className={`flex size-4 items-center justify-center rounded border transition-colors ${
-                        picked ? 'bg-primary border-primary' : 'border-muted-foreground/30'
-                      }`}>
+                      <span
+                        className={`flex size-4 items-center justify-center rounded border transition-colors ${
+                          picked
+                            ? 'bg-primary border-primary'
+                            : 'border-muted-foreground/30'
+                        }`}
+                      >
                         {picked && <Check size={10} className="text-white" />}
                       </span>
                     ) : (
-                      <span className={`flex size-4 items-center justify-center rounded-full border-2 transition-colors ${
-                        picked ? 'border-primary' : 'border-muted-foreground/30'
-                      }`}>
-                        {picked && <span className="size-2 rounded-full bg-primary" />}
+                      <span
+                        className={`flex size-4 items-center justify-center rounded-full border-2 transition-colors ${
+                          picked
+                            ? 'border-primary'
+                            : 'border-muted-foreground/30'
+                        }`}
+                      >
+                        {picked && (
+                          <span className="size-2 rounded-full bg-primary" />
+                        )}
                       </span>
                     )}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className={`text-sm font-medium block ${picked ? 'text-primary' : 'text-foreground'}`}>
+                    <span
+                      className={`text-sm font-medium block ${picked ? 'text-primary' : 'text-foreground'}`}
+                    >
                       {opt.label}
                     </span>
                     {opt.description && (
-                      <span className="text-xs text-muted-foreground/60 block mt-0.5">{opt.description}</span>
+                      <span className="text-xs text-muted-foreground/60 block mt-0.5">
+                        {opt.description}
+                      </span>
                     )}
                   </span>
                 </button>
@@ -324,8 +366,8 @@ export default function QuestionDock({ request }: { request: QuestionRequest }) 
             })}
 
             {/* Custom answer option */}
-            {question?.custom !== false && (
-              editing ? (
+            {question?.custom !== false &&
+              (editing ? (
                 <div
                   className={`rounded-[18px] border px-3 py-3 transition-all ${
                     currentCustomOn
@@ -334,23 +376,43 @@ export default function QuestionDock({ request }: { request: QuestionRequest }) 
                   }`}
                 >
                   <div className="flex items-start gap-3">
-                    <span className="mt-0.5 shrink-0" onClick={(e) => { e.stopPropagation(); customToggle(); }}>
+                    <span
+                      className="mt-0.5 shrink-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        customToggle();
+                      }}
+                    >
                       {isMulti ? (
-                        <span className={`flex size-4 items-center justify-center rounded border cursor-pointer transition-colors ${
-                          currentCustomOn ? 'bg-primary border-primary' : 'border-muted-foreground/30'
-                        }`}>
-                          {currentCustomOn && <Check size={10} className="text-white" />}
+                        <span
+                          className={`flex size-4 items-center justify-center rounded border cursor-pointer transition-colors ${
+                            currentCustomOn
+                              ? 'bg-primary border-primary'
+                              : 'border-muted-foreground/30'
+                          }`}
+                        >
+                          {currentCustomOn && (
+                            <Check size={10} className="text-white" />
+                          )}
                         </span>
                       ) : (
-                        <span className={`flex size-4 items-center justify-center rounded-full border-2 cursor-pointer transition-colors ${
-                          currentCustomOn ? 'border-primary' : 'border-muted-foreground/30'
-                        }`}>
-                          {currentCustomOn && <span className="size-2 rounded-full bg-primary" />}
+                        <span
+                          className={`flex size-4 items-center justify-center rounded-full border-2 cursor-pointer transition-colors ${
+                            currentCustomOn
+                              ? 'border-primary'
+                              : 'border-muted-foreground/30'
+                          }`}
+                        >
+                          {currentCustomOn && (
+                            <span className="size-2 rounded-full bg-primary" />
+                          )}
                         </span>
                       )}
                     </span>
                     <div className="min-w-0 flex-1">
-                      <span className="text-sm font-medium text-foreground block mb-1.5">{t('question.typeOwn')}</span>
+                      <span className="text-sm font-medium text-foreground block mb-1.5">
+                        {t('question.typeOwn')}
+                      </span>
                       <textarea
                         ref={textareaRef}
                         value={currentCustom}
@@ -390,16 +452,28 @@ export default function QuestionDock({ request }: { request: QuestionRequest }) 
                 >
                   <span className="mt-0.5 shrink-0">
                     {isMulti ? (
-                      <span className={`flex size-4 items-center justify-center rounded border transition-colors ${
-                        currentCustomOn ? 'bg-primary border-primary' : 'border-muted-foreground/30'
-                      }`}>
-                        {currentCustomOn && <Check size={10} className="text-white" />}
+                      <span
+                        className={`flex size-4 items-center justify-center rounded border transition-colors ${
+                          currentCustomOn
+                            ? 'bg-primary border-primary'
+                            : 'border-muted-foreground/30'
+                        }`}
+                      >
+                        {currentCustomOn && (
+                          <Check size={10} className="text-white" />
+                        )}
                       </span>
                     ) : (
-                      <span className={`flex size-4 items-center justify-center rounded-full border-2 transition-colors ${
-                        currentCustomOn ? 'border-primary' : 'border-muted-foreground/30'
-                      }`}>
-                        {currentCustomOn && <span className="size-2 rounded-full bg-primary" />}
+                      <span
+                        className={`flex size-4 items-center justify-center rounded-full border-2 transition-colors ${
+                          currentCustomOn
+                            ? 'border-primary'
+                            : 'border-muted-foreground/30'
+                        }`}
+                      >
+                        {currentCustomOn && (
+                          <span className="size-2 rounded-full bg-primary" />
+                        )}
                       </span>
                     )}
                   </span>
@@ -413,8 +487,7 @@ export default function QuestionDock({ request }: { request: QuestionRequest }) 
                     </span>
                   </span>
                 </button>
-              )
-            )}
+              ))}
           </div>
 
           {/* Footer */}
@@ -431,7 +504,12 @@ export default function QuestionDock({ request }: { request: QuestionRequest }) 
             </Button>
             <div className="flex items-center gap-2">
               {tab > 0 && (
-                <Button variant="outline" size="sm" onClick={handleBack} disabled={sending}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleBack}
+                  disabled={sending}
+                >
                   <ChevronLeft size={14} className="mr-1" />
                   {t('question.back')}
                 </Button>

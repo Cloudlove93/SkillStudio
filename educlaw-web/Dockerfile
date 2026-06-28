@@ -30,7 +30,8 @@ COPY educlaw-web/nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY educlaw-web/start-nginx.sh /usr/local/bin/start-nginx.sh
 COPY --from=builder /app/educlaw-web/dist /usr/share/nginx/html
 
-RUN chmod +x /usr/local/bin/start-nginx.sh
+RUN sed -i 's/\r$//' /usr/local/bin/start-nginx.sh \
+  && chmod +x /usr/local/bin/start-nginx.sh
 
 EXPOSE 80
 
