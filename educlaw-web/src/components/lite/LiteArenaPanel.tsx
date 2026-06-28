@@ -2877,7 +2877,7 @@ export default function LiteArenaPanel() {
                   )}
                 </div>
                 <div className="hidden text-xs text-muted-foreground sm:block">
-                  \u8f93\u5165\u95ee\u9898\uff0c\u6d4b\u8bd5\u667a\u80fd\u4f53\u6548\u679c
+                  输入问题，测试智能体效果
                 </div>
               </div>
               <div className="flex flex-wrap items-center justify-end gap-2">

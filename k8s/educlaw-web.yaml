@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: educlaw-web
+  namespace: educlaw
+  labels:
+    app: educlaw-web
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: educlaw-web
+  template:
+    metadata:
+      labels:
+        app: educlaw-web
+    spec:
+      imagePullSecrets:
+        - name: mi
+      containers:
+        - name: educlaw-web
+          image: crpi-a4e25wq5oddt3z3b.cn-shanghai.personal.cr.aliyuncs.com/educlaw/educlaw-web:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
+              name: http
+              protocol: TCP
+          env:
+            - name: API_UPSTREAM
+              value: "http://educlaw-server:3000"
+          resources:
+            limits:
+              cpu: "1"
+              ephemeral-storage: 10Gi
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              ephemeral-storage: 2Gi
+              memory: 64Mi
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            failureThreshold: 3
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /etc/localtime
+              name: volume-localtime
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - name: volume-localtime
+          hostPath:
+            path: /etc/localtime
+            type: ''
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: educlaw-web
+  namespace: educlaw
+  labels:
+    app: educlaw-web
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: educlaw-web

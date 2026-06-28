@@ -32,12 +32,9 @@ services:
       - CONVERSATION_EVAL_BASE_URL=${CONVERSATION_EVAL_BASE_URL:-http://host.docker.internal:8090}
       - CONVERSATION_EVAL_SCENES_DIR=${CONVERSATION_EVAL_SCENES_DIR:-/data/educlaw-eval-scenes}
       - APP_ORIGIN=${APP_ORIGIN:-http://eduskill.localhost}
-      - SEED_USERS=${SEED_USERS:-false}
-      - SEED_USER_NAMES=${SEED_USER_NAMES:-}
-      - SEED_USER_PASSWORD=${SEED_USER_PASSWORD:-}
       - PORT=3000
     volumes:
-      - ${CONVERSATION_EVAL_SCENES_DIR:-/data/educlaw-eval-scenes}:${CONVERSATION_EVAL_SCENES_DIR:-/data/educlaw-eval-scenes}
+      - ./data/educlaw-eval-scenes:${CONVERSATION_EVAL_SCENES_DIR:-/data/educlaw-eval-scenes}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:

@@ -1,0 +1,150 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-backend
+  namespace: educlaw
+  labels:
+    app: auth-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: auth-backend
+  template:
+    metadata:
+      labels:
+        app: auth-backend
+    spec:
+      imagePullSecrets:
+        - name: mi
+      containers:
+        - name: auth-backend
+          image: crpi-a4e25wq5oddt3z3b.cn-shanghai.personal.cr.aliyuncs.com/educlaw/auth-backend:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+              name: http
+              protocol: TCP
+          env:
+            - name: HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: educlaw-config
+                  key: HOST
+            - name: PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: educlaw-config
+                  key: AUTH_PORT
+            - name: ZITADEL_ISSUER
+              valueFrom:
+                configMapKeyRef:
+                  name: educlaw-config
+                  key: ZITADEL_ISSUER
+            - name: ZITADEL_INTERNAL_ISSUER
+              valueFrom:
+                configMapKeyRef:
+                  name: educlaw-config
+                  key: ZITADEL_INTERNAL_ISSUER
+            - name: ZITADEL_CLIENT_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: educlaw-config
+                  key: ZITADEL_CLIENT_ID
+            - name: ZITADEL_LOGIN_REDIRECT_URI
+              valueFrom:
+                configMapKeyRef:
+                  name: educlaw-config
+                  key: ZITADEL_LOGIN_REDIRECT_URI
+            - name: ZITADEL_PROJECT_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: educlaw-config
+                  key: ZITADEL_PROJECT_ID
+            - name: ZITADEL_DEFAULT_ROLE_KEY
+              valueFrom:
+                configMapKeyRef:
+                  name: educlaw-config
+                  key: ZITADEL_DEFAULT_ROLE_KEY
+            - name: ZITADEL_SERVICE_PAT_FILE
+              value: "/zitadel/bootstrap/login-client.pat"
+            - name: ALIYUN_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: educlaw-secrets
+                  key: ALIYUN_ACCESS_KEY_ID
+            - name: ALIYUN_ACCESS_KEY_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: educlaw-secrets
+                  key: ALIYUN_ACCESS_KEY_SECRET
+            - name: ALIYUN_SMS_SIGN_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: educlaw-secrets
+                  key: ALIYUN_SMS_SIGN_NAME
+            - name: ALIYUN_SMS_TEMPLATE_CODE
+              valueFrom:
+                secretKeyRef:
+                  name: educlaw-secrets
+                  key: ALIYUN_SMS_TEMPLATE_CODE
+          volumeMounts:
+            - mountPath: /zitadel/bootstrap
+              name: bootstrap
+              readOnly: true
+            - mountPath: /etc/localtime
+              name: volume-localtime
+          resources:
+            limits:
+              cpu: "2"
+              ephemeral-storage: 10Gi
+              memory: 1Gi
+            requests:
+              cpu: 250m
+              ephemeral-storage: 2Gi
+              memory: 256Mi
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 3
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - name: bootstrap
+          persistentVolumeClaim:
+            claimName: zitadel-pat
+        - name: volume-localtime
+          hostPath:
+            path: /etc/localtime
+            type: ''
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-backend
+  namespace: educlaw
+  labels:
+    app: auth-backend
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3000
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: auth-backend

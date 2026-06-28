@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: educlaw-config
+  namespace: educlaw
+  labels:
+    app: educlaw
+data:
+  # ─── 环境 ───
+  NODE_ENV: "production"
+
+  # ─── EduClaw Server ───
+  PORT: "3000"
+  LLM_BASE_URL: "https://api.moonshot.cn/v1"
+  LLM_MODEL: "kimi-k2.5"
+  LLM_BASELINE_MODEL: "kimi-k2.5"
+  LLM_TIMEOUT_MS: "300000"
+  LLM_NETWORK_RETRIES: "2"
+  APP_ORIGIN: "http://app.localhost"
+  SEED_USERS: "false"
+
+  # ─── Auth Backend ───
+  HOST: "0.0.0.0"
+  AUTH_PORT: "3000"
+  # Zitadel 对外的 OIDC Issuer（客户端浏览器会访问这个地址）
+  ZITADEL_ISSUER: "http://auth.localhost"
+  # Zitadel 集群内部地址（auth-backend 容器内访问 Zitadel API）
+  ZITADEL_INTERNAL_ISSUER: "http://zitadel:8080"
+  # Zitadel OIDC Client ID（从 zitadel-secrets 中读取，此处仅为文档）
+  # ZITADEL_CLIENT_ID 在 Kong initContainer 中通过 zitadel-secrets 注入
+  ZITADEL_CLIENT_ID: "379413931283775492"
+  # auth-backend 回调地址（Zitadel 登录成功后的 redirect_uri）
+  ZITADEL_LOGIN_REDIRECT_URI: "http://auth-backend:3000/auth/callback"
+  # Zitadel 项目 ID
+  ZITADEL_PROJECT_ID: "379413856222445572"
+  # 默认角色 key
+  ZITADEL_DEFAULT_ROLE_KEY: "EduClaw"
