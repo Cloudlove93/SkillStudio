@@ -176,7 +176,7 @@ export default function OptimizePanel() {
                     <div className="mt-3 grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
                       <div><span className="font-medium text-foreground">{t('optimize.target')}:</span> {selectedTargetDisplay?.label}</div>
                       {selectedTargetDisplay?.showRef && (
-                        <div><span className="font-medium text-foreground">\u6807\u8bc6:</span> <span className="font-mono">{selected.run.target_ref}</span></div>
+                        <div><span className="font-medium text-foreground">标识:</span> <span className="font-mono">{selected.run.target_ref}</span></div>
                       )}
                       <div><span className="font-medium text-foreground">{t('optimize.scope')}:</span> {targetScopeLabel(selected.run.target_scope)}</div>
                       <div><span className="font-medium text-foreground">{t('optimize.trigger')}:</span> {t(triggerKeyMap[selected.run.trigger_source as OptimizationTriggerSource])}</div>
