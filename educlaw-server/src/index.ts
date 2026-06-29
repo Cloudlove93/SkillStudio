@@ -5,7 +5,7 @@ import { config } from "./config.js";
 import { getLogger } from "./lib/request-context.js";
 import { safeError } from "./lib/logger.js";
 import { withRequestContext } from "./middleware/request-context.js";
-import { initDb } from "./services/db.js";
+import { checkDbConnection } from "./services/db.js";
 import apiRoutes from "./routes/index.js";
 import compatRoutes from "./routes/compat.js";
 
@@ -43,7 +43,7 @@ app.use((err: unknown, req: express.Request, res: express.Response, next: expres
   res.status(500).json({ error: err instanceof Error ? err.message : "Internal server error" });
 });
 
-await initDb();
+await checkDbConnection();
 app.listen(config.port, () => {
   getLogger({ port: config.port }).info("server.listen");
 });

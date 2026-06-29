@@ -130,7 +130,7 @@ CREATE DATABASE educlawlite OWNER educlawlite;
 GRANT ALL PRIVILEGES ON DATABASE educlawlite TO educlawlite;
 ```
 
-> **注意**：EduClaw Server 的 `db.ts` 会在启动时自动创建表结构，无需手动导入 SQL。
+> **注意**：EduClaw Server 启动时只检查数据库连接，不会自动创建或修改表结构。首次部署或表结构变化后，需要手动执行“EduClaw 数据库表初始化”步骤。
 
 ### 2.2 NAS 文件存储
 
@@ -313,6 +313,11 @@ kubectl apply -f k8s/auth-backend.yaml -n educlaw
 # 3. educlaw-server
 kubectl apply -f k8s/educlaw-server.yaml -n educlaw
 
+# 3.1 手动初始化 EduClaw 数据库表（首次部署或表结构变化后执行）
+kubectl rollout status deployment/educlaw-server -n educlaw
+kubectl exec -n educlaw deploy/educlaw-server -- \
+  node dist/educlaw-server/src/scripts/init-db.js
+
 # 4. educlaw-web
 kubectl apply -f k8s/educlaw-web.yaml -n educlaw
 
@@ -492,6 +497,7 @@ kubectl logs -n educlaw -l app=educlaw-server --previous
 # 常见原因：
 # - DATABASE_URL 不对或 RDS 不可达（白名单）
 # - LLM_API_KEY 未设置
+# - 首次部署后未手动执行 EduClaw 数据库表初始化脚本
 ```
 
 ### 8.3 Kong 返回 502 Bad Gateway
