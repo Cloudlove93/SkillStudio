@@ -7,7 +7,6 @@ const CONFIG_ENV_KEYS = [
   "BODY_LIMIT",
   "LLM_TIMEOUT_MS",
   "DATABASE_URL",
-  "JWT_SECRET",
   "APP_ORIGIN",
   "SEED_USERS",
   "SEED_USER_NAMES",
@@ -21,7 +20,6 @@ const CONFIG_ENV_KEYS = [
 ];
 
 const DEFAULT_LOCAL_DATABASE_URL = "postgres://educlawlite:local-dev-password@127.0.0.1:5435/educlawlite";
-const DEFAULT_LOCAL_JWT_SECRET = "local-dev-jwt-secret-not-for-production";
 const DEFAULT_LOCAL_SEED_PASSWORD = "local-dev-seed-password-not-for-production";
 
 function restoreEnv() {
@@ -86,7 +84,6 @@ describe("config", () => {
     expect(config.bodyLimit).toBe("100mb");
     expect(config.llmTimeoutMs).toBe(300_000);
     expect(config.databaseUrl).toBe(DEFAULT_LOCAL_DATABASE_URL);
-    expect(config.jwtSecret).toBe(DEFAULT_LOCAL_JWT_SECRET);
     expect(config.appOrigin).toBe("http://localhost:4173");
     expect(config.appOrigins).toEqual(["http://localhost:4173"]);
     expect(config.seedUsers).toBe(true);
@@ -160,27 +157,17 @@ describe("config", () => {
   it("prefers .env.local over .env when both exist", async () => {
     const config = await loadConfig({
       envFile: [
-        "JWT_SECRET=from-dot-env",
+        "LLM_MODEL=from-dot-env",
         "DATABASE_URL=postgres://from-dot-env",
       ].join("\n"),
       envLocalFile: [
-        "JWT_SECRET=from-dot-env-local",
+        "LLM_MODEL=from-dot-env-local",
         "DATABASE_URL=postgres://from-dot-env-local",
       ].join("\n"),
     });
 
-    expect(config.jwtSecret).toBe("from-dot-env-local");
+    expect(config.llmModel).toBe("from-dot-env-local");
     expect(config.databaseUrl).toBe("postgres://from-dot-env-local");
-  });
-
-  it("rejects weak production JWT secrets", async () => {
-    await expect(loadConfig({
-      env: {
-        NODE_ENV: "production",
-        JWT_SECRET: "change-me",
-        LLM_API_KEY: "valid-test-key",
-      },
-    })).rejects.toThrow("JWT_SECRET must be set to a strong production value");
   });
 
   it("requires an LLM API key in production", async () => {
@@ -188,7 +175,6 @@ describe("config", () => {
       env: {
         NODE_ENV: "production",
         DATABASE_URL: "postgres://prod-user:prod-secret-password@db.example.com:5432/educlaw",
-        JWT_SECRET: "a-strong-production-secret-value-12345",
       },
     })).rejects.toThrow("LLM_API_KEY must be set before starting production");
   });
@@ -197,7 +183,6 @@ describe("config", () => {
     await expect(loadConfig({
       env: {
         NODE_ENV: "production",
-        JWT_SECRET: "a-strong-production-secret-value-12345",
         LLM_API_KEY: "valid-test-key",
       },
     })).rejects.toThrow("DATABASE_URL must be set to a strong production value");
@@ -208,7 +193,6 @@ describe("config", () => {
       env: {
         NODE_ENV: "production",
         DATABASE_URL: "postgres://prod-user:prod-secret-password@db.example.com:5432/educlaw",
-        JWT_SECRET: "a-strong-production-secret-value-12345",
         LLM_API_KEY: "valid-test-key",
         SEED_USERS: "true",
       },

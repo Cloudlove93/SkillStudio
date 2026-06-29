@@ -7,7 +7,6 @@ const serverRoot = path.resolve(__dirname, "..");
 const workspaceRoot = path.resolve(serverRoot, "..");
 
 const DEFAULT_LOCAL_DATABASE_URL = "postgres://educlawlite:local-dev-password@127.0.0.1:5435/educlawlite";
-const DEFAULT_LOCAL_JWT_SECRET = "local-dev-jwt-secret-not-for-production";
 const DEFAULT_LOCAL_SEED_PASSWORD = "local-dev-seed-password-not-for-production";
 
 function loadEnvFile(fileName: string) {
@@ -55,18 +54,11 @@ function assertProductionConfig(name: string, value: string, invalidValues: stri
 }
 
 const isProduction = process.env.NODE_ENV === "production";
-const jwtSecret = process.env.JWT_SECRET || DEFAULT_LOCAL_JWT_SECRET;
 const llmApiKey = process.env.LLM_API_KEY || "";
 const databaseUrl = process.env.DATABASE_URL || DEFAULT_LOCAL_DATABASE_URL;
 const seedUsers = readBoolean("SEED_USERS", !isProduction);
 const seedUserPassword = process.env.SEED_USER_PASSWORD || DEFAULT_LOCAL_SEED_PASSWORD;
 
-assertProductionConfig("JWT_SECRET", jwtSecret, [
-  "change-me",
-  "change-me-in-production",
-  "change-this-to-a-random-long-string",
-  DEFAULT_LOCAL_JWT_SECRET,
-]);
 assertProductionConfig("DATABASE_URL", databaseUrl, [
   "postgres://educlawlite:educlawlite@127.0.0.1:5435/educlawlite",
   DEFAULT_LOCAL_DATABASE_URL,
@@ -88,7 +80,6 @@ export const config = {
   bodyLimit: process.env.BODY_LIMIT || "100mb",
   llmTimeoutMs: readNumber("LLM_TIMEOUT_MS", 300_000),
   databaseUrl,
-  jwtSecret,
   inviteCode: process.env.INVITE_CODE || "",
   appOrigin: process.env.APP_ORIGIN || "http://localhost:4173",
   appOrigins: readList("APP_ORIGIN", ["http://localhost:4173"]),
