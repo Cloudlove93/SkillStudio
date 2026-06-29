@@ -48,7 +48,6 @@ LLM_BASE_URL=https://api.moonshot.ai/v1
 LLM_API_KEY=你的API密钥
 LLM_MODEL=kimi-k2.6
 LLM_BASELINE_MODEL=kimi-k2.6
-JWT_SECRET=随便一个长随机字符串（至少32位）
 APP_ORIGIN=http://你的服务器IP
 SEED_USERS=false
 ```

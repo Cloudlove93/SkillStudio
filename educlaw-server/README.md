@@ -35,7 +35,6 @@ pnpm format
 | --- | --- | --- |
 | `PORT` | 服务端口 | `3000` |
 | `DATABASE_URL` | PostgreSQL 连接串 | 本地开发默认指向 `127.0.0.1:5435` |
-| `JWT_SECRET` | 登录签名密钥 | 生产必须替换 |
 | `LLM_BASE_URL` | 模型服务地址 | 默认 `https://api.openai.com/v1` |
 | `LLM_API_KEY` | 模型服务密钥 | 生产必填 |
 | `LLM_MODEL` | 默认模型 | `gpt-4.1-mini` |

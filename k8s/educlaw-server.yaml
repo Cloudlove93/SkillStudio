@@ -41,11 +41,6 @@ spec:
                 secretKeyRef:
                   name: educlaw-secrets
                   key: DATABASE_URL
-            - name: JWT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: educlaw-secrets
-                  key: JWT_SECRET
             - name: INVITE_CODE
               valueFrom:
                 secretKeyRef:

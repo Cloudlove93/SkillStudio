@@ -33,6 +33,7 @@ npm-debug.log*
 
 # Claude
 .claude/
+CLAUDE.md
 
 # Local planning artifacts
 docs/superpowers/

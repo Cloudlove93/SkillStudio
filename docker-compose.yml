@@ -23,7 +23,6 @@ services:
     image: educlaw-server:latest
     environment:
       - DATABASE_URL=${DATABASE_URL}
-      - JWT_SECRET=${JWT_SECRET:-local-dev-jwt-secret-not-for-production}
       - INVITE_CODE=${INVITE_CODE}
       - LLM_BASE_URL=${LLM_BASE_URL}
       - LLM_API_KEY=${LLM_API_KEY}

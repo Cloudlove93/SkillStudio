@@ -163,7 +163,6 @@ write_env_file() {
   umask 077
   cat > "$PROJECT_DIR/.env" <<ENVEOF
 DATABASE_URL=postgres://${DB_USER}:${DB_PASSWORD}@127.0.0.1:5432/${DB_NAME}
-JWT_SECRET=${JWT_SECRET}
 PORT=${PORT}
 BODY_LIMIT=${BODY_LIMIT}
 LLM_TIMEOUT_MS=${LLM_TIMEOUT_MS}
@@ -435,11 +434,6 @@ main() {
 
   DB_PASSWORD="${POSTGRES_PASSWORD:-$(read_env_value POSTGRES_PASSWORD "")}"
   [[ -n "$DB_PASSWORD" ]] || DB_PASSWORD="$(openssl rand -hex 16)"
-
-  JWT_SECRET="${JWT_SECRET:-$(read_env_value JWT_SECRET "")}"
-  if [[ -z "$JWT_SECRET" || "$JWT_SECRET" == "change-me" || "$JWT_SECRET" == "change-me-in-production" || "$JWT_SECRET" == "change-this-to-a-random-long-string" ]]; then
-    JWT_SECRET="$(openssl rand -hex 32)"
-  fi
 
   APP_ORIGIN="${APP_ORIGIN:-$(read_env_value APP_ORIGIN "http://${APP_HOST}")}"
   SEED_USERS="${SEED_USERS:-$(read_env_value SEED_USERS "false")}"
