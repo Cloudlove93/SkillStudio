@@ -407,10 +407,9 @@ function extractRubricSectionFromText(content: string): string {
     const extracted = collectRubricBlock(lines, index);
     if (
       extracted &&
-      (hasConfiguredRubricText(extracted) ||
-        /(?:权重|分值|评分等级|评级标准|关键检查点|评估要点|评分要点|优秀|良好|合格|待改进|不合格|\b[1-5]分\b)/.test(
-          extracted,
-        ))
+      /(?:权重|分值|评分等级|评级标准|关键检查点|评估要点|评分要点|优秀|良好|合格|待改进|不合格|\b[1-5]分\b)/.test(
+        extracted,
+      )
     ) {
       return extracted;
     }
