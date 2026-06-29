@@ -28,7 +28,6 @@ describe("db schema initialization", () => {
     const { schemaStatements } = await import("./db-schema.js");
     const schemaSql = schemaStatements.join("\n").toLowerCase();
 
-    expect(schemaSql).toContain("create table if not exists users");
     expect(schemaSql).toContain("create table if not exists agent_packages");
     expect(schemaSql).toContain("create table if not exists agent_package_versions");
     expect(schemaSql).toContain("create table if not exists arena_threads");

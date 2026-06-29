@@ -7,8 +7,6 @@ const serverRoot = path.resolve(__dirname, "..");
 const workspaceRoot = path.resolve(serverRoot, "..");
 
 const DEFAULT_LOCAL_DATABASE_URL = "postgres://educlawlite:local-dev-password@127.0.0.1:5435/educlawlite";
-const DEFAULT_LOCAL_SEED_PASSWORD = "local-dev-seed-password-not-for-production";
-
 function loadEnvFile(fileName: string) {
   const envPath = path.join(workspaceRoot, fileName);
   if (!fs.existsSync(envPath)) return;
@@ -34,12 +32,6 @@ function readNumber(name: string, fallback: number): number {
   return Number.isFinite(value) ? value : fallback;
 }
 
-function readBoolean(name: string, fallback: boolean): boolean {
-  const raw = process.env[name];
-  if (raw == null || raw === "") return fallback;
-  return ["1", "true", "yes", "on"].includes(raw.toLowerCase());
-}
-
 function readList(name: string, fallback: string[]): string[] {
   const raw = process.env[name];
   const value = raw == null || raw.trim() === "" ? fallback.join(",") : raw;
@@ -56,20 +48,10 @@ function assertProductionConfig(name: string, value: string, invalidValues: stri
 const isProduction = process.env.NODE_ENV === "production";
 const llmApiKey = process.env.LLM_API_KEY || "";
 const databaseUrl = process.env.DATABASE_URL || DEFAULT_LOCAL_DATABASE_URL;
-const seedUsers = readBoolean("SEED_USERS", !isProduction);
-const seedUserPassword = process.env.SEED_USER_PASSWORD || DEFAULT_LOCAL_SEED_PASSWORD;
-
 assertProductionConfig("DATABASE_URL", databaseUrl, [
   "postgres://educlawlite:educlawlite@127.0.0.1:5435/educlawlite",
   DEFAULT_LOCAL_DATABASE_URL,
 ]);
-if (isProduction && seedUsers) {
-  assertProductionConfig("SEED_USER_PASSWORD", seedUserPassword, [
-    "educlaw123",
-    "replace-with-a-strong-password",
-    DEFAULT_LOCAL_SEED_PASSWORD,
-  ]);
-}
 if (isProduction && (!llmApiKey || llmApiKey === "your-llm-api-key" || llmApiKey === "replace-with-a-real-api-key")) {
   throw new Error("LLM_API_KEY must be set before starting production");
 }
@@ -83,13 +65,6 @@ export const config = {
   inviteCode: process.env.INVITE_CODE || "",
   appOrigin: process.env.APP_ORIGIN || "http://localhost:4173",
   appOrigins: readList("APP_ORIGIN", ["http://localhost:4173"]),
-  seedUsers,
-  seedUserNames: readList("SEED_USER_NAMES", [
-    "user1", "user2", "user3", "user4", "user5",
-    "user6", "user7", "user8", "user9", "user10",
-    "user11", "user12", "user13", "user14", "user15",
-  ]),
-  seedUserPassword,
   uploadLimitBytes: readNumber("UPLOAD_LIMIT_MB", 25) * 1024 * 1024,
   llmBaseUrl: (process.env.LLM_BASE_URL || "https://api.openai.com/v1").replace(/\/+$/, ""),
   llmApiKey,

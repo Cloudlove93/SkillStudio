@@ -2,14 +2,6 @@ import { checkDbConnection, query } from "./db.js";
 
 export const schemaStatements = [
   `
-    create table if not exists users (
-      id text primary key,
-      username text unique not null,
-      password_hash text not null,
-      created_at text not null
-    )
-  `,
-  `
     create table if not exists agent_packages (
       id text primary key,
       user_id text not null,

@@ -81,11 +81,6 @@ spec:
                 configMapKeyRef:
                   name: educlaw-config
                   key: APP_ORIGIN
-            - name: SEED_USERS
-              valueFrom:
-                configMapKeyRef:
-                  name: educlaw-config
-                  key: SEED_USERS
           volumeMounts:
             - mountPath: /data/educlaw-eval-scenes
               name: eval-scenes

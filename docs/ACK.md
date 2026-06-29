@@ -44,6 +44,8 @@ Kong 路由规则：
 | `/`                           | `app.eduskill`  | educlaw-web      | 80   |
 
 > educlaw-web 的 nginx 会将 `/auth`、`/api` 等 API 请求反向代理到 educlaw-server，静态资源由自身直接返回。
+>
+> **跨命名空间通信**：Kong（`gateway` 命名空间）通过 `<service>.<namespace>.svc.cluster.local` 访问 `educlaw` 命名空间中的服务。例如，Kong 路由到 `educlaw-server.educlaw.svc.cluster.local:3000`。
 
 ### 关键决策
 
@@ -164,9 +166,9 @@ NAS 上需要创建两个独立的 PVC（对应不同目录，挂载到不同容
 | 地址        | `crpi-a4e25wq5oddt3z3b.cn-shanghai.personal.cr.aliyuncs.com` |
 | 命名空间    | `educlaw`                                                    |
 | 类型        | 个人版                                                         |
-| 拉取 Secret | `mi`（已在集群中创建）                                       |
+| 拉取 Secret | `mi`（已在 gateway 集群中创建）                            |
 
-> 如果 `mi` Secret 尚未在集群中创建：
+> 如果 `mi` Secret 尚未在 `educlaw` 命名空间中创建：
 >
 > ```bash
 > kubectl create secret docker-registry mi \
@@ -264,33 +266,44 @@ stringData:
 
 ## 五、部署
 
+> **kubeconfig**：所有命令使用 `--kubeconfig ~/.kube/hk-ack.config`，或先 `export KUBECONFIG=~/.kube/hk-ack.config`。
+>
+> **命名空间**：Zitadel、Kong、auth-backend 部署在 `gateway` 命名空间；EduClaw 服务部署在 `educlaw` 命名空间。
+
 ### 5.1 部署顺序
 
-| 阶段 | 资源                                                       | 状态           |
-| ---- | ---------------------------------------------------------- | -------------- |
-| 0    | Namespace（已存在）+ Secrets + zitadel-pat PVC             | **新增** |
-| 1    | Zitadel init Job → setup Job → start Deployment          | **新增** |
-| 2    | Zitadel Login UI + Kong                                    | **新增** |
-| 3    | educlaw-secrets + educlaw-config + educlaw-eval-scenes PVC | **新增** |
-| 4    | auth-backend Deployment                                    | **新增** |
-| 5    | educlaw-server Deployment                                  | **新增** |
-| 6    | educlaw-web Deployment                                     | **新增** |
-| 7    | Ingress                                                    | **新增** |
+| 阶段 | 资源                                                       | 命名空间 | 状态     |
+| ---- | ---------------------------------------------------------- | -------- | -------- |
+| 0    | Namespace + Secrets + zitadel-pat PVC                      | gateway  | 已部署   |
+| 1    | Zitadel init Job → setup Job → start Deployment          | gateway  | 已部署   |
+| 2    | Zitadel Login UI + Kong                                    | gateway  | 已部署   |
+| 3    | auth-backend Deployment                                    | gateway  | 已部署   |
+| 4    | educlaw-secrets + educlaw-config + educlaw-eval-scenes PVC | educlaw  | **新增** |
+| 5    | educlaw-server Deployment                                  | educlaw  | **新增** |
+| 6    | educlaw-web Deployment                                     | educlaw  | **新增** |
+| 7    | Ingress                                                    | educlaw  | **新增** |
 
 ### 5.2 前置检查
 
 ```bash
+# 指定 kubeconfig
+export KUBECONFIG=~/.kube/hk-ack.config
+
 # 确认 kubectl 连接正确
 kubectl cluster-info
 
 # 确认命名空间存在
+kubectl get ns gateway
 kubectl get ns educlaw
 
 # 确认 Zitadel 已启动且 PAT 文件已生成
-kubectl exec -n educlaw deploy/zitadel -- ls -la /zitadel/bootstrap/login-client.pat
+kubectl exec -n gateway deploy/zitadel -- ls -la /zitadel/bootstrap/login-client.pat
 
 # 确认 Kong 已启动
-kubectl get pods -n educlaw -l app=kong
+kubectl get pods -n gateway -l app=kong
+
+# 确认 auth-backend 已启动
+kubectl get pods -n gateway -l app=inno-agent-auth
 
 # 确认 RDS 可连通（从集群内测试）
 kubectl run pg-test --rm -it --image=postgres:17 --restart=Never -n educlaw -- \
@@ -307,56 +320,55 @@ kubectl apply -f k8s/educlaw-secrets.yaml -n educlaw
 kubectl apply -f k8s/educlaw-config.yaml -n educlaw
 kubectl apply -f k8s/educlaw-pvc.yaml -n educlaw
 
-# 2. auth-backend
-kubectl apply -f k8s/auth-backend.yaml -n educlaw
-
-# 3. educlaw-server
+# 2. educlaw-server
 kubectl apply -f k8s/educlaw-server.yaml -n educlaw
 
-# 3.1 手动初始化 EduClaw 数据库表（首次部署或表结构变化后执行）
+# 2.1 手动初始化 EduClaw 数据库表（首次部署或表结构变化后执行）
 kubectl rollout status deployment/educlaw-server -n educlaw
 kubectl exec -n educlaw deploy/educlaw-server -- \
   node dist/educlaw-server/src/scripts/init-db.js
 
-# 4. educlaw-web
+# 3. educlaw-web
 kubectl apply -f k8s/educlaw-web.yaml -n educlaw
 
-# 5. Ingress
+# 4. Ingress
 kubectl apply -f k8s/ingress.yaml -n educlaw
 ```
 
 ### 5.4 部署验证
 
 ```bash
-# 1. 检查所有 Pod 状态
+# 1. 检查 gateway 命名空间 Pod 状态（Zitadel / Kong / auth-backend）
+kubectl get pods -n gateway
+
+# 预期输出（全部 Running）：
+# NAME                               READY   STATUS    RESTARTS   AGE
+# zitadel-xxx                        1/1     Running   0          1d
+# zitadel-login-xxx                  1/1     Running   0          1d
+# kong-xxx                           1/1     Running   0          1d
+# inno-agent-auth-xxx                1/1     Running   0          1d
+
+# 2. 检查 educlaw 命名空间 Pod 状态
 kubectl get pods -n educlaw
 
 # 预期输出（全部 Running）：
 # NAME                              READY   STATUS    RESTARTS   AGE
-# zitadel-xxx                       1/1     Running   0          1d
-# zitadel-login-xxx                 1/1     Running   0          1d
-# kong-xxx                          1/1     Running   0          1d
-# auth-backend-xxx                  1/1     Running   0          1m
 # educlaw-server-xxx                1/1     Running   0          1m
 # educlaw-web-xxx                   1/1     Running   0          1m
 
-# 2. 检查健康端点
+# 3. 检查健康端点
 kubectl exec -n educlaw deploy/educlaw-server -- \
   wget -qO- http://localhost:3000/healthz
 
-kubectl exec -n educlaw deploy/auth-backend -- \
-  wget -qO- http://localhost:3000/healthz
-
-# 3. 检查 Ingress
+# 4. 检查 Ingress
 kubectl get ingress -n educlaw
 
-# 4. 测试 Kong 路由（从集群内）
-kubectl exec -n educlaw deploy/kong -- \
+# 5. 测试 Kong 路由（从集群内）
+kubectl exec -n gateway deploy/kong -- \
   wget -qO- --header="Host: app.eduskill" http://localhost:8000/
 
-# 5. 查看日志
+# 6. 查看日志
 kubectl logs -n educlaw -l app=educlaw-server --tail=50
-kubectl logs -n educlaw -l app=auth-backend --tail=50
 ```
 
 ---
@@ -395,22 +407,31 @@ kubectl logs -n educlaw -l app=auth-backend --tail=50
 ### 7.1 查看日志
 
 ```bash
-# 实时跟踪
+# EduClaw 服务日志（educlaw 命名空间）
 kubectl logs -n educlaw -l app=educlaw-server -f
-
-# 最近 100 行
-kubectl logs -n educlaw -l app=kong --tail=100
-
-# 查看上一个崩溃容器的日志
 kubectl logs -n educlaw -l app=educlaw-server --previous
+
+# Kong 日志（gateway 命名空间）
+kubectl logs -n gateway -l app=kong --tail=100
+
+# Zitadel 日志（gateway 命名空间）
+kubectl logs -n gateway -l app=zitadel --tail=100
+
+# auth-backend 日志（gateway 命名空间）
+kubectl logs -n gateway -l app=inno-agent-auth --tail=100
 ```
 
 ### 7.2 重启服务
 
 ```bash
-# 滚动重启（零停机）
+# educlaw 命名空间
 kubectl rollout restart deployment/educlaw-server -n educlaw
-kubectl rollout restart deployment/auth-backend -n educlaw
+kubectl rollout restart deployment/educlaw-web -n educlaw
+
+# gateway 命名空间
+kubectl rollout restart deployment/kong -n gateway
+kubectl rollout restart deployment/zitadel -n gateway
+kubectl rollout restart deployment/inno-agent-auth -n gateway
 
 # 查看滚动更新状态
 kubectl rollout status deployment/educlaw-server -n educlaw
@@ -419,25 +440,29 @@ kubectl rollout status deployment/educlaw-server -n educlaw
 ### 7.3 扩缩容
 
 ```bash
-# 手动扩容
+# 手动扩容（educlaw 命名空间）
 kubectl scale deployment/educlaw-server -n educlaw --replicas=4
 
 # 查看当前副本数
 kubectl get deployments -n educlaw
+kubectl get deployments -n gateway
 ```
 
 ### 7.4 进入容器调试
 
 ```bash
-# educlaw-server
+# educlaw-server（educlaw 命名空间）
 kubectl exec -it -n educlaw deploy/educlaw-server -- sh
 
 # 检查环境变量
 kubectl exec -n educlaw deploy/educlaw-server -- env | sort
 
-# 测试 Kong 内部路由
-kubectl exec -n educlaw deploy/kong -- \
-  wget -qO- http://educlaw-server:3000/healthz
+# Kong（gateway 命名空间）
+kubectl exec -it -n gateway deploy/kong -- sh
+
+# 测试 Kong 到 educlaw-server 的内部路由（跨命名空间）
+kubectl exec -n gateway deploy/kong -- \
+  wget -qO- http://educlaw-server.educlaw:3000/healthz
 ```
 
 ### 7.5 更新镜像
@@ -462,14 +487,19 @@ kubectl rollout undo deployment/educlaw-server -n educlaw
 ### 7.6 健康检查
 
 ```bash
-# 所有服务健康状态
+# gateway 命名空间服务状态
+kubectl get pods -n gateway -o wide
+
+# educlaw 命名空间服务状态
 kubectl get pods -n educlaw -o wide
 
 # 资源使用
+kubectl top pods -n gateway
 kubectl top pods -n educlaw
 kubectl top nodes
 
 # Events（排查问题）
+kubectl get events -n gateway --sort-by='.lastTimestamp' | tail -20
 kubectl get events -n educlaw --sort-by='.lastTimestamp' | tail -20
 ```
 
@@ -480,8 +510,9 @@ kubectl get events -n educlaw --sort-by='.lastTimestamp' | tail -20
 ### 8.1 Pod 一直 Pending
 
 ```bash
-# 查看原因
+# 查看原因（根据 Pod 所在命名空间选择）
 kubectl describe pod -n educlaw <pod-name>
+kubectl describe pod -n gateway <pod-name>
 
 # 常见原因：
 # - PVC 未绑定：检查 NAS CSI 驱动是否安装，StorageClass 是否正确
@@ -504,11 +535,12 @@ kubectl logs -n educlaw -l app=educlaw-server --previous
 
 ```bash
 # 确认 upstream 服务正常运行
+kubectl get endpoints -n gateway
 kubectl get endpoints -n educlaw
 
-# 确认 Kong 路由配置正确
-kubectl exec -n educlaw deploy/kong -- \
-  wget -qO- http://educlaw-server:3000/healthz
+# 确认 Kong 路由配置正确（跨命名空间访问 educlaw-server）
+kubectl exec -n gateway deploy/kong -- \
+  wget -qO- http://educlaw-server.educlaw:3000/healthz
 
 # 确认 Service 的 selector 与 Pod labels 匹配
 kubectl describe service educlaw-server -n educlaw
@@ -518,8 +550,8 @@ kubectl describe service educlaw-server -n educlaw
 
 ```bash
 # 查看 Job 日志
-kubectl logs -n educlaw job/zitadel-init
-kubectl logs -n educlaw job/zitadel-setup
+kubectl logs -n gateway job/zitadel-init
+kubectl logs -n gateway job/zitadel-setup
 
 # 常见原因：
 # - RDS 连接失败（检查白名单、安全组）
@@ -528,23 +560,23 @@ kubectl logs -n educlaw job/zitadel-setup
 # - Init Steps YAML 格式错误
 
 # 重置（如果需要完全重来）：
-kubectl delete job zitadel-init zitadel-setup -n educlaw
-kubectl delete pvc zitadel-pat -n educlaw
-kubectl apply -f <auth-service>/k8s/init.yaml
-kubectl apply -f <auth-service>/k8s/setup.yaml
+kubectl delete job zitadel-init zitadel-setup -n gateway
+kubectl delete pvc zitadel-pat -n gateway
+kubectl apply -f <auth-service>/k8s/init.yaml -n gateway
+kubectl apply -f <auth-service>/k8s/setup.yaml -n gateway
 ```
 
 ### 8.5 auth-backend 读不到 PAT 文件
 
 ```bash
-# 确认 PAT 文件存在
-kubectl exec -n educlaw deploy/zitadel -- ls -la /zitadel/bootstrap/
+# 确认 PAT 文件存在（gateway 命名空间）
+kubectl exec -n gateway deploy/zitadel -- ls -la /zitadel/bootstrap/
 
 # 确认 auth-backend 已挂载 PVC
-kubectl exec -n educlaw deploy/auth-backend -- ls -la /zitadel/bootstrap/
+kubectl exec -n gateway deploy/inno-agent-auth -- ls -la /zitadel/bootstrap/
 
 # 如果一个 Pod 能看到另一个看不到：PVC 的 accessMode 必须是 ReadWriteMany
-kubectl get pvc zitadel-pat -n educlaw
+kubectl get pvc zitadel-pat -n gateway
 ```
 
 ---
@@ -573,8 +605,11 @@ kubectl get pvc zitadel-pat -n educlaw
 ### 9.3 Kubernetes 资源
 
 ```bash
-# 导出所有资源定义作为备份
-kubectl get all,configmap,secret,ingress,pvc -n educlaw -o yaml > backup-$(date +%Y%m%d).yaml
+# 导出 gateway 命名空间资源
+kubectl get all,configmap,secret,ingress,pvc -n gateway -o yaml > backup-gateway-$(date +%Y%m%d).yaml
+
+# 导出 educlaw 命名空间资源
+kubectl get all,configmap,secret,ingress,pvc -n educlaw -o yaml > backup-educlaw-$(date +%Y%m%d).yaml
 ```
 
 ---

@@ -17,7 +17,6 @@ data:
   LLM_TIMEOUT_MS: "300000"
   LLM_NETWORK_RETRIES: "2"
   APP_ORIGIN: "http://app.localhost"
-  SEED_USERS: "false"
 
   # ─── Auth Backend ───
   HOST: "0.0.0.0"

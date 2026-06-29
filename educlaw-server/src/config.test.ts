@@ -8,9 +8,6 @@ const CONFIG_ENV_KEYS = [
   "LLM_TIMEOUT_MS",
   "DATABASE_URL",
   "APP_ORIGIN",
-  "SEED_USERS",
-  "SEED_USER_NAMES",
-  "SEED_USER_PASSWORD",
   "UPLOAD_LIMIT_MB",
   "LLM_BASE_URL",
   "LLM_API_KEY",
@@ -20,7 +17,6 @@ const CONFIG_ENV_KEYS = [
 ];
 
 const DEFAULT_LOCAL_DATABASE_URL = "postgres://educlawlite:local-dev-password@127.0.0.1:5435/educlawlite";
-const DEFAULT_LOCAL_SEED_PASSWORD = "local-dev-seed-password-not-for-production";
 
 function restoreEnv() {
   for (const key of Object.keys(process.env)) {
@@ -86,9 +82,6 @@ describe("config", () => {
     expect(config.databaseUrl).toBe(DEFAULT_LOCAL_DATABASE_URL);
     expect(config.appOrigin).toBe("http://localhost:4173");
     expect(config.appOrigins).toEqual(["http://localhost:4173"]);
-    expect(config.seedUsers).toBe(true);
-    expect(config.seedUserNames).toHaveLength(15);
-    expect(config.seedUserPassword).toBe(DEFAULT_LOCAL_SEED_PASSWORD);
     expect(config.uploadLimitBytes).toBe(25 * 1024 * 1024);
     expect(config.llmBaseUrl).toBe("https://api.openai.com/v1");
     expect(config.llmApiKey).toBe("");
@@ -103,8 +96,6 @@ describe("config", () => {
         PORT: "4001",
         LLM_TIMEOUT_MS: "1500",
         APP_ORIGIN: "http://localhost:5173, https://example.test ",
-        SEED_USERS: "false",
-        SEED_USER_NAMES: "alice, bob,,",
         UPLOAD_LIMIT_MB: "3",
         LLM_BASE_URL: "https://llm.example.test/v1///",
         LLM_NETWORK_RETRIES: "5",
@@ -114,8 +105,6 @@ describe("config", () => {
     expect(config.port).toBe(4001);
     expect(config.llmTimeoutMs).toBe(1500);
     expect(config.appOrigins).toEqual(["http://localhost:5173", "https://example.test"]);
-    expect(config.seedUsers).toBe(false);
-    expect(config.seedUserNames).toEqual(["alice", "bob"]);
     expect(config.uploadLimitBytes).toBe(3 * 1024 * 1024);
     expect(config.llmBaseUrl).toBe("https://llm.example.test/v1");
     expect(config.llmNetworkRetries).toBe(5);
@@ -143,15 +132,11 @@ describe("config", () => {
       envFile: [
         "APP_ORIGIN=http://from-dot-env.test",
         "DATABASE_URL='postgres://from-env-file'",
-        "SEED_USERS=yes",
-        "SEED_USER_NAMES=env1,env2",
       ].join("\n"),
     });
 
     expect(config.appOrigin).toBe("http://from-process-env.test");
     expect(config.databaseUrl).toBe("postgres://from-env-file");
-    expect(config.seedUsers).toBe(true);
-    expect(config.seedUserNames).toEqual(["env1", "env2"]);
   });
 
   it("prefers .env.local over .env when both exist", async () => {
@@ -188,14 +173,4 @@ describe("config", () => {
     })).rejects.toThrow("DATABASE_URL must be set to a strong production value");
   });
 
-  it("rejects placeholder seed passwords when seeded users are enabled in production", async () => {
-    await expect(loadConfig({
-      env: {
-        NODE_ENV: "production",
-        DATABASE_URL: "postgres://prod-user:prod-secret-password@db.example.com:5432/educlaw",
-        LLM_API_KEY: "valid-test-key",
-        SEED_USERS: "true",
-      },
-    })).rejects.toThrow("SEED_USER_PASSWORD must be set to a strong production value");
-  });
 });
