@@ -49,7 +49,7 @@ export interface AgentPackageSnapshot {
 }
 
 export interface AgentPackageSummary {
-  id: string;
+  id: number;
   userId: string;
   name: string;
   description: string;
@@ -62,8 +62,8 @@ export interface AgentPackageDetail extends AgentPackageSummary {
 }
 
 export interface PackageVersion {
-  id: string;
-  packageId: string;
+  id: number;
+  packageId: number;
   versionNumber: number;
   createdAt: string;
   source: "generated" | "imported" | "optimized" | "manual" | "interactive";
@@ -75,8 +75,8 @@ export type ArenaSide = "shared" | "baseline" | "enhanced";
 export type ArenaRole = "user" | "assistant";
 
 export interface ArenaThread {
-  id: string;
-  packageId: string;
+  id: number;
+  packageId: number;
   title: string;
   model: string | null;
   createdAt: string;
@@ -84,8 +84,8 @@ export interface ArenaThread {
 }
 
 export interface ArenaMessage {
-  id: string;
-  threadId: string;
+  id: number;
+  threadId: number;
   side: ArenaSide;
   role: ArenaRole;
   content: string;
@@ -119,7 +119,7 @@ export interface ArenaReportSide {
 }
 
 export interface ArenaReport {
-  threadId: string;
+  threadId: number;
   baseline: ArenaReportSide;
   enhanced: ArenaReportSide;
   recommendation: string;
@@ -154,8 +154,8 @@ export interface AutoEvalCaseResult {
 }
 
 export interface AutoEvalReport {
-  runId: string;
-  packageId: string;
+  runId: number;
+  packageId: number;
   sceneName: string;
   status: "pending" | "running" | "completed" | "failed";
   totalScore: number;
@@ -172,7 +172,7 @@ export interface AutoEvalReport {
 }
 
 export interface AutoEvalPreview {
-  packageId: string;
+  packageId: number;
   packageName: string;
   skillCount: number;
   builtinQuestions: AutoEvalQuestion[];
@@ -191,8 +191,8 @@ export interface OptimizationIssue {
 }
 
 export interface OptimizationResult {
-  packageId: string;
-  versionId: string;
+  packageId: number;
+  versionId: number;
   versionNumber: number;
   issues: OptimizationIssue[];
   snapshot: AgentPackageSnapshot;

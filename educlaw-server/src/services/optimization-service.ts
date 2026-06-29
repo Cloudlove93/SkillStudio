@@ -11,15 +11,15 @@ function isGeneratedSkill(value: unknown): value is Partial<PackageSkill> {
 
 export async function optimizePackage(
   userId: string,
-  packageId: string,
-  threadId: string,
+  packageId: string | number,
+  threadId: string | number,
   model?: string,
   onProgress?: ProgressCallback,
 ): Promise<OptimizationResult> {
   await onProgress?.("读取智能体与对话轨迹");
   const pkg = await getPackage(userId, packageId);
   const detail = await getThreadDetail(userId, threadId);
-  if (detail.thread.packageId !== packageId) {
+  if (Number(detail.thread.packageId) !== Number(packageId)) {
     throw new Error("当前 Arena 对话不属于这个智能体");
   }
 
@@ -144,7 +144,7 @@ export async function optimizePackage(
   const latest = versions[0]!;
 
   return {
-    packageId,
+    packageId: Number(packageId),
     versionId: latest.id,
     versionNumber: latest.versionNumber,
     issues: merged.issues,

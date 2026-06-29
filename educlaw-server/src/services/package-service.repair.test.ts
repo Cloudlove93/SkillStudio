@@ -5,8 +5,8 @@ const streamTextMock = vi.fn();
 const generateTextMock = vi.fn();
 
 interface VersionRow {
-  id: string;
-  package_id: string;
+  id: string | number;
+  package_id: string | number;
   version_number: number;
   source: string;
   snapshot_json: string;
@@ -16,11 +16,11 @@ interface VersionRow {
 
 interface SeedState {
   packageRow: {
-    id: string;
+    id: string | number;
     user_id: string;
     name: string;
     description: string;
-    current_version_id: string;
+    current_version_id: string | number;
     created_at: string;
     updated_at: string;
   };
@@ -105,18 +105,18 @@ function createSeedState(rubricMd = incompleteRubric): SeedState {
 
   return {
     packageRow: {
-      id: 'package-1',
+      id: 1,
       user_id: 'user-1',
       name: snapshot.name,
       description: snapshot.description,
-      current_version_id: 'version-1',
+      current_version_id: 1,
       created_at: '2026-06-27T00:00:00.000Z',
       updated_at: '2026-06-27T00:00:00.000Z',
     },
     versions: [
       {
-        id: 'version-1',
-        package_id: 'package-1',
+        id: 1,
+        package_id: 1,
         version_number: 1,
         source: 'generated',
         snapshot_json: JSON.stringify(snapshot),
@@ -130,10 +130,9 @@ function createSeedState(rubricMd = incompleteRubric): SeedState {
 async function loadService(state: SeedState) {
   vi.resetModules();
 
-  const ids = ['version-2'];
+  let nextId = state.versions.length + 1;
 
   vi.doMock('./db.js', () => ({
-    newId: () => ids.shift() || `id-${Math.random().toString(36).slice(2, 8)}`,
     query: queryMock.mockImplementation(async (sql: string, args: unknown[]) => {
       if (
         sql.startsWith(
@@ -165,16 +164,17 @@ async function loadService(state: SeedState) {
       }
 
       if (sql.startsWith('insert into agent_package_versions')) {
+        const id = nextId++;
         state.versions.push({
-          id: String(args[0]),
-          package_id: String(args[1]),
-          version_number: Number(args[2]),
-          source: String(args[3]),
-          snapshot_json: String(args[4]),
-          note: String(args[5] || ''),
-          created_at: String(args[6] || args[5]),
+          id,
+          package_id: args[0],
+          version_number: Number(args[1]),
+          source: String(args[2]),
+          snapshot_json: String(args[3]),
+          note: String(args[4] || ''),
+          created_at: String(args[5] || args[4]),
         });
-        return { rows: [], rowCount: 1 };
+        return { rows: [{ id }], rowCount: 1 };
       }
 
       if (
@@ -186,7 +186,7 @@ async function loadService(state: SeedState) {
           ...state.packageRow,
           name: String(args[0]),
           description: String(args[1]),
-          current_version_id: String(args[2]),
+          current_version_id: args[2],
           updated_at: String(args[3]),
         };
         return { rows: [], rowCount: 1 };
@@ -222,7 +222,7 @@ describe('repairPackageRubric', () => {
 
     const { hasConfiguredRubricText, repairPackageRubric } =
       await loadService(state);
-    const detail = await repairPackageRubric('user-1', 'package-1');
+    const detail = await repairPackageRubric('user-1', 1);
 
     expect(generateTextMock).toHaveBeenCalledTimes(1);
     expect(detail.versionNumber).toBe(2);
@@ -236,7 +236,7 @@ describe('repairPackageRubric', () => {
 
     const { hasConfiguredRubricText, repairPackageRubric } =
       await loadService(state);
-    const detail = await repairPackageRubric('user-1', 'package-1');
+    const detail = await repairPackageRubric('user-1', 1);
 
     expect(streamTextMock).not.toHaveBeenCalled();
     expect(generateTextMock).toHaveBeenCalledTimes(1);
@@ -257,7 +257,7 @@ describe('repairPackageRubric', () => {
     const state = createSeedState(completeRubric);
 
     const { repairPackageRubric } = await loadService(state);
-    const detail = await repairPackageRubric('user-1', 'package-1');
+    const detail = await repairPackageRubric('user-1', 1);
 
     expect(streamTextMock).not.toHaveBeenCalled();
     expect(generateTextMock).not.toHaveBeenCalled();
@@ -277,7 +277,7 @@ describe('repairPackageRubric', () => {
       .mockResolvedValueOnce(completeRubric);
 
     const { repairPackageRubric } = await loadService(state);
-    const detail = await repairPackageRubric('user-1', 'package-1');
+    const detail = await repairPackageRubric('user-1', 1);
 
     expect(generateTextMock).toHaveBeenCalledTimes(2);
     expect(generateTextMock.mock.calls[1]?.[0]?.userPrompt).toContain(
@@ -295,7 +295,7 @@ describe('optimizePackageRubric', () => {
     generateTextMock.mockResolvedValue(optimizedRubric);
 
     const { optimizePackageRubric } = await loadService(state);
-    const detail = await optimizePackageRubric('user-1', 'package-1');
+    const detail = await optimizePackageRubric('user-1', 1);
 
     expect(generateTextMock).toHaveBeenCalledTimes(1);
     expect(generateTextMock.mock.calls[0]?.[0]?.userPrompt).toContain(
@@ -312,7 +312,7 @@ describe('optimizePackageRubric', () => {
     generateTextMock.mockResolvedValue(completeRubric);
 
     const { optimizePackageRubric } = await loadService(state);
-    const detail = await optimizePackageRubric('user-1', 'package-1');
+    const detail = await optimizePackageRubric('user-1', 1);
 
     expect(generateTextMock).toHaveBeenCalledTimes(1);
     expect(detail.versionNumber).toBe(2);

@@ -14,14 +14,22 @@ describe("db schema initialization", () => {
     checkDbConnectionMock.mockReset();
   });
 
-  it("checks the database connection before running schema statements", async () => {
-    const { initDbSchema, schemaStatements } = await import("./db-schema.js");
+  it("checks the database connection before running schema and migration statements", async () => {
+    const { initDbSchema, schemaStatements, migrationStatements } = await import("./db-schema.js");
 
     await initDbSchema();
 
     expect(checkDbConnectionMock).toHaveBeenCalledOnce();
-    expect(queryMock).toHaveBeenCalledTimes(schemaStatements.length);
-    expect(queryMock.mock.calls.map((call) => call[0])).toEqual(schemaStatements);
+    const totalExpected = schemaStatements.length + migrationStatements.length;
+    expect(queryMock).toHaveBeenCalledTimes(totalExpected);
+
+    // First N calls are schema statements
+    const schemaCalls = queryMock.mock.calls.slice(0, schemaStatements.length).map((call) => call[0]);
+    expect(schemaCalls).toEqual(schemaStatements);
+
+    // Remaining calls are migration statements
+    const migrationCalls = queryMock.mock.calls.slice(schemaStatements.length).map((call) => call[0]);
+    expect(migrationCalls).toEqual(migrationStatements);
   });
 
   it("keeps all existing application tables in the manual schema script", async () => {

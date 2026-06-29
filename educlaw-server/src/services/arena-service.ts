@@ -7,7 +7,7 @@ import type {
   ArenaThread,
   ArenaThreadDetail,
 } from "@educlaw/shared";
-import { newId, query } from "./db.js";
+import { query } from "./db.js";
 import { generateJson, resolveBaselineModel, streamText } from "./llm-service.js";
 import { getPackage } from "./package-service.js";
 import type { DbRowMessage, DbRowThread } from "../types.js";
@@ -192,7 +192,7 @@ const BASELINE_SYSTEM_PROMPT = [
   "回答要务实、清晰、简洁。",
 ].join("\n");
 
-export async function listThreads(userId: string, packageId: string) {
+export async function listThreads(userId: string, packageId: string | number) {
   const result = await query<DbRowThread>(
     "select * from arena_threads where user_id = $1 and package_id = $2 order by updated_at desc",
     [userId, packageId],
@@ -200,28 +200,29 @@ export async function listThreads(userId: string, packageId: string) {
   return result.rows.map(toThread);
 }
 
-export async function createThread(userId: string, packageId: string, model?: string) {
+export async function createThread(userId: string, packageId: string | number, model?: string) {
   await getPackage(userId, packageId);
 
+  const now = new Date().toISOString();
+  const result = await query<{ id: number }>(
+    "insert into arena_threads (user_id, package_id, title, model, created_at, updated_at) values ($1, $2, $3, $4, $5, $6) returning id",
+    [userId, packageId, "New Arena Conversation", model || null, now, now],
+  );
+
   const row: DbRowThread = {
-    id: newId(),
+    id: result.rows[0].id,
     user_id: userId,
-    package_id: packageId,
+    package_id: Number(packageId),
     title: "New Arena Conversation",
     model: model || null,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    created_at: now,
+    updated_at: now,
   };
-
-  await query(
-    "insert into arena_threads (id, user_id, package_id, title, model, created_at, updated_at) values ($1, $2, $3, $4, $5, $6, $7)",
-    [row.id, row.user_id, row.package_id, row.title, row.model, row.created_at, row.updated_at],
-  );
 
   return toThread(row);
 }
 
-export async function getThreadDetail(userId: string, threadId: string): Promise<ArenaThreadDetail> {
+export async function getThreadDetail(userId: string, threadId: string | number): Promise<ArenaThreadDetail> {
   const threadResult = await query<DbRowThread>(
     "select * from arena_threads where id = $1 and user_id = $2",
     [threadId, userId],
@@ -239,7 +240,7 @@ export async function getThreadDetail(userId: string, threadId: string): Promise
 
 export async function* streamMessage(
   userId: string,
-  threadId: string,
+  threadId: string | number,
   content: string,
   model?: string,
   mode: ArenaMode = "compare",
@@ -257,19 +258,19 @@ export async function* streamMessage(
   const pkg = await getPackage(userId, detail.thread.packageId);
   const now = new Date().toISOString();
 
+  const sharedResult = await query<{ id: number }>(
+    "insert into arena_messages (thread_id, user_id, side, role, content, created_at) values ($1, $2, $3, $4, $5, $6) returning id",
+    [threadId, userId, "shared", "user", prompt, now],
+  );
+
   const shared: ArenaMessage = {
-    id: newId(),
-    threadId,
+    id: sharedResult.rows[0].id,
+    threadId: Number(threadId),
     side: "shared",
     role: "user",
     content: prompt,
     createdAt: now,
   };
-
-  await query(
-    "insert into arena_messages (id, thread_id, user_id, side, role, content, created_at) values ($1, $2, $3, $4, $5, $6, $7)",
-    [shared.id, threadId, userId, shared.side, shared.role, shared.content, shared.createdAt],
-  );
 
   yield { event: "shared", data: { message: shared } };
   yield {
@@ -347,20 +348,21 @@ export async function* streamMessage(
   }
 
   const savedAt = new Date().toISOString();
-  const assistantMessages: ArenaMessage[] = sides.map((side) => ({
-    id: newId(),
-    threadId,
-    side,
-    role: "assistant",
-    content: sideContents[side],
-    createdAt: savedAt,
-  }));
+  const assistantMessages: ArenaMessage[] = [];
 
-  for (const message of assistantMessages) {
-    await query(
-      "insert into arena_messages (id, thread_id, user_id, side, role, content, created_at) values ($1, $2, $3, $4, $5, $6, $7)",
-      [message.id, threadId, userId, message.side, message.role, message.content, message.createdAt],
+  for (const side of sides) {
+    const result = await query<{ id: number }>(
+      "insert into arena_messages (thread_id, user_id, side, role, content, created_at) values ($1, $2, $3, $4, $5, $6) returning id",
+      [threadId, userId, side, "assistant", sideContents[side], savedAt],
     );
+    assistantMessages.push({
+      id: result.rows[0].id,
+      threadId: Number(threadId),
+      side,
+      role: "assistant",
+      content: sideContents[side],
+      createdAt: savedAt,
+    });
   }
 
   await query(
@@ -399,7 +401,7 @@ export async function sendMessage(
   };
 }
 
-export async function generateReport(userId: string, threadId: string, model?: string): Promise<ArenaReport> {
+export async function generateReport(userId: string, threadId: string | number, model?: string): Promise<ArenaReport> {
   const detail = await getThreadDetail(userId, threadId);
   const pkg = await getPackage(userId, detail.thread.packageId);
   const enhancedLabel = pkg.snapshot.name || "Enhanced";
@@ -478,7 +480,7 @@ export async function generateReport(userId: string, threadId: string, model?: s
   };
 
   const report: ArenaReport = {
-    threadId,
+    threadId: Number(threadId),
     baseline: normalizeSide(rawReport.baseline, "Baseline"),
     enhanced: normalizeSide(rawReport.enhanced, enhancedLabel),
     recommendation: String(rawReport.recommendation || "").trim(),

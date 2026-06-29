@@ -7,36 +7,64 @@ const streamTextMock = vi.fn();
 async function loadService() {
   vi.resetModules();
 
-  const ids = ['skill-1', 'package-1', 'version-1'];
+  let nextId = 1;
   let storedPackage: Record<string, unknown> | null = null;
   let storedVersion: Record<string, unknown> | null = null;
 
   vi.doMock('./db.js', () => ({
-    newId: () => ids.shift() || `id-${Math.random().toString(36).slice(2, 8)}`,
     query: queryMock.mockImplementation(async (sql: string, args: unknown[]) => {
       if (sql.startsWith('insert into agent_package_versions')) {
+        const id = nextId++;
         storedVersion = {
-          id: args[0],
-          package_id: args[1],
-          version_number: args[2],
-          source: args[3],
-          snapshot_json: args[4],
-          created_at: args[5],
+          id,
+          package_id: args[0],
+          version_number: args[1],
+          source: args[2],
+          snapshot_json: args[3],
+          created_at: args[4],
           note: '',
         };
-        return { rows: [], rowCount: 1 };
+        return { rows: [{ id }], rowCount: 1 };
       }
 
       if (sql.startsWith('insert into agent_packages')) {
+        const id = nextId++;
         storedPackage = {
-          id: args[0],
-          user_id: args[1],
-          name: args[2],
-          description: args[3],
-          current_version_id: args[4],
-          created_at: args[5],
-          updated_at: args[6],
+          id,
+          user_id: args[0],
+          name: args[1],
+          description: args[2],
+          current_version_id: 0,
+          created_at: args[3],
+          updated_at: args[4],
         };
+        return { rows: [{ id }], rowCount: 1 };
+      }
+
+      if (
+        sql.startsWith(
+          'update agent_packages set name = $1, description = $2',
+        )
+      ) {
+        if (storedPackage) {
+          storedPackage = {
+            ...storedPackage,
+            name: args[0],
+            description: args[1],
+            current_version_id: args[2],
+            updated_at: args[3],
+          };
+        }
+        return { rows: [], rowCount: 1 };
+      }
+
+      if (sql.startsWith('update agent_packages set current_version_id')) {
+        if (storedPackage) {
+          storedPackage = {
+            ...storedPackage,
+            current_version_id: args[0],
+          };
+        }
         return { rows: [], rowCount: 1 };
       }
 

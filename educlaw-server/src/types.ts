@@ -12,18 +12,18 @@ export interface DbRowUser {
 }
 
 export interface DbRowPackage {
-  id: string;
+  id: number;
   user_id: string;
   name: string;
   description: string;
-  current_version_id: string;
+  current_version_id: number;
   created_at: string;
   updated_at: string;
 }
 
 export interface DbRowPackageVersion {
-  id: string;
-  package_id: string;
+  id: number;
+  package_id: number;
   version_number: number;
   source: string;
   snapshot_json: string;
@@ -32,9 +32,9 @@ export interface DbRowPackageVersion {
 }
 
 export interface DbRowThread {
-  id: string;
+  id: number;
   user_id: string;
-  package_id: string;
+  package_id: number;
   title: string;
   model: string | null;
   created_at: string;
@@ -42,8 +42,8 @@ export interface DbRowThread {
 }
 
 export interface DbRowMessage {
-  id: string;
-  thread_id: string;
+  id: number;
+  thread_id: number;
   user_id: string;
   side: string;
   role: string;
@@ -52,24 +52,25 @@ export interface DbRowMessage {
 }
 
 export interface DbRowInteractiveOptimizationSession {
-  id: string;
+  id: number;
   user_id: string;
-  package_id: string;
-  thread_id: string;
+  package_id: number;
+  thread_id: number;
   status: string;
   messages_json: string;
   issues_json: string;
   adopted_json: string;
   summary: string;
-  version_id: string | null;
+  version_id: number | null;
   version_number: number | null;
   created_at: string;
   updated_at: string;
 }
 
 export interface DbRowAutoEvalSpec {
+  id: number;
   user_id: string;
-  package_id: string;
+  package_id: number;
   questions_json: string;
   dimensions_json: string;
   created_at: string;
@@ -77,9 +78,9 @@ export interface DbRowAutoEvalSpec {
 }
 
 export interface DbRowAutoEvalRun {
-  id: string;
+  id: number;
   user_id: string;
-  package_id: string;
+  package_id: number;
   scene_name: string;
   status: string;
   questions_json: string;

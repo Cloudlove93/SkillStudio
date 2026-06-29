@@ -179,7 +179,7 @@ router.get(
         (req as AuthedRequest).userId || '',
         one(req.params.sessionId),
       );
-      if (session.packageId !== one(req.params.packageId)) {
+      if (session.packageId !== Number(one(req.params.packageId))) {
         res.status(404).json({ error: '优化记录不存在' });
         return;
       }

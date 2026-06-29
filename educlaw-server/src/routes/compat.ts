@@ -1,7 +1,8 @@
 import { Router, type Request, type Response } from "express";
 import type { AuthedRequest } from "../types.js";
 import { requireAuth } from "../middleware/auth.js";
-import { query, newId } from "../services/db.js";
+import { randomUUID } from "node:crypto";
+import { query } from "../services/db.js";
 import { listPackages, getPackage, generatePackage, deletePackage, exportPackageZip, importPackageZip } from "../services/package-service.js";
 import { listThreads, createThread, getThreadDetail, sendMessage, streamMessage, generateReport } from "../services/arena-service.js";
 import { optimizePackage } from "../services/optimization-service.js";
@@ -83,7 +84,7 @@ router.get("/events", writeCompatEventStream);
 
 router.get("/api/sidebar-groups", requireAuth, async (_req, res) => ok(res, []));
 router.post("/api/sidebar-groups", requireAuth, async (req, res) => ok(res, {
-  id: newId(),
+  id: randomUUID(),
   user_id: pickUserId(req),
   name: String(req.body?.name || "新分组"),
   icon: String(req.body?.icon || "folder"),
@@ -99,7 +100,7 @@ router.post("/api/sidebar-groups/move-item", requireAuth, async (_req, res) => o
 
 /* ─── Agents (stub) ─── */
 
-router.post("/agents", requireAuth, (_req, res) => ok(res, { id: newId(), name: "stub", profileFileName: "", status: "stopped" }));
+router.post("/agents", requireAuth, (_req, res) => ok(res, { id: randomUUID(), name: "stub", profileFileName: "", status: "stopped" }));
 router.post("/agents/:id/delete", requireAuth, (_req, res) => ok(res, { ok: true }));
 router.post("/agents/:id/start", requireAuth, (req, res) => ok(res, { id: String(req.params.id), status: "running" }));
 router.post("/agents/:id/stop", requireAuth, (req, res) => ok(res, { id: String(req.params.id), status: "stopped" }));
@@ -190,19 +191,19 @@ router.post("/profiles/published/:fileName/delete", requireAuth, async (_req, re
 router.post("/arena/profile/:fileName", requireAuth, async (req, res) => {
   try {
     await createThread(pickUserId(req), String(req.params.fileName));
-    ok(res, { id: newId(), target_kind: "profile", target_ref: String(req.params.fileName), status: "completed", created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+    ok(res, { id: randomUUID(), target_kind: "profile", target_ref: String(req.params.fileName), status: "completed", created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
   } catch (e) { bad(res, e instanceof Error ? e.message : "Failed"); }
 });
 
 router.post("/arena/skill/:dirName", requireAuth, async (req, res) => {
   try {
-    ok(res, { id: newId(), target_kind: "skill", target_ref: String(req.params.dirName), status: "completed", created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+    ok(res, { id: randomUUID(), target_kind: "skill", target_ref: String(req.params.dirName), status: "completed", created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
   } catch (e) { bad(res, e instanceof Error ? e.message : "Failed"); }
 });
 
 router.post("/arena/agent/:id", requireAuth, async (req, res) => {
   try {
-    ok(res, { id: newId(), target_kind: "agent", target_ref: String(req.params.id), status: "completed", created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+    ok(res, { id: randomUUID(), target_kind: "agent", target_ref: String(req.params.id), status: "completed", created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
   } catch (e) { bad(res, e instanceof Error ? e.message : "Failed"); }
 });
 
@@ -400,15 +401,20 @@ router.post("/arena/chat/sessions/:sessionId/report", requireAuth, async (req, r
     const report = await generateReport(userId, String(req.params.sessionId), req.body?.model);
     const detail = await getThreadDetail(userId, String(req.params.sessionId));
 
-    const runId = newId();
     const now = new Date().toISOString();
+    const runResult = await query<{ id: number }>(
+      "insert into arena_runs (session_id, package_id, target_kind, target_ref, model, state, report_json, created_at, updated_at) values ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning id",
+      [String(req.params.sessionId), detail.thread.packageId, "profile", detail.thread.packageId, detail.thread.model, 1, "{}", now, now],
+    );
+    const runId = runResult.rows[0].id;
+
     const runView = {
       run: {
         id: runId,
         target_kind: "profile" as const,
         target_ref: detail.thread.packageId,
         model: detail.thread.model,
-        status: "completed" as const,
+        state: 1,
         created_at: now,
         updated_at: now,
       },
@@ -454,8 +460,8 @@ router.post("/arena/chat/sessions/:sessionId/report", requireAuth, async (req, r
     };
 
     await query(
-      "insert into arena_runs (id, session_id, package_id, target_kind, target_ref, model, status, report_json, created_at, updated_at) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
-      [runId, String(req.params.sessionId), detail.thread.packageId, "profile", detail.thread.packageId, detail.thread.model, "completed", JSON.stringify(runView), now, now],
+      "update arena_runs set report_json = $1 where id = $2",
+      [JSON.stringify(runView), runId],
     );
 
     ok(res, runView);
@@ -483,7 +489,6 @@ async function createOptimizeRun(userId: string, targetRef: string, targetKind: 
 
   const result = await optimizePackage(userId, pkg.id, thread.id, model);
 
-  const runId = newId();
   const now = new Date().toISOString();
   const suggestions = result.issues.map((issue, idx) => ({
     key: `${issue.expert}-${idx}`,
@@ -498,6 +503,12 @@ async function createOptimizeRun(userId: string, targetRef: string, targetKind: 
         : { rubricMd: result.snapshot.rubricMd },
     status: "pending" as const,
   }));
+
+  const runResult = await query<{ id: number }>(
+    "insert into optimization_runs (package_id, thread_id, target_kind, target_ref, model, status, result_json, created_at, updated_at) values ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning id",
+    [pkg.id, thread.id, targetKind, targetRef, model || null, "pending", "{}", now, now],
+  );
+  const runId = runResult.rows[0].id;
 
   const runView = {
     run: {
@@ -515,8 +526,8 @@ async function createOptimizeRun(userId: string, targetRef: string, targetKind: 
   };
 
   await query(
-    "insert into optimization_runs (id, package_id, thread_id, target_kind, target_ref, model, status, result_json, created_at, updated_at) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
-    [runId, pkg.id, thread.id, targetKind, targetRef, model || null, "pending", JSON.stringify(runView), now, now],
+    "update optimization_runs set result_json = $1 where id = $2",
+    [JSON.stringify(runView), runId],
   );
 
   return { created: true, ...runView };

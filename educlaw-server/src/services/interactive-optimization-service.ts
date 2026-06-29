@@ -2,7 +2,7 @@
 import { generateChat, type ChatMessage } from "./llm-service.js";
 import { getPackage, applyOptimizedSnapshot } from "./package-service.js";
 import { getThreadDetail } from "./arena-service.js";
-import { newId, query } from "./db.js";
+import { query } from "./db.js";
 import type { DbRowInteractiveOptimizationSession } from "../types.js";
 
 export interface DiagnosisIssue {
@@ -51,15 +51,15 @@ export interface InteractiveOptimizationMessage {
 }
 
 export interface InteractiveOptimizationSession {
-  id: string;
-  packageId: string;
-  threadId: string;
+  id: number;
+  packageId: number;
+  threadId: number;
   status: string;
   messages: InteractiveOptimizationMessage[];
   issues: DiagnosisIssue[];
   adoptedChanges: AdoptedChange[];
   summary: string;
-  versionId?: string;
+  versionId?: number;
   versionNumber?: number;
   createdAt: string;
   updatedAt: string;
@@ -111,49 +111,37 @@ function buildSessionSummary(
 
 async function createInteractiveSession(
   userId: string,
-  packageId: string,
-  threadId: string,
+  packageId: string | number,
+  threadId: string | number,
   messages: InteractiveOptimizationMessage[],
   issues: DiagnosisIssue[],
   adoptedChanges: AdoptedChange[] = [],
 ) {
   const now = new Date().toISOString();
+  const summary = buildSessionSummary(messages, adoptedChanges, issues);
+
+  const result = await query<{ id: number }>(
+    `insert into interactive_optimization_sessions
+      (user_id, package_id, thread_id, status, messages_json, issues_json, adopted_json, summary, version_id, version_number, created_at, updated_at)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) returning id`,
+    [userId, packageId, threadId, "active", JSON.stringify(messages), JSON.stringify(issues), JSON.stringify(adoptedChanges), summary, null, null, now, now],
+  );
+
   const row: DbRowInteractiveOptimizationSession = {
-    id: newId(),
+    id: result.rows[0].id,
     user_id: userId,
-    package_id: packageId,
-    thread_id: threadId,
+    package_id: Number(packageId),
+    thread_id: Number(threadId),
     status: "active",
     messages_json: JSON.stringify(messages),
     issues_json: JSON.stringify(issues),
     adopted_json: JSON.stringify(adoptedChanges),
-    summary: buildSessionSummary(messages, adoptedChanges, issues),
+    summary,
     version_id: null,
     version_number: null,
     created_at: now,
     updated_at: now,
   };
-
-  await query(
-    `insert into interactive_optimization_sessions
-      (id, user_id, package_id, thread_id, status, messages_json, issues_json, adopted_json, summary, version_id, version_number, created_at, updated_at)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
-    [
-      row.id,
-      row.user_id,
-      row.package_id,
-      row.thread_id,
-      row.status,
-      row.messages_json,
-      row.issues_json,
-      row.adopted_json,
-      row.summary,
-      row.version_id,
-      row.version_number,
-      row.created_at,
-      row.updated_at,
-    ],
-  );
 
   return toInteractiveSession(row);
 }
@@ -176,7 +164,7 @@ async function updateInteractiveSession(
     issues?: DiagnosisIssue[];
     adoptedChanges?: AdoptedChange[];
     status?: string;
-    versionId?: string;
+    versionId?: string | number;
     versionNumber?: number;
   },
 ) {
@@ -218,7 +206,7 @@ async function updateInteractiveSession(
   return toInteractiveSession(row);
 }
 
-export async function listInteractiveSessions(userId: string, packageId: string) {
+export async function listInteractiveSessions(userId: string, packageId: string | number) {
   await getPackage(userId, packageId);
   const result = await query<DbRowInteractiveOptimizationSession>(
     "select * from interactive_optimization_sessions where user_id = $1 and package_id = $2 order by updated_at desc",
@@ -552,14 +540,14 @@ function parseMarkers(reply: string): {
 
 export async function diagnosePackage(
   userId: string,
-  packageId: string,
-  threadId: string,
+  packageId: string | number,
+  threadId: string | number,
   model?: string,
 ): Promise<DiagnosisResult> {
   const pkg = await getPackage(userId, packageId);
   const detail = await getThreadDetail(userId, threadId);
 
-  if (detail.thread.packageId !== packageId) {
+  if (Number(detail.thread.packageId) !== Number(packageId)) {
     throw new Error("当前 Arena 对话不属于这个智能体");
   }
 
@@ -674,7 +662,7 @@ export async function diagnosePackage(
 
 export async function chatOptimize(
   userId: string,
-  packageId: string,
+  packageId: string | number,
   input: ChatOptimizeInput,
   model?: string,
 ): Promise<ChatOptimizeResult> {
@@ -777,12 +765,12 @@ export async function chatOptimize(
 
 export async function applyInteractiveChanges(
   userId: string,
-  packageId: string,
+  packageId: string | number,
   changes: AdoptedChange[],
   model?: string,
   note?: string,
   sessionId?: string,
-): Promise<{ versionId: string; versionNumber: number }> {
+): Promise<{ versionId: number; versionNumber: number }> {
   const pkg = await getPackage(userId, packageId);
   const normalizedSnapshot = buildInteractiveSnapshotFromAdoptions(pkg, changes);
 

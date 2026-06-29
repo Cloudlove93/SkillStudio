@@ -26,7 +26,8 @@ import {
   buildSkillSystemPrompt,
   buildSkillUserPrompt,
 } from '../prompts/package-generation.js';
-import { newId, query } from './db.js';
+import { randomUUID } from 'node:crypto';
+import { query } from './db.js';
 import type { DbRowPackage, DbRowPackageVersion } from '../types.js';
 
 interface PackageGenerationResult {
@@ -118,7 +119,7 @@ function ensureSkillIds(snapshot: AgentPackageSnapshot): AgentPackageSnapshot {
     ...snapshot,
     skills: skills.map((skill) => ({
       ...skill,
-      id: skill.id || newId(),
+      id: skill.id || randomUUID(),
     })),
   };
 }
@@ -1313,7 +1314,7 @@ function normalizeSnapshot(
     agentMd: input.agentMd.trim(),
     rubricMd: normalizeStoredRubricMarkdown(input.rubricMd),
     skills: input.skills.map((skill) => ({
-      id: newId(),
+      id: randomUUID(),
       dirName: slugify(skill.dirName || skill.name),
       name: skill.name.trim(),
       description: skill.description.trim(),
@@ -1633,7 +1634,7 @@ function toDetail(
   };
 }
 
-async function getPackageRow(userId: string, packageId: string) {
+async function getPackageRow(userId: string, packageId: string | number) {
   const packageResult = await query<DbRowPackage>(
     'select * from agent_packages where id = $1 and user_id = $2',
     [packageId, userId],
@@ -1667,14 +1668,14 @@ export async function listPackages(userId: string) {
   return items;
 }
 
-export async function getPackage(userId: string, packageId: string) {
+export async function getPackage(userId: string, packageId: string | number) {
   const { row, version } = await getPackageRow(userId, packageId);
   return toDetail(row, version);
 }
 
 export async function renamePackage(
   userId: string,
-  packageId: string,
+  packageId: string | number,
   name: string,
 ) {
   const nextName = name.trim();
@@ -1697,7 +1698,7 @@ export async function renamePackage(
   return toDetail(result.rows[0], version);
 }
 
-export async function listVersions(userId: string, packageId: string) {
+export async function listVersions(userId: string, packageId: string | number) {
   const packageResult = await query<DbRowPackage>(
     'select * from agent_packages where id = $1 and user_id = $2',
     [packageId, userId],
@@ -1758,27 +1759,27 @@ async function createPackageWithSnapshot(
   snapshot: AgentPackageSnapshot,
   source: PackageVersion['source'],
 ) {
-  const packageId = newId();
-  const versionId = newId();
   const now = new Date().toISOString();
   const fixedSnapshot = ensureSkillIds(snapshot);
 
-  await query(
-    'insert into agent_package_versions (id, package_id, version_number, source, snapshot_json, created_at) values ($1, $2, $3, $4, $5, $6)',
-    [versionId, packageId, 1, source, JSON.stringify(fixedSnapshot), now],
+  // Insert package first (with placeholder current_version_id)
+  const pkgResult = await query<{ id: number }>(
+    'insert into agent_packages (user_id, name, description, current_version_id, created_at, updated_at) values ($1, $2, $3, 0, $4, $5) returning id',
+    [userId, fixedSnapshot.name, fixedSnapshot.description, now, now],
   );
+  const packageId = pkgResult.rows[0].id;
 
+  // Insert version with real package_id
+  const verResult = await query<{ id: number }>(
+    'insert into agent_package_versions (package_id, version_number, source, snapshot_json, created_at) values ($1, $2, $3, $4, $5) returning id',
+    [packageId, 1, source, JSON.stringify(fixedSnapshot), now],
+  );
+  const versionId = verResult.rows[0].id;
+
+  // Update package with real version_id
   await query(
-    'insert into agent_packages (id, user_id, name, description, current_version_id, created_at, updated_at) values ($1, $2, $3, $4, $5, $6, $7)',
-    [
-      packageId,
-      userId,
-      fixedSnapshot.name,
-      fixedSnapshot.description,
-      versionId,
-      now,
-      now,
-    ],
+    'update agent_packages set current_version_id = $1 where id = $2',
+    [versionId, packageId],
   );
 
   return getPackage(userId, packageId);
@@ -1993,7 +1994,6 @@ async function importPackageWithVersions(
 ) {
   if (versions.length === 0) throw new Error('版本历史为空');
 
-  const packageId = newId();
   const now = new Date().toISOString();
 
   // Sort by versionNumber ascending to ensure correct insertion order
@@ -2012,44 +2012,37 @@ async function importPackageWithVersions(
   if (!packageName) packageName = '导入的智能体';
   if (!packageDescription) packageDescription = '导入的智能体';
 
+  // Insert package first (with placeholder current_version_id)
+  const pkgResult = await query<{ id: number }>(
+    'insert into agent_packages (user_id, name, description, current_version_id, created_at, updated_at) values ($1, $2, $3, 0, $4, $5) returning id',
+    [userId, packageName, packageDescription, now, now],
+  );
+  const packageId = pkgResult.rows[0].id;
+
   // 创建所有版本记录（确保每个 snapshot 都有 name/description）
-  let currentVersionId = '';
+  let currentVersionId = 0;
   let maxVersionNumber = 0;
   for (const v of sortedVersions) {
-    const versionId = newId();
     const enrichedSnapshot: AgentPackageSnapshot = ensureSkillIds({
       ...v.snapshot,
       name: v.snapshot.name || packageName,
       description: v.snapshot.description || packageDescription,
     });
-    await query(
-      'insert into agent_package_versions (id, package_id, version_number, source, snapshot_json, created_at) values ($1, $2, $3, $4, $5, $6)',
-      [
-        versionId,
-        packageId,
-        v.versionNumber,
-        v.source,
-        JSON.stringify(enrichedSnapshot),
-        v.createdAt || now,
-      ],
+    const verResult = await query<{ id: number }>(
+      'insert into agent_package_versions (package_id, version_number, source, snapshot_json, created_at) values ($1, $2, $3, $4, $5) returning id',
+      [packageId, v.versionNumber, v.source, JSON.stringify(enrichedSnapshot), v.createdAt || now],
     );
+    const versionId = verResult.rows[0].id;
     if (v.versionNumber >= maxVersionNumber) {
       maxVersionNumber = v.versionNumber;
       currentVersionId = versionId;
     }
   }
 
+  // Update package with real current_version_id
   await query(
-    'insert into agent_packages (id, user_id, name, description, current_version_id, created_at, updated_at) values ($1, $2, $3, $4, $5, $6, $7)',
-    [
-      packageId,
-      userId,
-      packageName,
-      packageDescription,
-      currentVersionId,
-      now,
-      now,
-    ],
+    'update agent_packages set current_version_id = $1 where id = $2',
+    [currentVersionId, packageId],
   );
 
   return getPackage(userId, packageId);
@@ -2143,7 +2136,7 @@ export async function importPackageZip(userId: string, zipBuffer: Buffer) {
         .find((line: string) => line.startsWith('# '))
         ?.replace(/^#\s+/, '') || dirName;
     return {
-      id: newId(),
+      id: randomUUID(),
       dirName,
       name: title,
       description: `${title} skill`,
@@ -2241,7 +2234,7 @@ export async function deletePackage(userId: string, packageId: string) {
 
 export async function applyOptimizedSnapshot(
   userId: string,
-  packageId: string,
+  packageId: string | number,
   snapshot: AgentPackageSnapshot,
   source: PackageVersion['source'],
   note?: string,
@@ -2252,7 +2245,6 @@ export async function applyOptimizedSnapshot(
     [packageId],
   );
   const nextVersion = (versions.rows[0]?.version_number || 0) + 1;
-  const versionId = newId();
   const now = new Date().toISOString();
 
   // Ensure snapshot has name/description from the original package
@@ -2264,18 +2256,11 @@ export async function applyOptimizedSnapshot(
     versionLabel: `v${nextVersion}`,
   });
 
-  await query(
-    'insert into agent_package_versions (id, package_id, version_number, source, snapshot_json, note, created_at) values ($1, $2, $3, $4, $5, $6, $7)',
-    [
-      versionId,
-      packageId,
-      nextVersion,
-      source,
-      JSON.stringify(nextSnapshot),
-      note || '',
-      now,
-    ],
+  const verResult = await query<{ id: number }>(
+    'insert into agent_package_versions (package_id, version_number, source, snapshot_json, note, created_at) values ($1, $2, $3, $4, $5, $6) returning id',
+    [packageId, nextVersion, source, JSON.stringify(nextSnapshot), note || '', now],
   );
+  const versionId = verResult.rows[0].id;
 
   await query(
     'update agent_packages set name = $1, description = $2, current_version_id = $3, updated_at = $4 where id = $5 and user_id = $6',
@@ -2517,13 +2502,13 @@ export interface SkillDiff {
 
 export interface VersionCompareResult {
   baseVersion: {
-    id: string;
+    id: number;
     versionNumber: number;
     source: string;
     createdAt: string;
   };
   targetVersion: {
-    id: string;
+    id: number;
     versionNumber: number;
     source: string;
     createdAt: string;
@@ -2638,7 +2623,7 @@ function compactDiff(diffs: LineDiff[], contextLines = 2): LineDiff[] {
 
 export async function getVersion(
   userId: string,
-  packageId: string,
+  packageId: string | number,
   versionId: string,
 ): Promise<PackageVersion> {
   const packageResult = await query<DbRowPackage>(
@@ -2667,7 +2652,7 @@ export async function getVersion(
 
 export async function compareVersions(
   userId: string,
-  packageId: string,
+  packageId: string | number,
   baseVersionId: string,
   targetVersionId: string,
   model?: string,

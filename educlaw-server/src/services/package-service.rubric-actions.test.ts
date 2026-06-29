@@ -5,8 +5,8 @@ const generateTextMock = vi.fn();
 const streamTextMock = vi.fn();
 
 interface VersionRow {
-  id: string;
-  package_id: string;
+  id: string | number;
+  package_id: string | number;
   version_number: number;
   source: string;
   snapshot_json: string;
@@ -16,11 +16,11 @@ interface VersionRow {
 
 interface SeedState {
   packageRow: {
-    id: string;
+    id: string | number;
     user_id: string;
     name: string;
     description: string;
-    current_version_id: string;
+    current_version_id: string | number;
     created_at: string;
     updated_at: string;
   };
@@ -92,18 +92,18 @@ function createSeedState(rubricMd = pollutedStoredRubric): SeedState {
 
   return {
     packageRow: {
-      id: 'package-1',
+      id: 1,
       user_id: 'user-1',
       name: snapshot.name,
       description: snapshot.description,
-      current_version_id: 'version-1',
+      current_version_id: 1,
       created_at: '2026-06-28T00:00:00.000Z',
       updated_at: '2026-06-28T00:00:00.000Z',
     },
     versions: [
       {
-        id: 'version-1',
-        package_id: 'package-1',
+        id: 1,
+        package_id: 1,
         version_number: 1,
         source: 'generated',
         snapshot_json: JSON.stringify(snapshot),
@@ -117,8 +117,9 @@ function createSeedState(rubricMd = pollutedStoredRubric): SeedState {
 async function loadService(state: SeedState) {
   vi.resetModules();
 
+  let nextId = state.versions.length + 1;
+
   vi.doMock('./db.js', () => ({
-    newId: () => `id-${state.versions.length + 1}`,
     query: queryMock.mockImplementation(async (sql: string, args: unknown[]) => {
       if (
         sql.startsWith(
@@ -151,16 +152,17 @@ async function loadService(state: SeedState) {
       }
 
       if (sql.startsWith('insert into agent_package_versions')) {
+        const id = nextId++;
         state.versions.push({
-          id: String(args[0]),
-          package_id: String(args[1]),
-          version_number: Number(args[2]),
-          source: String(args[3]),
-          snapshot_json: String(args[4]),
-          note: String(args[5] || ''),
-          created_at: String(args[6] || ''),
+          id,
+          package_id: args[0],
+          version_number: Number(args[1]),
+          source: String(args[2]),
+          snapshot_json: String(args[3]),
+          note: String(args[4] || ''),
+          created_at: String(args[5] || ''),
         });
-        return { rows: [], rowCount: 1 };
+        return { rows: [{ id }], rowCount: 1 };
       }
 
       if (
@@ -172,7 +174,7 @@ async function loadService(state: SeedState) {
           ...state.packageRow,
           name: String(args[0]),
           description: String(args[1]),
-          current_version_id: String(args[2]),
+          current_version_id: args[2],
           updated_at: String(args[3]),
         };
         return { rows: [], rowCount: 1 };
@@ -206,7 +208,7 @@ describe('rubric actions', () => {
     const state = createSeedState();
     const { applyManualMarkdownEdit } = await loadService(state);
 
-    const detail = await applyManualMarkdownEdit('user-1', 'package-1', {
+    const detail = await applyManualMarkdownEdit('user-1', 1, {
       target: 'rubric',
       content: pollutedStoredRubric,
       note: 'manual cleanup',
@@ -220,7 +222,7 @@ describe('rubric actions', () => {
     const state = createSeedState();
     const { repairPackageRubric } = await loadService(state);
 
-    const detail = await repairPackageRubric('user-1', 'package-1');
+    const detail = await repairPackageRubric('user-1', 1);
 
     expect(generateTextMock).not.toHaveBeenCalled();
     expect(detail.versionNumber).toBe(2);
@@ -231,7 +233,7 @@ describe('rubric actions', () => {
     const state = createSeedState();
     const { optimizePackageRubric } = await loadService(state);
 
-    const detail = await optimizePackageRubric('user-1', 'package-1');
+    const detail = await optimizePackageRubric('user-1', 1);
 
     expect(generateTextMock).not.toHaveBeenCalled();
     expect(detail.versionNumber).toBe(2);
@@ -248,7 +250,7 @@ describe('rubric actions', () => {
     });
 
     const { optimizePackageRubric } = await loadService(state);
-    const detail = await optimizePackageRubric('user-1', 'package-1');
+    const detail = await optimizePackageRubric('user-1', 1);
 
     expect(generateTextMock).toHaveBeenCalledTimes(1);
     expect(detail.versionNumber).toBe(2);

@@ -9,7 +9,7 @@ import type {
   AutoEvalDimensionScore,
 } from "@educlaw/shared";
 import { config } from "../config.js";
-import { newId, query } from "./db.js";
+import { query } from "./db.js";
 import { getPackage } from "./package-service.js";
 import { generateJson } from "./llm-service.js";
 import type { DbRowAutoEvalRun, DbRowAutoEvalSpec } from "../types.js";
@@ -77,7 +77,7 @@ function trimBlock(text: string, maxChars: number) {
   return normalized.length > maxChars ? `${normalized.slice(0, maxChars)}\n\n[内容已截断]` : normalized;
 }
 
-function safeSceneName(packageId: string) {
+function safeSceneName(packageId: string | number) {
   return `educlaw-${packageId}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`.replace(/[^a-zA-Z0-9_-]/g, "-");
 }
 
@@ -172,7 +172,7 @@ async function enrichTitles(questions: AutoEvalQuestion[], model?: string): Prom
   }
 }
 
-async function getSpec(userId: string, packageId: string) {
+async function getSpec(userId: string, packageId: string | number) {
   const result = await query<DbRowAutoEvalSpec>(
     "select * from auto_eval_specs where user_id = $1 and package_id = $2",
     [userId, packageId],
@@ -195,7 +195,7 @@ async function saveSpec(userId: string, packageId: string, questions: AutoEvalQu
   );
 }
 
-async function latestRun(userId: string, packageId: string): Promise<AutoEvalReport | undefined> {
+async function latestRun(userId: string, packageId: string | number): Promise<AutoEvalReport | undefined> {
   const result = await query<DbRowAutoEvalRun>(
     "select * from auto_eval_runs where user_id = $1 and package_id = $2 order by created_at desc limit 1",
     [userId, packageId],
@@ -247,11 +247,11 @@ export async function getAutoEvalHealth() {
   }
 }
 
-export async function previewAutoEval(userId: string, packageId: string): Promise<AutoEvalPreview> {
+export async function previewAutoEval(userId: string, packageId: string | number): Promise<AutoEvalPreview> {
   const pkg = await getPackage(userId, packageId);
   const spec = await getSpec(userId, packageId);
   return {
-    packageId,
+    packageId: Number(packageId),
     packageName: pkg.name,
     skillCount: pkg.snapshot.skills.length,
     builtinQuestions: AUTO_EVAL_QUESTIONS,
@@ -558,7 +558,7 @@ function summarizeDimensions(results: Record<string, unknown>[]): AutoEvalDimens
   }));
 }
 
-function normalizeReport(raw: unknown, runId: string, packageId: string, sceneName: string, questions: AutoEvalQuestion[], compactRetryUsed: boolean): AutoEvalReport {
+function normalizeReport(raw: unknown, runId: string | number, packageId: string | number, sceneName: string, questions: AutoEvalQuestion[], compactRetryUsed: boolean): AutoEvalReport {
   const root = asRecord(raw);
   const rows = getBatchItems(root);
   const completedResults = rows
@@ -600,8 +600,8 @@ function normalizeReport(raw: unknown, runId: string, packageId: string, sceneNa
   const allSuggestions = [...new Set(cases.flatMap((item) => item.suggestions))];
   const now = new Date().toISOString();
   return {
-    runId,
-    packageId,
+    runId: Number(runId),
+    packageId: Number(packageId),
     sceneName,
     status: "completed",
     totalScore,
@@ -617,7 +617,7 @@ function normalizeReport(raw: unknown, runId: string, packageId: string, sceneNa
   };
 }
 
-export async function runAutoEval(userId: string, packageId: string, questionIds?: string[]) {
+export async function runAutoEval(userId: string, packageId: string | number, questionIds?: string[]) {
   const pkg = await getPackage(userId, packageId);
   const spec = await getSpec(userId, packageId);
   const allQuestions = [...spec.documentQuestions, ...AUTO_EVAL_QUESTIONS];
@@ -626,14 +626,14 @@ export async function runAutoEval(userId: string, packageId: string, questionIds
     : allQuestions.slice(0, 3);
   if (selected.length === 0) throw new Error("请至少选择一道测评题");
 
-  const runId = newId();
   const now = new Date().toISOString();
   let sceneName = "";
-  await query(
-    `insert into auto_eval_runs (id, user_id, package_id, scene_name, status, questions_json, report_json, error_message, created_at, updated_at)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-    [runId, userId, packageId, "", "running", JSON.stringify(selected), "{}", "", now, now],
+  const runResult = await query<{ id: number }>(
+    `insert into auto_eval_runs (user_id, package_id, scene_name, status, questions_json, report_json, error_message, created_at, updated_at)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning id`,
+    [userId, packageId, "", "running", JSON.stringify(selected), "{}", "", now, now],
   );
+  const runId = runResult.rows[0].id;
 
   try {
     sceneName = await writeScene(pkg, selected, spec.dimensions, false);
@@ -659,8 +659,8 @@ export async function runAutoEval(userId: string, packageId: string, questionIds
     const message = error instanceof Error ? error.message : String(error);
     const updatedAt = new Date().toISOString();
     const failed: AutoEvalReport = {
-      runId,
-      packageId,
+      runId: Number(runId),
+      packageId: Number(packageId),
       sceneName,
       status: "failed",
       totalScore: 0,

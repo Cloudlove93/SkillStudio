@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { Pool, type QueryResultRow } from "pg";
 import { config } from "../config.js";
 
@@ -14,8 +13,4 @@ export async function closeDbPool() {
 
 export async function query<T extends QueryResultRow = Record<string, unknown>>(text: string, values: unknown[] = []) {
   return pool.query<T>(text, values);
-}
-
-export function newId() {
-  return randomUUID();
 }
