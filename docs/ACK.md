@@ -4,7 +4,7 @@
 
 ```mermaid
 flowchart TD
-    SLB[阿里云 SLB / Nginx Ingress<br/>app.localhost / auth.localhost]
+    SLB[阿里云 SLB / Nginx Ingress<br/>app.eduskill / auth.eduskill]
     Kong[Kong Gateway<br/>Deployment, replicas: 2<br/>oidc-jwt-auth + 模板渲染 initContainer]
     Zitadel[Zitadel v4.13.1<br/>:8080]
     AuthBackend[Auth Backend<br/>:3000]
@@ -37,11 +37,11 @@ Kong 路由规则：
 
 | 路径                            | Host 条件          | 目标服务         | 端口 |
 | ------------------------------- | ------------------ | ---------------- | ---- |
-| `/`                           | `auth.localhost` | Zitadel          | 8080 |
-| `/ui/v2/login`                | `auth.localhost` | Zitadel Login UI | 3000 |
+| `/`                           | `auth.eduskill` | Zitadel          | 8080 |
+| `/ui/v2/login`                | `auth.eduskill` | Zitadel Login UI | 3000 |
 | `/auth`, `/sms/send`        | 无限制             | auth-backend     | 3000 |
-| `/agents`, `/api`, `/llm` | `app.localhost`  | educlaw-server   | 3000 |
-| `/`                           | `app.localhost`  | educlaw-web      | 80   |
+| `/agents`, `/api`, `/llm` | `app.eduskill`  | educlaw-server   | 3000 |
+| `/`                           | `app.eduskill`  | educlaw-web      | 80   |
 
 > educlaw-web 的 nginx 会将 `/auth`、`/api` 等 API 请求反向代理到 educlaw-server，静态资源由自身直接返回。
 
@@ -54,7 +54,7 @@ Kong 路由规则：
 | 身份认证 | Zitadel v4.13.1                    | OIDC 标准，支持 SMS / 密码登录                             |
 | 文件存储 | 阿里云 NAS（极速型，两个独立 PVC） | ReadWriteMany，zitadel-pat 与 educlaw-eval-scenes 隔离挂载 |
 | 镜像仓库 | ACR 个人版（上海）                 | 已有账号，内网拉取快                                       |
-| 入口     | Nginx Ingress Controller           | 灵活的路由注解，支持 SSL                                   |
+| 入口     | Nginx Ingress Controller           | 灵活的路由注解                                             |
 
 ---
 
@@ -83,8 +83,8 @@ Kong 路由规则：
 # 2. 安装 NAS CSI 驱动（如果需要 NAS 存储）
 #    控制台 → 组件管理 → 安装 csi-plugin + csi-provisioner
 
-# 3. （可选）安装 cert-manager 用于自动 SSL
-kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.14.0/cert-manager.yaml
+# 3. （可选）安装 cert-manager
+# kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.14.0/cert-manager.yaml
 ```
 
 ### 1.3 资源预估
@@ -266,16 +266,16 @@ stringData:
 
 ### 5.1 部署顺序
 
-| 阶段 | 资源                                                       | 状态                          |
-| ---- | ---------------------------------------------------------- | ----------------------------- |
-| 0    | Namespace + Secrets + zitadel-pat PVC                      | 已有（auth-service/k8s 管理） |
-| 1    | Zitadel init Job → setup Job → start Deployment          | 已部署                        |
-| 2    | Zitadel Login UI + Kong                                    | 已部署                        |
-| 3    | educlaw-secrets + educlaw-config + educlaw-eval-scenes PVC | **新增**                |
-| 4    | auth-backend Deployment                                    | **新增**                |
-| 5    | educlaw-server Deployment                                  | **新增**                |
-| 6    | educlaw-web Deployment                                     | **新增**                |
-| 7    | Ingress                                                    | **新增**                |
+| 阶段 | 资源                                                       | 状态           |
+| ---- | ---------------------------------------------------------- | -------------- |
+| 0    | Namespace（已存在）+ Secrets + zitadel-pat PVC             | **新增** |
+| 1    | Zitadel init Job → setup Job → start Deployment          | **新增** |
+| 2    | Zitadel Login UI + Kong                                    | **新增** |
+| 3    | educlaw-secrets + educlaw-config + educlaw-eval-scenes PVC | **新增** |
+| 4    | auth-backend Deployment                                    | **新增** |
+| 5    | educlaw-server Deployment                                  | **新增** |
+| 6    | educlaw-web Deployment                                     | **新增** |
+| 7    | Ingress                                                    | **新增** |
 
 ### 5.2 前置检查
 
@@ -303,24 +303,21 @@ kubectl run pg-test --rm -it --image=postgres:17 --restart=Never -n educlaw -- \
 cd <EduClaw-arena-repo-path>
 
 # 1. 基础配置
-kubectl apply -f k8s/educlaw-secrets.yaml
-kubectl apply -f k8s/educlaw-config.yaml
-kubectl apply -f k8s/educlaw-pvc.yaml
+kubectl apply -f k8s/educlaw-secrets.yaml -n educlaw
+kubectl apply -f k8s/educlaw-config.yaml -n educlaw
+kubectl apply -f k8s/educlaw-pvc.yaml -n educlaw
 
 # 2. auth-backend
-kubectl apply -f k8s/auth-backend.yaml
-kubectl wait --for=condition=ready pod -l app=auth-backend -n educlaw --timeout=120s
+kubectl apply -f k8s/auth-backend.yaml -n educlaw
 
 # 3. educlaw-server
-kubectl apply -f k8s/educlaw-server.yaml
-kubectl wait --for=condition=ready pod -l app=educlaw-server -n educlaw --timeout=120s
+kubectl apply -f k8s/educlaw-server.yaml -n educlaw
 
 # 4. educlaw-web
-kubectl apply -f k8s/educlaw-web.yaml
-kubectl wait --for=condition=ready pod -l app=educlaw-web -n educlaw --timeout=120s
+kubectl apply -f k8s/educlaw-web.yaml -n educlaw
 
 # 5. Ingress
-kubectl apply -f k8s/ingress.yaml
+kubectl apply -f k8s/ingress.yaml -n educlaw
 ```
 
 ### 5.4 部署验证
@@ -350,7 +347,7 @@ kubectl get ingress -n educlaw
 
 # 4. 测试 Kong 路由（从集群内）
 kubectl exec -n educlaw deploy/kong -- \
-  wget -qO- --header="Host: app.localhost" http://localhost:8000/
+  wget -qO- --header="Host: app.eduskill" http://localhost:8000/
 
 # 5. 查看日志
 kubectl logs -n educlaw -l app=educlaw-server --tail=50
@@ -365,61 +362,26 @@ kubectl logs -n educlaw -l app=auth-backend --tail=50
 
 本方案使用本地测试域名（通过 `/etc/hosts` 或 DNS 解析到 Ingress SLB IP）：
 
-| 域名                 | 用途                | Kong 路由                 |
-| -------------------- | ------------------- | ------------------------- |
-| `app.localhost`    | EduClaw 应用        | educlaw-web + educlaw-api |
-| `auth.localhost`   | 认证服务            | Zitadel + auth-backend    |
-| `edunex.localhost` | EduNex 应用（预留） | edunex-web + edunex-api   |
+| 域名               | 用途             | Kong 路由                 |
+| ------------------ | ---------------- | ------------------------- |
+| `app.eduskill`  | EduClaw 应用     | educlaw-web + educlaw-api |
+| `auth.eduskill` | 认证服务         | Zitadel + auth-backend    |
 
 ### 6.2 生产域名切换
 
-要切换到真实域名（如 `eduskill.example.com`），需要修改以下位置：
+要切换到其他域名，需要修改以下位置：
 
-| 位置                                                      | 当前值                                     | 需改为                                                         |
-| --------------------------------------------------------- | ------------------------------------------ | -------------------------------------------------------------- |
-| `educlaw-config.yaml` → `APP_ORIGIN`                 | `http://app.localhost`                   | `https://eduskill.example.com`                               |
-| `educlaw-config.yaml` → `ZITADEL_ISSUER`             | `http://auth.localhost`                  | `https://auth.example.com`                                   |
+| 位置                                                      | 当前值                                     | 需改为（示例）                                                   |
+| --------------------------------------------------------- | ------------------------------------------ | ---------------------------------------------------------------- |
+| `educlaw-config.yaml` → `APP_ORIGIN`                 | `http://app.eduskill`                    | `http://app.example.com`                                       |
+| `educlaw-config.yaml` → `ZITADEL_ISSUER`             | `http://auth.eduskill`                   | `http://auth.example.com`                                      |
 | `educlaw-config.yaml` → `ZITADEL_LOGIN_REDIRECT_URI` | `http://auth-backend:3000/auth/callback` | 保持不变（集群内部回调）                                       |
-| `ingress.yaml` → `host`                              | `app.localhost`                          | `eduskill.example.com`                                       |
-| `ingress.yaml` → `host`                              | `auth.localhost`                         | `auth.example.com`                                           |
+| `ingress.yaml` → `host`                              | `app.eduskill`                           | `app.example.com`                                              |
+| `ingress.yaml` → `host`                              | `auth.eduskill`                          | `auth.example.com`                                             |
 | Kong ConfigMap →`kong.yml` 中的 hosts                  | `__KONG_APP_HOST__` 等                   | 由 initContainer 模板渲染，修改`kong.yaml` Deployment 的 env |
-| Zitadel ConfigMap →`ExternalDomain`                    | `auth.localhost`                         | `auth.example.com`                                           |
+| Zitadel ConfigMap →`ExternalDomain`                    | `auth.eduskill`                          | `auth.example.com`                                             |
 
 > ⚠️ **注意**：Zitadel 的 issuer URL 设定后不能更改，否则已签发的所有 JWT Token 将失效。切换前务必备份数据库。
-
-### 6.3 SSL / HTTPS
-
-```bash
-# 方案 A：使用 cert-manager + Let's Encrypt
-kubectl apply -f - <<EOF
-apiVersion: cert-manager.io/v1
-kind: ClusterIssuer
-metadata:
-  name: letsencrypt-prod
-spec:
-  acme:
-    server: https://acme-v02.api.letsencrypt.org/directory
-    email: admin@example.com
-    privateKeySecretRef:
-      name: letsencrypt-prod
-    solvers:
-      - http01:
-          ingress:
-            class: nginx
-EOF
-
-# 然后在 ingress.yaml 中添加 tls 字段
-```
-
-```yaml
-# ingress.yaml 添加 TLS：
-spec:
-  tls:
-    - hosts:
-        - app.localhost
-        - auth.localhost
-      secretName: educlaw-tls
-```
 
 ---
 
@@ -620,6 +582,6 @@ kubectl get all,configmap,secret,ingress,pvc -n educlaw -o yaml > backup-$(date 
 | 高     | 监控告警      | 接入 ARMS Prometheus，监控 4xx/5xx 率和延迟                      |
 | 中     | CI/CD         | ACR 自动构建 + GitOps（ArgoCD）自动部署                          |
 | 中     | IRSA          | 用 RAM Role + OIDC 替代 AccessKey 访问短信服务                   |
-| 中     | 生产域名+SSL  | 切换到真实域名，配置 cert-manager 自动 HTTPS                     |
+| 中     | 生产域名      | 切换到真实域名                                                   |
 | 低     | 节点池分离    | 核心服务（Zitadel/Kong）用固定节点池，业务服务用弹性节点池       |
 | 低     | NetworkPolicy | 限制跨服务通信，只开放必要端口                                   |
