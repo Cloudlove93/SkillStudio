@@ -328,6 +328,37 @@ kubectl rollout status deployment/educlaw-server -n educlaw
 kubectl exec -n educlaw deploy/educlaw-server -- \
   node dist/educlaw-server/src/scripts/init-db.js
 
+# 2.2 init-db 脚本会同步执行表结构迁移，包括 JSON 文本列转 JSONB。
+# 如需通过 psql/DMS 明确执行迁移 SQL，可执行：
+# ALTER TABLE agent_package_versions ALTER COLUMN snapshot_json TYPE jsonb USING snapshot_json::jsonb;
+# ALTER TABLE arena_runs ALTER COLUMN report_json DROP DEFAULT;
+# ALTER TABLE arena_runs ALTER COLUMN report_json TYPE jsonb USING report_json::jsonb;
+# ALTER TABLE arena_runs ALTER COLUMN report_json SET DEFAULT '{}'::jsonb;
+# ALTER TABLE optimization_runs ALTER COLUMN result_json DROP DEFAULT;
+# ALTER TABLE optimization_runs ALTER COLUMN result_json TYPE jsonb USING result_json::jsonb;
+# ALTER TABLE optimization_runs ALTER COLUMN result_json SET DEFAULT '{}'::jsonb;
+# ALTER TABLE interactive_optimization_sessions ALTER COLUMN messages_json DROP DEFAULT;
+# ALTER TABLE interactive_optimization_sessions ALTER COLUMN messages_json TYPE jsonb USING messages_json::jsonb;
+# ALTER TABLE interactive_optimization_sessions ALTER COLUMN messages_json SET DEFAULT '[]'::jsonb;
+# ALTER TABLE interactive_optimization_sessions ALTER COLUMN issues_json DROP DEFAULT;
+# ALTER TABLE interactive_optimization_sessions ALTER COLUMN issues_json TYPE jsonb USING issues_json::jsonb;
+# ALTER TABLE interactive_optimization_sessions ALTER COLUMN issues_json SET DEFAULT '[]'::jsonb;
+# ALTER TABLE interactive_optimization_sessions ALTER COLUMN adopted_json DROP DEFAULT;
+# ALTER TABLE interactive_optimization_sessions ALTER COLUMN adopted_json TYPE jsonb USING adopted_json::jsonb;
+# ALTER TABLE interactive_optimization_sessions ALTER COLUMN adopted_json SET DEFAULT '[]'::jsonb;
+# ALTER TABLE auto_eval_specs ALTER COLUMN questions_json DROP DEFAULT;
+# ALTER TABLE auto_eval_specs ALTER COLUMN questions_json TYPE jsonb USING questions_json::jsonb;
+# ALTER TABLE auto_eval_specs ALTER COLUMN questions_json SET DEFAULT '[]'::jsonb;
+# ALTER TABLE auto_eval_specs ALTER COLUMN dimensions_json DROP DEFAULT;
+# ALTER TABLE auto_eval_specs ALTER COLUMN dimensions_json TYPE jsonb USING dimensions_json::jsonb;
+# ALTER TABLE auto_eval_specs ALTER COLUMN dimensions_json SET DEFAULT '[]'::jsonb;
+# ALTER TABLE auto_eval_runs ALTER COLUMN questions_json DROP DEFAULT;
+# ALTER TABLE auto_eval_runs ALTER COLUMN questions_json TYPE jsonb USING questions_json::jsonb;
+# ALTER TABLE auto_eval_runs ALTER COLUMN questions_json SET DEFAULT '[]'::jsonb;
+# ALTER TABLE auto_eval_runs ALTER COLUMN report_json DROP DEFAULT;
+# ALTER TABLE auto_eval_runs ALTER COLUMN report_json TYPE jsonb USING report_json::jsonb;
+# ALTER TABLE auto_eval_runs ALTER COLUMN report_json SET DEFAULT '{}'::jsonb;
+
 # 3. educlaw-web
 kubectl apply -f k8s/educlaw-web.yaml -n educlaw
 

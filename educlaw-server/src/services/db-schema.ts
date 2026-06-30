@@ -21,7 +21,7 @@ export const schemaStatements = [
       package_id bigint not null,
       version_number integer not null,
       source text not null,
-      snapshot_json text not null,
+      snapshot_json jsonb not null,
       note text not null default '',
       created_at timestamptz not null
     )
@@ -72,7 +72,7 @@ export const schemaStatements = [
       target_ref text not null,
       model text,
       state smallint not null default 1,
-      report_json text not null default '{}',
+      report_json jsonb not null default '{}'::jsonb,
       created_at timestamptz not null,
       updated_at timestamptz not null
     )
@@ -92,7 +92,7 @@ export const schemaStatements = [
       target_ref text not null,
       model text,
       status text not null default 'pending',
-      result_json text not null default '{}',
+      result_json jsonb not null default '{}'::jsonb,
       created_at timestamptz not null,
       updated_at timestamptz not null
     )
@@ -107,9 +107,9 @@ export const schemaStatements = [
       package_id bigint not null,
       thread_id bigint not null,
       status text not null default 'active',
-      messages_json text not null default '[]',
-      issues_json text not null default '[]',
-      adopted_json text not null default '[]',
+      messages_json jsonb not null default '[]'::jsonb,
+      issues_json jsonb not null default '[]'::jsonb,
+      adopted_json jsonb not null default '[]'::jsonb,
       summary text not null default '',
       version_id bigint,
       version_number integer,
@@ -128,8 +128,8 @@ export const schemaStatements = [
       id bigserial primary key,
       user_id text not null,
       package_id bigint not null,
-      questions_json text not null default '[]',
-      dimensions_json text not null default '[]',
+      questions_json jsonb not null default '[]'::jsonb,
+      dimensions_json jsonb not null default '[]'::jsonb,
       created_at timestamptz not null,
       updated_at timestamptz not null,
       unique (user_id, package_id)
@@ -145,8 +145,8 @@ export const schemaStatements = [
       package_id bigint not null,
       scene_name text not null,
       status text not null default 'pending',
-      questions_json text not null default '[]',
-      report_json text not null default '{}',
+      questions_json jsonb not null default '[]'::jsonb,
+      report_json jsonb not null default '{}'::jsonb,
       error_message text not null default '',
       created_at timestamptz not null,
       updated_at timestamptz not null
@@ -158,10 +158,39 @@ export const schemaStatements = [
 ];
 
 /**
- * Migrate existing text timestamp columns to TIMESTAMPTZ.
- * These statements are idempotent — they only run when the column is still `text`.
+ * Migrate existing columns to the current schema shape.
+ * Statements are run independently so an already-migrated column does not block later migrations.
  */
 export const migrationStatements = [
+  // JSON text columns to JSONB.
+  `alter table agent_package_versions alter column snapshot_json type jsonb using snapshot_json::jsonb`,
+  `alter table arena_runs alter column report_json drop default`,
+  `alter table arena_runs alter column report_json type jsonb using report_json::jsonb`,
+  `alter table arena_runs alter column report_json set default '{}'::jsonb`,
+  `alter table optimization_runs alter column result_json drop default`,
+  `alter table optimization_runs alter column result_json type jsonb using result_json::jsonb`,
+  `alter table optimization_runs alter column result_json set default '{}'::jsonb`,
+  `alter table interactive_optimization_sessions alter column messages_json drop default`,
+  `alter table interactive_optimization_sessions alter column messages_json type jsonb using messages_json::jsonb`,
+  `alter table interactive_optimization_sessions alter column messages_json set default '[]'::jsonb`,
+  `alter table interactive_optimization_sessions alter column issues_json drop default`,
+  `alter table interactive_optimization_sessions alter column issues_json type jsonb using issues_json::jsonb`,
+  `alter table interactive_optimization_sessions alter column issues_json set default '[]'::jsonb`,
+  `alter table interactive_optimization_sessions alter column adopted_json drop default`,
+  `alter table interactive_optimization_sessions alter column adopted_json type jsonb using adopted_json::jsonb`,
+  `alter table interactive_optimization_sessions alter column adopted_json set default '[]'::jsonb`,
+  `alter table auto_eval_specs alter column questions_json drop default`,
+  `alter table auto_eval_specs alter column questions_json type jsonb using questions_json::jsonb`,
+  `alter table auto_eval_specs alter column questions_json set default '[]'::jsonb`,
+  `alter table auto_eval_specs alter column dimensions_json drop default`,
+  `alter table auto_eval_specs alter column dimensions_json type jsonb using dimensions_json::jsonb`,
+  `alter table auto_eval_specs alter column dimensions_json set default '[]'::jsonb`,
+  `alter table auto_eval_runs alter column questions_json drop default`,
+  `alter table auto_eval_runs alter column questions_json type jsonb using questions_json::jsonb`,
+  `alter table auto_eval_runs alter column questions_json set default '[]'::jsonb`,
+  `alter table auto_eval_runs alter column report_json drop default`,
+  `alter table auto_eval_runs alter column report_json type jsonb using report_json::jsonb`,
+  `alter table auto_eval_runs alter column report_json set default '{}'::jsonb`,
   // agent_packages
   `alter table agent_packages alter column created_at type timestamptz using created_at::timestamptz`,
   `alter table agent_packages alter column updated_at type timestamptz using updated_at::timestamptz`,
@@ -196,7 +225,7 @@ export async function initDbSchema() {
     await query(statement);
   }
 
-  // Migrate text columns to TIMESTAMPTZ — safe to re-run; ALTER TYPE is a no-op when already timestamptz.
+  // Migrations are safe to re-run; already-applied statements are skipped individually.
   for (const statement of migrationStatements) {
     try {
       await query(statement);

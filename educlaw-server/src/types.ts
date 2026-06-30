@@ -26,7 +26,7 @@ export interface DbRowPackageVersion {
   package_id: number;
   version_number: number;
   source: string;
-  snapshot_json: string;
+  snapshot_json: unknown;
   note: string;
   created_at: string;
 }
@@ -57,9 +57,9 @@ export interface DbRowInteractiveOptimizationSession {
   package_id: number;
   thread_id: number;
   status: string;
-  messages_json: string;
-  issues_json: string;
-  adopted_json: string;
+  messages_json: unknown;
+  issues_json: unknown;
+  adopted_json: unknown;
   summary: string;
   version_id: number | null;
   version_number: number | null;
@@ -71,8 +71,8 @@ export interface DbRowAutoEvalSpec {
   id: number;
   user_id: string;
   package_id: number;
-  questions_json: string;
-  dimensions_json: string;
+  questions_json: unknown;
+  dimensions_json: unknown;
   created_at: string;
   updated_at: string;
 }
@@ -83,8 +83,8 @@ export interface DbRowAutoEvalRun {
   package_id: number;
   scene_name: string;
   status: string;
-  questions_json: string;
-  report_json: string;
+  questions_json: unknown;
+  report_json: unknown;
   error_message: string;
   created_at: string;
   updated_at: string;

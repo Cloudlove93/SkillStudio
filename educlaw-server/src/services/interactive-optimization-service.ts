@@ -4,6 +4,7 @@ import { assertRubricConfigured, getPackage, applyOptimizedSnapshot } from "./pa
 import { getThreadDetail } from "./arena-service.js";
 import { query } from "./db.js";
 import type { DbRowInteractiveOptimizationSession } from "../types.js";
+import { parseDbJson } from "../utils/json.js";
 
 export interface DiagnosisIssue {
   id: string;
@@ -67,13 +68,9 @@ export interface InteractiveOptimizationSession {
 
 /* ── helpers ── */
 
-function parseJsonArray<T>(value: string, fallback: T[] = []): T[] {
-  try {
-    const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed as T[] : fallback;
-  } catch {
-    return fallback;
-  }
+function parseJsonArray<T>(value: unknown, fallback: T[] = []): T[] {
+  const parsed = parseDbJson<unknown>(value, fallback);
+  return Array.isArray(parsed) ? parsed as T[] : fallback;
 }
 
 function toInteractiveSession(row: DbRowInteractiveOptimizationSession): InteractiveOptimizationSession {

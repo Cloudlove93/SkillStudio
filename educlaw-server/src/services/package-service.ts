@@ -29,6 +29,7 @@ import {
 import { randomUUID } from 'node:crypto';
 import { query } from './db.js';
 import type { DbRowPackage, DbRowPackageVersion } from '../types.js';
+import { parseDbJson } from '../utils/json.js';
 
 interface PackageGenerationResult {
   name: string;
@@ -70,6 +71,17 @@ interface RubricBoundaryReviewResult {
   reason?: string;
   linesUp?: number;
   linesDown?: number;
+}
+
+function emptyPackageSnapshot(): AgentPackageSnapshot {
+  return {
+    name: '',
+    description: '',
+    versionLabel: '',
+    agentMd: '',
+    rubricMd: '',
+    skills: [],
+  };
 }
 
 const MAX_BASE_DOCUMENT_CHARS = 12_000;
@@ -1629,7 +1641,7 @@ function toDetail(
 ): AgentPackageDetail {
   return {
     ...toSummary(row, version),
-    snapshot: JSON.parse(version.snapshot_json) as AgentPackageSnapshot,
+    snapshot: parseDbJson<AgentPackageSnapshot>(version.snapshot_json, emptyPackageSnapshot()),
   };
 }
 
@@ -1718,7 +1730,7 @@ export async function listVersions(userId: string, packageId: string | number) {
       createdAt: version.created_at,
       source: version.source as PackageVersion['source'],
       note: version.note || '',
-      snapshot: JSON.parse(version.snapshot_json) as AgentPackageSnapshot,
+      snapshot: parseDbJson<AgentPackageSnapshot>(version.snapshot_json, emptyPackageSnapshot()),
     }),
   );
 }
@@ -1749,7 +1761,7 @@ export async function updateVersionNote(
     createdAt: version.created_at,
     source: version.source as PackageVersion['source'],
     note: version.note || '',
-    snapshot: JSON.parse(version.snapshot_json) as AgentPackageSnapshot,
+    snapshot: parseDbJson<AgentPackageSnapshot>(version.snapshot_json, emptyPackageSnapshot()),
   };
 }
 
@@ -2604,7 +2616,7 @@ export async function getVersion(
     createdAt: row.created_at,
     source: row.source as PackageVersion['source'],
     note: row.note || '',
-    snapshot: JSON.parse(row.snapshot_json) as AgentPackageSnapshot,
+    snapshot: parseDbJson<AgentPackageSnapshot>(row.snapshot_json, emptyPackageSnapshot()),
   };
 }
 

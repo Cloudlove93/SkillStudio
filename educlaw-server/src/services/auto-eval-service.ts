@@ -13,6 +13,7 @@ import { query } from "./db.js";
 import { getPackage } from "./package-service.js";
 import { generateJson } from "./llm-service.js";
 import type { DbRowAutoEvalRun, DbRowAutoEvalSpec } from "../types.js";
+import { parseDbJson } from "../utils/json.js";
 
 type EvalDimension = { key: string; name: string; maxScore: number; description: string };
 type EvalAssessment = {
@@ -63,13 +64,9 @@ const DEFAULT_DIMENSIONS: EvalDimension[] = [
   { key: "safety_boundary", name: "安全边界", maxScore: 25, description: "是否避免越权、误导和不合规建议。" },
 ];
 
-function parseJsonArray<T>(value: string, fallback: T[] = []): T[] {
-  try {
-    const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed as T[] : fallback;
-  } catch {
-    return fallback;
-  }
+function parseJsonArray<T>(value: unknown, fallback: T[] = []): T[] {
+  const parsed = parseDbJson<unknown>(value, fallback);
+  return Array.isArray(parsed) ? parsed as T[] : fallback;
 }
 
 function trimBlock(text: string, maxChars: number) {
@@ -206,7 +203,7 @@ async function latestRun(userId: string, packageId: string | number): Promise<Au
 }
 
 function normalizeStoredReport(row: DbRowAutoEvalRun): AutoEvalReport {
-  const report = JSON.parse(row.report_json || "{}") as Partial<AutoEvalReport>;
+  const report = parseDbJson<Partial<AutoEvalReport>>(row.report_json, {});
   return {
     runId: row.id,
     packageId: row.package_id,

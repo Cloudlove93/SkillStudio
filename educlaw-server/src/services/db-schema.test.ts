@@ -47,4 +47,24 @@ describe("db schema initialization", () => {
     expect(schemaSql).toContain("create table if not exists auto_eval_runs");
     expect(schemaSql).toContain("alter table agent_package_versions add column if not exists note");
   });
+
+  it("defines stored JSON columns as jsonb with jsonb defaults", async () => {
+    const { schemaStatements, migrationStatements } = await import("./db-schema.js");
+    const schemaSql = schemaStatements.join("\n").toLowerCase();
+    const migrationSql = migrationStatements.join("\n").toLowerCase();
+
+    expect(schemaSql).toContain("snapshot_json jsonb not null");
+    expect(schemaSql).toContain("report_json jsonb not null default '{}'::jsonb");
+    expect(schemaSql).toContain("result_json jsonb not null default '{}'::jsonb");
+    expect(schemaSql).toContain("messages_json jsonb not null default '[]'::jsonb");
+    expect(schemaSql).toContain("issues_json jsonb not null default '[]'::jsonb");
+    expect(schemaSql).toContain("adopted_json jsonb not null default '[]'::jsonb");
+    expect(schemaSql).toContain("questions_json jsonb not null default '[]'::jsonb");
+    expect(schemaSql).toContain("dimensions_json jsonb not null default '[]'::jsonb");
+
+    expect(schemaSql).not.toContain("_json text");
+    expect(migrationSql).toContain("alter column snapshot_json type jsonb using snapshot_json::jsonb");
+    expect(migrationSql).toContain("alter column report_json type jsonb using report_json::jsonb");
+    expect(migrationSql).toContain("alter column questions_json type jsonb using questions_json::jsonb");
+  });
 });

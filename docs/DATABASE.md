@@ -60,7 +60,7 @@ CREATE TABLE agent_package_versions (
   package_id     BIGINT NOT NULL,                 -- 所属包 ID → agent_packages.id
   version_number INTEGER NOT NULL,                -- 版本号（递增）
   source         TEXT NOT NULL,                   -- 来源：generated | imported | optimized | manual | interactive
-  snapshot_json  TEXT NOT NULL,                   -- 完整快照 JSON（包含 agentMd, rubricMd, skills 等）
+  snapshot_json  JSONB NOT NULL,                  -- 完整快照 JSON（包含 agentMd, rubricMd, skills 等）
   note           TEXT NOT NULL DEFAULT '',        -- 版本备注
   created_at     TIMESTAMPTZ NOT NULL             -- 创建时间
 );
@@ -164,7 +164,7 @@ CREATE TABLE arena_runs (
   target_ref  TEXT NOT NULL,                      -- 评估目标引用
   model       TEXT,                               -- 评估使用的模型
   state       SMALLINT NOT NULL DEFAULT 1,         -- 状态：0=pending, 1=completed, 2=failed
-  report_json TEXT NOT NULL DEFAULT '{}',         -- 评估报告 JSON
+  report_json JSONB NOT NULL DEFAULT '{}'::jsonb, -- 评估报告 JSON
   created_at  TIMESTAMPTZ NOT NULL,               -- 创建时间
   updated_at  TIMESTAMPTZ NOT NULL                -- 最后更新时间
 );
@@ -210,7 +210,7 @@ CREATE TABLE optimization_runs (
   target_ref  TEXT NOT NULL,                      -- 优化目标引用
   model       TEXT,                               -- 优化使用的模型
   status      TEXT NOT NULL DEFAULT 'pending',    -- 状态：pending | applied | rejected
-  result_json TEXT NOT NULL DEFAULT '{}',         -- 优化结果 JSON
+  result_json JSONB NOT NULL DEFAULT '{}'::jsonb, -- 优化结果 JSON
   created_at  TIMESTAMPTZ NOT NULL,               -- 创建时间
   updated_at  TIMESTAMPTZ NOT NULL                -- 最后更新时间
 );
@@ -252,9 +252,9 @@ CREATE TABLE interactive_optimization_sessions (
   package_id     BIGINT NOT NULL,                 -- 关联的智能体包 ID
   thread_id      BIGINT NOT NULL,                 -- 关联的 Arena 线程 ID
   status         TEXT NOT NULL DEFAULT 'active',  -- 状态：active | completed
-  messages_json  TEXT NOT NULL DEFAULT '[]',      -- 对话消息 JSON 数组
-  issues_json    TEXT NOT NULL DEFAULT '[]',      -- 诊断问题 JSON 数组
-  adopted_json   TEXT NOT NULL DEFAULT '[]',      -- 已采纳的修改 JSON 数组
+  messages_json  JSONB NOT NULL DEFAULT '[]'::jsonb, -- 对话消息 JSON 数组
+  issues_json    JSONB NOT NULL DEFAULT '[]'::jsonb, -- 诊断问题 JSON 数组
+  adopted_json   JSONB NOT NULL DEFAULT '[]'::jsonb, -- 已采纳的修改 JSON 数组
   summary        TEXT NOT NULL DEFAULT '',        -- 会话摘要
   version_id     BIGINT,                          -- 生成的新版本 ID
   version_number INTEGER,                         -- 生成的新版本号
@@ -282,8 +282,8 @@ CREATE TABLE auto_eval_specs (
   id              BIGSERIAL PRIMARY KEY,          -- 自增主键
   user_id         TEXT NOT NULL,                  -- 用户 ID
   package_id      BIGINT NOT NULL,                -- 关联的智能体包 ID
-  questions_json  TEXT NOT NULL DEFAULT '[]',     -- 评估问题 JSON 数组
-  dimensions_json TEXT NOT NULL DEFAULT '[]',     -- 评分维度 JSON 数组
+  questions_json  JSONB NOT NULL DEFAULT '[]'::jsonb, -- 评估问题 JSON 数组
+  dimensions_json JSONB NOT NULL DEFAULT '[]'::jsonb, -- 评分维度 JSON 数组
   created_at      TIMESTAMPTZ NOT NULL,           -- 创建时间
   updated_at      TIMESTAMPTZ NOT NULL,           -- 最后更新时间
   UNIQUE (user_id, package_id)
@@ -321,8 +321,8 @@ CREATE TABLE auto_eval_runs (
   package_id     BIGINT NOT NULL,                 -- 关联的智能体包 ID
   scene_name     TEXT NOT NULL,                   -- 评估场景名称
   status         TEXT NOT NULL DEFAULT 'pending', -- 状态：pending | running | completed | failed
-  questions_json TEXT NOT NULL DEFAULT '[]',      -- 评估问题 JSON 数组
-  report_json    TEXT NOT NULL DEFAULT '{}',      -- 评估报告 JSON
+  questions_json JSONB NOT NULL DEFAULT '[]'::jsonb, -- 评估问题 JSON 数组
+  report_json    JSONB NOT NULL DEFAULT '{}'::jsonb, -- 评估报告 JSON
   error_message  TEXT NOT NULL DEFAULT '',        -- 错误信息
   created_at     TIMESTAMPTZ NOT NULL,            -- 创建时间
   updated_at     TIMESTAMPTZ NOT NULL             -- 最后更新时间

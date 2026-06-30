@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { extractFirstJsonObject, parseJsonObject } from "./json.js";
+import { extractFirstJsonObject, parseDbJson, parseJsonObject } from "./json.js";
 
 describe("extractFirstJsonObject", () => {
   it("returns null when the input does not contain a JSON object", () => {
@@ -42,5 +42,27 @@ describe("parseJsonObject", () => {
 
   it("repairs and parses bare text as a JSON string", () => {
     expect(parseJsonObject<string>("not json at all")).toBe("not json at all");
+  });
+});
+
+describe("parseDbJson", () => {
+  it("parses JSON stored as text", () => {
+    expect(parseDbJson<{ status: string }>('{"status":"ok"}', {})).toEqual({
+      status: "ok",
+    });
+  });
+
+  it("returns jsonb objects and arrays without reparsing", () => {
+    expect(parseDbJson<{ status: string }>({ status: "ok" }, {})).toEqual({
+      status: "ok",
+    });
+    expect(parseDbJson<number[]>([1, 2, 3], [])).toEqual([1, 2, 3]);
+  });
+
+  it("uses the fallback for nullish or invalid values", () => {
+    expect(parseDbJson(null, { status: "fallback" })).toEqual({
+      status: "fallback",
+    });
+    expect(parseDbJson("not-json", ["fallback"])).toEqual(["fallback"]);
   });
 });

@@ -7,6 +7,7 @@ import { listPackages, getPackage, generatePackage, deletePackage, exportPackage
 import { listThreads, createThread, getThreadDetail, sendMessage, streamMessage, generateReport } from "../services/arena-service.js";
 import { optimizePackage } from "../services/optimization-service.js";
 import { config } from "../config.js";
+import { parseDbJson } from "../utils/json.js";
 import {
   initSse,
   startSseHeartbeat,
@@ -24,6 +25,23 @@ function notFound(res: Response, message = "Not found") { res.status(404).json({
 
 function pickUserId(req: Request) {
   return (req as AuthedRequest).userId || "";
+}
+
+type CompatOptimizeRunView = {
+  applied_keys: string[];
+  rejected_keys: string[];
+  suggestions: Array<{ key: string }>;
+  run: { status: string };
+  [key: string]: unknown;
+};
+
+function emptyOptimizeRunView(): CompatOptimizeRunView {
+  return {
+    applied_keys: [],
+    rejected_keys: [],
+    suggestions: [],
+    run: { status: "pending" },
+  };
 }
 
 function calcTurnIndex(messages: Array<{ side: string; role: string; created_at?: string; createdAt?: string }>) {
@@ -558,7 +576,7 @@ router.get("/optimize/runs", requireAuth, async (req, res) => {
   try {
     const userId = pickUserId(req);
     const result = await query("select * from optimization_runs where package_id in (select id from agent_packages where user_id = $1) order by created_at desc", [userId]);
-    ok(res, result.rows.map((row) => JSON.parse(String(row.result_json))));
+    ok(res, result.rows.map((row) => parseDbJson<unknown>(row.result_json, {})));
   } catch (e) { bad(res, e instanceof Error ? e.message : "Failed"); }
 });
 
@@ -566,7 +584,7 @@ router.get("/optimize/runs/:runId", requireAuth, async (req, res) => {
   try {
     const result = await query("select * from optimization_runs where id = $1", [req.params.runId as string]);
     if (!result.rows[0]) { notFound(res); return; }
-    ok(res, JSON.parse(String(result.rows[0].result_json)));
+    ok(res, parseDbJson<unknown>(result.rows[0].result_json, {}));
   } catch (e) { bad(res, e instanceof Error ? e.message : "Failed"); }
 });
 
@@ -574,7 +592,7 @@ router.post("/optimize/runs/:runId/apply", requireAuth, async (req, res) => {
   try {
     const result = await query("select * from optimization_runs where id = $1", [req.params.runId as string]);
     if (!result.rows[0]) { notFound(res); return; }
-    const runView = JSON.parse(String(result.rows[0].result_json));
+    const runView = parseDbJson<CompatOptimizeRunView>(result.rows[0].result_json, emptyOptimizeRunView());
     const key = req.body?.suggestionKey;
     if (key) {
       if (!runView.applied_keys.includes(key)) runView.applied_keys.push(key);
@@ -593,7 +611,7 @@ router.post("/optimize/runs/:runId/reject", requireAuth, async (req, res) => {
   try {
     const result = await query("select * from optimization_runs where id = $1", [req.params.runId as string]);
     if (!result.rows[0]) { notFound(res); return; }
-    const runView = JSON.parse(String(result.rows[0].result_json));
+    const runView = parseDbJson<CompatOptimizeRunView>(result.rows[0].result_json, emptyOptimizeRunView());
     const key = req.body?.suggestionKey;
     if (key) {
       if (!runView.rejected_keys.includes(key)) runView.rejected_keys.push(key);
