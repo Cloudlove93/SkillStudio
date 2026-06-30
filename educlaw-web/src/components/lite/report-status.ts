@@ -6,6 +6,7 @@ type ReportMessageLike = {
 export type ReportReadinessReason =
   | 'missing_rubric'
   | 'missing_messages'
+  | 'generating_reply'
   | null;
 
 export function canOpenReportAction(
@@ -19,9 +20,14 @@ export function canOpenReportAction(
 export function getReportReadiness(
   messages: ReportMessageLike[],
   hasRubricContent: boolean,
+  replyGenerating = false,
 ): { canGenerateReport: boolean; reason: ReportReadinessReason } {
   if (!hasRubricContent) {
     return { canGenerateReport: false, reason: 'missing_rubric' };
+  }
+
+  if (replyGenerating) {
+    return { canGenerateReport: false, reason: 'generating_reply' };
   }
 
   const hasUserMessage = messages.some(

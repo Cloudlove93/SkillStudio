@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import test from "node:test";
-import { canOpenReportAction, getReportReadiness } from "./report-status";
+import { canOpenReportAction, getReportReadiness } from "./report-status.ts";
 
 test("report readiness requires a usable rubric first", () => {
   const readiness = getReportReadiness([], false);
@@ -25,6 +25,17 @@ test("report readiness passes after one compare turn exists", () => {
 
   assert.equal(readiness.canGenerateReport, true);
   assert.equal(readiness.reason, null);
+});
+
+test("report readiness waits until the final arena reply save has finished", () => {
+  const readiness = getReportReadiness([
+    { side: "shared", role: "user" },
+    { side: "baseline", role: "assistant" },
+    { side: "enhanced", role: "assistant" },
+  ], true, true);
+
+  assert.equal(readiness.canGenerateReport, false);
+  assert.equal(readiness.reason, "generating_reply");
 });
 
 test("report action stays visible when rubric exists even before messages", () => {

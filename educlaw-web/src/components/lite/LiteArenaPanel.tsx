@@ -36,6 +36,14 @@ import { getDefaultDetailTab, type DetailTab } from './detail-tab';
 import { canOpenReportAction, getReportReadiness } from './report-status';
 import { isArenaReport, parseStoredArenaReport } from './report-compat';
 import {
+  completeProgress,
+  failProgressState,
+  getProgressElapsedMs,
+  pushProgressStep,
+  startProgressState,
+  type ProgressState,
+} from './progress-state';
+import {
   buildGeneratedReportViewState,
   buildReportCompletionStatusMessage,
 } from './report-preview-state';
@@ -86,14 +94,6 @@ import {
   LogOut,
 } from 'lucide-react';
 
-type ProgressState = {
-  title: string;
-  phase: string;
-  steps: string[];
-  startedAt: number;
-  active: boolean;
-  isError: boolean;
-};
 type ManualEditState = {
   target: 'agent' | 'rubric' | 'skill';
   skillId?: string;
@@ -268,6 +268,9 @@ export default function LiteArenaPanel() {
     baseline: false,
     enhanced: false,
   });
+  const [replyGeneratingThreadIds, setReplyGeneratingThreadIds] = useState<
+    Set<string>
+  >(() => new Set());
   const [nowMs, setNowMs] = useState(0);
   const [isWideLayout, setIsWideLayout] = useState(prefersWideLayout);
   const [sidebarOpen, setSidebarOpen] = useState(prefersWideLayout);
@@ -348,7 +351,14 @@ export default function LiteArenaPanel() {
   const rubricHasContent = hasRubricContent(rubricText);
   const rubricConfigured = isRubricUsable(rubricText);
   const rubricNeedsRepair = rubricHasContent && !rubricConfigured;
-  const reportReadiness = getReportReadiness(messages, rubricConfigured);
+  const replyGenerating = Boolean(
+    thread?.id && replyGeneratingThreadIds.has(thread.id),
+  );
+  const reportReadiness = getReportReadiness(
+    messages,
+    rubricConfigured,
+    replyGenerating,
+  );
   const canGenerateReport = reportReadiness.canGenerateReport;
   const canOpenReport = canOpenReportAction(Boolean(thread), rubricConfigured);
   const reportHintMessage = rubricNeedsRepair
@@ -358,9 +368,18 @@ export default function LiteArenaPanel() {
     ? '当前 rubric 还缺少完整评分结构。请先在右侧 Rubric 中补充维度、权重或等级说明。'
     : '当前还没有配置 rubric。请先在右侧 Rubric 中手动填写评分规则。';
   const reportRequiredMessage =
-    reportReadiness.reason === 'missing_messages'
+    reportReadiness.reason === 'generating_reply'
+      ? '回复还在保存，请等当前回答完全结束后再生成评估报告。'
+      : reportReadiness.reason === 'missing_messages'
       ? '\u5f53\u524d\u8fd8\u6ca1\u6709\u53ef\u7528\u4e8e\u8bc4\u5206\u7684 Arena \u5bf9\u8bdd\u3002\u5148\u5b8c\u6210\u4e00\u8f6e\u5bf9\u8bdd\uff0c\u518d\u6765\u751f\u6210\u8bc4\u4f30\u62a5\u544a\u3002'
       : rubricRequiredMessage;
+  const interactiveRequiredMessage = replyGenerating
+    ? '回复还在保存，请等当前回答完全结束后再使用交互式优化。'
+    : rubricRequiredMessage;
+  const interactiveActionTitle =
+    !thread || !rubricConfigured || replyGenerating
+      ? interactiveRequiredMessage
+      : '开始交互式优化';
   const manualRubricHint =
     manualEdit?.target === 'rubric'
       ? getRubricEditValidationError(manualEdit.content)
@@ -697,67 +716,16 @@ export default function LiteArenaPanel() {
   }
 
   function startProgress(title: string, phase: string) {
-    setProgress({
-      title,
-      phase,
-      steps: [phase],
-      startedAt: Date.now(),
-      active: true,
-      isError: false,
-    });
+    setProgress(startProgressState(title, phase));
   }
   function pushProgress(label: string) {
-    setProgress((prev) =>
-      prev
-        ? {
-            ...prev,
-            phase: label,
-            steps:
-              prev.steps[prev.steps.length - 1] === label
-                ? prev.steps
-                : [...prev.steps, label],
-          }
-        : {
-            title: '当前进度',
-            phase: label,
-            steps: [label],
-            startedAt: Date.now(),
-            active: true,
-            isError: false,
-          },
-    );
+    setProgress((prev) => pushProgressStep(prev, label));
   }
   function finishProgress(label: string) {
-    setProgress((prev) =>
-      prev
-        ? {
-            ...prev,
-            active: false,
-            isError: false,
-            phase: label,
-            steps:
-              prev.steps[prev.steps.length - 1] === label
-                ? prev.steps
-                : [...prev.steps, label],
-          }
-        : null,
-    );
+    setProgress((prev) => completeProgress(prev, label));
   }
   function failProgress(label: string) {
-    setProgress((prev) =>
-      prev
-        ? {
-            ...prev,
-            active: false,
-            isError: true,
-            phase: label,
-            steps:
-              prev.steps[prev.steps.length - 1] === label
-                ? prev.steps
-                : [...prev.steps, label],
-          }
-        : null,
-    );
+    setProgress((prev) => failProgressState(prev, label));
   }
   function formatElapsed(ms: number) {
     const total = Math.max(0, Math.floor(ms / 1000));
@@ -1061,6 +1029,7 @@ export default function LiteArenaPanel() {
 
   async function handleSend() {
     if (!token || !thread?.id || !input.trim() || !threadDetail) return;
+    const currentThreadId = thread.id;
     const prompt = input.trim();
     const tempSharedId = `temp-shared-${Date.now()}`;
     const tempBaselineId = `temp-baseline-${Date.now()}`;
@@ -1068,7 +1037,7 @@ export default function LiteArenaPanel() {
     const now = new Date().toISOString();
     const tempShared: ArenaMessage = {
       id: tempSharedId,
-      threadId: thread.id,
+      threadId: currentThreadId,
       side: 'shared',
       role: 'user',
       content: prompt,
@@ -1076,7 +1045,7 @@ export default function LiteArenaPanel() {
     };
     const tempBaseline: ArenaMessage = {
       id: tempBaselineId,
-      threadId: thread.id,
+      threadId: currentThreadId,
       side: 'baseline',
       role: 'assistant',
       content: '',
@@ -1084,7 +1053,7 @@ export default function LiteArenaPanel() {
     };
     const tempEnhanced: ArenaMessage = {
       id: tempEnhancedId,
-      threadId: thread.id,
+      threadId: currentThreadId,
       side: 'enhanced',
       role: 'assistant',
       content: '',
@@ -1098,11 +1067,28 @@ export default function LiteArenaPanel() {
       ...(shouldShowBaseline ? [tempBaseline] : []),
       ...(shouldShowEnhanced ? [tempEnhanced] : []),
     ];
-    clearStoredReport(thread.id);
+    function isCurrentReplyThread() {
+      return threadRef.current?.id === currentThreadId;
+    }
+    function clearReplyGeneratingThread() {
+      setReplyGeneratingThreadIds((prev) => {
+        const next = new Set(prev);
+        next.delete(currentThreadId);
+        return next;
+      });
+    }
+
+    clearStoredReport(currentThreadId);
     setReport(null);
     setCenterPreview((prev) => (prev?.type === 'report' ? null : prev));
     setInput('');
     setOptimization(null);
+    setProgress((prev) => (prev?.active ? prev : null));
+    setReplyGeneratingThreadIds((prev) => {
+      const next = new Set(prev);
+      next.add(currentThreadId);
+      return next;
+    });
     flushSync(() => {
       setThreadDetail({
         thread: threadDetail.thread,
@@ -1113,25 +1099,22 @@ export default function LiteArenaPanel() {
       baseline: shouldShowBaseline,
       enhanced: shouldShowEnhanced,
     });
-    startProgress(
-      selectedPackage?.name || '\u5de5\u4f5c\u53f0',
-      '\u6b63\u5728\u751f\u6210\u56de\u590d...',
-    );
     setStatus('\u6b63\u5728\u751f\u6210...');
     try {
       await liteApi.sendMessageStream(
         token,
-        thread.id,
+        currentThreadId,
         prompt,
         undefined,
         arenaMode,
         (event) => {
           if (event.event === 'phase') {
-            pushProgress(event.data.label);
+            if (!isCurrentReplyThread()) return;
             setStatus(event.data.label);
             return;
           }
           if (event.event === 'shared') {
+            if (!isCurrentReplyThread()) return;
             setThreadDetail((prev) =>
               prev
                 ? {
@@ -1145,10 +1128,12 @@ export default function LiteArenaPanel() {
             return;
           }
           if (event.event === 'side_start') {
+            if (!isCurrentReplyThread()) return;
             setSideStreaming((prev) => ({ ...prev, [event.data.side]: true }));
             return;
           }
           if (event.event === 'delta') {
+            if (!isCurrentReplyThread()) return;
             const targetId =
               event.data.side === 'baseline' ? tempBaselineId : tempEnhancedId;
             setThreadDetail((prev) =>
@@ -1166,6 +1151,7 @@ export default function LiteArenaPanel() {
             return;
           }
           if (event.event === 'side_done') {
+            if (!isCurrentReplyThread()) return;
             const targetId =
               event.data.side === 'baseline' ? tempBaselineId : tempEnhancedId;
             setSideStreaming((prev) => ({ ...prev, [event.data.side]: false }));
@@ -1184,6 +1170,8 @@ export default function LiteArenaPanel() {
             return;
           }
           if (event.event === 'done') {
+            clearReplyGeneratingThread();
+            if (!isCurrentReplyThread()) return;
             setThread(event.data.thread);
             const finalMessageIds = new Set(
               event.data.messages.map((message) => message.id),
@@ -1208,7 +1196,6 @@ export default function LiteArenaPanel() {
                 : prev,
             );
             setSideStreaming({ baseline: false, enhanced: false });
-            finishProgress('\u56de\u590d\u5df2\u751f\u6210');
             setStatus('\u56de\u590d\u5df2\u751f\u6210');
             return;
           }
@@ -1219,10 +1206,12 @@ export default function LiteArenaPanel() {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : '\u53d1\u9001\u5931\u8d25';
-      setSideStreaming({ baseline: false, enhanced: false });
-      setInput(prompt);
-      failProgress(message);
-      setStatus(message);
+      clearReplyGeneratingThread();
+      if (isCurrentReplyThread()) {
+        setSideStreaming({ baseline: false, enhanced: false });
+        setInput(prompt);
+        setStatus(message);
+      }
     }
   }
 
@@ -1470,6 +1459,10 @@ export default function LiteArenaPanel() {
 
   async function startInteractive(forceNew = false) {
     if (!token || !thread?.id || !selectedPackageId) return;
+    if (replyGenerating) {
+      setStatus(interactiveRequiredMessage);
+      return;
+    }
     if (!ensureRubricConfigured('\u4ea4\u4e92\u5f0f\u4f18\u5316')) return;
     setInteractiveMode(true);
     setCenterPreview(null);
@@ -2459,6 +2452,7 @@ export default function LiteArenaPanel() {
                   size="sm"
                   variant="outline"
                   className="rounded-[12px] text-destructive border-destructive/30 hover:bg-destructive/10"
+                  disabled={replyGenerating}
                   onClick={() => {
                     if (
                       window.confirm(
@@ -2896,7 +2890,8 @@ export default function LiteArenaPanel() {
                   variant="outline"
                   className="rounded-[12px]"
                   onClick={() => void startInteractive()}
-                  disabled={!thread || !rubricConfigured}
+                  disabled={!thread || !rubricConfigured || replyGenerating}
+                  title={interactiveActionTitle}
                 >
                   交互式优化
                   {hasSavedSession && (
@@ -2924,7 +2919,7 @@ export default function LiteArenaPanel() {
                   <div className="flex items-center gap-2">
                     <div className="flex items-center gap-1 text-xs text-muted-foreground">
                       <Clock className="size-3" />
-                      {formatElapsed(nowMs - progress.startedAt)}
+                      {formatElapsed(getProgressElapsedMs(progress, nowMs))}
                     </div>
                     {!progress.active && (
                       <button
@@ -3606,7 +3601,10 @@ export default function LiteArenaPanel() {
                           variant="outline"
                           className="h-7 text-xs rounded-[8px]"
                           onClick={() => void startInteractive()}
-                          disabled={!rubricConfigured}
+                          disabled={
+                            !thread || !rubricConfigured || replyGenerating
+                          }
+                          title={interactiveActionTitle}
                         >
                           开始交互式优化
                         </Button>
@@ -3675,7 +3673,10 @@ export default function LiteArenaPanel() {
                           variant="outline"
                           className="rounded-[8px]"
                           onClick={() => void startInteractive()}
-                          disabled={!thread || !rubricConfigured}
+                          disabled={
+                            !thread || !rubricConfigured || replyGenerating
+                          }
+                          title={interactiveActionTitle}
                         >
                           开始交互式优化
                         </Button>

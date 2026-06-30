@@ -35,7 +35,10 @@ test('LiteArenaPanel should keep rubric edit wired to the manual edit flow', () 
 });
 
 test('LiteArenaPanel should require configured rubric before report actions are enabled', () => {
-  assert.match(source, /getReportReadiness\(messages, rubricConfigured\)/);
+  assert.match(
+    source,
+    /getReportReadiness\(\s*messages,\s*rubricConfigured,\s*replyGenerating,\s*\)/,
+  );
   assert.match(
     source,
     /canOpenReportAction\(Boolean\(thread\), rubricConfigured\)/,
@@ -44,6 +47,56 @@ test('LiteArenaPanel should require configured rubric before report actions are 
     source,
     /if \(!ensureRubricConfigured\('评估报告'\)\) return;/,
   );
+});
+
+test('LiteArenaPanel should not use global progress for normal reply generation', () => {
+  const handleSend = source.match(
+    /async function handleSend\(\) \{[\s\S]*?\n {2}async function handleDelete\(\)/,
+  )?.[0];
+
+  assert.ok(handleSend);
+  assert.doesNotMatch(handleSend, /startProgress\(/);
+  assert.doesNotMatch(handleSend, /pushProgress\(/);
+  assert.doesNotMatch(handleSend, /finishProgress\(/);
+  assert.doesNotMatch(handleSend, /failProgress\(/);
+  assert.match(handleSend, /setReplyGeneratingThreadIds\(\(prev\)/);
+  assert.match(handleSend, /currentThreadId/);
+});
+
+test('LiteArenaPanel should ignore stale reply stream events after switching threads', () => {
+  const handleSend = source.match(
+    /async function handleSend\(\) \{[\s\S]*?\n {2}async function handleDelete\(\)/,
+  )?.[0];
+
+  assert.ok(handleSend);
+  assert.match(handleSend, /function isCurrentReplyThread\(\)/);
+  assert.match(handleSend, /threadRef\.current\?\.id === currentThreadId/);
+  assert.match(handleSend, /if \(!isCurrentReplyThread\(\)\) return;/);
+  assert.match(
+    handleSend,
+    /setReplyGeneratingThreadIds\(\(prev\) => \{[\s\S]*next\.delete\(currentThreadId\)/,
+  );
+});
+
+test('LiteArenaPanel should wait for reply save before starting interactive optimization', () => {
+  const startInteractive = source.match(
+    /async function startInteractive\(forceNew = false\) \{[\s\S]*?\n {2}async function sendInteractiveMessage\(\)/,
+  )?.[0];
+
+  assert.ok(startInteractive);
+  assert.match(startInteractive, /replyGenerating/);
+  assert.match(startInteractive, /setStatus\(interactiveRequiredMessage\)/);
+  assert.ok(
+    (source.match(
+      /disabled=\{\s*!thread \|\| !rubricConfigured \|\| replyGenerating\s*\}/g,
+    )?.length || 0) >= 3,
+  );
+  assert.match(source, /disabled=\{replyGenerating\}/);
+  assert.match(
+    source,
+    /const interactiveActionTitle =[\s\S]*'开始交互式优化'/,
+  );
+  assert.doesNotMatch(source, /title=\{interactiveRequiredMessage\}/);
 });
 
 test('LiteArenaPanel should open rubric center preview from the current rubric markdown content', () => {
