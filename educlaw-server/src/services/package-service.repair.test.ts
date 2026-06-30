@@ -216,41 +216,25 @@ afterEach(() => {
 });
 
 describe('repairPackageRubric', () => {
-  it('generates a rubric when the current package has no rubric yet', async () => {
+  it('rejects repair when the current package has no rubric yet', async () => {
     const state = createSeedState('');
     generateTextMock.mockResolvedValue(completeRubric);
 
-    const { hasConfiguredRubricText, repairPackageRubric } =
-      await loadService(state);
-    const detail = await repairPackageRubric('user-1', 1);
+    const { repairPackageRubric } = await loadService(state);
 
-    expect(generateTextMock).toHaveBeenCalledTimes(1);
-    expect(detail.versionNumber).toBe(2);
-    expect(detail.snapshot.rubricMd).toContain('# Rubric');
-    expect(hasConfiguredRubricText(detail.snapshot.rubricMd)).toBe(true);
+    await expect(repairPackageRubric('user-1', 1)).rejects.toThrow('rubric');
+    expect(generateTextMock).not.toHaveBeenCalled();
   });
 
-  it('repairs an incomplete stored rubric with non-stream generation', async () => {
+  it('rejects repair when the current rubric is incomplete', async () => {
     const state = createSeedState();
     generateTextMock.mockResolvedValue(completeRubric);
 
-    const { hasConfiguredRubricText, repairPackageRubric } =
-      await loadService(state);
-    const detail = await repairPackageRubric('user-1', 1);
+    const { repairPackageRubric } = await loadService(state);
 
+    await expect(repairPackageRubric('user-1', 1)).rejects.toThrow('rubric');
     expect(streamTextMock).not.toHaveBeenCalled();
-    expect(generateTextMock).toHaveBeenCalledTimes(1);
-    expect(generateTextMock.mock.calls[0]?.[0]?.userPrompt).toContain(
-      'Evidence fidelity',
-    );
-    expect(generateTextMock.mock.calls[0]?.[0]?.userPrompt).toContain(
-      'Family engagement',
-    );
-    expect(detail.versionNumber).toBe(2);
-    expect(detail.snapshot.rubricMd).toContain('# Rubric');
-    expect(detail.snapshot.rubricMd).toContain('evidence fidelity');
-    expect(detail.snapshot.rubricMd).toContain('family engagement');
-    expect(hasConfiguredRubricText(detail.snapshot.rubricMd)).toBe(true);
+    expect(generateTextMock).not.toHaveBeenCalled();
   });
 
   it('returns the current package unchanged when the rubric is already usable', async () => {
@@ -263,28 +247,6 @@ describe('repairPackageRubric', () => {
     expect(generateTextMock).not.toHaveBeenCalled();
     expect(detail.versionNumber).toBe(1);
     expect(detail.snapshot.rubricMd).toBe(completeRubric);
-  });
-
-  it('retries rubric repair with the first draft when the first completion is still not scorable', async () => {
-    const state = createSeedState();
-    generateTextMock
-      .mockResolvedValueOnce([
-        '维度一：文档保真度',
-        '权重：25%',
-        '分值 评级标准',
-        '5分 基本贴合材料。',
-      ].join('\n'))
-      .mockResolvedValueOnce(completeRubric);
-
-    const { repairPackageRubric } = await loadService(state);
-    const detail = await repairPackageRubric('user-1', 1);
-
-    expect(generateTextMock).toHaveBeenCalledTimes(2);
-    expect(generateTextMock.mock.calls[1]?.[0]?.userPrompt).toContain(
-      'Existing rubric draft:',
-    );
-    expect(detail.versionNumber).toBe(2);
-    expect(detail.snapshot.rubricMd).toContain('# Rubric');
   });
 });
 
@@ -307,15 +269,13 @@ describe('optimizePackageRubric', () => {
     );
   });
 
-  it('falls back to repair when the current rubric is still incomplete', async () => {
+  it('rejects optimization when the current rubric is still incomplete', async () => {
     const state = createSeedState(incompleteRubric);
     generateTextMock.mockResolvedValue(completeRubric);
 
     const { optimizePackageRubric } = await loadService(state);
-    const detail = await optimizePackageRubric('user-1', 1);
 
-    expect(generateTextMock).toHaveBeenCalledTimes(1);
-    expect(detail.versionNumber).toBe(2);
-    expect(detail.snapshot.rubricMd).toContain('# Rubric');
+    await expect(optimizePackageRubric('user-1', 1)).rejects.toThrow('rubric');
+    expect(generateTextMock).not.toHaveBeenCalled();
   });
 });

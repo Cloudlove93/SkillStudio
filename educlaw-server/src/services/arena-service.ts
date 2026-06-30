@@ -9,7 +9,7 @@ import type {
 } from "@educlaw/shared";
 import { query } from "./db.js";
 import { generateJson, resolveBaselineModel, streamText } from "./llm-service.js";
-import { getPackage } from "./package-service.js";
+import { assertRubricConfigured, getPackage } from "./package-service.js";
 import type { DbRowMessage, DbRowThread } from "../types.js";
 
 export type ArenaStreamSide = "baseline" | "enhanced";
@@ -404,6 +404,7 @@ export async function sendMessage(
 export async function generateReport(userId: string, threadId: string | number, model?: string): Promise<ArenaReport> {
   const detail = await getThreadDetail(userId, threadId);
   const pkg = await getPackage(userId, detail.thread.packageId);
+  assertRubricConfigured(pkg.snapshot.rubricMd, "评估报告");
   const enhancedLabel = pkg.snapshot.name || "Enhanced";
   const latestUser = [...detail.messages].reverse().find((message) => message.side === "shared" && message.role === "user");
   const latestBaseline = [...detail.messages].reverse().find((message) => message.side === "baseline");

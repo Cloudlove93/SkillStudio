@@ -1,6 +1,6 @@
 ﻿import type { AgentPackageSnapshot } from "@educlaw/shared";
 import { generateChat, type ChatMessage } from "./llm-service.js";
-import { getPackage, applyOptimizedSnapshot } from "./package-service.js";
+import { assertRubricConfigured, getPackage, applyOptimizedSnapshot } from "./package-service.js";
 import { getThreadDetail } from "./arena-service.js";
 import { query } from "./db.js";
 import type { DbRowInteractiveOptimizationSession } from "../types.js";
@@ -545,6 +545,7 @@ export async function diagnosePackage(
   model?: string,
 ): Promise<DiagnosisResult> {
   const pkg = await getPackage(userId, packageId);
+  assertRubricConfigured(pkg.snapshot.rubricMd, "交互式优化");
   const detail = await getThreadDetail(userId, threadId);
 
   if (Number(detail.thread.packageId) !== Number(packageId)) {
@@ -667,6 +668,7 @@ export async function chatOptimize(
   model?: string,
 ): Promise<ChatOptimizeResult> {
   const pkg = await getPackage(userId, packageId);
+  assertRubricConfigured(pkg.snapshot.rubricMd, "交互式优化");
 
   const systemPrompt = [
     "你是 EduClaw-lite 智能体优化专家。你正在与用户对话，帮助优化智能体。",

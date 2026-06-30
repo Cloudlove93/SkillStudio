@@ -348,15 +348,15 @@ export default function LiteArenaPanel() {
   const rubricHasContent = hasRubricContent(rubricText);
   const rubricConfigured = isRubricUsable(rubricText);
   const rubricNeedsRepair = rubricHasContent && !rubricConfigured;
-  const reportReadiness = getReportReadiness(messages, rubricHasContent);
+  const reportReadiness = getReportReadiness(messages, rubricConfigured);
   const canGenerateReport = reportReadiness.canGenerateReport;
-  const canOpenReport = canOpenReportAction(Boolean(thread), rubricHasContent);
+  const canOpenReport = canOpenReportAction(Boolean(thread), rubricConfigured);
   const reportHintMessage = rubricNeedsRepair
-    ? '当前 rubric 会按现有内容参与评分。若想让评分更稳定，可以继续补充维度、权重或等级说明。'
-    : '当前还没有 rubric。先编辑或导入一份 rubric，再生成评估报告。';
+    ? '当前 rubric 还缺少完整评分结构。请先在右侧 Rubric 中补充维度、权重或等级说明。'
+    : '当前还没有配置 rubric。请先在右侧 Rubric 中手动填写评分规则。';
   const rubricRequiredMessage = rubricNeedsRepair
-    ? '当前 rubric 结构较松，但已经可以直接生成报告。若要做交互式优化，建议继续补充 rubric。'
-    : '当前还没有 rubric。请先编辑或导入一份 rubric。';
+    ? '当前 rubric 还缺少完整评分结构。请先在右侧 Rubric 中补充维度、权重或等级说明。'
+    : '当前还没有配置 rubric。请先在右侧 Rubric 中手动填写评分规则。';
   const reportRequiredMessage =
     reportReadiness.reason === 'missing_messages'
       ? '\u5f53\u524d\u8fd8\u6ca1\u6709\u53ef\u7528\u4e8e\u8bc4\u5206\u7684 Arena \u5bf9\u8bdd\u3002\u5148\u5b8c\u6210\u4e00\u8f6e\u5bf9\u8bdd\uff0c\u518d\u6765\u751f\u6210\u8bc4\u4f30\u62a5\u544a\u3002'
@@ -963,14 +963,12 @@ export default function LiteArenaPanel() {
         return;
       }
       const { createdId, createdName } = await runGenerateJob(jobDocuments);
-      let finalPackageName = createdName;
+      const finalPackageName = createdName;
       if (createdId) {
         preserveGenerateProgressRef.current = true;
         setInstruction('');
         setDocuments([]);
         await refreshPackages(createdId);
-        const readyDetail = await ensurePackageRubricReady(createdId);
-        finalPackageName = readyDetail?.name || createdName;
       }
       const doneLabel = finalPackageName
         ? `\u751f\u6210\u5b8c\u6210\uff1a${finalPackageName}`
@@ -1347,26 +1345,6 @@ export default function LiteArenaPanel() {
       name: '评估报告',
       report: currentReport,
     });
-  }
-
-  async function ensurePackageRubricReady(packageId: string) {
-    if (!token) return null;
-    const detail = await liteApi.getPackage(token, packageId);
-    if (selectedPackageIdRef.current === packageId) {
-      setSelectedPackage(detail);
-    }
-    if (isRubricUsable(detail.snapshot.rubricMd)) {
-      return detail;
-    }
-    pushProgress(
-      '\u68c0\u6d4b\u5230 rubric \u7ed3\u6784\u8fd8\u4e0d\u5b8c\u6574\uff0c\u6b63\u5728\u81ea\u52a8\u8865\u9f50\u8bc4\u5206\u7ed3\u6784...',
-    );
-    const repaired = await liteApi.repairRubric(token, packageId);
-    if (selectedPackageIdRef.current === packageId) {
-      setSelectedPackage(repaired);
-    }
-    await refreshPackages(repaired.id);
-    return repaired;
   }
 
   async function handleRubricFiles(fileList: FileList | null) {

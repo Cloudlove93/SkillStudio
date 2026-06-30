@@ -1,6 +1,6 @@
 import type { AgentPackageSnapshot, OptimizationIssue, OptimizationResult, PackageSkill } from "@educlaw/shared";
 import { generateJson } from "./llm-service.js";
-import { applyOptimizedSnapshot, getPackage, listVersions } from "./package-service.js";
+import { applyOptimizedSnapshot, assertRubricConfigured, getPackage, listVersions } from "./package-service.js";
 import { getThreadDetail } from "./arena-service.js";
 
 type ProgressCallback = (label: string) => Promise<void> | void;
@@ -18,6 +18,7 @@ export async function optimizePackage(
 ): Promise<OptimizationResult> {
   await onProgress?.("读取智能体与对话轨迹");
   const pkg = await getPackage(userId, packageId);
+  assertRubricConfigured(pkg.snapshot.rubricMd, "报告驱动优化");
   const detail = await getThreadDetail(userId, threadId);
   if (Number(detail.thread.packageId) !== Number(packageId)) {
     throw new Error("当前 Arena 对话不属于这个智能体");

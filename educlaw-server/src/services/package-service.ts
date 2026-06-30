@@ -1865,16 +1865,7 @@ export async function generatePackage(
     ),
   );
 
-  const resolvedRubricMd = await generateRubricWithRepair(
-    {
-      model,
-      packageName: base.name,
-      packageDescription: base.description,
-      agentExcerpt: agentMd.slice(0, 1800),
-      sourceRubricExcerpt,
-    },
-    onPreviewDelta,
-  );
+  const resolvedRubricMd = normalizeStoredRubricMarkdown(sourceRubricExcerpt);
 
   onPreview?.({
     type: 'agent',
@@ -1889,9 +1880,7 @@ export async function generatePackage(
     });
   }
 
-  const skills: PackageGenerationResult['skills'] = [];
-  for (let index = 0; index < skillMetas.length; index += 1) {
-    const skillMeta = skillMetas[index];
+  const skills = await Promise.all(skillMetas.map(async (skillMeta, index) => {
     const skillStartedAt = Date.now();
     getLogger({ component: 'package-generation' }).info({
       event: 'packages.generate.skill.start',
@@ -1936,7 +1925,6 @@ export async function generatePackage(
       skillMeta.description,
     );
     const skill = { ...skillMeta, skillMd };
-    skills.push(skill);
     onPreview?.({
       type: 'skill',
       name: skill.name,
@@ -1948,7 +1936,8 @@ export async function generatePackage(
       dirName: skill.dirName,
       durationMs: Date.now() - skillStartedAt,
     });
-  }
+    return skill;
+  }));
 
   const generated: PackageGenerationResult = {
     name: base.name,
@@ -2274,6 +2263,7 @@ export async function repairPackageRubric(
   packageId: string,
   model?: string,
 ) {
+  void model;
   const pkg = await getPackage(userId, packageId);
   const currentRawRubric = normalizeRubricMarkdown(pkg.snapshot.rubricMd);
   const currentRubric = normalizeStoredRubricMarkdown(pkg.snapshot.rubricMd);
@@ -2298,38 +2288,7 @@ export async function repairPackageRubric(
     return pkg;
   }
 
-  const repairedRubric = await generateRubricWithRepair({
-    model,
-    packageName: pkg.snapshot.name,
-    packageDescription: pkg.snapshot.description,
-    agentExcerpt: pkg.snapshot.agentMd.slice(0, 1800),
-    sourceRubricExcerpt: currentRubric,
-    useStream: false,
-  });
-
-  if (!hasConfiguredRubricText(repairedRubric)) {
-    throw new Error(
-      'AI 未能把当前 rubric 修复成可评分格式，请稍后重试或手动补充。',
-    );
-  }
-
-  if (normalizeStoredRubricMarkdown(repairedRubric) === currentRubric) {
-    throw new Error('AI 没有产出新的 rubric 内容，请稍后重试。');
-  }
-
-  const nextSnapshot: AgentPackageSnapshot = {
-    ...pkg.snapshot,
-    rubricMd: normalizeStoredRubricMarkdown(repairedRubric),
-    skills: pkg.snapshot.skills.map((skill) => ({ ...skill })),
-  };
-
-  return applyOptimizedSnapshot(
-    userId,
-    packageId,
-    nextSnapshot,
-    'optimized',
-    'AI 修复 rubric.md',
-  );
+  assertRubricConfigured(currentRubric, 'rubric 修复');
 }
 
 export async function optimizePackageRubric(
@@ -2357,9 +2316,9 @@ export async function optimizePackageRubric(
         'AI 优化 rubric.md',
       );
     }
-  } else {
-    return repairPackageRubric(userId, packageId, model);
   }
+
+  assertRubricConfigured(currentRubric, 'rubric 优化');
 
   const optimizedRubric = await generateRubricWithRepair({
     model,

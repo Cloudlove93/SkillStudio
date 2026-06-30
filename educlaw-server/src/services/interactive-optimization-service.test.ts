@@ -3,6 +3,8 @@
 const getPackageMock = vi.fn();
 const applyOptimizedSnapshotMock = vi.fn();
 const listVersionsMock = vi.fn();
+const getThreadDetailMock = vi.fn();
+const generateChatMock = vi.fn();
 
 async function loadService() {
   vi.resetModules();
@@ -10,16 +12,21 @@ async function loadService() {
     getPackage: getPackageMock,
     applyOptimizedSnapshot: applyOptimizedSnapshotMock,
     listVersions: listVersionsMock,
+    assertRubricConfigured: (rubricMd: string | undefined | null, feature: string) => {
+      if (!String(rubricMd || "").trim()) {
+        throw new Error(`当前智能体还没有配置 rubric。请先在 Rubric 标签中补充评分规则后再使用${feature}。`);
+      }
+    },
   }));
   vi.doMock("./db.js", () => ({
     newId: () => "test-id",
     query: vi.fn(),
   }));
   vi.doMock("./arena-service.js", () => ({
-    getThreadDetail: vi.fn(),
+    getThreadDetail: getThreadDetailMock,
   }));
   vi.doMock("./llm-service.js", () => ({
-    generateChat: vi.fn(),
+    generateChat: generateChatMock,
     generateJson: vi.fn(),
   }));
   return import("./interactive-optimization-service.js");
@@ -34,9 +41,57 @@ afterEach(() => {
   getPackageMock.mockReset();
   applyOptimizedSnapshotMock.mockReset();
   listVersionsMock.mockReset();
+  getThreadDetailMock.mockReset();
+  generateChatMock.mockReset();
 });
 
 describe("interactive-optimization-service", () => {
+  it("rejects diagnosis before model work when rubric is missing", async () => {
+    getPackageMock.mockResolvedValue({
+      name: "No Rubric Agent",
+      snapshot: {
+        name: "No Rubric Agent",
+        description: "Needs manual rubric",
+        versionLabel: "v1",
+        agentMd: "# Agent",
+        rubricMd: "",
+        skills: [],
+      },
+    });
+    getThreadDetailMock.mockResolvedValue({
+      thread: { packageId: "package-1" },
+      messages: [],
+    });
+
+    const { diagnosePackage } = await loadService();
+
+    await expect(diagnosePackage("user-1", "package-1", "thread-1")).rejects.toThrow("还没有配置 rubric");
+    expect(generateChatMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects chat optimization before model work when rubric is missing", async () => {
+    getPackageMock.mockResolvedValue({
+      snapshot: {
+        name: "No Rubric Agent",
+        description: "Needs manual rubric",
+        versionLabel: "v1",
+        agentMd: "# Agent",
+        rubricMd: "",
+        skills: [],
+      },
+    });
+
+    const { chatOptimize } = await loadService();
+
+    await expect(
+      chatOptimize("user-1", "package-1", {
+        messages: [{ role: "user", content: "帮我优化" }],
+        adoptedChanges: [],
+      }),
+    ).rejects.toThrow("还没有配置 rubric");
+    expect(generateChatMock).not.toHaveBeenCalled();
+  });
+
   it("keeps untouched package metadata when saving adopted changes", async () => {
     getPackageMock.mockResolvedValue({
       snapshot: {

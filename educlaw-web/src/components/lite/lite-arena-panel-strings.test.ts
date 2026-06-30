@@ -34,11 +34,11 @@ test('LiteArenaPanel should keep rubric edit wired to the manual edit flow', () 
   assert.match(source, /title: '手动编辑 rubric\.md'/);
 });
 
-test('LiteArenaPanel should drive report readiness from rubric content instead of strict rubric usability', () => {
-  assert.match(source, /getReportReadiness\(messages, rubricHasContent\)/);
+test('LiteArenaPanel should require configured rubric before report actions are enabled', () => {
+  assert.match(source, /getReportReadiness\(messages, rubricConfigured\)/);
   assert.match(
     source,
-    /canOpenReportAction\(Boolean\(thread\), rubricHasContent\)/,
+    /canOpenReportAction\(Boolean\(thread\), rubricConfigured\)/,
   );
   assert.doesNotMatch(
     source,

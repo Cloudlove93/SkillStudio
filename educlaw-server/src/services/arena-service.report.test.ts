@@ -20,6 +20,11 @@ async function loadService() {
 
   vi.doMock("./package-service.js", () => ({
     getPackage: getPackageMock,
+    assertRubricConfigured: (rubricMd: string | undefined | null, feature: string) => {
+      if (!String(rubricMd || "").trim()) {
+        throw new Error(`当前智能体还没有配置 rubric。请先在 Rubric 标签中补充评分规则后再使用${feature}。`);
+      }
+    },
   }));
 
   return import("./arena-service.js");
@@ -36,6 +41,43 @@ afterEach(() => {
 });
 
 describe("generateReport", () => {
+  it("rejects report generation when rubric is missing", async () => {
+    queryMock.mockImplementation(async (sql: string) => {
+      if (sql.startsWith("select * from arena_threads where id = $1 and user_id = $2")) {
+        return {
+          rows: [
+            {
+              id: "thread-1",
+              user_id: "user-1",
+              package_id: "package-1",
+              title: "Arena Thread",
+              model: null,
+              created_at: "2026-06-27T00:00:00.000Z",
+              updated_at: "2026-06-27T00:00:00.000Z",
+            },
+          ],
+          rowCount: 1,
+        };
+      }
+      if (sql.startsWith("select * from arena_messages where thread_id = $1 and user_id = $2 order by created_at asc")) {
+        return { rows: [], rowCount: 0 };
+      }
+      throw new Error(`Unexpected query: ${sql}`);
+    });
+    getPackageMock.mockResolvedValue({
+      id: "package-1",
+      snapshot: {
+        name: "No Rubric Agent",
+        rubricMd: "",
+      },
+    });
+
+    const { generateReport } = await loadService();
+
+    await expect(generateReport("user-1", "thread-1")).rejects.toThrow("还没有配置 rubric");
+    expect(generateJsonMock).not.toHaveBeenCalled();
+  });
+
   it("fills missing summaries and recommendation with readable fallbacks", async () => {
     queryMock.mockImplementation(async (sql: string) => {
       if (sql.startsWith("select * from arena_threads where id = $1 and user_id = $2")) {

@@ -262,31 +262,6 @@ function makeEmbeddedLegacyRubricDocument() {
   ].join('\n');
 }
 
-function makeRepairedRubricMarkdown() {
-  return [
-    '# Rubric',
-    '',
-    '## 评分目标',
-    '- Score whether the response is grounded, practical, and safe.',
-    '',
-    '## 评分维度',
-    '### 角色贴合',
-    '- Full score: stays aligned with the package role and audience.',
-    '',
-    '### Skill 遵循',
-    '- Full score: uses the intended workflow and constraints.',
-    '',
-    '### 回答质量',
-    '- Full score: preserves behavior assessment and intervention variety.',
-    '',
-    '### 安全边界',
-    '- Full score: clearly escalates high-risk cases.',
-    '',
-    '## 使用说明',
-    '- Score each dimension and then give a summary.',
-  ].join('\n');
-}
-
 afterEach(() => {
   vi.resetModules();
   vi.doUnmock('./db.js');
@@ -297,7 +272,7 @@ afterEach(() => {
 });
 
 describe('generatePackage', () => {
-  it('creates a fallback scorable rubric when none is generated', async () => {
+  it('leaves rubric empty when no source rubric is provided', async () => {
     generateJsonMock.mockResolvedValue({
       name: 'Test Agent',
       description: 'Handle test requests.',
@@ -318,9 +293,6 @@ describe('generatePackage', () => {
           yield '# Test Agent\n\nAgent instructions.\n'.repeat(20);
         })();
       }
-      if (streamCall === 2) {
-        return (async function* () {})();
-      }
       return (async function* () {
         yield makeLongSkillMarkdown();
       })();
@@ -330,9 +302,74 @@ describe('generatePackage', () => {
     const detail = await generatePackage('user-1', 'Create a test package');
 
     expect(detail.name).toBe('Test Agent');
-    expect(detail.snapshot.rubricMd).toContain('# Rubric');
-    expect(hasConfiguredRubricText(detail.snapshot.rubricMd)).toBe(true);
+    expect(detail.snapshot.rubricMd).toBe('');
+    expect(hasConfiguredRubricText(detail.snapshot.rubricMd)).toBe(false);
     expect(detail.snapshot.skills).toHaveLength(1);
+    expect(streamTextMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('starts skill generation in parallel after the agent is generated', async () => {
+    generateJsonMock.mockResolvedValue({
+      name: 'Test Agent',
+      description: 'Handle test requests.',
+      skills: [
+        {
+          dirName: 'core-task',
+          name: 'Core Task',
+          description: 'Use this when the user needs the primary task handled.',
+        },
+        {
+          dirName: 'safety-check',
+          name: 'Safety Check',
+          description: 'Use this when the user needs risk boundaries checked.',
+        },
+      ],
+    });
+
+    let releaseFirstSkill!: () => void;
+    const firstSkillMayContinue = new Promise<void>((resolve) => {
+      releaseFirstSkill = resolve;
+    });
+    let secondSkillStartedBeforeFirstReleased = false;
+    let firstSkillReleased = false;
+    let streamCall = 0;
+
+    streamTextMock.mockImplementation(() => {
+      streamCall += 1;
+      if (streamCall === 1) {
+        return (async function* () {
+          yield '# Test Agent\n\nAgent instructions.\n'.repeat(20);
+        })();
+      }
+      if (streamCall === 2) {
+        return (async function* () {
+          await firstSkillMayContinue;
+          yield makeLongSkillMarkdown();
+        })();
+      }
+      if (!firstSkillReleased) {
+        secondSkillStartedBeforeFirstReleased = true;
+      }
+      return (async function* () {
+        yield makeLongSkillMarkdown();
+      })();
+    });
+
+    const { generatePackage } = await loadService();
+    const generating = generatePackage('user-1', 'Create a test package');
+
+    await vi.waitFor(() => {
+      expect(streamTextMock).toHaveBeenCalledTimes(3);
+    });
+    firstSkillReleased = true;
+    releaseFirstSkill();
+    const detail = await generating;
+
+    expect(secondSkillStartedBeforeFirstReleased).toBe(true);
+    expect(detail.snapshot.skills.map((skill) => skill.dirName)).toEqual([
+      'core-task',
+      'safety-check',
+    ]);
   });
 
   it('autofills missing skill sections before validation', async () => {
@@ -355,9 +392,6 @@ describe('generatePackage', () => {
         return (async function* () {
           yield '# Test Agent\n\nAgent instructions.\n'.repeat(20);
         })();
-      }
-      if (streamCall === 2) {
-        return (async function* () {})();
       }
       return (async function* () {
         yield makeSkillMarkdownMissingSections();
@@ -393,9 +427,6 @@ describe('generatePackage', () => {
         return (async function* () {
           yield '# Test Agent\n\nAgent instructions.\n'.repeat(20);
         })();
-      }
-      if (streamCall === 2) {
-        return (async function* () {})();
       }
       return (async function* () {
         yield makeLongSkillMarkdown();
@@ -486,7 +517,7 @@ describe('generatePackage', () => {
     expect(streamTextMock).toHaveBeenCalledTimes(2);
   });
 
-  it('repairs an incomplete model-generated rubric before saving', async () => {
+  it('does not ask the model to generate rubric when no source rubric exists', async () => {
     generateJsonMock.mockResolvedValue({
       name: 'Conflict Coach',
       description: 'Support home-school conflict handling.',
@@ -507,21 +538,6 @@ describe('generatePackage', () => {
           yield '# Conflict Coach\n\nAgent instructions.\n'.repeat(20);
         })();
       }
-      if (streamCall === 2) {
-        return (async function* () {
-          yield [
-            '5. Evaluation Criteria',
-            '',
-            '1. Conflict identification',
-            '- Spot the main source of conflict.',
-          ].join('\n');
-        })();
-      }
-      if (streamCall === 3) {
-        return (async function* () {
-          yield makeRepairedRubricMarkdown();
-        })();
-      }
       return (async function* () {
         yield makeLongSkillMarkdown();
       })();
@@ -530,13 +546,12 @@ describe('generatePackage', () => {
     const { generatePackage, hasConfiguredRubricText } = await loadService();
     const detail = await generatePackage('user-1', 'Create a conflict coach');
 
-    expect(detail.snapshot.rubricMd).toContain('# Rubric');
-    expect(detail.snapshot.rubricMd).toContain('## 使用说明');
-    expect(hasConfiguredRubricText(detail.snapshot.rubricMd)).toBe(true);
-    expect(streamTextMock).toHaveBeenCalledTimes(4);
+    expect(detail.snapshot.rubricMd).toBe('');
+    expect(hasConfiguredRubricText(detail.snapshot.rubricMd)).toBe(false);
+    expect(streamTextMock).toHaveBeenCalledTimes(2);
   });
 
-  it('extracts a rubric from docx raw text and repairs it when needed', async () => {
+  it('extracts a rubric from docx raw text without AI repair', async () => {
     generateJsonMock.mockResolvedValue({
       name: 'Village Support Agent',
       description: 'Organize intervention plans.',
@@ -557,27 +572,20 @@ describe('generatePackage', () => {
           yield '# Village Support Agent\n\nAgent instructions.\n'.repeat(20);
         })();
       }
-      if (streamCall === 2) {
-        return (async function* () {
-          yield makeRepairedRubricMarkdown();
-        })();
-      }
       return (async function* () {
         yield makeLongSkillMarkdown();
       })();
     });
 
-    const { generatePackage, hasConfiguredRubricText } = await loadService();
+    const { generatePackage } = await loadService();
     const detail = await generatePackage('user-1', '', undefined, [
       { name: 'task.docx', content: makeDocxRawRubricDocument() },
     ]);
 
-    expect(detail.snapshot.rubricMd).toContain('# Rubric');
-    expect(detail.snapshot.rubricMd).toContain('## 使用说明');
+    expect(detail.snapshot.rubricMd).toContain('Boundary language quality');
     expect(detail.snapshot.rubricMd).not.toContain('## Case comparison');
     expect(detail.snapshot.rubricMd).not.toContain('## References');
-    expect(hasConfiguredRubricText(detail.snapshot.rubricMd)).toBe(true);
-    expect(streamTextMock).toHaveBeenCalledTimes(3);
+    expect(streamTextMock).toHaveBeenCalledTimes(2);
   });
 
   it('keeps a standalone weighted rubric document without forcing template rewrite', async () => {
