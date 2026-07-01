@@ -24,6 +24,7 @@ services:
     environment:
       - DATABASE_URL=${DATABASE_URL}
       - INVITE_CODE=${INVITE_CODE}
+      - AUTH_BACKEND_URL=${AUTH_BACKEND_URL}
       - LLM_BASE_URL=${LLM_BASE_URL}
       - LLM_API_KEY=${LLM_API_KEY}
       - LLM_MODEL=${LLM_MODEL}

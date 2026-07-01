@@ -73,4 +73,5 @@ export const config = {
   llmBaselineModel: process.env.LLM_BASELINE_MODEL || "",
   conversationEvalBaseUrl: (process.env.CONVERSATION_EVAL_BASE_URL || "http://127.0.0.1:8090").replace(/\/+$/, ""),
   conversationEvalScenesDir: process.env.CONVERSATION_EVAL_SCENES_DIR || path.join(workspaceRoot, ".eval-scenes"),
+  authBackendUrl: (process.env.AUTH_BACKEND_URL || "").replace(/\/+$/, ""),
 };
