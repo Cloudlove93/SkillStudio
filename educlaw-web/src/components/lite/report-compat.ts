@@ -24,9 +24,13 @@ function isArenaReportSide(value: unknown): boolean {
     && value.dimensions.every(isArenaDimensionScore);
 }
 
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
 export function isArenaReport(value: unknown): value is ArenaReport {
   return isRecord(value)
-    && typeof value.threadId === "string"
+    && isFiniteNumber(value.threadId)
     && isArenaReportSide(value.baseline)
     && isArenaReportSide(value.enhanced)
     && typeof value.recommendation === "string"

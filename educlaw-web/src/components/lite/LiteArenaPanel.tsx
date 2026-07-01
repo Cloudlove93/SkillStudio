@@ -1001,6 +1001,9 @@ export default function LiteArenaPanel() {
         },
       );
       if (nextReport) {
+        if (!isArenaReport(nextReport)) {
+          throw new Error('\u62a5\u544a\u6570\u636e\u7ed3\u6784\u5f02\u5e38\uff0c\u8bf7\u91cd\u8bd5');
+        }
         localStorage.setItem(
           reportStorageKey(currentThreadId),
           JSON.stringify(nextReport),

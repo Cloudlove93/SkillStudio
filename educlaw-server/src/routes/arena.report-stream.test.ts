@@ -62,7 +62,7 @@ describe("POST /arena/threads/:threadId/report/stream", () => {
         new Promise((resolve) => {
           setTimeout(() => {
             resolve({
-              threadId: "thread-1",
+              threadId: 1,
               baseline: { summary: "baseline", total: 1, dimensions: [] },
               enhanced: { summary: "enhanced", total: 2, dimensions: [] },
               recommendation: "enhanced is better",

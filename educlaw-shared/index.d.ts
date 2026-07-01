@@ -86,7 +86,7 @@ export interface ArenaReportSide {
     dimensions: ArenaDimensionScore[];
 }
 export interface ArenaReport {
-    threadId: string;
+    threadId: number;
     baseline: ArenaReportSide;
     enhanced: ArenaReportSide;
     recommendation: string;

@@ -42,8 +42,10 @@ services:
         condition: service_healthy
     restart: unless-stopped
     networks:
-      - default
-      - auth-net
+      default:
+      auth-net:
+        aliases:
+          - educlaw-server
 
   educlaw-web:
     build:
@@ -56,8 +58,10 @@ services:
       - educlaw-server
     restart: unless-stopped
     networks:
-      - default
-      - auth-net
+      default:
+      auth-net:
+        aliases:
+          - educlaw-web
 
 networks:
   auth-net:

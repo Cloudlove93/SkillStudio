@@ -8,7 +8,7 @@ import {
 } from './arena-report.ts';
 
 const report: ArenaReport = {
-  threadId: 'thread-1',
+  threadId: 1,
   baseline: {
     summary: 'baseline summary',
     total: 72,

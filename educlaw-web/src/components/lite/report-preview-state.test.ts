@@ -7,7 +7,7 @@ import {
 } from "./report-preview-state.ts";
 
 const report: ArenaReport = {
-  threadId: "thread-1",
+  threadId: 1,
   baseline: {
     summary: "baseline summary",
     total: 18,
