@@ -15,6 +15,7 @@ export default function LoginPage() {
 
   const [mode, setMode] = useState<Mode>('login');
   const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [inviteCode, setInviteCode] = useState('');
@@ -32,7 +33,9 @@ export default function LoginPage() {
         '在一个工作台中完成 Skill 的创建、整理、评估与持续优化，让好用的能力能够被沉淀、复用和共享。',
       infoAccount: '注册后可以继续管理工作区中的账号、资料与使用记录。',
       accountAccess: '账户访问',
+      emailOrUsername: '邮箱',
       username: '用户名',
+      email: '邮箱',
       password: '密码',
       confirmPassword: '确认密码',
       inviteCode: '邀请码',
@@ -40,6 +43,7 @@ export default function LoginPage() {
       register: '注册',
       loggingIn: '登录中...',
       registering: '注册中...',
+      emailInvalid: '请输入有效的邮箱地址',
       usernameLength: '用户名需要 3-32 个字符',
       passwordLength: '密码至少需要 6 个字符',
       passwordMismatch: '两次密码输入不一致',
@@ -49,14 +53,32 @@ export default function LoginPage() {
     [],
   );
 
+  function isValidEmail(value: string): boolean {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
 
-    if (username.length < 3 || username.length > 32) {
-      setError(copy.usernameLength);
-      return;
+    if (mode === 'login') {
+      // 登录时，username 字段实际存储的是邮箱
+      if (!username.trim()) {
+        setError(copy.emailInvalid);
+        return;
+      }
+    } else {
+      // 注册时验证邮箱格式
+      if (!isValidEmail(email)) {
+        setError(copy.emailInvalid);
+        return;
+      }
+      if (username.length < 3 || username.length > 32) {
+        setError(copy.usernameLength);
+        return;
+      }
     }
+
     if (password.length < 6) {
       setError(copy.passwordLength);
       return;
@@ -77,7 +99,7 @@ export default function LoginPage() {
       if (mode === 'login') {
         await login(username, password);
       } else {
-        await register(username, password, inviteCode);
+        await register(email, password, inviteCode, username);
       }
       navigate('/', { replace: true });
     } catch (err: unknown) {
@@ -205,24 +227,60 @@ export default function LoginPage() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
+              {isRegister && (
+                <div className="space-y-2">
+                  <label
+                    htmlFor="auth-username"
+                    className="text-sm font-medium text-foreground"
+                  >
+                    {copy.username}
+                  </label>
+                  <div className="input-glow rounded-[12px] border border-border bg-card p-1">
+                    <Input
+                      id="auth-username"
+                      name="username"
+                      placeholder={copy.username}
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      autoFocus
+                      autoComplete="username"
+                      className="border-0 bg-transparent shadow-none focus-visible:ring-0"
+                    />
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-2">
                 <label
-                  htmlFor="auth-username"
+                  htmlFor={isRegister ? 'auth-email' : 'auth-username'}
                   className="text-sm font-medium text-foreground"
                 >
-                  {copy.username}
+                  {isRegister ? copy.email : copy.emailOrUsername}
                 </label>
                 <div className="input-glow rounded-[12px] border border-border bg-card p-1">
-                  <Input
-                    id="auth-username"
-                    name="username"
-                    placeholder={copy.username}
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    autoFocus
-                    autoComplete="username"
-                    className="border-0 bg-transparent shadow-none focus-visible:ring-0"
-                  />
+                  {isRegister ? (
+                    <Input
+                      id="auth-email"
+                      name="email"
+                      type="email"
+                      placeholder="your@email.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      autoComplete="email"
+                      className="border-0 bg-transparent shadow-none focus-visible:ring-0"
+                    />
+                  ) : (
+                    <Input
+                      id="auth-username"
+                      name="username"
+                      placeholder="your@email.com"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      autoFocus
+                      autoComplete="username"
+                      className="border-0 bg-transparent shadow-none focus-visible:ring-0"
+                    />
+                  )}
                 </div>
               </div>
 

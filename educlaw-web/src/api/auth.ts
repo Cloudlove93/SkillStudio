@@ -26,11 +26,12 @@ async function submitPasswordAuth(
   username: string,
   password: string,
   inviteCode?: string,
+  email?: string,
 ): Promise<StoredTokenResponse> {
   const tokens = await apiFetchJson<StoredTokenResponse>(`/auth/password`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(buildPasswordAuthRequest(mode, username, password, inviteCode)),
+    body: JSON.stringify(buildPasswordAuthRequest(mode, username, password, inviteCode, email)),
   });
 
   return persistPasswordAuth(tokens);
@@ -44,11 +45,12 @@ export async function login(
 }
 
 export async function register(
-  username: string,
+  email: string,
   password: string,
   inviteCode?: string,
+  username?: string,
 ): Promise<StoredTokenResponse> {
-  return submitPasswordAuth('register', username, password, inviteCode);
+  return submitPasswordAuth('register', username || email, password, inviteCode, email);
 }
 
 export async function getMe(token: string): Promise<AuthUser> {

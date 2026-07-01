@@ -16,7 +16,7 @@ import { config } from "../config.js";
  * replaces English ones with fallback strings like "Authentication failed".
  */
 const ERROR_TRANSLATIONS: Record<string, string> = {
-  "Authentication failed": "用户名或密码错误",
+  "Authentication failed": "邮箱或密码错误",
   "Registration failed": "注册失败，请稍后重试",
 };
 
@@ -62,6 +62,19 @@ router.all("/*path", async (req: Request, res: Response) => {
   if (!config.authBackendUrl) {
     res.status(503).json({ error: "Auth backend not configured (AUTH_BACKEND_URL)" });
     return;
+  }
+
+  // Transform request body for password auth
+  if (req.method === "POST" && req.path === "/password" && req.body) {
+    const { email, username, mode } = req.body;
+
+    // For login: use email as username (auth backend supports email lookup)
+    if (mode === "login" && email) {
+      req.body.username = email;
+    }
+
+    // For registration: keep username as-is, email is already a separate field
+    // The auth backend expects: username (display name), email (actual email), password
   }
 
   // Validate invite code for registration requests

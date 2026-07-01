@@ -14,9 +14,10 @@ interface AuthStore {
   isAdmin: boolean;
   login: (username: string, password: string) => Promise<void>;
   register: (
-    username: string,
+    email: string,
     password: string,
     inviteCode: string,
+    username: string,
   ) => Promise<void>;
   logout: () => void;
   checkAuth: () => Promise<boolean>;
@@ -39,8 +40,8 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     });
   },
 
-  async register(username: string, password: string, inviteCode: string) {
-    const tokens = await authApi.register(username, password, inviteCode);
+  async register(email: string, password: string, inviteCode: string, username: string) {
+    const tokens = await authApi.register(email, password, inviteCode, username);
     const me = await authApi.getMe(tokens.access_token);
     set({
       token: tokens.access_token,

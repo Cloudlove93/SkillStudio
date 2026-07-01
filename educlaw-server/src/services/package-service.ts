@@ -88,7 +88,7 @@ const MAX_BASE_DOCUMENT_CHARS = 12_000;
 const MAX_SKILL_DOCUMENT_CHARS = 8_000;
 const MAX_GENERATED_SKILLS = 2;
 const MAX_SOURCE_RUBRIC_CHARS = 12_000;
-const MAX_GENERATED_PACKAGE_NAME_CHARS = 24;
+const MAX_GENERATED_PACKAGE_NAME_CHARS = 10;
 const RUBRIC_SECTION_KEYWORDS = [
   'rubric',
   'evaluation criteria',
@@ -1358,6 +1358,7 @@ function getBaseOutputSchemaPrompt(): string {
     '3. dirName 必须是小写英文 kebab-case',
     "4. description 必须包含'当/如果/用于/遇到/针对'等触发词",
     '5. 不要在本步骤生成 agent.md、rubric.md 或 SKILL.md',
+    '6. name 不超过 10 个字，简洁明了',
   ].join('\n');
 }
 
