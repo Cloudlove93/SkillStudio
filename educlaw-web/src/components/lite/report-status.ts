@@ -11,10 +11,9 @@ export type ReportReadinessReason =
 
 export function canOpenReportAction(
   hasThread: boolean,
-  hasRubricContent: boolean,
+  canGenerateReport: boolean,
 ): boolean {
-  void hasRubricContent;
-  return hasThread;
+  return hasThread && canGenerateReport;
 }
 
 export function getReportReadiness(

@@ -25,7 +25,7 @@ test("package switching still preserves transient progress during generated-pack
 
   assert.deepEqual(decision, {
     preserveTransientState: true,
-    clearCenterPreview: false,
+    clearCenterPreview: true,
     clearProgress: false,
     clearGeneratePreviews: false,
     clearSideStreaming: false,

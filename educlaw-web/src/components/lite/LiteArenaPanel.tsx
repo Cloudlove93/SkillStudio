@@ -125,6 +125,7 @@ type CenterPreviewState =
 
 const DOCX_MIME_TYPE =
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+const BATCH_GENERATE_CONCURRENCY = 2;
 const RUBRIC_TEMPLATE = [
   '# Rubric',
   '',
@@ -360,7 +361,10 @@ export default function LiteArenaPanel() {
     replyGenerating,
   );
   const canGenerateReport = reportReadiness.canGenerateReport;
-  const canOpenReport = canOpenReportAction(Boolean(thread), rubricConfigured);
+  const canOpenReport = canOpenReportAction(
+    Boolean(thread),
+    canGenerateReport,
+  );
   const reportHintMessage = rubricNeedsRepair
     ? '当前 rubric 还缺少完整评分结构。请先在右侧 Rubric 中补充维度、权重或等级说明。'
     : '当前还没有配置 rubric。请先在右侧 Rubric 中手动填写评分规则。';
@@ -838,12 +842,12 @@ export default function LiteArenaPanel() {
     startProgress(
       '\u751f\u6210\u667a\u80fd\u4f53',
       batchMode
-        ? `\u6b63\u5728\u9010\u4e2a\u5904\u7406 ${jobDocuments.length} \u4e2a\u6587\u6863...`
+        ? `\u6b63\u5728\u5e76\u53d1\u5904\u7406 ${jobDocuments.length} \u4e2a\u6587\u6863\uff0c\u6700\u591a\u540c\u65f6 ${BATCH_GENERATE_CONCURRENCY} \u4e2a...`
         : '\u6b63\u5728\u751f\u6210\u667a\u80fd\u4f53...',
     );
     setStatus(
       batchMode
-        ? `\u6b63\u5728\u9010\u4e2a\u5904\u7406 ${jobDocuments.length} \u4e2a\u6587\u6863...`
+        ? `\u6b63\u5728\u5e76\u53d1\u5904\u7406 ${jobDocuments.length} \u4e2a\u6587\u6863\uff0c\u6700\u591a\u540c\u65f6 ${BATCH_GENERATE_CONCURRENCY} \u4e2a...`
         : '\u6b63\u5728\u751f\u6210\u667a\u80fd\u4f53...',
     );
     setGeneratePreviews([]);
@@ -851,10 +855,11 @@ export default function LiteArenaPanel() {
     try {
       const runGenerateJob = async (
         docs: Array<{ name: string; content: string }>,
+        showPreview = true,
       ) => {
         let createdId = '';
         let createdName = '';
-        setGeneratePreviews([]);
+        if (showPreview) setGeneratePreviews([]);
         await liteApi.generatePackageStream(
           token,
           instructionText,
@@ -862,15 +867,17 @@ export default function LiteArenaPanel() {
           docs,
           (event) => {
             if (event.event === 'phase') {
-              pushProgress(event.data.label);
-              setStatus(event.data.label);
+              if (showPreview) {
+                pushProgress(event.data.label);
+                setStatus(event.data.label);
+              }
             }
-            if (event.event === 'preview_delta') {
+            if (showPreview && event.event === 'preview_delta') {
               setGeneratePreviews((prev) =>
                 appendPackagePreviewDelta(prev, event.data),
               );
             }
-            if (event.event === 'preview') {
+            if (showPreview && event.event === 'preview') {
               setGeneratePreviews((prev) =>
                 upsertPackagePreview(prev, event.data),
               );
@@ -889,35 +896,51 @@ export default function LiteArenaPanel() {
       if (batchMode) {
         let successCount = 0;
         let failureCount = 0;
-        for (let index = 0; index < batchPlan.length; index += 1) {
-          const item = batchPlan[index]!;
-          const sourceDoc = jobDocuments[index]!;
-          updateBatchRun(item.id, { status: 'running' });
-          setStatus(`正在生成 ${sourceDoc.name}...`);
-          try {
-            const result = await runGenerateJob([sourceDoc]);
-            if (result.createdId) {
-              successCount += 1;
-              updateBatchRun(item.id, {
-                status: 'done',
-                packageId: result.createdId,
-                packageName: result.createdName || sourceDoc.name,
-              });
-            } else {
+        let nextBatchIndex = 0;
+
+        const runBatchWorker = async () => {
+          while (true) {
+            const index = nextBatchIndex;
+            nextBatchIndex += 1;
+            if (index >= batchPlan.length) return;
+
+            const item = batchPlan[index]!;
+            const sourceDoc = jobDocuments[index]!;
+            updateBatchRun(item.id, { status: 'running' });
+            setStatus(`正在生成 ${sourceDoc.name}...`);
+            try {
+              const result = await runGenerateJob([sourceDoc], false);
+              if (result.createdId) {
+                successCount += 1;
+                updateBatchRun(item.id, {
+                  status: 'done',
+                  packageId: result.createdId,
+                  packageName: result.createdName || sourceDoc.name,
+                });
+              } else {
+                failureCount += 1;
+                updateBatchRun(item.id, {
+                  status: 'error',
+                  error: '未生成出结果',
+                });
+              }
+            } catch (error) {
               failureCount += 1;
               updateBatchRun(item.id, {
                 status: 'error',
-                error: '未生成出结果',
+                error: error instanceof Error ? error.message : '生成失败',
               });
             }
-          } catch (error) {
-            failureCount += 1;
-            updateBatchRun(item.id, {
-              status: 'error',
-              error: error instanceof Error ? error.message : '生成失败',
-            });
           }
-        }
+        };
+
+        const workers = Array.from(
+          {
+            length: Math.min(BATCH_GENERATE_CONCURRENCY, batchPlan.length),
+          },
+          () => runBatchWorker(),
+        );
+        await Promise.all(workers);
         await reloadPackageList();
         if (failureCount === 0) {
           setInstruction('');
@@ -2136,7 +2159,7 @@ export default function LiteArenaPanel() {
               </div>
             </div>
             <ScrollArea className="flex-1 min-h-0">
-              <div className="space-y-4 p-4">
+              <div className="space-y-4 overflow-x-hidden p-4">
                 <div className="space-y-2">
                   <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                     生成 Agent / Skill
@@ -2175,11 +2198,11 @@ export default function LiteArenaPanel() {
                   )}
                   {documents.length > 1 && (
                     <div className="text-[11px] text-muted-foreground">
-                      多文档会逐个生成，不会合并成一个包。
+                      多文档会并发生成，不会合并成一个包。
                     </div>
                   )}
                   {batchRuns.length > 0 && (
-                    <div className="space-y-1.5 rounded-xl border border-border/70 bg-card/40 p-2">
+                    <div className="min-w-0 max-w-full space-y-1.5 overflow-hidden rounded-xl border border-border/70 bg-card/40 p-2">
                       <div className="flex items-center justify-between px-0.5 text-[11px] text-muted-foreground">
                         <span>批量任务</span>
                         <span>
@@ -2193,9 +2216,9 @@ export default function LiteArenaPanel() {
                       {batchRuns.map((item) => (
                         <div
                           key={item.id}
-                          className="flex items-start justify-between gap-3 rounded-lg border border-border/70 bg-card/70 px-2.5 py-2 text-xs"
+                          className="flex min-w-0 items-start justify-between gap-2 overflow-hidden rounded-lg border border-border/70 bg-card/70 px-2.5 py-2 text-xs"
                         >
-                          <div className="min-w-0 flex-1">
+                          <div className="min-w-0 flex-1 overflow-hidden">
                             <div className="truncate font-medium">
                               {item.name}
                             </div>
@@ -2204,14 +2227,14 @@ export default function LiteArenaPanel() {
                                 <div className="truncate text-[11px] text-muted-foreground">
                                   {`生成结果：${item.packageName}`}
                                 </div>
-                              )}
+                            )}
                             {item.error && (
-                              <div className="truncate text-[11px] text-destructive">
+                              <div className="break-words text-[11px] text-destructive">
                                 {item.error}
                               </div>
                             )}
                           </div>
-                          <div className="flex shrink-0 items-center gap-1.5 text-[11px] text-muted-foreground">
+                          <div className="flex w-14 shrink-0 items-center justify-end gap-1 text-[11px] text-muted-foreground">
                             {item.status === 'running' && (
                               <Loader2 className="size-3.5 animate-spin" />
                             )}

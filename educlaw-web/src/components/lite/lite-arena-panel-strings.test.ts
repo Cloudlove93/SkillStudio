@@ -41,7 +41,7 @@ test('LiteArenaPanel should require configured rubric before report actions are 
   );
   assert.match(
     source,
-    /canOpenReportAction\(Boolean\(thread\), rubricConfigured\)/,
+    /canOpenReportAction\(\s*Boolean\(thread\),\s*canGenerateReport,\s*\)/,
   );
   assert.doesNotMatch(
     source,
@@ -61,6 +61,34 @@ test('LiteArenaPanel should not use global progress for normal reply generation'
   assert.doesNotMatch(handleSend, /failProgress\(/);
   assert.match(handleSend, /setReplyGeneratingThreadIds\(\(prev\)/);
   assert.match(handleSend, /currentThreadId/);
+});
+
+test('LiteArenaPanel should generate batch documents with a limited concurrency pool', () => {
+  const handleGeneratePackages = source.match(
+    /async function handleGeneratePackages\(\) \{[\s\S]*?\n {2}async function handleSend\(\)/,
+  )?.[0];
+
+  assert.ok(handleGeneratePackages);
+  assert.match(source, /const BATCH_GENERATE_CONCURRENCY = 2;/);
+  assert.match(handleGeneratePackages, /nextBatchIndex/);
+  assert.match(handleGeneratePackages, /Math\.min\(BATCH_GENERATE_CONCURRENCY, batchPlan\.length\)/);
+  assert.match(handleGeneratePackages, /Promise\.all\(workers\)/);
+  assert.doesNotMatch(
+    handleGeneratePackages,
+    /for \(let index = 0; index < batchPlan\.length; index \+= 1\) \{[\s\S]*?await runGenerateJob\(\[sourceDoc\]\);/,
+  );
+});
+
+test('LiteArenaPanel should constrain batch task UI inside the left sidebar', () => {
+  assert.match(source, /className="space-y-4 overflow-x-hidden p-4"/);
+  assert.match(
+    source,
+    /className="min-w-0 max-w-full space-y-1\.5 overflow-hidden rounded-xl border border-border\/70 bg-card\/40 p-2"/,
+  );
+  assert.match(
+    source,
+    /className="flex min-w-0 items-start justify-between gap-2 overflow-hidden rounded-lg border border-border\/70 bg-card\/70 px-2\.5 py-2 text-xs"/,
+  );
 });
 
 test('LiteArenaPanel should ignore stale reply stream events after switching threads', () => {

@@ -20,7 +20,7 @@ export function getPackageSwitchDecision({
 
   return {
     preserveTransientState,
-    clearCenterPreview: !preserveTransientState,
+    clearCenterPreview: !preserveTransientState || preserveGenerateProgress,
     clearProgress: !preserveTransientState,
     clearGeneratePreviews: !preserveTransientState,
     clearSideStreaming: !preserveTransientState,

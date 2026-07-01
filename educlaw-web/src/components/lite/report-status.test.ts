@@ -38,14 +38,18 @@ test("report readiness waits until the final arena reply save has finished", () 
   assert.equal(readiness.reason, "generating_reply");
 });
 
-test("report action stays visible when rubric exists even before messages", () => {
+test("report action stays disabled before a complete compare turn exists", () => {
+  assert.equal(canOpenReportAction(true, false), false);
+});
+
+test("report action is enabled when a report can be generated", () => {
   assert.equal(canOpenReportAction(true, true), true);
 });
 
-test("report action stays visible so users can read missing rubric guidance", () => {
-  assert.equal(canOpenReportAction(true, false), true);
+test("report action stays disabled when rubric is missing", () => {
+  assert.equal(canOpenReportAction(true, false), false);
 });
 
-test("report action stays disabled only when thread is missing", () => {
+test("report action stays disabled when thread is missing", () => {
   assert.equal(canOpenReportAction(false, true), false);
 });
