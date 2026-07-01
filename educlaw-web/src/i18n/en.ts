@@ -550,6 +550,9 @@ const en: Record<keyof typeof zh, string> = {
   'auth.passwordLength': 'Password must be at least 6 characters',
   'auth.passwordMismatch': 'Passwords do not match',
   'auth.unknownError': 'An unknown error occurred. Please try again.',
+  'auth.inviteCode': 'Invite Code',
+  'auth.inviteCodeRequired': 'Please enter the invite code',
+  'auth.inviteCodeInvalid': 'Invalid invite code. Please check and try again.',
 
   // 鈹€鈹€鈹€ Admin 鈹€鈹€鈹€
   'admin.title': 'Admin Dashboard',

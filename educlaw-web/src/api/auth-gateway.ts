@@ -5,6 +5,7 @@ export interface PasswordAuthRequest {
   username: string;
   password: string;
   email?: string;
+  inviteCode?: string;
 }
 
 function shortHex(input: string): string {
@@ -43,6 +44,7 @@ export function buildPasswordAuthRequest(
   mode: PasswordAuthMode,
   username: string,
   password: string,
+  inviteCode?: string,
 ): PasswordAuthRequest {
   if (mode === 'register') {
     return {
@@ -50,6 +52,7 @@ export function buildPasswordAuthRequest(
       username,
       password,
       email: buildRegistrationEmail(username),
+      inviteCode,
     };
   }
 

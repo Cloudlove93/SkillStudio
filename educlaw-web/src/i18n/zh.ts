@@ -562,6 +562,9 @@
   'auth.passwordLength': '密码至少 6 个字符',
   'auth.passwordMismatch': '两次密码输入不一致',
   'auth.unknownError': '发生未知错误，请重试',
+  'auth.inviteCode': '邀请码',
+  'auth.inviteCodeRequired': '请输入邀请码',
+  'auth.inviteCodeInvalid': '邀请码无效，请检查后重试',
 
   // ─── Admin ───
   'admin.title': '管理后台',

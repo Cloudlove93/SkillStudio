@@ -10,6 +10,28 @@ import { config } from "../config.js";
  * is unavailable rather than getting a silent 404.
  */
 
+/**
+ * Translate known error messages from the auth backend to Chinese.
+ * The auth backend's sanitizeError() keeps Chinese messages as-is but
+ * replaces English ones with fallback strings like "Authentication failed".
+ */
+const ERROR_TRANSLATIONS: Record<string, string> = {
+  "Authentication failed": "用户名或密码错误",
+  "Registration failed": "注册失败，请稍后重试",
+};
+
+function translateError(message: string): string {
+  // Already Chinese — pass through
+  if (/[一-鿿]/.test(message)) return message;
+  // Exact match
+  if (ERROR_TRANSLATIONS[message]) return ERROR_TRANSLATIONS[message];
+  // Prefix match for "Registration failed: <details>"
+  for (const [en, zh] of Object.entries(ERROR_TRANSLATIONS)) {
+    if (message.startsWith(en)) return zh;
+  }
+  return message;
+}
+
 const HOP_BY_HOP = new Set([
   "connection",
   "keep-alive",
@@ -42,6 +64,19 @@ router.all("/*path", async (req: Request, res: Response) => {
     return;
   }
 
+  // Validate invite code for registration requests
+  if (req.method === "POST" && req.path === "/password" && req.body?.mode === "register") {
+    const { inviteCode } = req.body;
+    if (!config.inviteCode) {
+      res.status(500).json({ error: "服务器未配置邀请码，请联系管理员" });
+      return;
+    }
+    if (!inviteCode || inviteCode !== config.inviteCode) {
+      res.status(403).json({ error: "邀请码无效，请检查后重试" });
+      return;
+    }
+  }
+
   const targetPath = `/auth${req.path === "/" ? "" : req.path}`;
   const qs = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
   const targetUrl = `${config.authBackendUrl}${targetPath}${qs}`;
@@ -63,8 +98,21 @@ router.all("/*path", async (req: Request, res: Response) => {
       res.setHeader(key, value);
     }
 
-    // Stream body
+    // Stream body (translate error messages for non-OK responses)
     const body = await upstream.arrayBuffer();
+    const contentType = upstream.headers.get("content-type") || "";
+    if (!upstream.ok && contentType.includes("application/json")) {
+      try {
+        const json = JSON.parse(Buffer.from(body).toString("utf-8"));
+        if (json.error && typeof json.error === "string") {
+          json.error = translateError(json.error);
+        }
+        res.json(json);
+        return;
+      } catch {
+        // fall through to raw send
+      }
+    }
     res.send(Buffer.from(body));
   } catch (err) {
     res.status(502).json({
