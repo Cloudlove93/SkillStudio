@@ -2176,11 +2176,16 @@ export default function LiteArenaPanel() {
                       {documents.map((doc, i) => (
                         <div
                           key={`${doc.name}-${i}`}
-                          className="flex items-center justify-between rounded-lg border border-border/70 bg-card/60 px-2.5 py-1.5 text-xs"
+                          className="flex min-w-0 items-center justify-between gap-2 overflow-hidden rounded-lg border border-border/70 bg-card/60 px-2.5 py-1.5 text-xs"
                         >
-                          <div className="flex items-center gap-1.5 min-w-0">
+                          <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
                             <FileText className="size-3 shrink-0 text-muted-foreground" />
-                            <span className="truncate">{doc.name}</span>
+                            <span
+                              className="block min-w-0 truncate"
+                              title={doc.name}
+                            >
+                              {doc.name}
+                            </span>
                           </div>
                           <button
                             onClick={() =>
@@ -2219,12 +2224,18 @@ export default function LiteArenaPanel() {
                           className="flex min-w-0 items-start justify-between gap-2 overflow-hidden rounded-lg border border-border/70 bg-card/70 px-2.5 py-2 text-xs"
                         >
                           <div className="min-w-0 flex-1 overflow-hidden">
-                            <div className="truncate font-medium">
+                            <div
+                              className="block min-w-0 truncate font-medium"
+                              title={item.name}
+                            >
                               {item.name}
                             </div>
                             {item.packageName &&
                               item.packageName !== item.name && (
-                                <div className="truncate text-[11px] text-muted-foreground">
+                                <div
+                                  className="block min-w-0 truncate text-[11px] text-muted-foreground"
+                                  title={item.packageName}
+                                >
                                   {`生成结果：${item.packageName}`}
                                 </div>
                             )}

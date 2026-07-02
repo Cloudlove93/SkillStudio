@@ -1,7 +1,7 @@
 import { strict as assert } from "node:assert";
 import test from "node:test";
 import type { ArenaReport } from "@educlaw/shared";
-import { isArenaReport, parseStoredArenaReport } from "./report-compat";
+import { isArenaReport, parseStoredArenaReport } from "./report-compat.ts";
 
 const validReport: ArenaReport = {
   threadId: 1,

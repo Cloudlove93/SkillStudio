@@ -91,6 +91,25 @@ test('LiteArenaPanel should constrain batch task UI inside the left sidebar', ()
   );
 });
 
+test('LiteArenaPanel should hard-limit long document names inside the left sidebar lists', () => {
+  assert.match(
+    source,
+    /className="flex min-w-0 flex-1 items-center gap-1\.5 overflow-hidden"/,
+  );
+  assert.match(
+    source,
+    /<span[\s\S]*className="block min-w-0 truncate"[\s\S]*title=\{doc\.name\}[\s\S]*>\s*\{doc\.name\}\s*<\/span>/,
+  );
+  assert.match(
+    source,
+    /<div[\s\S]*className="block min-w-0 truncate font-medium"[\s\S]*title=\{item\.name\}[\s\S]*>/,
+  );
+  assert.match(
+    source,
+    /<div[\s\S]*className="block min-w-0 truncate text-\[11px\] text-muted-foreground"[\s\S]*title=\{item\.packageName\}[\s\S]*>/,
+  );
+});
+
 test('LiteArenaPanel should ignore stale reply stream events after switching threads', () => {
   const handleSend = source.match(
     /async function handleSend\(\) \{[\s\S]*?\n {2}async function handleDelete\(\)/,
