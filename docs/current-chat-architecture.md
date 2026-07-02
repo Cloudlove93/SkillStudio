@@ -191,5 +191,4 @@ When touching this area next time:
 
 ## Related Docs
 
-- [docs/architecture-refactor-plan.md](/Users/wumengsong/Code/EduClaw/docs/architecture-refactor-plan.md)
-- [openagent/README.md](/Users/wumengsong/Code/EduClaw/openagent/README.md)
+- [openagent/README.md](openagent/README.md)

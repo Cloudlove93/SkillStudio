@@ -47,7 +47,7 @@ services:
       dockerfile: educlaw-web/Dockerfile
     image: educlaw-web:latest
     environment:
-      - API_UPSTREAM=http://educlaw-server:3000
+      - API_UPSTREAM=http://eduskill-server:3000
       - AUTH_UPSTREAM=${AUTH_UPSTREAM:-http://auth-backend:3000}
     depends_on:
       - educlaw-server
