@@ -16,6 +16,22 @@ export interface AuthUser {
   roles?: string[];
 }
 
+// ── 错误翻译（原 auth-proxy 中的逻辑迁移到前端）──────────────────────────
+const ERROR_TRANSLATIONS: Record<string, string> = {
+  'Authentication failed': '邮箱或密码错误',
+  'Registration failed': '注册失败，请稍后重试',
+};
+
+function translateError(message: string): string {
+  if (/[一-鿿]/.test(message)) return message;
+  const exact = ERROR_TRANSLATIONS[message];
+  if (exact) return exact;
+  for (const [en, zh] of Object.entries(ERROR_TRANSLATIONS)) {
+    if (message.startsWith(en)) return zh;
+  }
+  return message;
+}
+
 function persistPasswordAuth(tokens: StoredTokenResponse): StoredTokenResponse {
   persistTokens(tokens);
   return tokens;
@@ -28,13 +44,19 @@ async function submitPasswordAuth(
   inviteCode?: string,
   email?: string,
 ): Promise<StoredTokenResponse> {
-  const tokens = await apiFetchJson<StoredTokenResponse>(`/auth/password`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(buildPasswordAuthRequest(mode, username, password, inviteCode, email)),
-  });
-
-  return persistPasswordAuth(tokens);
+  try {
+    const tokens = await apiFetchJson<StoredTokenResponse>(`/auth/password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(buildPasswordAuthRequest(mode, username, password, inviteCode, email)),
+    });
+    return persistPasswordAuth(tokens);
+  } catch (err: unknown) {
+    if (err instanceof Error) {
+      throw new Error(translateError(err.message));
+    }
+    throw err;
+  }
 }
 
 export async function login(

@@ -76,7 +76,7 @@ describe("config", () => {
     const config = await loadConfig();
 
     expect(config.isProduction).toBe(false);
-    expect(config.port).toBe(3000);
+    expect(config.port).toBe(3001);
     expect(config.bodyLimit).toBe("100mb");
     expect(config.llmTimeoutMs).toBe(300_000);
     expect(config.databaseUrl).toBe(DEFAULT_LOCAL_DATABASE_URL);
@@ -119,7 +119,7 @@ describe("config", () => {
       },
     });
 
-    expect(config.port).toBe(3000);
+    expect(config.port).toBe(3001);
     expect(config.llmTimeoutMs).toBe(300_000);
     expect(config.uploadLimitBytes).toBe(25 * 1024 * 1024);
   });

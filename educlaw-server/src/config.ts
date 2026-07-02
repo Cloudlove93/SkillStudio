@@ -58,11 +58,10 @@ if (isProduction && (!llmApiKey || llmApiKey === "your-llm-api-key" || llmApiKey
 
 export const config = {
   isProduction,
-  port: readNumber("PORT", 3000),
+  port: readNumber("PORT", 3001),
   bodyLimit: process.env.BODY_LIMIT || "100mb",
   llmTimeoutMs: readNumber("LLM_TIMEOUT_MS", 300_000),
   databaseUrl,
-  inviteCode: process.env.INVITE_CODE || "",
   appOrigin: process.env.APP_ORIGIN || "http://localhost:4173",
   appOrigins: readList("APP_ORIGIN", ["http://localhost:4173"]),
   uploadLimitBytes: readNumber("UPLOAD_LIMIT_MB", 25) * 1024 * 1024,
@@ -73,5 +72,4 @@ export const config = {
   llmBaselineModel: process.env.LLM_BASELINE_MODEL || "",
   conversationEvalBaseUrl: (process.env.CONVERSATION_EVAL_BASE_URL || "http://127.0.0.1:8090").replace(/\/+$/, ""),
   conversationEvalScenesDir: process.env.CONVERSATION_EVAL_SCENES_DIR || path.join(workspaceRoot, ".eval-scenes"),
-  authBackendUrl: (process.env.AUTH_BACKEND_URL || "").replace(/\/+$/, ""),
 };

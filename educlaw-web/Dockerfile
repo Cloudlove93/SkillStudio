@@ -25,6 +25,7 @@ RUN pnpm --filter educlaw-web build
 FROM nginx:1.27-alpine AS runner
 
 ENV API_UPSTREAM=http://educlaw-server:3000
+ENV AUTH_UPSTREAM=http://auth-backend:3000
 
 COPY educlaw-web/nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY educlaw-web/start-nginx.sh /usr/local/bin/start-nginx.sh

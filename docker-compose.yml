@@ -1,3 +1,5 @@
+name: educlaw
+
 services:
   educlaw-db:
     image: m.daocloud.io/docker.io/library/postgres:17
@@ -6,7 +8,7 @@ services:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     ports:
-      - "${POSTGRES_PORT:-5435}:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -23,26 +25,18 @@ services:
     image: educlaw-server:latest
     environment:
       - DATABASE_URL=${DATABASE_URL}
-      - INVITE_CODE=${INVITE_CODE}
-      - AUTH_BACKEND_URL=${AUTH_BACKEND_URL}
       - LLM_BASE_URL=${LLM_BASE_URL}
       - LLM_API_KEY=${LLM_API_KEY}
       - LLM_MODEL=${LLM_MODEL}
       - LLM_BASELINE_MODEL=${LLM_BASELINE_MODEL}
-      - CONVERSATION_EVAL_BASE_URL=${CONVERSATION_EVAL_BASE_URL:-http://host.docker.internal:8090}
-      - CONVERSATION_EVAL_SCENES_DIR=${CONVERSATION_EVAL_SCENES_DIR:-/data/educlaw-eval-scenes}
       - APP_ORIGIN=${APP_ORIGIN:-http://eduskill.localhost}
       - PORT=3000
-    volumes:
-      - ./data/educlaw-eval-scenes:${CONVERSATION_EVAL_SCENES_DIR:-/data/educlaw-eval-scenes}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     depends_on:
       educlaw-db:
         condition: service_healthy
     restart: unless-stopped
     networks:
-      default:
+      default: {}
       auth-net:
         aliases:
           - educlaw-server
@@ -54,11 +48,12 @@ services:
     image: educlaw-web:latest
     environment:
       - API_UPSTREAM=http://educlaw-server:3000
+      - AUTH_UPSTREAM=${AUTH_UPSTREAM:-http://auth-backend:3000}
     depends_on:
       - educlaw-server
     restart: unless-stopped
     networks:
-      default:
+      default: {}
       auth-net:
         aliases:
           - educlaw-web

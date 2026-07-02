@@ -8,7 +8,6 @@ import { withRequestContext } from "./middleware/request-context.js";
 import { checkDbConnection } from "./services/db.js";
 import apiRoutes from "./routes/index.js";
 import compatRoutes from "./routes/compat.js";
-import authProxyRoutes from "./routes/auth-proxy.js";
 
 const app = express();
 const allowedOrigins = new Set(config.appOrigins);
@@ -30,7 +29,6 @@ app.get("/healthz", (_req, res) => {
   res.json({ ok: true, service: "educlaw-lite-server" });
 });
 
-app.use("/auth", authProxyRoutes);
 app.use("/api", apiRoutes);
 app.use(compatRoutes);
 

@@ -35,11 +35,11 @@ flowchart TD
 
 Kong 路由规则：
 
-| 路径                            | Host 条件          | 目标服务         | 端口 |
-| ------------------------------- | ------------------ | ---------------- | ---- |
+| 路径                            | Host 条件         | 目标服务         | 端口 |
+| ------------------------------- | ----------------- | ---------------- | ---- |
 | `/`                           | `auth.eduskill` | Zitadel          | 8080 |
 | `/ui/v2/login`                | `auth.eduskill` | Zitadel Login UI | 3000 |
-| `/auth`, `/sms/send`        | 无限制             | auth-backend     | 3000 |
+| `/auth`, `/sms/send`        | 无限制            | auth-backend     | 3000 |
 | `/agents`, `/api`, `/llm` | `app.eduskill`  | educlaw-server   | 3000 |
 | `/`                           | `app.eduskill`  | educlaw-web      | 80   |
 
@@ -166,7 +166,7 @@ NAS 上需要创建两个独立的 PVC（对应不同目录，挂载到不同容
 | 地址        | `crpi-a4e25wq5oddt3z3b.cn-shanghai.personal.cr.aliyuncs.com` |
 | 命名空间    | `educlaw`                                                    |
 | 类型        | 个人版                                                         |
-| 拉取 Secret | `mi`（已在 gateway 集群中创建）                            |
+| 拉取 Secret | `mi`（已在 gateway 集群中创建）                              |
 
 > 如果 `mi` Secret 尚未在 `educlaw` 命名空间中创建：
 >
@@ -188,10 +188,10 @@ NAS 上需要创建两个独立的 PVC（对应不同目录，挂载到不同容
 cd <auth-service-repo-path>
 
 docker build --platform linux/amd64 \
-  -t crpi-a4e25wq5oddt3z3b.cn-shanghai.personal.cr.aliyuncs.com/educlaw/auth-backend:latest \
+  -t crpi-a4e25wq5oddt3z3b.cn-shanghai.personal.cr.aliyuncs.com/educlaw/eduskill-auth:latest \
   -f auth-backend/Dockerfile .
 
-docker push crpi-a4e25wq5oddt3z3b.cn-shanghai.personal.cr.aliyuncs.com/educlaw/auth-backend:latest
+docker push crpi-a4e25wq5oddt3z3b.cn-shanghai.personal.cr.aliyuncs.com/educlaw/eduskill-auth:latest
 ```
 
 ### 3.2 educlaw-server
@@ -200,10 +200,10 @@ docker push crpi-a4e25wq5oddt3z3b.cn-shanghai.personal.cr.aliyuncs.com/educlaw/a
 cd <EduClaw-arena-repo-path>
 
 docker build --platform linux/amd64 \
-  -t crpi-a4e25wq5oddt3z3b.cn-shanghai.personal.cr.aliyuncs.com/educlaw/educlaw-server:latest \
+  -t crpi-a4e25wq5oddt3z3b.cn-shanghai.personal.cr.aliyuncs.com/educlaw/eduskill-server:latest \
   -f educlaw-server/Dockerfile .
 
-docker push crpi-a4e25wq5oddt3z3b.cn-shanghai.personal.cr.aliyuncs.com/educlaw/educlaw-server:latest
+docker push crpi-a4e25wq5oddt3z3b.cn-shanghai.personal.cr.aliyuncs.com/educlaw/eduskill-server:latest
 ```
 
 ### 3.3 educlaw-web
@@ -212,10 +212,10 @@ docker push crpi-a4e25wq5oddt3z3b.cn-shanghai.personal.cr.aliyuncs.com/educlaw/e
 cd <EduClaw-arena-repo-path>
 
 docker build --platform linux/amd64 \
-  -t crpi-a4e25wq5oddt3z3b.cn-shanghai.personal.cr.aliyuncs.com/educlaw/educlaw-web:latest \
+  -t crpi-a4e25wq5oddt3z3b.cn-shanghai.personal.cr.aliyuncs.com/educlaw/eduskill-web:latest \
   -f educlaw-web/Dockerfile .
 
-docker push crpi-a4e25wq5oddt3z3b.cn-shanghai.personal.cr.aliyuncs.com/educlaw/educlaw-web:latest
+docker push crpi-a4e25wq5oddt3z3b.cn-shanghai.personal.cr.aliyuncs.com/educlaw/eduskill-web:latest
 ```
 
 ---
@@ -272,12 +272,12 @@ stringData:
 
 ### 5.1 部署顺序
 
-| 阶段 | 资源                                                       | 命名空间 | 状态     |
-| ---- | ---------------------------------------------------------- | -------- | -------- |
-| 0    | Namespace + Secrets + zitadel-pat PVC                      | gateway  | 已部署   |
-| 1    | Zitadel init Job → setup Job → start Deployment          | gateway  | 已部署   |
-| 2    | Zitadel Login UI + Kong                                    | gateway  | 已部署   |
-| 3    | auth-backend Deployment                                    | gateway  | 已部署   |
+| 阶段 | 资源                                                       | 命名空间 | 状态           |
+| ---- | ---------------------------------------------------------- | -------- | -------------- |
+| 0    | Namespace + Secrets + zitadel-pat PVC                      | gateway  | 已部署         |
+| 1    | Zitadel init Job → setup Job → start Deployment          | gateway  | 已部署         |
+| 2    | Zitadel Login UI + Kong                                    | gateway  | 已部署         |
+| 3    | auth-backend Deployment                                    | gateway  | 已部署         |
 | 4    | educlaw-secrets + educlaw-config + educlaw-eval-scenes PVC | educlaw  | **新增** |
 | 5    | educlaw-server Deployment                                  | educlaw  | **新增** |
 | 6    | educlaw-web Deployment                                     | educlaw  | **新增** |
@@ -410,24 +410,24 @@ kubectl logs -n educlaw -l app=educlaw-server --tail=50
 
 本方案使用本地测试域名（通过 `/etc/hosts` 或 DNS 解析到 Ingress SLB IP）：
 
-| 域名               | 用途             | Kong 路由                 |
-| ------------------ | ---------------- | ------------------------- |
-| `app.eduskill`  | EduClaw 应用     | educlaw-web + educlaw-api |
-| `auth.eduskill` | 认证服务         | Zitadel + auth-backend    |
+| 域名              | 用途         | Kong 路由                 |
+| ----------------- | ------------ | ------------------------- |
+| `app.eduskill`  | EduClaw 应用 | educlaw-web + educlaw-api |
+| `auth.eduskill` | 认证服务     | Zitadel + auth-backend    |
 
 ### 6.2 生产域名切换
 
 要切换到其他域名，需要修改以下位置：
 
-| 位置                                                      | 当前值                                     | 需改为（示例）                                                   |
-| --------------------------------------------------------- | ------------------------------------------ | ---------------------------------------------------------------- |
-| `educlaw-config.yaml` → `APP_ORIGIN`                 | `http://app.eduskill`                    | `http://app.example.com`                                       |
-| `educlaw-config.yaml` → `ZITADEL_ISSUER`             | `http://auth.eduskill`                   | `http://auth.example.com`                                      |
+| 位置                                                      | 当前值                                     | 需改为（示例）                                                 |
+| --------------------------------------------------------- | ------------------------------------------ | -------------------------------------------------------------- |
+| `educlaw-config.yaml` → `APP_ORIGIN`                 | `http://app.eduskill`                    | `http://app.example.com`                                     |
+| `educlaw-config.yaml` → `ZITADEL_ISSUER`             | `http://auth.eduskill`                   | `http://auth.example.com`                                    |
 | `educlaw-config.yaml` → `ZITADEL_LOGIN_REDIRECT_URI` | `http://auth-backend:3000/auth/callback` | 保持不变（集群内部回调）                                       |
-| `ingress.yaml` → `host`                              | `app.eduskill`                           | `app.example.com`                                              |
-| `ingress.yaml` → `host`                              | `auth.eduskill`                          | `auth.example.com`                                             |
+| `ingress.yaml` → `host`                              | `app.eduskill`                           | `app.example.com`                                            |
+| `ingress.yaml` → `host`                              | `auth.eduskill`                          | `auth.example.com`                                           |
 | Kong ConfigMap →`kong.yml` 中的 hosts                  | `__KONG_APP_HOST__` 等                   | 由 initContainer 模板渲染，修改`kong.yaml` Deployment 的 env |
-| Zitadel ConfigMap →`ExternalDomain`                    | `auth.eduskill`                          | `auth.example.com`                                             |
+| Zitadel ConfigMap →`ExternalDomain`                    | `auth.eduskill`                          | `auth.example.com`                                           |
 
 > ⚠️ **注意**：Zitadel 的 issuer URL 设定后不能更改，否则已签发的所有 JWT Token 将失效。切换前务必备份数据库。
 
