@@ -1,21 +1,22 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const queryMock = vi.hoisted(() => vi.fn());
 const checkDbConnectionMock = vi.hoisted(() => vi.fn());
 
-vi.mock("./db.js", () => ({
+vi.mock('./db.js', () => ({
   checkDbConnection: checkDbConnectionMock,
   query: queryMock,
 }));
 
-describe("db schema initialization", () => {
+describe('db schema initialization', () => {
   beforeEach(() => {
     queryMock.mockReset();
     checkDbConnectionMock.mockReset();
   });
 
-  it("checks the database connection before running schema and migration statements", async () => {
-    const { initDbSchema, schemaStatements, migrationStatements } = await import("./db-schema.js");
+  it('checks the database connection before running schema and migration statements', async () => {
+    const { initDbSchema, schemaStatements, migrationStatements } =
+      await import('./db-schema.js');
 
     await initDbSchema();
 
@@ -24,47 +25,179 @@ describe("db schema initialization", () => {
     expect(queryMock).toHaveBeenCalledTimes(totalExpected);
 
     // First N calls are schema statements
-    const schemaCalls = queryMock.mock.calls.slice(0, schemaStatements.length).map((call) => call[0]);
+    const schemaCalls = queryMock.mock.calls
+      .slice(0, schemaStatements.length)
+      .map((call) => call[0]);
     expect(schemaCalls).toEqual(schemaStatements);
 
     // Remaining calls are migration statements
-    const migrationCalls = queryMock.mock.calls.slice(schemaStatements.length).map((call) => call[0]);
+    const migrationCalls = queryMock.mock.calls
+      .slice(schemaStatements.length)
+      .map((call) => call[0]);
     expect(migrationCalls).toEqual(migrationStatements);
   });
 
-  it("keeps all existing application tables in the manual schema script", async () => {
-    const { schemaStatements } = await import("./db-schema.js");
-    const schemaSql = schemaStatements.join("\n").toLowerCase();
+  it('keeps all existing application tables in the manual schema script', async () => {
+    const { schemaStatements } = await import('./db-schema.js');
+    const schemaSql = schemaStatements.join('\n').toLowerCase();
 
-    expect(schemaSql).toContain("create table if not exists agent_packages");
-    expect(schemaSql).toContain("create table if not exists agent_package_versions");
-    expect(schemaSql).toContain("create table if not exists arena_threads");
-    expect(schemaSql).toContain("create table if not exists arena_messages");
-    expect(schemaSql).toContain("create table if not exists arena_runs");
-    expect(schemaSql).toContain("create table if not exists optimization_runs");
-    expect(schemaSql).toContain("create table if not exists interactive_optimization_sessions");
-    expect(schemaSql).toContain("create table if not exists auto_eval_specs");
-    expect(schemaSql).toContain("create table if not exists auto_eval_runs");
-    expect(schemaSql).toContain("alter table agent_package_versions add column if not exists note");
+    expect(schemaSql).toContain('create table if not exists agent_packages');
+    expect(schemaSql).toContain(
+      'create table if not exists agent_package_versions',
+    );
+    expect(schemaSql).toContain('create table if not exists arena_threads');
+    expect(schemaSql).toContain('create table if not exists arena_thread_variants');
+    expect(schemaSql).toContain('create table if not exists arena_messages');
+    expect(schemaSql).toContain('create table if not exists arena_runs');
+    expect(schemaSql).toContain('create table if not exists optimization_runs');
+    expect(schemaSql).toContain(
+      'create table if not exists interactive_optimization_sessions',
+    );
+    expect(schemaSql).toContain('create table if not exists auto_eval_specs');
+    expect(schemaSql).toContain('create table if not exists auto_eval_runs');
+    expect(schemaSql).toContain(
+      'alter table agent_package_versions add column if not exists note',
+    );
   });
 
-  it("defines stored JSON columns as jsonb with jsonb defaults", async () => {
-    const { schemaStatements, migrationStatements } = await import("./db-schema.js");
-    const schemaSql = schemaStatements.join("\n").toLowerCase();
-    const migrationSql = migrationStatements.join("\n").toLowerCase();
+  it('defines independent skill version tables with relationship constraints', async () => {
+    const { schemaStatements } = await import('./db-schema.js');
+    const schemaSql = schemaStatements.join('\n').toLowerCase();
 
-    expect(schemaSql).toContain("snapshot_json jsonb not null");
-    expect(schemaSql).toContain("report_json jsonb not null default '{}'::jsonb");
-    expect(schemaSql).toContain("result_json jsonb not null default '{}'::jsonb");
-    expect(schemaSql).toContain("messages_json jsonb not null default '[]'::jsonb");
-    expect(schemaSql).toContain("issues_json jsonb not null default '[]'::jsonb");
-    expect(schemaSql).toContain("adopted_json jsonb not null default '[]'::jsonb");
-    expect(schemaSql).toContain("questions_json jsonb not null default '[]'::jsonb");
-    expect(schemaSql).toContain("dimensions_json jsonb not null default '[]'::jsonb");
+    expect(schemaSql).toContain(
+      'create table if not exists agent_package_skills',
+    );
+    expect(schemaSql).toContain(
+      'create table if not exists agent_skill_versions',
+    );
+    expect(schemaSql).toContain(
+      'create table if not exists agent_package_version_skills',
+    );
+    expect(schemaSql).toContain(
+      'references agent_packages(id) on delete cascade',
+    );
+    expect(schemaSql).toContain(
+      'references agent_package_versions(id, package_id) on delete cascade',
+    );
+    expect(schemaSql).toContain(
+      'references agent_package_skills(id, package_id) on delete cascade',
+    );
+    expect(schemaSql).toContain("check (status in ('active', 'removed'))");
+    expect(schemaSql).toContain("check (status in ('active', 'discarded'))");
+    expect(schemaSql).toContain(
+      "check (jsonb_typeof(skill_snapshot_json) = 'object')",
+    );
+    expect(schemaSql).toContain('unique (package_id, skill_uid)');
+    expect(schemaSql).toContain('unique (skill_id, version_number)');
+    expect(schemaSql).toContain('unique (package_id, version_number)');
+    expect(schemaSql).toContain('foreign key (based_on_version_id, skill_id)');
+    expect(schemaSql).toContain(
+      'references agent_skill_versions(id, skill_id)',
+    );
+    expect(schemaSql).toContain(
+      'foreign key (skill_version_id, skill_id, package_id)',
+    );
+  });
 
-    expect(schemaSql).not.toContain("_json text");
-    expect(migrationSql).toContain("alter column snapshot_json type jsonb using snapshot_json::jsonb");
-    expect(migrationSql).toContain("alter column report_json type jsonb using report_json::jsonb");
-    expect(migrationSql).toContain("alter column questions_json type jsonb using questions_json::jsonb");
+  it('defines API idempotency storage for action based writes', async () => {
+    const { schemaStatements } = await import('./db-schema.js');
+    const schemaSql = schemaStatements.join('\n').toLowerCase();
+
+    expect(schemaSql).toContain(
+      'create table if not exists api_idempotency_keys',
+    );
+    expect(schemaSql).toContain(
+      "status text not null default 'pending' check (status in ('pending', 'completed'))",
+    );
+    expect(schemaSql).toContain('response_status integer');
+    expect(schemaSql).toContain('response_json jsonb');
+    expect(schemaSql).toContain('expires_at timestamptz not null');
+    expect(schemaSql).toContain(
+      'unique (user_id, action, package_id, idempotency_key)',
+    );
+  });
+
+  it('defines stored JSON columns as jsonb with jsonb defaults', async () => {
+    const { schemaStatements, migrationStatements } =
+      await import('./db-schema.js');
+    const schemaSql = schemaStatements.join('\n').toLowerCase();
+    const migrationSql = migrationStatements.join('\n').toLowerCase();
+
+    expect(schemaSql).toContain('snapshot_json jsonb not null');
+    expect(schemaSql).toContain(
+      "arena_config_jsonb jsonb not null default '{}'::jsonb",
+    );
+    expect(schemaSql).toContain(
+      "report_json jsonb not null default '{}'::jsonb",
+    );
+    expect(schemaSql).toContain(
+      "result_json jsonb not null default '{}'::jsonb",
+    );
+    expect(schemaSql).toContain(
+      "messages_json jsonb not null default '[]'::jsonb",
+    );
+    expect(schemaSql).toContain(
+      "issues_json jsonb not null default '[]'::jsonb",
+    );
+    expect(schemaSql).toContain(
+      "adopted_json jsonb not null default '[]'::jsonb",
+    );
+    expect(schemaSql).toContain(
+      "questions_json jsonb not null default '[]'::jsonb",
+    );
+    expect(schemaSql).toContain(
+      "dimensions_json jsonb not null default '[]'::jsonb",
+    );
+
+    expect(schemaSql).not.toContain('_json text');
+    expect(migrationSql).toContain(
+      'alter column snapshot_json type jsonb using snapshot_json::jsonb',
+    );
+    expect(migrationSql).toContain(
+      'alter column report_json type jsonb using report_json::jsonb',
+    );
+    expect(migrationSql).toContain(
+      'alter column questions_json type jsonb using questions_json::jsonb',
+    );
+  });
+
+  it('defines skill arena thread metadata and relational variant links', async () => {
+    const { schemaStatements, migrationStatements } =
+      await import('./db-schema.js');
+    const schemaSql = schemaStatements.join('\n').toLowerCase();
+    const migrationSql = migrationStatements.join('\n').toLowerCase();
+
+    expect(schemaSql).toContain(
+      "arena_kind text not null default 'package_arena'",
+    );
+    expect(schemaSql).toContain('base_package_version_id bigint');
+    expect(schemaSql).toContain('arena_config_jsonb jsonb not null');
+    expect(schemaSql).toContain('create table if not exists arena_thread_variants');
+    expect(schemaSql).toContain("side text not null check (side in ('left', 'right'))");
+    expect(schemaSql).toContain('foreign key (thread_id, package_id)');
+    expect(schemaSql).toContain(
+      'references arena_threads(id, package_id) on delete cascade',
+    );
+    expect(schemaSql).toContain('foreign key (skill_id, package_id)');
+    expect(schemaSql).toContain(
+      'references agent_package_skills(id, package_id) on delete cascade',
+    );
+    expect(schemaSql).toContain(
+      'foreign key (skill_version_id, skill_id, package_id)',
+    );
+    expect(schemaSql).toContain(
+      'references agent_skill_versions(id, skill_id, package_id)',
+    );
+    expect(schemaSql).toContain('unique (thread_id, side)');
+
+    expect(migrationSql).toContain(
+      "alter table arena_threads add column if not exists arena_kind text not null default 'package_arena'",
+    );
+    expect(migrationSql).toContain(
+      'alter table arena_threads add column if not exists base_package_version_id bigint',
+    );
+    expect(migrationSql).toContain(
+      "alter table arena_threads add column if not exists arena_config_jsonb jsonb not null default '{}'::jsonb",
+    );
   });
 });

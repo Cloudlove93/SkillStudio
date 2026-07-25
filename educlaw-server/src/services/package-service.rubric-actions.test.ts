@@ -120,68 +120,82 @@ async function loadService(state: SeedState) {
   let nextId = state.versions.length + 1;
 
   vi.doMock('./db.js', () => ({
-    query: queryMock.mockImplementation(async (sql: string, args: unknown[]) => {
-      if (
-        sql.startsWith(
-          'select * from agent_packages where id = $1 and user_id = $2',
-        )
-      ) {
-        const row =
-          state.packageRow.id === args[0] && state.packageRow.user_id === args[1]
-            ? state.packageRow
-            : null;
-        return { rows: row ? [row] : [], rowCount: row ? 1 : 0 };
-      }
+    withTransaction: async (
+      work: (client: { query: typeof queryMock }) => Promise<unknown>,
+    ) => work({ query: queryMock }),
+    query: queryMock.mockImplementation(
+      async (sql: string, args: unknown[]) => {
+        if (
+          sql.startsWith(
+            'select * from agent_packages where id = $1 and user_id = $2',
+          )
+        ) {
+          const row =
+            state.packageRow.id === args[0] &&
+            state.packageRow.user_id === args[1]
+              ? state.packageRow
+              : null;
+          return { rows: row ? [row] : [], rowCount: row ? 1 : 0 };
+        }
 
-      if (sql.startsWith('select * from agent_package_versions where id = $1')) {
-        const version = state.versions.find((item) => item.id === args[0]) || null;
-        return { rows: version ? [version] : [], rowCount: version ? 1 : 0 };
-      }
+        if (
+          sql.startsWith('select * from agent_package_versions where id = $1')
+        ) {
+          const version =
+            state.versions.find((item) => item.id === args[0]) || null;
+          return { rows: version ? [version] : [], rowCount: version ? 1 : 0 };
+        }
 
-      if (
-        sql.startsWith(
-          'select * from agent_package_versions where package_id = $1 order by version_number desc limit 1',
-        )
-      ) {
-        const version =
-          [...state.versions]
-            .filter((item) => item.package_id === args[0])
-            .sort((left, right) => right.version_number - left.version_number)[0] ||
-          null;
-        return { rows: version ? [version] : [], rowCount: version ? 1 : 0 };
-      }
+        if (
+          sql.startsWith(
+            'select * from agent_package_versions where package_id = $1 order by version_number desc limit 1',
+          )
+        ) {
+          const version =
+            [...state.versions]
+              .filter((item) => item.package_id === args[0])
+              .sort(
+                (left, right) => right.version_number - left.version_number,
+              )[0] || null;
+          return { rows: version ? [version] : [], rowCount: version ? 1 : 0 };
+        }
 
-      if (sql.startsWith('insert into agent_package_versions')) {
-        const id = nextId++;
-        state.versions.push({
-          id,
-          package_id: args[0],
-          version_number: Number(args[1]),
-          source: String(args[2]),
-          snapshot_json: String(args[3]),
-          note: String(args[4] || ''),
-          created_at: String(args[5] || ''),
-        });
-        return { rows: [{ id }], rowCount: 1 };
-      }
+        if (sql.startsWith('insert into agent_package_versions')) {
+          const id = nextId++;
+          state.versions.push({
+            id,
+            package_id: args[0],
+            version_number: Number(args[1]),
+            source: String(args[2]),
+            snapshot_json: String(args[3]),
+            note: String(args[4] || ''),
+            created_at: String(args[5] || ''),
+          });
+          return { rows: [{ id }], rowCount: 1 };
+        }
 
-      if (
-        sql.startsWith(
-          'update agent_packages set name = $1, description = $2, current_version_id = $3, updated_at = $4 where id = $5 and user_id = $6',
-        )
-      ) {
-        state.packageRow = {
-          ...state.packageRow,
-          name: String(args[0]),
-          description: String(args[1]),
-          current_version_id: args[2],
-          updated_at: String(args[3]),
-        };
-        return { rows: [], rowCount: 1 };
-      }
+        if (
+          sql.startsWith(
+            'update agent_packages set name = $1, description = $2, current_version_id = $3, updated_at = $4 where id = $5 and user_id = $6',
+          )
+        ) {
+          state.packageRow = {
+            ...state.packageRow,
+            name: String(args[0]),
+            description: String(args[1]),
+            current_version_id: args[2],
+            updated_at: String(args[3]),
+          };
+          return { rows: [], rowCount: 1 };
+        }
 
-      throw new Error(`Unexpected query: ${sql}`);
-    }),
+        throw new Error(`Unexpected query: ${sql}`);
+      },
+    ),
+  }));
+
+  vi.doMock('./skill-version-service.js', () => ({
+    syncPackageVersionSkillsFromSnapshot: vi.fn(),
   }));
 
   vi.doMock('./llm-service.js', () => ({
@@ -197,6 +211,7 @@ async function loadService(state: SeedState) {
 afterEach(() => {
   vi.resetModules();
   vi.doUnmock('./db.js');
+  vi.doUnmock('./skill-version-service.js');
   vi.doUnmock('./llm-service.js');
   queryMock.mockReset();
   generateTextMock.mockReset();
@@ -242,12 +257,14 @@ describe('rubric actions', () => {
 
   it('sends only the cleaned rubric body into AI optimize when the rubric is already clean', async () => {
     const state = createSeedState(cleanedRubric);
-    generateTextMock.mockImplementation(async (input: { userPrompt: string }) => {
-      expect(input.userPrompt).toContain('口令设计的科学性');
-      expect(input.userPrompt).not.toContain('案例对比');
-      expect(input.userPrompt).not.toContain('测试情景');
-      return `${cleanedRubric}\n课堂节奏的可持续性\t20%\t能长期稳定执行\t基本可维持\t长期效果不佳`;
-    });
+    generateTextMock.mockImplementation(
+      async (input: { userPrompt: string }) => {
+        expect(input.userPrompt).toContain('口令设计的科学性');
+        expect(input.userPrompt).not.toContain('案例对比');
+        expect(input.userPrompt).not.toContain('测试情景');
+        return `${cleanedRubric}\n课堂节奏的可持续性\t20%\t能长期稳定执行\t基本可维持\t长期效果不佳`;
+      },
+    );
 
     const { optimizePackageRubric } = await loadService(state);
     const detail = await optimizePackageRubric('user-1', 1);

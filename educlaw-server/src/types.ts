@@ -37,8 +37,21 @@ export interface DbRowThread {
   package_id: number;
   title: string;
   model: string | null;
+  arena_kind?: string;
+  base_package_version_id?: number | null;
+  arena_config_jsonb?: unknown;
   created_at: string;
   updated_at: string;
+}
+
+export interface DbRowArenaThreadVariant {
+  id: number;
+  thread_id: number;
+  package_id: number;
+  side: string;
+  skill_id: number;
+  skill_version_id: number;
+  created_at: string;
 }
 
 export interface DbRowMessage {

@@ -14,8 +14,14 @@ import type {
   ArenaThread,
   ArenaThreadDetail,
   OptimizationResult,
+  PackageSkillRecord,
   PackageVersion,
+  SkillVersionDetail,
 } from '@educlaw/shared';
+import {
+  LiteApiError,
+  computeLineDiff,
+} from '../../api/lite-api';
 import type {
   DiagnosisIssue,
   AdoptedChange,
@@ -24,7 +30,6 @@ import type {
   InteractiveOptimizationSession,
   ArenaMode,
 } from '../../api/lite-api';
-import { computeLineDiff } from '../../api/lite-api';
 import { useAuthStore } from '../../stores/auth';
 import { liteApi } from '../../api/lite-api';
 import {
@@ -238,6 +243,50 @@ async function readTextDocument(
   };
 }
 
+function createClientIdempotencyKey() {
+  if (
+    typeof crypto !== 'undefined' &&
+    typeof crypto.randomUUID === 'function'
+  ) {
+    return crypto.randomUUID();
+  }
+  return `skill-op-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function getSkillActionId(
+  action: 'rollback' | 'discard' | 'undiscard',
+  skillId: string,
+  versionId: string,
+) {
+  return `${action}:${skillId}:${versionId}`;
+}
+
+function formatSkillArenaVariantLabel(
+  variant: NonNullable<ArenaThread['skillArenaConfig']>['left'],
+) {
+  return `${variant.skillName} v${variant.versionNumber}`;
+}
+
+function getArenaSideLabels(
+  currentThread: ArenaThread | null,
+  packageName?: string,
+  currentReport?: ArenaReport | null,
+) {
+  if (currentReport?.labels) {
+    return currentReport.labels;
+  }
+  if (currentThread?.arenaKind === 'skill_arena' && currentThread.skillArenaConfig) {
+    return {
+      baseline: formatSkillArenaVariantLabel(currentThread.skillArenaConfig.left),
+      enhanced: formatSkillArenaVariantLabel(currentThread.skillArenaConfig.right),
+    };
+  }
+  return {
+    baseline: '基础模型',
+    enhanced: packageName || '智能体',
+  };
+}
+
 export default function LiteArenaPanel() {
   const token = useAuthStore((s) => s.token) || '';
   const authUser = useAuthStore((s) => s.user);
@@ -247,6 +296,7 @@ export default function LiteArenaPanel() {
   const [selectedPackage, setSelectedPackage] =
     useState<AgentPackageDetail | null>(null);
   const [versions, setVersions] = useState<PackageVersion[]>([]);
+  const [packageSkills, setPackageSkills] = useState<PackageSkillRecord[]>([]);
   const [thread, setThread] = useState<ArenaThread | null>(null);
   const [threadDetail, setThreadDetail] = useState<ArenaThreadDetail | null>(
     null,
@@ -257,6 +307,15 @@ export default function LiteArenaPanel() {
   );
   const [detailTab, setDetailTab] = useState<DetailTab>(getDefaultDetailTab);
   const [selectedSkillId, setSelectedSkillId] = useState('');
+  const [skillVersions, setSkillVersions] = useState<SkillVersionDetail[]>([]);
+  const [skillVersionsLoading, setSkillVersionsLoading] = useState(false);
+  const [skillVersionsError, setSkillVersionsError] = useState('');
+  const [skillVersionsCurrentId, setSkillVersionsCurrentId] = useState('');
+  const [selectedSkillVersionId, setSelectedSkillVersionId] = useState('');
+  const [showDiscardedSkillVersions, setShowDiscardedSkillVersions] =
+    useState(false);
+  const [skillActionPendingId, setSkillActionPendingId] = useState('');
+  const skillActionPendingIdRef = useRef('');
 
   const [instruction, setInstruction] = useState('');
   const [input, setInput] = useState('');
@@ -310,6 +369,24 @@ export default function LiteArenaPanel() {
     'chat' | 'issues' | 'adopted' | 'history'
   >('chat');
   const [arenaMode, setArenaMode] = useState<ArenaMode>('compare');
+  const [arenaComposerKind, setArenaComposerKind] = useState<
+    'package_arena' | 'skill_arena'
+  >('package_arena');
+  const [skillArenaLeftSkillId, setSkillArenaLeftSkillId] = useState('');
+  const [skillArenaRightSkillId, setSkillArenaRightSkillId] = useState('');
+  const [skillArenaLeftVersions, setSkillArenaLeftVersions] = useState<
+    SkillVersionDetail[]
+  >([]);
+  const [skillArenaRightVersions, setSkillArenaRightVersions] = useState<
+    SkillVersionDetail[]
+  >([]);
+  const [skillArenaLeftVersionId, setSkillArenaLeftVersionId] = useState('');
+  const [skillArenaRightVersionId, setSkillArenaRightVersionId] = useState('');
+  const [skillArenaLoading, setSkillArenaLoading] = useState({
+    left: false,
+    right: false,
+  });
+  const [skillArenaCreatePending, setSkillArenaCreatePending] = useState(false);
   const [manualEdit, setManualEdit] = useState<ManualEditState | null>(null);
   const [manualEditSaving, setManualEditSaving] = useState(false);
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
@@ -325,6 +402,9 @@ export default function LiteArenaPanel() {
   useEffect(() => {
     threadRef.current = thread;
   }, [thread]);
+  const skillVersionsRequestIdRef = useRef(0);
+  const skillArenaLeftRequestIdRef = useRef(0);
+  const skillArenaRightRequestIdRef = useRef(0);
 
   // Center preview mode (view file in main panel)
   const [centerPreview, setCenterPreview] = useState<CenterPreviewState | null>(
@@ -341,11 +421,37 @@ export default function LiteArenaPanel() {
 
   const messages = threadDetail?.messages || [];
   const selectedSkill =
-    selectedPackage?.snapshot.skills.find(
-      (s) => (s.id || s.dirName) === selectedSkillId,
-    ) ||
+    (selectedSkillId
+      ? selectedPackage?.snapshot.skills.find(
+          (s) => (s.id || s.dirName) === selectedSkillId,
+        )
+      : null) ||
     selectedPackage?.snapshot.skills[0] ||
     null;
+  const selectedSkillRecord =
+    packageSkills.find((skill) => skill.skillUid === selectedSkillId) ||
+    (selectedSkill
+      ? packageSkills.find(
+          (skill) => skill.skillUid === (selectedSkill.id || selectedSkill.dirName),
+        )
+      : null) ||
+    packageSkills[0] ||
+    null;
+  const selectedSkillVersion =
+    skillVersions.find((version) => version.id === selectedSkillVersionId) ||
+    skillVersions.find((version) => version.id === skillVersionsCurrentId) ||
+    skillVersions[0] ||
+    null;
+  const currentPackageVersionId =
+    versions.find(
+      (version) => version.versionNumber === selectedPackage?.versionNumber,
+    )?.id || '';
+  const arenaSideLabels = getArenaSideLabels(
+    thread,
+    selectedPackage?.name,
+    report,
+  );
+  const isSkillArenaThread = thread?.arenaKind === 'skill_arena';
   const rubricText = selectedPackage?.snapshot.rubricMd || '';
   const rubricDisplayText = extractDisplayRubricContent(rubricText);
   const rubricPreviewContent = rubricText.trim() || rubricDisplayText;
@@ -412,9 +518,15 @@ export default function LiteArenaPanel() {
     return () => media.removeEventListener('change', syncLayout);
   }, []);
   useEffect(() => {
-    if (selectedPackage?.snapshot.skills.length)
-      setSelectedSkillId((c) => c || selectedPackage.snapshot.skills[0]!.id);
-    else setSelectedSkillId('');
+    if (selectedPackage?.snapshot.skills.length) {
+      const firstSkill =
+        selectedPackage.snapshot.skills[0]?.id ||
+        selectedPackage.snapshot.skills[0]?.dirName ||
+        '';
+      setSelectedSkillId((current) => current || firstSkill);
+      return;
+    }
+    setSelectedSkillId('');
   }, [selectedPackage]);
   useEffect(() => {
     if (chatScrollRef.current) {
@@ -487,20 +599,165 @@ export default function LiteArenaPanel() {
     [applyInteractiveSession, token],
   );
 
+  const loadSkillVersions = useCallback(
+    async (
+      packageId: string,
+      skillRecordId: string,
+      preferredVersionId?: string,
+    ) => {
+      if (!token || !packageId || !skillRecordId) return;
+      const requestId = skillVersionsRequestIdRef.current + 1;
+      skillVersionsRequestIdRef.current = requestId;
+      setSkillVersionsLoading(true);
+      setSkillVersionsError('');
+      try {
+        const result = await liteApi.listSkillVersions(
+          token,
+          packageId,
+          skillRecordId,
+          {
+            includeDiscarded: showDiscardedSkillVersions,
+          },
+        );
+        if (
+          skillVersionsRequestIdRef.current !== requestId ||
+          selectedPackageIdRef.current !== packageId
+        ) {
+          return;
+        }
+        setSkillVersions(result.items);
+        setSkillVersionsCurrentId(result.currentVersionId || '');
+        setSelectedSkillVersionId((prev) => {
+          if (
+            preferredVersionId &&
+            result.items.some((item) => item.id === preferredVersionId)
+          ) {
+            return preferredVersionId;
+          }
+          if (prev && result.items.some((item) => item.id === prev)) {
+            return prev;
+          }
+          if (
+            result.currentVersionId &&
+            result.items.some((item) => item.id === result.currentVersionId)
+          ) {
+            return result.currentVersionId;
+          }
+          return result.items[0]?.id || '';
+        });
+      } catch (error) {
+        if (
+          skillVersionsRequestIdRef.current !== requestId ||
+          selectedPackageIdRef.current !== packageId
+        ) {
+          return;
+        }
+        setSkillVersions([]);
+        setSkillVersionsCurrentId('');
+        setSelectedSkillVersionId('');
+        setSkillVersionsError(
+          error instanceof Error ? error.message : '加载 Skill 历史失败',
+        );
+      } finally {
+        if (skillVersionsRequestIdRef.current === requestId) {
+          setSkillVersionsLoading(false);
+        }
+      }
+    },
+    [showDiscardedSkillVersions, token],
+  );
+
+  const loadSkillArenaVersions = useCallback(
+    async (
+      side: 'left' | 'right',
+      packageId: string,
+      skillRecordId: string,
+      preferredVersionId?: string,
+    ) => {
+      if (!token || !packageId || !skillRecordId) return;
+      const requestRef =
+        side === 'left'
+          ? skillArenaLeftRequestIdRef
+          : skillArenaRightRequestIdRef;
+      const requestId = requestRef.current + 1;
+      requestRef.current = requestId;
+      setSkillArenaLoading((prev) => ({ ...prev, [side]: true }));
+      try {
+        const result = await liteApi.listSkillVersions(token, packageId, skillRecordId, {
+          includeDiscarded: showDiscardedSkillVersions,
+        });
+        if (
+          requestRef.current !== requestId ||
+          selectedPackageIdRef.current !== packageId
+        ) {
+          return;
+        }
+        const setVersions =
+          side === 'left' ? setSkillArenaLeftVersions : setSkillArenaRightVersions;
+        const setVersionId =
+          side === 'left'
+            ? setSkillArenaLeftVersionId
+            : setSkillArenaRightVersionId;
+        setVersions(result.items);
+        setVersionId((current) => {
+          if (
+            preferredVersionId &&
+            result.items.some((item) => item.id === preferredVersionId)
+          ) {
+            return preferredVersionId;
+          }
+          if (current && result.items.some((item) => item.id === current)) {
+            return current;
+          }
+          if (
+            result.currentVersionId &&
+            result.items.some((item) => item.id === result.currentVersionId)
+          ) {
+            return result.currentVersionId;
+          }
+          return result.items[0]?.id || '';
+        });
+      } catch {
+        if (
+          requestRef.current !== requestId ||
+          selectedPackageIdRef.current !== packageId
+        ) {
+          return;
+        }
+        if (side === 'left') {
+          setSkillArenaLeftVersions([]);
+          setSkillArenaLeftVersionId('');
+        } else {
+          setSkillArenaRightVersions([]);
+          setSkillArenaRightVersionId('');
+        }
+      } finally {
+        if (requestRef.current === requestId) {
+          setSkillArenaLoading((prev) => ({ ...prev, [side]: false }));
+        }
+      }
+    },
+    [showDiscardedSkillVersions, token],
+  );
+
   const openPackage = useCallback(
     async (packageId: string, snapshotList?: AgentPackageSummary[]) => {
       if (!token || !packageId) return;
       selectedPackageIdRef.current = packageId;
       setSelectedPackageId(packageId);
-      const detail = await liteApi.getPackage(token, packageId);
-      const versionList = await liteApi.listVersions(token, packageId);
-      const threads = await liteApi.listThreads(token, packageId);
+      const [detail, versionList, skillList, threads] = await Promise.all([
+        liteApi.getPackage(token, packageId),
+        liteApi.listVersions(token, packageId),
+        liteApi.listPackageSkills(token, packageId, true),
+        liteApi.listThreads(token, packageId),
+      ]);
       const activeThread =
         threads[0] || (await liteApi.createThread(token, packageId));
       const activeDetail = await liteApi.getThread(token, activeThread.id);
       if (selectedPackageIdRef.current === packageId) {
         setSelectedPackage(detail);
         setVersions(versionList);
+        setPackageSkills(skillList);
         setThread(activeThread);
         setThreadDetail(activeDetail);
         setReport(null);
@@ -548,11 +805,15 @@ export default function LiteArenaPanel() {
         if (nextId !== currentPackageId) {
           await openPackage(nextId, list);
         } else {
-          const detail = await liteApi.getPackage(token, nextId);
-          const versionList = await liteApi.listVersions(token, nextId);
+          const [detail, versionList, skillList] = await Promise.all([
+            liteApi.getPackage(token, nextId),
+            liteApi.listVersions(token, nextId),
+            liteApi.listPackageSkills(token, nextId, true),
+          ]);
           if (selectedPackageIdRef.current === nextId) {
             setSelectedPackage(detail);
             setVersions(versionList);
+            setPackageSkills(skillList);
             setPackages((prev) =>
               prev.map((item) =>
                 item.id === nextId
@@ -600,6 +861,7 @@ export default function LiteArenaPanel() {
     }
 
     if (!selectedPackageId) {
+      skillVersionsRequestIdRef.current += 1;
       setInteractiveMode(false);
       setHasSavedSession(false);
       setInteractiveSessionId('');
@@ -607,6 +869,20 @@ export default function LiteArenaPanel() {
       setInteractiveMessages([]);
       setInteractiveAdopted([]);
       setInteractiveIssues([]);
+      setPackageSkills([]);
+      setSkillVersions([]);
+      setSkillVersionsCurrentId('');
+      setSelectedSkillVersionId('');
+      setSkillVersionsLoading(false);
+      setSkillVersionsError('');
+      setSkillArenaLeftSkillId('');
+      setSkillArenaRightSkillId('');
+      setSkillArenaLeftVersions([]);
+      setSkillArenaRightVersions([]);
+      setSkillArenaLeftVersionId('');
+      setSkillArenaRightVersionId('');
+      setSkillArenaLoading({ left: false, right: false });
+      setSkillArenaCreatePending(false);
       return;
     }
     setInteractiveMode(false);
@@ -618,6 +894,126 @@ export default function LiteArenaPanel() {
     setInteractiveIssues([]);
     void loadInteractiveSessions(selectedPackageId, false);
   }, [loadInteractiveSessions, selectedPackageId, token]);
+
+  useEffect(() => {
+    const nextSelectedSkillId =
+      (selectedSkillId &&
+      packageSkills.some((skill) => skill.skillUid === selectedSkillId)
+        ? selectedSkillId
+        : '') ||
+      selectedPackage?.snapshot.skills[0]?.id ||
+      packageSkills.find((skill) => skill.status === 'active')?.skillUid ||
+      packageSkills[0]?.skillUid ||
+      '';
+    if (nextSelectedSkillId !== selectedSkillId) {
+      setSelectedSkillId(nextSelectedSkillId);
+    }
+  }, [packageSkills, selectedPackage?.snapshot.skills, selectedSkillId]);
+
+  useEffect(() => {
+    if (!packageSkills.length) {
+      setSkillArenaLeftSkillId('');
+      setSkillArenaRightSkillId('');
+      return;
+    }
+    const currentSkillUid =
+      selectedPackage?.snapshot.skills[0]?.id ||
+      packageSkills[0]?.skillUid ||
+      '';
+    const alternateSkillUid =
+      packageSkills.find((skill) => skill.skillUid !== currentSkillUid)?.skillUid ||
+      currentSkillUid;
+    setSkillArenaLeftSkillId((current) =>
+      current && packageSkills.some((skill) => skill.skillUid === current)
+        ? current
+        : currentSkillUid,
+    );
+    setSkillArenaRightSkillId((current) =>
+      current && packageSkills.some((skill) => skill.skillUid === current)
+        ? current
+        : alternateSkillUid,
+    );
+  }, [packageSkills, selectedPackage?.snapshot.skills]);
+
+  useEffect(() => {
+    if (!selectedPackageId || !selectedSkillRecord?.id) {
+      skillVersionsRequestIdRef.current += 1;
+      setSkillVersions([]);
+      setSkillVersionsCurrentId('');
+      setSelectedSkillVersionId('');
+      setSkillVersionsLoading(false);
+      setSkillVersionsError('');
+      return;
+    }
+    void loadSkillVersions(selectedPackageId, selectedSkillRecord.id);
+  }, [
+    loadSkillVersions,
+    selectedPackageId,
+    selectedSkillRecord?.id,
+    showDiscardedSkillVersions,
+  ]);
+
+  useEffect(() => {
+    const leftRecord = packageSkills.find(
+      (skill) => skill.skillUid === skillArenaLeftSkillId,
+    );
+    if (!selectedPackageId || !leftRecord?.id) {
+      skillArenaLeftRequestIdRef.current += 1;
+      setSkillArenaLeftVersions([]);
+      setSkillArenaLeftVersionId('');
+      setSkillArenaLoading((prev) => ({ ...prev, left: false }));
+      return;
+    }
+    void loadSkillArenaVersions('left', selectedPackageId, leftRecord.id);
+  }, [
+    loadSkillArenaVersions,
+    packageSkills,
+    selectedPackageId,
+    skillArenaLeftSkillId,
+    showDiscardedSkillVersions,
+  ]);
+
+  useEffect(() => {
+    const rightRecord = packageSkills.find(
+      (skill) => skill.skillUid === skillArenaRightSkillId,
+    );
+    if (!selectedPackageId || !rightRecord?.id) {
+      skillArenaRightRequestIdRef.current += 1;
+      setSkillArenaRightVersions([]);
+      setSkillArenaRightVersionId('');
+      setSkillArenaLoading((prev) => ({ ...prev, right: false }));
+      return;
+    }
+    void loadSkillArenaVersions('right', selectedPackageId, rightRecord.id);
+  }, [
+    loadSkillArenaVersions,
+    packageSkills,
+    selectedPackageId,
+    skillArenaRightSkillId,
+    showDiscardedSkillVersions,
+  ]);
+
+  useEffect(() => {
+    if (
+      skillArenaLeftSkillId &&
+      skillArenaLeftSkillId === skillArenaRightSkillId &&
+      skillArenaLeftVersionId &&
+      skillArenaLeftVersionId === skillArenaRightVersionId
+    ) {
+      const alternativeVersionId = skillArenaRightVersions.find(
+        (version) => version.id !== skillArenaLeftVersionId,
+      )?.id;
+      if (alternativeVersionId) {
+        setSkillArenaRightVersionId(alternativeVersionId);
+      }
+    }
+  }, [
+    skillArenaLeftSkillId,
+    skillArenaLeftVersionId,
+    skillArenaRightSkillId,
+    skillArenaRightVersionId,
+    skillArenaRightVersions,
+  ]);
 
   useEffect(() => {
     if (!token) return;
@@ -737,18 +1133,33 @@ export default function LiteArenaPanel() {
   }
 
   function clearWorkspaceState() {
+    skillVersionsRequestIdRef.current += 1;
     selectedPackageIdRef.current = '';
     setSelectedPackageId('');
     setSelectedPackage(null);
     setThread(null);
     setThreadDetail(null);
     setVersions([]);
+    setPackageSkills([]);
     setReport(null);
     setOptimization(null);
     setCompareResult(null);
     setCompareBaseId('');
     setCompareTargetId('');
     setSelectedSkillId('');
+    setSkillVersions([]);
+    setSkillVersionsCurrentId('');
+    setSelectedSkillVersionId('');
+    setSkillVersionsLoading(false);
+    setSkillVersionsError('');
+    setSkillArenaLeftSkillId('');
+    setSkillArenaRightSkillId('');
+    setSkillArenaLeftVersions([]);
+    setSkillArenaRightVersions([]);
+    setSkillArenaLeftVersionId('');
+    setSkillArenaRightVersionId('');
+    setSkillArenaLoading({ left: false, right: false });
+    setSkillArenaCreatePending(false);
     setCenterPreview(null);
     setManualEdit(null);
     setInteractiveMode(false);
@@ -988,6 +1399,73 @@ export default function LiteArenaPanel() {
       const message = error instanceof Error ? error.message : '导入失败';
       failProgress(message);
       setStatus(message);
+    }
+  }
+
+  async function handleCreateArenaThread() {
+    const currentPkgId = selectedPackageIdRef.current || selectedPackageId;
+    if (!token || !currentPkgId || skillArenaCreatePending) return;
+    setSkillArenaCreatePending(true);
+    try {
+      let nextThread: ArenaThread;
+      let nextDetail: ArenaThreadDetail;
+      if (arenaComposerKind === 'skill_arena') {
+        const leftRecord = packageSkills.find(
+          (skill) => skill.skillUid === skillArenaLeftSkillId,
+        );
+        const rightRecord = packageSkills.find(
+          (skill) => skill.skillUid === skillArenaRightSkillId,
+        );
+        if (
+          !currentPackageVersionId ||
+          !leftRecord?.id ||
+          !rightRecord?.id ||
+          !skillArenaLeftVersionId ||
+          !skillArenaRightVersionId
+        ) {
+          throw new Error('请先选择左右 Skill 及其版本');
+        }
+        nextThread = await liteApi.createArenaThread(token, currentPkgId, {
+          idempotencyKey: createClientIdempotencyKey(),
+          basePackageVersionId: currentPackageVersionId,
+          left: {
+            skillId: leftRecord.id,
+            skillVersionId: skillArenaLeftVersionId,
+          },
+          right: {
+            skillId: rightRecord.id,
+            skillVersionId: skillArenaRightVersionId,
+          },
+        });
+        nextDetail = await liteApi.getArenaThreadDetail(
+          token,
+          currentPkgId,
+          String(nextThread.id),
+        );
+      } else {
+        nextThread = await liteApi.createThread(token, currentPkgId);
+        nextDetail = await liteApi.getThread(token, String(nextThread.id));
+      }
+      if (selectedPackageIdRef.current !== currentPkgId) {
+        return;
+      }
+      setThread(nextThread);
+      setThreadDetail(nextDetail);
+      setReport(null);
+      setCenterPreview((prev) => (prev?.type === 'report' ? null : prev));
+      setArenaMode('compare');
+      setStatus(
+        nextThread.warning ||
+          (arenaComposerKind === 'skill_arena'
+            ? 'Skill Arena 已创建'
+            : '标准 Arena 已创建'),
+      );
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : '创建 Arena 线程失败');
+    } finally {
+      if (selectedPackageIdRef.current === currentPkgId) {
+        setSkillArenaCreatePending(false);
+      }
     }
   }
 
@@ -1760,6 +2238,144 @@ export default function LiteArenaPanel() {
     }
   }
 
+  function formatSkillVersionSourceLabel(source: SkillVersionDetail['source']) {
+    if (source === 'generated') return '生成';
+    if (source === 'imported') return '导入';
+    if (source === 'optimized') return '优化';
+    if (source === 'manual') return '手动';
+    if (source === 'interactive') return '交互优化';
+    if (source === 'rollback') return '回退';
+    return source;
+  }
+
+  async function handleRollbackSkillVersion(version: SkillVersionDetail) {
+    if (
+      !token ||
+      !selectedPackageId ||
+      !selectedSkillRecord?.id ||
+      !currentPackageVersionId
+    ) {
+      return;
+    }
+    if (
+      !window.confirm(
+        `确认回退到 Skill 历史版本 v${version.versionNumber} 吗？系统会前向创建一个新的智能体版本。`,
+      )
+    ) {
+      return;
+    }
+    const note = window.prompt('请输入回退备注（可选）：', 'Skill 版本回退');
+    if (note === null) return;
+    const currentPkgId = selectedPackageId;
+    const currentSkillId = selectedSkillRecord.id;
+    const actionId = getSkillActionId('rollback', currentSkillId, version.id);
+    if (skillActionPendingIdRef.current === actionId) return;
+    const idempotencyKey = createClientIdempotencyKey();
+    skillActionPendingIdRef.current = actionId;
+    setSkillActionPendingId(actionId);
+    startProgress('回退 Skill 版本', '正在创建新的智能体版本...');
+    try {
+      const result = await liteApi.rollbackSkillVersion(token, currentPkgId, {
+        skillId: currentSkillId,
+        versionId: version.id,
+        expectedPackageVersionId: currentPackageVersionId,
+        idempotencyKey,
+        note: note.trim() || undefined,
+      });
+      await refreshPackages(currentPkgId);
+      await loadSkillVersions(
+        currentPkgId,
+        currentSkillId,
+        result.rolledBackSkillVersionId,
+      );
+      finishProgress(`已创建新版本 v${result.versionNumber}`);
+      setStatus(`已回退并创建新版本 v${result.versionNumber}`);
+      setDetailTab('skills');
+    } catch (error) {
+      const apiError = error instanceof LiteApiError ? error : null;
+      if (apiError?.code === 'PACKAGE_VERSION_CONFLICT') {
+        const message =
+          '当前智能体包已被其他操作更新。页面会先刷新到最新版本，请确认后重新执行回退。';
+        await refreshPackages(currentPkgId);
+        await loadSkillVersions(currentPkgId, currentSkillId);
+        failProgress(message);
+        setStatus(message);
+        return;
+      }
+      const message = error instanceof Error ? error.message : '回退失败';
+      failProgress(message);
+      setStatus(message);
+    } finally {
+      if (skillActionPendingIdRef.current === actionId) {
+        skillActionPendingIdRef.current = '';
+      }
+      setSkillActionPendingId((current) =>
+        current === actionId ? '' : current,
+      );
+    }
+  }
+
+  async function handleDiscardSkillVersion(version: SkillVersionDetail) {
+    if (!token || !selectedPackageId || !selectedSkillRecord?.id) return;
+    const currentPkgId = selectedPackageId;
+    const currentSkillId = selectedSkillRecord.id;
+    const actionId = getSkillActionId('discard', currentSkillId, version.id);
+    if (skillActionPendingIdRef.current === actionId) return;
+    const reason = window.prompt('请输入废弃原因：', '该版本不再使用');
+    if (reason === null) return;
+    if (!reason.trim()) {
+      setStatus('废弃原因不能为空');
+      return;
+    }
+    skillActionPendingIdRef.current = actionId;
+    setSkillActionPendingId(actionId);
+    try {
+      await liteApi.discardSkillVersion(
+        token,
+        currentPkgId,
+        version.id,
+        reason.trim(),
+      );
+      await loadSkillVersions(currentPkgId, currentSkillId, version.id);
+      setStatus(`已废弃 Skill 版本 v${version.versionNumber}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '废弃失败';
+      setStatus(message);
+    } finally {
+      if (skillActionPendingIdRef.current === actionId) {
+        skillActionPendingIdRef.current = '';
+      }
+      setSkillActionPendingId((current) =>
+        current === actionId ? '' : current,
+      );
+    }
+  }
+
+  async function handleUndiscardSkillVersion(version: SkillVersionDetail) {
+    if (!token || !selectedPackageId || !selectedSkillRecord?.id) return;
+    const currentPkgId = selectedPackageId;
+    const currentSkillId = selectedSkillRecord.id;
+    const actionId = getSkillActionId('undiscard', currentSkillId, version.id);
+    if (skillActionPendingIdRef.current === actionId) return;
+    skillActionPendingIdRef.current = actionId;
+    setSkillActionPendingId(actionId);
+    try {
+      await liteApi.undiscardSkillVersion(token, currentPkgId, version.id);
+      await loadSkillVersions(currentPkgId, currentSkillId, version.id);
+      setStatus(`已恢复 Skill 版本 v${version.versionNumber}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '恢复失败';
+      setStatus(message);
+    } finally {
+      if (skillActionPendingIdRef.current === actionId) {
+        skillActionPendingIdRef.current = '';
+      }
+      setSkillActionPendingId((current) =>
+        current === actionId ? '' : current,
+      );
+    }
+  }
+
   function buildDiffMarkdown(result: VersionCompareResult): string {
     const lines: string[] = [
       `# 版本对比：v${result.baseVersion.versionNumber} -> v${result.targetVersion.versionNumber}`,
@@ -1957,12 +2573,19 @@ export default function LiteArenaPanel() {
     }
 
     const rows = buildArenaReportRows(currentReport);
-    const enhancedLabel = selectedPackage?.name || 'Enhanced';
+    const reportLabels = getArenaSideLabels(
+      thread,
+      selectedPackage?.name,
+      currentReport,
+    );
     const winnerLabel = formatArenaReportWinner(
       currentReport.winningSide,
-      enhancedLabel,
+      reportLabels,
     );
-    const sideCards = buildArenaReportSideCards(currentReport, enhancedLabel);
+    const sideCards = buildArenaReportSideCards(currentReport, reportLabels);
+    const sideTitles = isSkillArenaThread
+      ? { baseline: '左侧版本', enhanced: '右侧版本' }
+      : { baseline: '基础回答', enhanced: '增强回答' };
     const titleClass = compact ? 'text-lg' : 'text-xl';
 
     return (
@@ -2030,7 +2653,9 @@ export default function LiteArenaPanel() {
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                    {card.key === 'baseline' ? '基础回答' : '增强回答'}
+                    {card.key === 'baseline'
+                      ? sideTitles.baseline
+                      : sideTitles.enhanced}
                   </div>
                   <div className="mt-1 text-sm font-medium text-foreground">
                     {card.label}
@@ -2073,7 +2698,7 @@ export default function LiteArenaPanel() {
                   <article className="rounded-[14px] border border-border/60 bg-muted/20 px-3 py-3">
                     <div className="flex items-center justify-between gap-3">
                       <div className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                        基础回答
+                        {sideTitles.baseline}
                       </div>
                       <div className="rounded-full border border-border/80 bg-background/85 px-2.5 py-1 text-sm font-semibold text-foreground">
                         {row.baselineScore}/{row.baselineMaxScore}
@@ -2086,7 +2711,7 @@ export default function LiteArenaPanel() {
                   <article className="rounded-[14px] border border-primary/15 bg-primary/5 px-3 py-3">
                     <div className="flex items-center justify-between gap-3">
                       <div className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                        增强回答
+                        {sideTitles.enhanced}
                       </div>
                       <div className="rounded-full border border-primary/20 bg-background/90 px-2.5 py-1 text-sm font-semibold text-foreground">
                         {row.enhancedScore}/{row.enhancedMaxScore}
@@ -2893,8 +3518,14 @@ export default function LiteArenaPanel() {
                 <div className="inline-flex rounded-[12px] border border-border/70 bg-muted/40 p-0.5">
                   {[
                     { key: 'compare' as const, label: '\u5bf9\u6bd4' },
-                    { key: 'agent' as const, label: '\u667a\u80fd\u4f53' },
-                    { key: 'baseline' as const, label: '\u57fa\u7840' },
+                    {
+                      key: 'agent' as const,
+                      label: isSkillArenaThread ? '\u53f3\u4fa7' : '\u667a\u80fd\u4f53',
+                    },
+                    {
+                      key: 'baseline' as const,
+                      label: isSkillArenaThread ? '\u5de6\u4fa7' : '\u57fa\u7840',
+                    },
                   ].map((mode) => (
                     <button
                       key={mode.key}
@@ -2994,11 +3625,140 @@ export default function LiteArenaPanel() {
               previews={showGeneratePreviews ? generatePreviews : []}
             />
 
+            {selectedPackage && (
+              <div className="mx-5 mt-3 rounded-[16px] border border-border/70 bg-card/70 px-4 py-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      Arena 线程
+                    </div>
+                    <div className="mt-1 text-sm text-foreground">
+                      {thread?.arenaKind === 'skill_arena'
+                        ? `${arenaSideLabels.baseline} vs ${arenaSideLabels.enhanced}`
+                        : '标准 Arena'}
+                    </div>
+                  </div>
+                  <div className="inline-flex rounded-[12px] border border-border/70 bg-muted/40 p-0.5">
+                    {[
+                      { key: 'package_arena' as const, label: '标准 Arena' },
+                      { key: 'skill_arena' as const, label: 'Skill Arena' },
+                    ].map((kind) => (
+                      <button
+                        key={kind.key}
+                        onClick={() => setArenaComposerKind(kind.key)}
+                        className={`rounded-[9px] px-2.5 py-1 text-xs font-medium transition-colors ${arenaComposerKind === kind.key ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                      >
+                        {kind.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {arenaComposerKind === 'skill_arena' && (
+                  <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                    <div className="space-y-2">
+                      <div className="text-[11px] font-medium text-muted-foreground">
+                        左侧 Skill
+                      </div>
+                      <select
+                        className="w-full rounded-[10px] border border-border/70 bg-background px-3 py-2 text-sm"
+                        value={skillArenaLeftSkillId}
+                        onChange={(e) => setSkillArenaLeftSkillId(e.target.value)}
+                      >
+                        <option value="">选择 Skill</option>
+                        {packageSkills.map((skill) => (
+                          <option key={skill.id} value={skill.skillUid}>
+                            {skill.name}
+                            {skill.status === 'removed' ? ' (已移除)' : ''}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        className="w-full rounded-[10px] border border-border/70 bg-background px-3 py-2 text-sm"
+                        value={skillArenaLeftVersionId}
+                        onChange={(e) => setSkillArenaLeftVersionId(e.target.value)}
+                        disabled={skillArenaLoading.left || !skillArenaLeftVersions.length}
+                      >
+                        <option value="">
+                          {skillArenaLoading.left ? '加载版本中...' : '选择版本'}
+                        </option>
+                        {skillArenaLeftVersions.map((version) => (
+                          <option key={version.id} value={version.id}>
+                            v{version.versionNumber} ({version.source})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="text-[11px] font-medium text-muted-foreground">
+                        右侧 Skill
+                      </div>
+                      <select
+                        className="w-full rounded-[10px] border border-border/70 bg-background px-3 py-2 text-sm"
+                        value={skillArenaRightSkillId}
+                        onChange={(e) => setSkillArenaRightSkillId(e.target.value)}
+                      >
+                        <option value="">选择 Skill</option>
+                        {packageSkills.map((skill) => (
+                          <option key={skill.id} value={skill.skillUid}>
+                            {skill.name}
+                            {skill.status === 'removed' ? ' (已移除)' : ''}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        className="w-full rounded-[10px] border border-border/70 bg-background px-3 py-2 text-sm"
+                        value={skillArenaRightVersionId}
+                        onChange={(e) => setSkillArenaRightVersionId(e.target.value)}
+                        disabled={skillArenaLoading.right || !skillArenaRightVersions.length}
+                      >
+                        <option value="">
+                          {skillArenaLoading.right ? '加载版本中...' : '选择版本'}
+                        </option>
+                        {skillArenaRightVersions.map((version) => (
+                          <option key={version.id} value={version.id}>
+                            v{version.versionNumber} ({version.source})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                  <div className="text-xs text-muted-foreground">
+                    {arenaComposerKind === 'skill_arena'
+                      ? '线程会固定绑定当前 Package 版本与左右 Skill 版本，后续对话和报告都使用这份快照。'
+                      : '标准 Arena 使用当前智能体快照。'}
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="rounded-[10px]"
+                    onClick={() => void handleCreateArenaThread()}
+                    disabled={
+                      skillArenaCreatePending ||
+                      (arenaComposerKind === 'skill_arena' &&
+                        (!currentPackageVersionId ||
+                          !skillArenaLeftSkillId ||
+                          !skillArenaRightSkillId ||
+                          !skillArenaLeftVersionId ||
+                          !skillArenaRightVersionId))
+                    }
+                  >
+                    {skillArenaCreatePending ? '创建中...' : '创建线程'}
+                  </Button>
+                </div>
+              </div>
+            )}
+
             <div className="flex-1 overflow-auto">
               <ConversationBoard
                 messages={messages}
                 sideStreaming={sideStreaming}
                 packageName={selectedPackage?.name}
+                sideLabels={arenaSideLabels}
                 mode={arenaMode}
               />
             </div>
@@ -3287,7 +4047,7 @@ export default function LiteArenaPanel() {
                   </div>
                 )}
                 {selectedPackage && detailTab === 'skills' && (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                         技能文件
@@ -3315,38 +4075,328 @@ export default function LiteArenaPanel() {
                         </div>
                       )}
                     </div>
-                    {selectedPackage.snapshot.skills.length > 0 ? (
+                    {packageSkills.length > 0 ? (
                       <>
                         <div className="flex gap-1.5 overflow-x-auto pb-1">
-                          {selectedPackage.snapshot.skills.map((skill) => (
+                          {packageSkills.map((skill) => (
                             <button
-                              key={skill.id || skill.dirName}
-                              onClick={() =>
-                                setSelectedSkillId(skill.id || skill.dirName)
-                              }
-                              className={`shrink-0 rounded-lg px-2.5 py-1 text-xs font-medium whitespace-nowrap transition-colors ${selectedSkillId === (skill.id || skill.dirName) ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'}`}
+                              key={skill.id}
+                              onClick={() => setSelectedSkillId(skill.skillUid)}
+                              title={skill.name}
+                              className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium whitespace-nowrap transition-colors ${selectedSkillId === skill.skillUid ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'}`}
                             >
-                              {skill.name}
+                              <span className="max-w-[12rem] truncate">
+                                {skill.name}
+                              </span>
+                              {skill.status === 'removed' && (
+                                <span className="rounded-full border border-current/25 px-1.5 py-0.5 text-[10px] leading-none">
+                                  已移除
+                                </span>
+                              )}
                             </button>
                           ))}
                         </div>
-                        <div
-                          className="rounded-[20px] border border-border/70 bg-muted/50 p-4 text-sm cursor-pointer hover:border-primary/30 transition-colors overflow-auto max-h-[60vh]"
-                          onClick={() =>
-                            selectedSkill &&
-                            setCenterPreview({
-                              type: 'skill',
-                              name: selectedSkill.name,
-                              content: selectedSkill.skillMd,
-                            })
-                          }
-                        >
-                          <SkillMarkdownContent
-                            content={
-                              selectedSkill?.skillMd ||
-                              '\u6682\u65e0\u6280\u80fd\u5185\u5bb9'
+                        {selectedSkill ? (
+                          <div
+                            className="rounded-[20px] border border-border/70 bg-muted/50 p-4 text-sm cursor-pointer hover:border-primary/30 transition-colors overflow-auto max-h-[60vh]"
+                            onClick={() =>
+                              setCenterPreview({
+                                type: 'skill',
+                                name: selectedSkill.name,
+                                content: selectedSkill.skillMd,
+                              })
                             }
-                          />
+                          >
+                            <SkillMarkdownContent
+                              content={
+                                selectedSkill?.skillMd ||
+                                '\u6682\u65e0\u6280\u80fd\u5185\u5bb9'
+                              }
+                            />
+                          </div>
+                        ) : (
+                          <div className="rounded-[18px] border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-200">
+                            <div className="font-medium">
+                              当前 Skill 已不在最新智能体快照中
+                            </div>
+                            <div className="mt-1 text-xs leading-5">
+                              这个 Skill 仍然保留历史版本，可以继续查看、恢复到包内，或做历史审计。
+                            </div>
+                          </div>
+                        )}
+                        <div className="space-y-3 rounded-[20px] border border-border/70 bg-card/50 p-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                                历史版本
+                              </div>
+                              <div className="mt-1 text-xs text-muted-foreground">
+                                {selectedSkillRecord
+                                  ? `${selectedSkillRecord.name} / ${selectedSkillRecord.dirName}`
+                                  : '请选择一个 Skill'}
+                              </div>
+                            </div>
+                            <label className="inline-flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+                              <input
+                                type="checkbox"
+                                checked={showDiscardedSkillVersions}
+                                onChange={(e) =>
+                                  setShowDiscardedSkillVersions(e.target.checked)
+                                }
+                                className="size-3.5 rounded border-border/70"
+                              />
+                              显示已废弃
+                            </label>
+                          </div>
+                          {skillVersionsError && (
+                            <div className="rounded-[16px] border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+                              {skillVersionsError}
+                            </div>
+                          )}
+                          {skillVersionsLoading ? (
+                            <div className="flex items-center gap-2 rounded-[16px] border border-border/70 bg-muted/40 px-3 py-3 text-xs text-muted-foreground">
+                              <Loader2 className="size-3.5 animate-spin" />
+                              正在加载 Skill 历史...
+                            </div>
+                          ) : skillVersions.length > 0 ? (
+                            <>
+                              <div className="space-y-1.5">
+                                {skillVersions.map((version) => {
+                                  const isCurrent =
+                                    version.id === skillVersionsCurrentId;
+                                  const isSelected =
+                                    version.id === selectedSkillVersion?.id;
+                                  const rollbackActionId = selectedSkillRecord
+                                    ? getSkillActionId(
+                                        'rollback',
+                                        selectedSkillRecord.id,
+                                        version.id,
+                                      )
+                                    : '';
+                                  const discardActionId = selectedSkillRecord
+                                    ? getSkillActionId(
+                                        'discard',
+                                        selectedSkillRecord.id,
+                                        version.id,
+                                      )
+                                    : '';
+                                  const undiscardActionId = selectedSkillRecord
+                                    ? getSkillActionId(
+                                        'undiscard',
+                                        selectedSkillRecord.id,
+                                        version.id,
+                                      )
+                                    : '';
+                                  const isPending =
+                                    skillActionPendingId === rollbackActionId ||
+                                    skillActionPendingId === discardActionId ||
+                                    skillActionPendingId === undiscardActionId;
+                                  return (
+                                    <div
+                                      key={version.id}
+                                      role="button"
+                                      tabIndex={0}
+                                      onClick={() =>
+                                        setSelectedSkillVersionId(version.id)
+                                      }
+                                      onKeyDown={(event) => {
+                                        if (
+                                          event.key === 'Enter' ||
+                                          event.key === ' '
+                                        ) {
+                                          event.preventDefault();
+                                          setSelectedSkillVersionId(version.id);
+                                        }
+                                      }}
+                                      className={`w-full rounded-lg border px-3 py-2 text-left text-xs transition-colors ${isSelected ? 'border-primary/30 bg-primary/5' : 'border-border/70 bg-muted/45 hover:border-primary/20 hover:bg-muted/65'}`}
+                                    >
+                                      <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <div className="flex min-w-0 items-center gap-2">
+                                          <span className="font-medium">
+                                            v{version.versionNumber}
+                                          </span>
+                                          {isCurrent && (
+                                            <Badge
+                                              variant="outline"
+                                              className="h-5 rounded-full border-primary/30 bg-primary/10 px-2 text-[10px] text-primary"
+                                            >
+                                              当前
+                                            </Badge>
+                                          )}
+                                          {version.status === 'discarded' && (
+                                            <Badge
+                                              variant="outline"
+                                              className="h-5 rounded-full border-amber-500/30 bg-amber-500/10 px-2 text-[10px] text-amber-700 dark:text-amber-300"
+                                            >
+                                              已废弃
+                                            </Badge>
+                                          )}
+                                          {version.basedOnVersionId && (
+                                            <Badge
+                                              variant="outline"
+                                              className="h-5 rounded-full px-2 text-[10px]"
+                                            >
+                                              回退创建
+                                            </Badge>
+                                          )}
+                                        </div>
+                                        <span className="text-muted-foreground">
+                                          {new Date(
+                                            version.createdAt,
+                                          ).toLocaleString()}
+                                        </span>
+                                      </div>
+                                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                                        <span>
+                                          来源：
+                                          {formatSkillVersionSourceLabel(
+                                            version.source,
+                                          )}
+                                        </span>
+                                        {version.note && (
+                                          <span className="truncate">
+                                            备注：{version.note}
+                                          </span>
+                                        )}
+                                        {version.discardReason && (
+                                          <span className="truncate">
+                                            废弃原因：{version.discardReason}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px]">
+                                        <span className="text-primary">
+                                          点击预览
+                                        </span>
+                                        {!isCurrent &&
+                                          version.status === 'active' && (
+                                            <>
+                                              <button
+                                                type="button"
+                                                disabled={isPending}
+                                                onClick={(event) => {
+                                                  event.stopPropagation();
+                                                  void handleRollbackSkillVersion(
+                                                    version,
+                                                  );
+                                                }}
+                                                onKeyDown={(event) => {
+                                                  if (
+                                                    event.key === 'Enter' ||
+                                                    event.key === ' '
+                                                  ) {
+                                                    event.preventDefault();
+                                                    event.stopPropagation();
+                                                    void handleRollbackSkillVersion(
+                                                      version,
+                                                    );
+                                                  }
+                                                }}
+                                                className="text-primary hover:underline disabled:pointer-events-none disabled:opacity-60"
+                                              >
+                                                {isPending
+                                                  ? '处理中...'
+                                                  : '回退到此版本'}
+                                              </button>
+                                              <button
+                                                type="button"
+                                                disabled={isPending}
+                                                onClick={(event) => {
+                                                  event.stopPropagation();
+                                                  void handleDiscardSkillVersion(
+                                                    version,
+                                                  );
+                                                }}
+                                                onKeyDown={(event) => {
+                                                  if (
+                                                    event.key === 'Enter' ||
+                                                    event.key === ' '
+                                                  ) {
+                                                    event.preventDefault();
+                                                    event.stopPropagation();
+                                                    void handleDiscardSkillVersion(
+                                                      version,
+                                                    );
+                                                  }
+                                                }}
+                                                className="text-muted-foreground hover:text-foreground hover:underline disabled:pointer-events-none disabled:opacity-60"
+                                              >
+                                                废弃
+                                              </button>
+                                            </>
+                                          )}
+                                        {version.status === 'discarded' && (
+                                          <button
+                                            type="button"
+                                            disabled={isPending}
+                                            onClick={(event) => {
+                                              event.stopPropagation();
+                                              void handleUndiscardSkillVersion(
+                                                version,
+                                              );
+                                            }}
+                                            onKeyDown={(event) => {
+                                              if (
+                                                event.key === 'Enter' ||
+                                                event.key === ' '
+                                              ) {
+                                                event.preventDefault();
+                                                event.stopPropagation();
+                                                void handleUndiscardSkillVersion(
+                                                  version,
+                                                );
+                                              }
+                                            }}
+                                            className="text-primary hover:underline disabled:pointer-events-none disabled:opacity-60"
+                                          >
+                                            {isPending ? '处理中...' : '恢复可用'}
+                                          </button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                              {selectedSkillVersion && (
+                                <div className="space-y-2 rounded-[16px] border border-border/70 bg-muted/35 p-3">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="min-w-0">
+                                      <div className="text-xs font-medium">
+                                        版本预览 v{selectedSkillVersion.versionNumber}
+                                      </div>
+                                      <div className="mt-1 text-[11px] text-muted-foreground">
+                                        {selectedSkillVersion.basedOnVersionId
+                                          ? `基于历史版本 ${selectedSkillVersion.basedOnVersionId} 前向创建`
+                                          : `来源：${formatSkillVersionSourceLabel(selectedSkillVersion.source)}`}
+                                      </div>
+                                    </div>
+                                    <button
+                                      onClick={() =>
+                                        setCenterPreview({
+                                          type: 'skill',
+                                          name: `${selectedSkillVersion.skill.name} / v${selectedSkillVersion.versionNumber}`,
+                                          content:
+                                            selectedSkillVersion.skill.skillMd,
+                                        })
+                                      }
+                                      className="shrink-0 text-[10px] text-primary hover:underline"
+                                    >
+                                      在中间打开
+                                    </button>
+                                  </div>
+                                  <div className="max-h-[60vh] overflow-auto rounded-[14px] border border-border/70 bg-card/70 p-3">
+                                    <SkillMarkdownContent
+                                      content={selectedSkillVersion.skill.skillMd}
+                                    />
+                                  </div>
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <div className="rounded-[16px] border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
+                              这个 Skill 还没有历史版本记录
+                            </div>
+                          )}
                         </div>
                       </>
                     ) : (

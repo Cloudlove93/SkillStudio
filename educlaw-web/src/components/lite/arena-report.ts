@@ -19,15 +19,28 @@ export interface ArenaReportSideCard {
   summary: string;
 }
 
+function resolveArenaReportLabels(
+  labelsOrEnhancedLabel?: { baseline: string; enhanced: string } | string,
+) {
+  if (labelsOrEnhancedLabel && typeof labelsOrEnhancedLabel === 'object') {
+    return labelsOrEnhancedLabel;
+  }
+  return {
+    baseline: 'Baseline',
+    enhanced: labelsOrEnhancedLabel || 'Enhanced',
+  };
+}
+
 export function formatArenaReportWinner(
   winningSide: ArenaReport['winningSide'],
-  packageName: string,
+  labelsOrEnhancedLabel: { baseline: string; enhanced: string } | string,
 ): string {
+  const labels = resolveArenaReportLabels(labelsOrEnhancedLabel);
   if (winningSide === 'baseline') {
-    return '基础模型';
+    return labels.baseline;
   }
   if (winningSide === 'enhanced') {
-    return packageName;
+    return labels.enhanced;
   }
   return '平局';
 }
@@ -74,18 +87,21 @@ export function buildArenaReportRows(report: ArenaReport): ArenaReportRow[] {
 
 export function buildArenaReportSideCards(
   report: ArenaReport,
-  enhancedLabel: string,
+  labelsOrEnhancedLabel: { baseline: string; enhanced: string } | string,
 ): ArenaReportSideCard[] {
+  const labels = resolveArenaReportLabels(
+    report.labels || labelsOrEnhancedLabel,
+  );
   return [
     {
       key: 'baseline',
-      label: 'Baseline',
+      label: labels.baseline,
       total: report.baseline.total,
       summary: report.baseline.summary,
     },
     {
       key: 'enhanced',
-      label: enhancedLabel,
+      label: labels.enhanced,
       total: report.enhanced.total,
       summary: report.enhanced.summary,
     },

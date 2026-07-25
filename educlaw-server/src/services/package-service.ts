@@ -27,9 +27,10 @@ import {
   buildSkillUserPrompt,
 } from '../prompts/package-generation.js';
 import { randomUUID } from 'node:crypto';
-import { query } from './db.js';
+import { query, withTransaction } from './db.js';
 import type { DbRowPackage, DbRowPackageVersion } from '../types.js';
 import { parseDbJson } from '../utils/json.js';
+import { syncPackageVersionSkillsFromSnapshot } from './skill-version-service.js';
 
 interface PackageGenerationResult {
   name: string;
@@ -127,12 +128,31 @@ const RUBRIC_SIGNAL_PATTERN =
 
 function ensureSkillIds(snapshot: AgentPackageSnapshot): AgentPackageSnapshot {
   const skills = Array.isArray(snapshot.skills) ? snapshot.skills : [];
+  const usedIds = new Set<string>();
   return {
     ...snapshot,
-    skills: skills.map((skill) => ({
-      ...skill,
-      id: skill.id || randomUUID(),
-    })),
+    skills: skills.map((skill, index) => {
+      const rawId = String(skill.id || '').trim();
+      if (rawId) {
+        usedIds.add(rawId);
+        return { ...skill, id: rawId };
+      }
+      const base =
+        slugify(String(skill.dirName || '').trim()) ||
+        slugify(String(skill.name || '').trim()) ||
+        `skill-${index + 1}`;
+      let nextId = base;
+      let suffix = 2;
+      while (usedIds.has(nextId)) {
+        nextId = `${base}-${suffix}`;
+        suffix += 1;
+      }
+      usedIds.add(nextId);
+      return {
+        ...skill,
+        id: nextId,
+      };
+    }),
   };
 }
 
@@ -251,7 +271,10 @@ function sanitizeGeneratedPackageName(name: string): string {
     .replace(/[：:;；，,。.!！?？]+$/u, '')
     .trim();
   if (!normalized) return '智能体助手';
-  return truncateByCodePoints(normalized, MAX_GENERATED_PACKAGE_NAME_CHARS).trim();
+  return truncateByCodePoints(
+    normalized,
+    MAX_GENERATED_PACKAGE_NAME_CHARS,
+  ).trim();
 }
 
 function isLikelyRubricSupportSectionHeading(line: string): boolean {
@@ -290,7 +313,9 @@ function isStrongRubricCandidateStart(line: string): boolean {
   const normalized = normalizeSectionHeading(line);
   if (!normalized) return false;
   return (
-    /^\d+\s*[、.)）]\s*(?:评价|评估|评分)(?:准则|标准|量表)/.test(line.trim()) ||
+    /^\d+\s*[、.)）]\s*(?:评价|评估|评分)(?:准则|标准|量表)/.test(
+      line.trim(),
+    ) ||
     /^维度[一二三四五六七八九十百0-9]+[:：.]/.test(line.trim()) ||
     /(?:^|[\s-])(evaluation criteria|rubric)(?:$|[\s-])/i.test(normalized) ||
     /(?:评分|评估|评价)(?:标准|准则|量表)/.test(normalized)
@@ -304,7 +329,11 @@ function countRubricSignals(value: string): number {
 function scoreRubricCandidate(headingLine: string, extracted: string): number {
   let score = countRubricSignals(extracted);
   const trimmedHeading = headingLine.trim();
-  if (/^\d+\s*[、.)）]\s*(?:评价|评估|评分)(?:准则|标准|量表)/.test(trimmedHeading)) {
+  if (
+    /^\d+\s*[、.)）]\s*(?:评价|评估|评分)(?:准则|标准|量表)/.test(
+      trimmedHeading,
+    )
+  ) {
     score += 140;
   } else if (isRubricSectionHeading(headingLine)) {
     score += /^#{1,6}\s*rubric$/i.test(trimmedHeading) ? 40 : 110;
@@ -373,7 +402,10 @@ function extractRawRubricSection(content: string): string {
       continue;
     }
 
-    return lines.slice(index + 1).join('\n').trim();
+    return lines
+      .slice(index + 1)
+      .join('\n')
+      .trim();
   }
 
   return '';
@@ -525,7 +557,11 @@ function locateExcerptLineRange(
   const excerptLines = excerpt.split(/\r?\n/);
   if (excerptLines.length === 0) return null;
 
-  for (let start = 0; start <= sourceLines.length - excerptLines.length; start += 1) {
+  for (
+    let start = 0;
+    start <= sourceLines.length - excerptLines.length;
+    start += 1
+  ) {
     let matched = true;
     for (let offset = 0; offset < excerptLines.length; offset += 1) {
       if ((sourceLines[start + offset] ?? '') !== excerptLines[offset]) {
@@ -555,7 +591,12 @@ function applyBoundaryReviewExpansion(
   const down = clampReviewLineCount(review.linesDown);
   const start = Math.max(0, range.start - up);
   const end = Math.min(sourceLines.length - 1, range.end + down);
-  return sourceLines.slice(start, end + 1).join('\n').trim() || excerpt;
+  return (
+    sourceLines
+      .slice(start, end + 1)
+      .join('\n')
+      .trim() || excerpt
+  );
 }
 
 async function reviewRubricExtractionBoundary(
@@ -721,7 +762,9 @@ function countCleanRubricDimensions(content: string): number {
     }
     if (
       /^###\s+/.test(line) ||
-      /^(?:维度[一二三四五六七八九十百0-9]+|[①②③④⑤⑥⑦⑧⑨]|\d+\s*[、.)）])/.test(line)
+      /^(?:维度[一二三四五六七八九十百0-9]+|[①②③④⑤⑥⑦⑧⑨]|\d+\s*[、.)）])/.test(
+        line,
+      )
     ) {
       count += 1;
     }
@@ -802,8 +845,7 @@ function looksLikeWeightedRubric(content: string): boolean {
       content,
     );
   const hasWeights = /(?:\d{1,3}\s*%)|权重|比例|占比/.test(content);
-  const hasEvaluationShape =
-    /整体评价|具体评价|应提供/.test(content);
+  const hasEvaluationShape = /整体评价|具体评价|应提供/.test(content);
   return (
     hasHeaderSignals &&
     dimensionHeadings >= 1 &&
@@ -842,7 +884,9 @@ function hasCompactScorableRubricStructure(content: string): boolean {
       content,
     );
   const hasScoringSignals =
-    /优秀|良好|合格|待改进|不合格|满分标准|评分|score|Full score/i.test(content);
+    /优秀|良好|合格|待改进|不合格|满分标准|评分|score|Full score/i.test(
+      content,
+    );
   const hasSummaryGoal =
     /Overall evaluation|整体评价|评分目标|评估目标|评价目标/i.test(content);
   const hasWeightSignals = /(?:\d{1,3}\s*%)|权重|分值|评级标准/.test(content);
@@ -996,12 +1040,7 @@ function buildFallbackRubricMarkdown(input: {
   const draft = normalizeRubricMarkdown(input.rubricDraft);
   const preservedSource = source || draft;
   const dimensionTitles = extractRubricDimensionTitles(preservedSource);
-  const fallbackTitles = [
-    '角色贴合',
-    'Skill 遵循',
-    '回答质量',
-    '安全边界',
-  ];
+  const fallbackTitles = ['角色贴合', 'Skill 遵循', '回答质量', '安全边界'];
   const mergedTitles = [...dimensionTitles];
   for (const title of fallbackTitles) {
     if (mergedTitles.length >= 4) break;
@@ -1018,7 +1057,12 @@ function buildFallbackRubricMarkdown(input: {
         : index === finalTitles.length - 1
           ? '如原始 rubric 涉及风险边界、转介、禁区或不可越界事项，应优先遵循这些要求。'
           : '优先遵循原始 rubric 中与该维度相关的权重、等级描述、案例和限制条件。';
-    return [`### ${title}`, `- ${emphasis}`, '- 如原始 rubric 中有更细规则，评分时以原文为准。', ''];
+    return [
+      `### ${title}`,
+      `- ${emphasis}`,
+      '- 如原始 rubric 中有更细规则，评分时以原文为准。',
+      '',
+    ];
   });
 
   const preservedSection = preservedSource
@@ -1180,10 +1224,8 @@ async function generateRubricWithRepair(
 
     if (useStream) {
       return stripMarkdownFence(
-        await collectStreamedText(
-          request,
-          (delta) =>
-            onPreviewDelta?.({ type: 'rubric', name: 'rubric.md', delta }),
+        await collectStreamedText(request, (delta) =>
+          onPreviewDelta?.({ type: 'rubric', name: 'rubric.md', delta }),
         ),
       );
     }
@@ -1319,7 +1361,7 @@ function normalizeSnapshot(
   input: PackageGenerationResult,
 ): AgentPackageSnapshot {
   return {
-    name: input.name.trim(),
+    name: sanitizeGeneratedPackageName(input.name),
     description: input.description.trim(),
     versionLabel: 'v1',
     agentMd: input.agentMd.trim(),
@@ -1442,6 +1484,20 @@ function buildSnapshotJson(snapshot: AgentPackageSnapshot): string {
   return json;
 }
 
+function toSkillVersionSource(source: string): PackageVersion['source'] {
+  if (
+    source === 'generated' ||
+    source === 'imported' ||
+    source === 'optimized' ||
+    source === 'manual' ||
+    source === 'interactive' ||
+    source === 'rollback'
+  ) {
+    return source;
+  }
+  return 'imported';
+}
+
 function getCompactSkillTemplatePrompt(): string {
   return [
     '返回完整 SKILL.md 的 Markdown 文本，不要 JSON，不要 Markdown 代码块。',
@@ -1525,7 +1581,9 @@ function validateSkillMdStandard(skillMd: string, dirName: string): string[] {
   const triggerPattern =
     /(\u5f53|\u5982\u679c|\u7528\u4e8e|\u9002\u5408|\u573a\u666f|\u89e6\u53d1|\u8c03\u7528|\u9700\u8981|\u60c5\u51b5|\u9488\u5bf9|\u9047\u5230|\u9762\u5bf9|\u51fa\u73b0|\u7528\u6237|\u8f93\u5165|\u8bf7\u6c42|\u95ee\u9898|\u4efb\u52a1|\u4f8b\u5982|\bwhen\b|\bwhenever\b|\bif\b|\bfor\b|\buse(?:d|s|ing)?\b|\buser\b|\brequest\b|\binput\b|\btask\b|\bworkflow\b|\bscenario\b|\btrigger\b)/i;
   if (fmDescription && !triggerPattern.test(fmDescription)) {
-    errors.push('frontmatter description 应说明 skill 的触发场景（什么时候使用）');
+    errors.push(
+      'frontmatter description 应说明 skill 的触发场景（什么时候使用）',
+    );
   }
 
   const body = skillMd.replace(/^---\s*\n[\s\S]*?\n---\s*\n?/, '').trim();
@@ -1642,7 +1700,10 @@ function toDetail(
 ): AgentPackageDetail {
   return {
     ...toSummary(row, version),
-    snapshot: parseDbJson<AgentPackageSnapshot>(version.snapshot_json, emptyPackageSnapshot()),
+    snapshot: parseDbJson<AgentPackageSnapshot>(
+      version.snapshot_json,
+      emptyPackageSnapshot(),
+    ),
   };
 }
 
@@ -1731,7 +1792,10 @@ export async function listVersions(userId: string, packageId: string | number) {
       createdAt: version.created_at,
       source: version.source as PackageVersion['source'],
       note: version.note || '',
-      snapshot: parseDbJson<AgentPackageSnapshot>(version.snapshot_json, emptyPackageSnapshot()),
+      snapshot: parseDbJson<AgentPackageSnapshot>(
+        version.snapshot_json,
+        emptyPackageSnapshot(),
+      ),
     }),
   );
 }
@@ -1762,7 +1826,10 @@ export async function updateVersionNote(
     createdAt: version.created_at,
     source: version.source as PackageVersion['source'],
     note: version.note || '',
-    snapshot: parseDbJson<AgentPackageSnapshot>(version.snapshot_json, emptyPackageSnapshot()),
+    snapshot: parseDbJson<AgentPackageSnapshot>(
+      version.snapshot_json,
+      emptyPackageSnapshot(),
+    ),
   };
 }
 
@@ -1774,25 +1841,33 @@ async function createPackageWithSnapshot(
   const now = new Date().toISOString();
   const fixedSnapshot = ensureSkillIds(snapshot);
 
-  // Insert package first (with placeholder current_version_id)
-  const pkgResult = await query<{ id: number }>(
-    'insert into agent_packages (user_id, name, description, current_version_id, created_at, updated_at) values ($1, $2, $3, 0, $4, $5) returning id',
-    [userId, fixedSnapshot.name, fixedSnapshot.description, now, now],
-  );
-  const packageId = pkgResult.rows[0].id;
+  const packageId = await withTransaction(async (client) => {
+    const pkgResult = await client.query<{ id: number }>(
+      'insert into agent_packages (user_id, name, description, current_version_id, created_at, updated_at) values ($1, $2, $3, 0, $4, $5) returning id',
+      [userId, fixedSnapshot.name, fixedSnapshot.description, now, now],
+    );
+    const nextPackageId = pkgResult.rows[0].id;
 
-  // Insert version with real package_id
-  const verResult = await query<{ id: number }>(
-    'insert into agent_package_versions (package_id, version_number, source, snapshot_json, created_at) values ($1, $2, $3, $4, $5) returning id',
-    [packageId, 1, source, JSON.stringify(fixedSnapshot), now],
-  );
-  const versionId = verResult.rows[0].id;
+    const verResult = await client.query<{ id: number }>(
+      'insert into agent_package_versions (package_id, version_number, source, snapshot_json, created_at) values ($1, $2, $3, $4, $5) returning id',
+      [nextPackageId, 1, source, JSON.stringify(fixedSnapshot), now],
+    );
+    const versionId = verResult.rows[0].id;
 
-  // Update package with real version_id
-  await query(
-    'update agent_packages set current_version_id = $1 where id = $2',
-    [versionId, packageId],
-  );
+    await syncPackageVersionSkillsFromSnapshot(client, {
+      packageId: nextPackageId,
+      packageVersionId: versionId,
+      packageVersionNumber: 1,
+      source,
+      snapshot: fixedSnapshot,
+    });
+
+    await client.query(
+      'update agent_packages set current_version_id = $1 where id = $2',
+      [versionId, nextPackageId],
+    );
+    return nextPackageId;
+  });
 
   return getPackage(userId, packageId);
 }
@@ -1893,64 +1968,66 @@ export async function generatePackage(
     });
   }
 
-  const skills = await Promise.all(skillMetas.map(async (skillMeta, index) => {
-    const skillStartedAt = Date.now();
-    getLogger({ component: 'package-generation' }).info({
-      event: 'packages.generate.skill.start',
-      index: index + 1,
-      total: skillMetas.length,
-      dirName: skillMeta.dirName,
-      model,
-    });
-
-    const skillMdRaw = await collectStreamedText(
-      {
+  const skills = await Promise.all(
+    skillMetas.map(async (skillMeta, index) => {
+      const skillStartedAt = Date.now();
+      getLogger({ component: 'package-generation' }).info({
+        event: 'packages.generate.skill.start',
+        index: index + 1,
+        total: skillMetas.length,
+        dirName: skillMeta.dirName,
         model,
-        systemPrompt: buildSkillSystemPrompt(),
-        userPrompt: buildSkillUserPrompt({
-          packageName: base.name,
-          packageDescription: base.description,
-          agentExcerpt: agentMd.slice(0, 1800),
-          rubricExcerpt: resolvedRubricMd.slice(0, 1200),
-          documentContext: skillDocParts,
-          skillMetaJson: JSON.stringify(skillMeta),
-          siblingSkillsJson: JSON.stringify(
-            skillMetas.filter((meta) => meta.dirName !== skillMeta.dirName),
-            null,
-            2,
-          ),
-          skillTemplatePrompt: getCompactSkillTemplatePrompt(),
-        }),
-        temperature: 0.35,
-        maxTokens: 4000,
-      },
-      (delta) =>
-        onPreviewDelta?.({ type: 'skill', name: skillMeta.name, delta }),
-    );
+      });
 
-    const skillMd = normalizeSkillMdMissingSections(
-      normalizeSkillMdFrontmatter(
-        skillMdRaw || '',
-        skillMeta.dirName,
+      const skillMdRaw = await collectStreamedText(
+        {
+          model,
+          systemPrompt: buildSkillSystemPrompt(),
+          userPrompt: buildSkillUserPrompt({
+            packageName: base.name,
+            packageDescription: base.description,
+            agentExcerpt: agentMd.slice(0, 1800),
+            rubricExcerpt: resolvedRubricMd.slice(0, 1200),
+            documentContext: skillDocParts,
+            skillMetaJson: JSON.stringify(skillMeta),
+            siblingSkillsJson: JSON.stringify(
+              skillMetas.filter((meta) => meta.dirName !== skillMeta.dirName),
+              null,
+              2,
+            ),
+            skillTemplatePrompt: getCompactSkillTemplatePrompt(),
+          }),
+          temperature: 0.35,
+          maxTokens: 4000,
+        },
+        (delta) =>
+          onPreviewDelta?.({ type: 'skill', name: skillMeta.name, delta }),
+      );
+
+      const skillMd = normalizeSkillMdMissingSections(
+        normalizeSkillMdFrontmatter(
+          skillMdRaw || '',
+          skillMeta.dirName,
+          skillMeta.description,
+        ),
+        skillMeta.name,
         skillMeta.description,
-      ),
-      skillMeta.name,
-      skillMeta.description,
-    );
-    const skill = { ...skillMeta, skillMd };
-    onPreview?.({
-      type: 'skill',
-      name: skill.name,
-      content: skill.skillMd.slice(0, 800),
-    });
-    getLogger({ component: 'package-generation' }).info({
-      event: 'packages.generate.skill.done',
-      index: index + 1,
-      dirName: skill.dirName,
-      durationMs: Date.now() - skillStartedAt,
-    });
-    return skill;
-  }));
+      );
+      const skill = { ...skillMeta, skillMd };
+      onPreview?.({
+        type: 'skill',
+        name: skill.name,
+        content: skill.skillMd.slice(0, 800),
+      });
+      getLogger({ component: 'package-generation' }).info({
+        event: 'packages.generate.skill.done',
+        index: index + 1,
+        dirName: skill.dirName,
+        durationMs: Date.now() - skillStartedAt,
+      });
+      return skill;
+    }),
+  );
 
   const generated: PackageGenerationResult = {
     name: base.name,
@@ -2013,38 +2090,53 @@ async function importPackageWithVersions(
   if (!packageName) packageName = '导入的智能体';
   if (!packageDescription) packageDescription = '导入的智能体';
 
-  // Insert package first (with placeholder current_version_id)
-  const pkgResult = await query<{ id: number }>(
-    'insert into agent_packages (user_id, name, description, current_version_id, created_at, updated_at) values ($1, $2, $3, 0, $4, $5) returning id',
-    [userId, packageName, packageDescription, now, now],
-  );
-  const packageId = pkgResult.rows[0].id;
-
-  // 创建所有版本记录（确保每个 snapshot 都有 name/description）
-  let currentVersionId = 0;
-  let maxVersionNumber = 0;
-  for (const v of sortedVersions) {
-    const enrichedSnapshot: AgentPackageSnapshot = ensureSkillIds({
-      ...v.snapshot,
-      name: v.snapshot.name || packageName,
-      description: v.snapshot.description || packageDescription,
-    });
-    const verResult = await query<{ id: number }>(
-      'insert into agent_package_versions (package_id, version_number, source, snapshot_json, created_at) values ($1, $2, $3, $4, $5) returning id',
-      [packageId, v.versionNumber, v.source, JSON.stringify(enrichedSnapshot), v.createdAt || now],
+  const packageId = await withTransaction(async (client) => {
+    const pkgResult = await client.query<{ id: number }>(
+      'insert into agent_packages (user_id, name, description, current_version_id, created_at, updated_at) values ($1, $2, $3, 0, $4, $5) returning id',
+      [userId, packageName, packageDescription, now, now],
     );
-    const versionId = verResult.rows[0].id;
-    if (v.versionNumber >= maxVersionNumber) {
-      maxVersionNumber = v.versionNumber;
-      currentVersionId = versionId;
-    }
-  }
+    const nextPackageId = pkgResult.rows[0].id;
 
-  // Update package with real current_version_id
-  await query(
-    'update agent_packages set current_version_id = $1 where id = $2',
-    [currentVersionId, packageId],
-  );
+    // 创建所有版本记录（确保每个 snapshot 都有 name/description）
+    let currentVersionId = 0;
+    let maxVersionNumber = 0;
+    for (const v of sortedVersions) {
+      const enrichedSnapshot: AgentPackageSnapshot = ensureSkillIds({
+        ...v.snapshot,
+        name: v.snapshot.name || packageName,
+        description: v.snapshot.description || packageDescription,
+      });
+      const verResult = await client.query<{ id: number }>(
+        'insert into agent_package_versions (package_id, version_number, source, snapshot_json, created_at) values ($1, $2, $3, $4, $5) returning id',
+        [
+          nextPackageId,
+          v.versionNumber,
+          v.source,
+          JSON.stringify(enrichedSnapshot),
+          v.createdAt || now,
+        ],
+      );
+      const versionId = verResult.rows[0].id;
+      await syncPackageVersionSkillsFromSnapshot(client, {
+        packageId: nextPackageId,
+        packageVersionId: versionId,
+        packageVersionNumber: v.versionNumber,
+        source: toSkillVersionSource(v.source),
+        snapshot: enrichedSnapshot,
+      });
+      if (v.versionNumber >= maxVersionNumber) {
+        maxVersionNumber = v.versionNumber;
+        currentVersionId = versionId;
+      }
+    }
+
+    // Update package with real current_version_id
+    await client.query(
+      'update agent_packages set current_version_id = $1 where id = $2',
+      [currentVersionId, nextPackageId],
+    );
+    return nextPackageId;
+  });
 
   return getPackage(userId, packageId);
 }
@@ -2240,33 +2332,73 @@ export async function applyOptimizedSnapshot(
   source: PackageVersion['source'],
   note?: string,
 ) {
-  const pkg = await getPackage(userId, packageId);
-  const versions = await query<DbRowPackageVersion>(
-    'select * from agent_package_versions where package_id = $1 order by version_number desc limit 1',
-    [packageId],
-  );
-  const nextVersion = (versions.rows[0]?.version_number || 0) + 1;
   const now = new Date().toISOString();
 
-  // Ensure snapshot has name/description from the original package
-  const nextSnapshot: AgentPackageSnapshot = ensureSkillIds({
-    ...snapshot,
-    name: snapshot.name || pkg.name,
-    description: snapshot.description || pkg.description,
-    rubricMd: normalizeStoredRubricMarkdown(snapshot.rubricMd),
-    versionLabel: `v${nextVersion}`,
+  await withTransaction(async (client) => {
+    const packageResult = await client.query<DbRowPackage>(
+      'select * from agent_packages where id = $1 and user_id = $2 for update',
+      [packageId, userId],
+    );
+    const pkg = packageResult.rows[0];
+    if (!pkg) throw new Error('智能体不存在');
+
+    const versions = await client.query<DbRowPackageVersion>(
+      'select * from agent_package_versions where package_id = $1 order by version_number desc limit 1',
+      [packageId],
+    );
+    const nextVersion = (versions.rows[0]?.version_number || 0) + 1;
+    const currentVersion = versions.rows[0];
+    const currentSnapshot = currentVersion
+      ? parseDbJson<AgentPackageSnapshot>(
+          currentVersion.snapshot_json,
+          emptyPackageSnapshot(),
+        )
+      : emptyPackageSnapshot();
+
+    const nextSnapshot: AgentPackageSnapshot = ensureSkillIds({
+      ...snapshot,
+      name: snapshot.name || pkg.name,
+      description: snapshot.description || pkg.description,
+      rubricMd: normalizeStoredRubricMarkdown(snapshot.rubricMd),
+      versionLabel: `v${nextVersion}`,
+    });
+
+    const verResult = await client.query<{ id: number }>(
+      'insert into agent_package_versions (package_id, version_number, source, snapshot_json, note, created_at) values ($1, $2, $3, $4, $5, $6) returning id',
+      [
+        packageId,
+        nextVersion,
+        source,
+        JSON.stringify(nextSnapshot),
+        note || '',
+        now,
+      ],
+    );
+    const versionId = verResult.rows[0].id;
+
+    if (currentVersion) {
+      await syncPackageVersionSkillsFromSnapshot(client, {
+        packageId,
+        packageVersionId: currentVersion.id,
+        packageVersionNumber: currentVersion.version_number,
+        source: currentVersion.source as PackageVersion['source'],
+        snapshot: currentSnapshot,
+      });
+    }
+    await syncPackageVersionSkillsFromSnapshot(client, {
+      packageId,
+      packageVersionId: versionId,
+      packageVersionNumber: nextVersion,
+      source,
+      snapshot: nextSnapshot,
+      note,
+    });
+
+    await client.query(
+      'update agent_packages set name = $1, description = $2, current_version_id = $3, updated_at = $4 where id = $5 and user_id = $6',
+      [pkg.name, pkg.description, versionId, now, pkg.id, userId],
+    );
   });
-
-  const verResult = await query<{ id: number }>(
-    'insert into agent_package_versions (package_id, version_number, source, snapshot_json, note, created_at) values ($1, $2, $3, $4, $5, $6) returning id',
-    [packageId, nextVersion, source, JSON.stringify(nextSnapshot), note || '', now],
-  );
-  const versionId = verResult.rows[0].id;
-
-  await query(
-    'update agent_packages set name = $1, description = $2, current_version_id = $3, updated_at = $4 where id = $5 and user_id = $6',
-    [pkg.name, pkg.description, versionId, now, pkg.id, userId],
-  );
 
   return getPackage(userId, packageId);
 }
@@ -2617,7 +2749,10 @@ export async function getVersion(
     createdAt: row.created_at,
     source: row.source as PackageVersion['source'],
     note: row.note || '',
-    snapshot: parseDbJson<AgentPackageSnapshot>(row.snapshot_json, emptyPackageSnapshot()),
+    snapshot: parseDbJson<AgentPackageSnapshot>(
+      row.snapshot_json,
+      emptyPackageSnapshot(),
+    ),
   };
 }
 

@@ -6,7 +6,12 @@ import type {
   ArenaThread,
   ArenaThreadDetail,
   OptimizationResult,
+  PackageSkillRecord,
   PackageVersion,
+  RollbackSkillVersionPayload,
+  SkillAction,
+  SkillVersionDetail,
+  SkillVersionListResult,
   UserSummary,
 } from '@educlaw/shared';
 import { ARENA_ROUTES, PACKAGE_ROUTES } from '@educlaw/shared';
@@ -181,6 +186,11 @@ export type ArenaMessageStreamEvent =
 
 export type ArenaMode = 'compare' | 'agent' | 'baseline';
 
+export interface SkillArenaSelectionPayload {
+  skillId: string;
+  skillVersionId: string;
+}
+
 export type ReportStreamEvent =
   | { event: 'phase'; data: { label: string } }
   | { event: 'ping'; data: Record<string, never> }
@@ -215,6 +225,49 @@ async function request<T>(
     throw new Error(body.error || `HTTP ${response.status}`);
   }
   return response.json() as Promise<T>;
+}
+
+class LiteApiError extends Error {
+  constructor(
+    message: string,
+    public readonly code?: string,
+    public readonly status?: number,
+    public readonly details?: Record<string, unknown>,
+  ) {
+    super(message);
+  }
+}
+
+async function actionRequest<T>(
+  token: string,
+  action: SkillAction,
+  pkgId: string,
+  payload: Record<string, unknown> = {},
+): Promise<T> {
+  const response = await apiFetch('/api', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ action, pkgId, payload }),
+  });
+  const body = await response
+    .json()
+    .catch(() => ({ message: `HTTP ${response.status}` }));
+  if (!response.ok) {
+    const message =
+      body && typeof body.message === 'string' && body.message.trim()
+        ? body.message
+        : `HTTP ${response.status}`;
+    throw new LiteApiError(
+      message,
+      typeof body?.code === 'string' ? body.code : undefined,
+      response.status,
+      body && typeof body === 'object' ? body : undefined,
+    );
+  }
+  return body.data as T;
 }
 
 async function streamRequest<TEvent>(
@@ -305,6 +358,72 @@ export const liteApi = {
     ),
   listVersions: (token: string, packageId: string) =>
     request<PackageVersion[]>(`/packages/${packageId}/versions`, {}, token),
+  listPackageSkills: (
+    token: string,
+    packageId: string,
+    includeRemoved = true,
+  ) =>
+    actionRequest<PackageSkillRecord[]>(token, 'skill.list', packageId, {
+      includeRemoved,
+    }),
+  listSkillVersions: (
+    token: string,
+    packageId: string,
+    skillId: string,
+    options?: {
+      includeDiscarded?: boolean;
+      cursor?: string;
+      limit?: number;
+    },
+  ) =>
+    actionRequest<SkillVersionListResult>(
+      token,
+      'skill.version.list',
+      packageId,
+      {
+        skillId,
+        includeDiscarded: options?.includeDiscarded,
+        cursor: options?.cursor,
+        limit: options?.limit,
+      },
+    ),
+  getSkillVersionDetail: (token: string, packageId: string, versionId: string) =>
+    actionRequest<SkillVersionDetail>(
+      token,
+      'skill.version.detail',
+      packageId,
+      { versionId },
+    ),
+  rollbackSkillVersion: (
+    token: string,
+    packageId: string,
+    payload: RollbackSkillVersionPayload,
+  ) =>
+    actionRequest<{
+      packageId: string;
+      packageVersionId: string;
+      versionNumber: number;
+      rolledBackSkillVersionId: string;
+    }>(token, 'skill.version.rollback', packageId, payload),
+  discardSkillVersion: (
+    token: string,
+    packageId: string,
+    versionId: string,
+    reason: string,
+  ) =>
+    actionRequest<SkillVersionDetail>(
+      token,
+      'skill.version.discard',
+      packageId,
+      { versionId, reason },
+    ),
+  undiscardSkillVersion: (token: string, packageId: string, versionId: string) =>
+    actionRequest<SkillVersionDetail>(
+      token,
+      'skill.version.undiscard',
+      packageId,
+      { versionId },
+    ),
   generatePackageStream: (
     token: string,
     instruction: string,
@@ -340,12 +459,35 @@ export const liteApi = {
       { method: 'POST', body: JSON.stringify({ packageId, model }) },
       token,
     ),
+  createArenaThread: (
+    token: string,
+    packageId: string,
+    payload: {
+      idempotencyKey: string;
+      basePackageVersionId: string;
+      left: SkillArenaSelectionPayload;
+      right: SkillArenaSelectionPayload;
+      model?: string;
+    },
+  ) =>
+    actionRequest<ArenaThread>(token, 'arena.thread.create', packageId, {
+      arenaKind: 'skill_arena',
+      idempotencyKey: payload.idempotencyKey,
+      basePackageVersionId: payload.basePackageVersionId,
+      left: payload.left,
+      right: payload.right,
+      model: payload.model,
+    }),
   getThread: (token: string, threadId: string) =>
     request<ArenaThreadDetail>(
       `${ARENA_ROUTES.THREAD_DETAIL}?threadId=${encodeURIComponent(threadId)}`,
       {},
       token,
     ),
+  getArenaThreadDetail: (token: string, packageId: string, threadId: string) =>
+    actionRequest<ArenaThreadDetail>(token, 'arena.thread.detail', packageId, {
+      threadId,
+    }),
   sendMessageStream: (
     token: string,
     threadId: string,
@@ -505,3 +647,5 @@ export const liteApi = {
     URL.revokeObjectURL(url);
   },
 };
+
+export { LiteApiError };

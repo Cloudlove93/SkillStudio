@@ -66,9 +66,93 @@ export interface PackageVersion {
   packageId: number;
   versionNumber: number;
   createdAt: string;
-  source: "generated" | "imported" | "optimized" | "manual" | "interactive";
+  source:
+    | "generated"
+    | "imported"
+    | "optimized"
+    | "manual"
+    | "interactive"
+    | "rollback";
   note: string;
   snapshot: AgentPackageSnapshot;
+}
+
+export type SkillEntityStatus = "active" | "removed";
+export type SkillVersionStatus = "active" | "discarded";
+export type SkillVersionSource = PackageVersion["source"];
+
+export interface PackageSkillRecord {
+  id: string;
+  packageId: string;
+  skillUid: string;
+  dirName: string;
+  name: string;
+  description: string;
+  status: SkillEntityStatus;
+  updatedAt: string;
+}
+
+export interface SkillVersionDetail {
+  id: string;
+  skillId: string;
+  packageId: string;
+  createdInPackageVersionId: string;
+  versionNumber: number;
+  source: SkillVersionSource;
+  basedOnVersionId: string | null;
+  skill: PackageSkill;
+  contentHash: string;
+  status: SkillVersionStatus;
+  note: string;
+  createdAt: string;
+  discardedAt: string | null;
+  discardedBy: string | null;
+  discardReason: string | null;
+  restoredAt: string | null;
+  restoredBy: string | null;
+}
+
+export type SkillAction =
+  | "skill.list"
+  | "skill.version.list"
+  | "skill.version.detail"
+  | "skill.version.rollback"
+  | "skill.version.discard"
+  | "skill.version.undiscard"
+  | "arena.thread.create"
+  | "arena.thread.detail";
+
+export type ArenaKind = "package_arena" | "skill_arena";
+
+export interface ArenaThreadVariant {
+  side: "left" | "right";
+  skillId: string;
+  skillVersionId: string;
+  skillUid: string;
+  skillName: string;
+  versionNumber: number;
+}
+
+export interface SkillArenaConfig {
+  mode: "skill_arena";
+  compositionMode: "skill_only";
+  basePackageVersionId: string;
+  left: ArenaThreadVariant;
+  right: ArenaThreadVariant;
+}
+
+export interface RollbackSkillVersionPayload {
+  skillId: string;
+  versionId: string;
+  expectedPackageVersionId: string;
+  idempotencyKey: string;
+  note?: string;
+}
+
+export interface SkillVersionListResult {
+  items: SkillVersionDetail[];
+  nextCursor: string | null;
+  currentVersionId: string | null;
 }
 
 export type ArenaSide = "shared" | "baseline" | "enhanced";
@@ -79,6 +163,10 @@ export interface ArenaThread {
   packageId: number;
   title: string;
   model: string | null;
+  arenaKind: ArenaKind;
+  basePackageVersionId: string | null;
+  skillArenaConfig: SkillArenaConfig | null;
+  warning?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -124,6 +212,10 @@ export interface ArenaReport {
   enhanced: ArenaReportSide;
   recommendation: string;
   winningSide: "baseline" | "enhanced" | "tie";
+  labels?: {
+    baseline: string;
+    enhanced: string;
+  };
 }
 
 export interface AutoEvalQuestion {

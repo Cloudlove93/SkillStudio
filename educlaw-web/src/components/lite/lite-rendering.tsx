@@ -422,11 +422,13 @@ export function ConversationBoard({
   messages,
   sideStreaming,
   packageName,
+  sideLabels,
   mode = 'compare',
 }: {
   messages: ArenaMessage[];
   sideStreaming: { baseline: boolean; enhanced: boolean };
   packageName?: string;
+  sideLabels?: { baseline: string; enhanced: string };
   mode?: 'compare' | 'agent' | 'baseline';
 }) {
   const turns: Array<{
@@ -494,7 +496,7 @@ export function ConversationBoard({
                       <span className="inline-flex size-6 items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-500 text-[10px]">
                         B
                       </span>
-                      基础模型
+                      {sideLabels?.baseline || '基础模型'}
                       {sideStreaming.baseline && isLatest && (
                         <Loader2 className="ml-auto size-3 animate-spin text-cyan-500" />
                       )}
@@ -518,7 +520,7 @@ export function ConversationBoard({
                       <span className="inline-flex size-6 items-center justify-center rounded-lg bg-primary/10 text-primary text-[10px]">
                         E
                       </span>
-                      {packageName || '智能体'}
+                      {sideLabels?.enhanced || packageName || '智能体'}
                       {sideStreaming.enhanced && isLatest && (
                         <Loader2 className="ml-auto size-3 animate-spin text-primary" />
                       )}

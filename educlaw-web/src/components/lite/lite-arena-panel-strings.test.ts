@@ -169,3 +169,39 @@ test('LiteArenaPanel should render rubric content through the structured rubric 
     /centerPreview\.type === 'rubric'[\s\S]*<RubricStructuredView content=\{previewContent\} \/>/,
   );
 });
+
+test('LiteArenaPanel should load skill history through the new action APIs', () => {
+  assert.match(source, /liteApi\.listPackageSkills\(token, packageId, true\)/);
+  assert.match(
+    source,
+    /liteApi\.listSkillVersions\(\s*token,\s*packageId,\s*skillRecordId,/,
+  );
+  assert.match(source, /expectedPackageVersionId: currentPackageVersionId/);
+  assert.match(source, /const idempotencyKey = createClientIdempotencyKey\(\);/);
+});
+
+test('LiteArenaPanel should ignore stale skill history responses and clear loading when selection changes', () => {
+  assert.match(source, /const skillVersionsRequestIdRef = useRef\(0\);/);
+  assert.match(source, /const requestId = skillVersionsRequestIdRef\.current \+ 1;/);
+  assert.match(
+    source,
+    /skillVersionsRequestIdRef\.current !== requestId \|\|\s*selectedPackageIdRef\.current !== packageId/,
+  );
+  assert.match(source, /setSkillVersionsLoading\(false\);/);
+});
+
+test('LiteArenaPanel should show the removed-skill notice instead of previewing another skill', () => {
+  assert.match(
+    source,
+    /const selectedSkill =\s*\(selectedSkillId\s*\?\s*selectedPackage\?\.snapshot\.skills\.find/,
+  );
+  assert.match(source, /当前 Skill 已不在最新智能体快照中/);
+});
+
+test('LiteArenaPanel should expose skill history controls in the skills tab', () => {
+  assert.match(source, /历史版本/);
+  assert.match(source, /显示已废弃/);
+  assert.match(source, /回退到此版本/);
+  assert.match(source, /恢复可用/);
+  assert.match(source, /版本预览 v\{/);
+});

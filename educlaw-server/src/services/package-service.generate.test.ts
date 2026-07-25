@@ -12,78 +12,89 @@ async function loadService() {
   let storedVersion: Record<string, unknown> | null = null;
 
   vi.doMock('./db.js', () => ({
-    query: queryMock.mockImplementation(async (sql: string, args: unknown[]) => {
-      if (sql.startsWith('insert into agent_package_versions')) {
-        const id = nextId++;
-        storedVersion = {
-          id,
-          package_id: args[0],
-          version_number: args[1],
-          source: args[2],
-          snapshot_json: args[3],
-          created_at: args[4],
-          note: '',
-        };
-        return { rows: [{ id }], rowCount: 1 };
-      }
+    withTransaction: async (
+      work: (client: { query: typeof queryMock }) => Promise<unknown>,
+    ) => work({ query: queryMock }),
+    query: queryMock.mockImplementation(
+      async (sql: string, args: unknown[]) => {
+        if (sql.startsWith('insert into agent_package_versions')) {
+          const id = nextId++;
+          storedVersion = {
+            id,
+            package_id: args[0],
+            version_number: args[1],
+            source: args[2],
+            snapshot_json: args[3],
+            created_at: args[4],
+            note: '',
+          };
+          return { rows: [{ id }], rowCount: 1 };
+        }
 
-      if (sql.startsWith('insert into agent_packages')) {
-        const id = nextId++;
-        storedPackage = {
-          id,
-          user_id: args[0],
-          name: args[1],
-          description: args[2],
-          current_version_id: 0,
-          created_at: args[3],
-          updated_at: args[4],
-        };
-        return { rows: [{ id }], rowCount: 1 };
-      }
-
-      if (
-        sql.startsWith(
-          'update agent_packages set name = $1, description = $2',
-        )
-      ) {
-        if (storedPackage) {
+        if (sql.startsWith('insert into agent_packages')) {
+          const id = nextId++;
           storedPackage = {
-            ...storedPackage,
-            name: args[0],
-            description: args[1],
-            current_version_id: args[2],
-            updated_at: args[3],
+            id,
+            user_id: args[0],
+            name: args[1],
+            description: args[2],
+            current_version_id: 0,
+            created_at: args[3],
+            updated_at: args[4],
+          };
+          return { rows: [{ id }], rowCount: 1 };
+        }
+
+        if (
+          sql.startsWith(
+            'update agent_packages set name = $1, description = $2',
+          )
+        ) {
+          if (storedPackage) {
+            storedPackage = {
+              ...storedPackage,
+              name: args[0],
+              description: args[1],
+              current_version_id: args[2],
+              updated_at: args[3],
+            };
+          }
+          return { rows: [], rowCount: 1 };
+        }
+
+        if (sql.startsWith('update agent_packages set current_version_id')) {
+          if (storedPackage) {
+            storedPackage = {
+              ...storedPackage,
+              current_version_id: args[0],
+            };
+          }
+          return { rows: [], rowCount: 1 };
+        }
+
+        if (sql.startsWith('select * from agent_packages where id = $1')) {
+          return {
+            rows: storedPackage ? [storedPackage] : [],
+            rowCount: storedPackage ? 1 : 0,
           };
         }
-        return { rows: [], rowCount: 1 };
-      }
 
-      if (sql.startsWith('update agent_packages set current_version_id')) {
-        if (storedPackage) {
-          storedPackage = {
-            ...storedPackage,
-            current_version_id: args[0],
+        if (
+          sql.startsWith('select * from agent_package_versions where id = $1')
+        ) {
+          return {
+            rows: storedVersion ? [storedVersion] : [],
+            rowCount: storedVersion ? 1 : 0,
           };
         }
-        return { rows: [], rowCount: 1 };
-      }
 
-      if (sql.startsWith('select * from agent_packages where id = $1')) {
-        return {
-          rows: storedPackage ? [storedPackage] : [],
-          rowCount: storedPackage ? 1 : 0,
-        };
-      }
+        throw new Error(`Unexpected query: ${sql}`);
+      },
+    ),
+  }));
 
-      if (sql.startsWith('select * from agent_package_versions where id = $1')) {
-        return {
-          rows: storedVersion ? [storedVersion] : [],
-          rowCount: storedVersion ? 1 : 0,
-        };
-      }
-
-      throw new Error(`Unexpected query: ${sql}`);
-    }),
+  vi.doMock('./skill-version-service.js', () => ({
+    syncPackageVersionSkillsFromSnapshot: vi.fn(),
   }));
 
   vi.doMock('./llm-service.js', () => ({
@@ -265,6 +276,7 @@ function makeEmbeddedLegacyRubricDocument() {
 afterEach(() => {
   vi.resetModules();
   vi.doUnmock('./db.js');
+  vi.doUnmock('./skill-version-service.js');
   vi.doUnmock('./llm-service.js');
   queryMock.mockReset();
   generateJsonMock.mockReset();
@@ -437,7 +449,11 @@ describe('generatePackage', () => {
     const detail = await generatePackage('user-1', 'Create a test package');
 
     expect(Array.from(detail.name).length).toBeLessThanOrEqual(24);
-    expect(detail.name.startsWith('这是一个非常非常非常长的乡村中学心理干预')).toBe(true);
+    expect(
+      '这是一个非常非常非常长的乡村中学心理干预智能体名字需要被截断'.startsWith(
+        detail.name,
+      ),
+    ).toBe(true);
     expect(detail.name).not.toBe(
       '这是一个非常非常非常长的乡村中学心理干预智能体名字需要被截断',
     );
@@ -475,7 +491,9 @@ describe('generatePackage', () => {
     ]);
 
     expect(detail.snapshot.rubricMd).toContain('Document fidelity');
-    expect(detail.snapshot.rubricMd).toContain('Safety and referral boundaries');
+    expect(detail.snapshot.rubricMd).toContain(
+      'Safety and referral boundaries',
+    );
     expect(detail.snapshot.rubricMd).not.toContain('## Other Section');
     expect(streamTextMock).toHaveBeenCalledTimes(2);
   });
@@ -508,7 +526,10 @@ describe('generatePackage', () => {
 
     const { generatePackage, hasConfiguredRubricText } = await loadService();
     const detail = await generatePackage('user-1', '', undefined, [
-      { name: 'rubric-source.md', content: makeIncompleteSourceRubricDocument() },
+      {
+        name: 'rubric-source.md',
+        content: makeIncompleteSourceRubricDocument(),
+      },
     ]);
 
     expect(detail.snapshot.rubricMd).toContain('Behavior assessment');
@@ -616,11 +637,18 @@ describe('generatePackage', () => {
 
     const { generatePackage, hasConfiguredRubricText } = await loadService();
     const detail = await generatePackage('user-1', '', undefined, [
-      { name: 'rubric-source.docx', content: makeStandaloneWeightedRubricDocument() },
+      {
+        name: 'rubric-source.docx',
+        content: makeStandaloneWeightedRubricDocument(),
+      },
     ]);
 
-    expect(detail.snapshot.rubricMd).toContain('中职家校冲突处置顾问 - 评估量表');
-    expect(detail.snapshot.rubricMd).toContain('维度一：文档保真度与知识准确性');
+    expect(detail.snapshot.rubricMd).toContain(
+      '中职家校冲突处置顾问 - 评估量表',
+    );
+    expect(detail.snapshot.rubricMd).toContain(
+      '维度一：文档保真度与知识准确性',
+    );
     expect(detail.snapshot.rubricMd).toContain('维度四：工具可执行性');
     expect(hasConfiguredRubricText(detail.snapshot.rubricMd)).toBe(true);
     expect(streamTextMock).toHaveBeenCalledTimes(2);
@@ -659,7 +687,9 @@ describe('generatePackage', () => {
 
     expect(detail.snapshot.rubricMd).toContain('风险识别');
     expect(detail.snapshot.rubricMd).toContain('话术可用性');
-    expect(detail.snapshot.rubricMd).not.toContain('任务背景：先介绍项目目标和用户对象。');
+    expect(detail.snapshot.rubricMd).not.toContain(
+      '任务背景：先介绍项目目标和用户对象。',
+    );
     expect(detail.snapshot.rubricMd).not.toContain('附录：这里是后续参考资料');
     expect(hasConfiguredRubricText(detail.snapshot.rubricMd)).toBe(true);
     expect(streamTextMock).toHaveBeenCalledTimes(2);
@@ -692,7 +722,9 @@ describe('generatePackage', () => {
       streamCall += 1;
       if (streamCall === 1) {
         return (async function* () {
-          yield '# Classroom Workflow Coach\n\nAgent instructions.\n'.repeat(20);
+          yield '# Classroom Workflow Coach\n\nAgent instructions.\n'.repeat(
+            20,
+          );
         })();
       }
       return (async function* () {
@@ -753,7 +785,9 @@ describe('generatePackage', () => {
       streamCall += 1;
       if (streamCall === 1) {
         return (async function* () {
-          yield '# Parent Communication Coach\n\nAgent instructions.\n'.repeat(20);
+          yield '# Parent Communication Coach\n\nAgent instructions.\n'.repeat(
+            20,
+          );
         })();
       }
       return (async function* () {
