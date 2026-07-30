@@ -16,6 +16,13 @@ interface ChatRequestInput {
   maxTokens?: number;
 }
 
+export class LlmInvalidJsonError extends Error {
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "LlmInvalidJsonError";
+  }
+}
+
 const STRICT_JSON_CONTRACT = [
   "Strict JSON output contract:",
   "1. Return exactly one JSON object and nothing else.",
@@ -412,7 +419,11 @@ export async function* streamChat(messages: ChatMessage[], model?: string, tempe
   logLlmTextResult("messages-stream", model || config.llmModel, output.join(""));
 }
 
-export async function generateJson<T>(input: ChatRequestInput, retries = 1): Promise<T> {
+export async function generateJson<T>(
+  input: ChatRequestInput,
+  retries = 1,
+  repairInvalidJson = true,
+): Promise<T> {
   let lastError: Error | undefined;
   const jsonInput = withStrictJsonContract(input);
   for (let attempt = 0; attempt <= retries; attempt += 1) {
@@ -428,6 +439,11 @@ export async function generateJson<T>(input: ChatRequestInput, retries = 1): Pro
           error: parseError instanceof Error ? parseError.message : String(parseError),
           preview: truncateForLog(raw, 500),
         });
+        if (!repairInvalidJson) {
+          throw new LlmInvalidJsonError("Model returned invalid JSON", {
+            cause: parseError,
+          });
+        }
         return await repairJsonOutput<T>(jsonInput, raw, parseError);
       }
     } catch (error) {
@@ -437,11 +453,16 @@ export async function generateJson<T>(input: ChatRequestInput, retries = 1): Pro
       }
     }
   }
+  if (lastError instanceof LlmInvalidJsonError) throw lastError;
   throw new Error(`JSON generation failed: ${lastError?.message || "model did not return parseable JSON"}`);
 }
 
 export function resolveBaselineModel(preferred?: string) {
   return preferred || config.llmBaselineModel || config.llmModel;
+}
+
+export function resolveEnhancedModel(preferred?: string) {
+  return preferred || config.llmModel;
 }
 
 async function repairJsonOutput<T>(

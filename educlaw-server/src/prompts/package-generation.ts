@@ -29,6 +29,13 @@ interface RubricBoundaryReviewPromptInput {
   trailingContext: string;
 }
 
+interface RubricLocatorPromptInput {
+  documentName: string;
+  windowStartLine: number;
+  windowEndLine: number;
+  numberedWindow: string;
+}
+
 interface SkillPromptInput {
   packageName: string;
   packageDescription: string;
@@ -154,6 +161,62 @@ export function buildRubricBoundaryReviewUserPrompt(
     "- If only nearby omitted lines belong to the rubric, expand just enough to include them.",
     "- Never request expansion just to make the rubric better, longer, or more polished.",
     "- linesUp and linesDown must be integers from 0 to 6.",
+  ].join("\n");
+}
+
+export function buildRubricLocatorSystemPrompt(): string {
+  return [
+    "You are a rubric locator for educational agent task documents.",
+    "Return strict JSON only.",
+    "Your job is to locate the rubric section inside a document that has been pre-converted to plain text (possibly from Markdown, Word, or PDF).",
+    "You are a locator, not a rubric author. Never rewrite, summarize, or improve the rubric.",
+    "You only return the line range of the actual scoring body.",
+    "",
+    "Definition of a rubric section:",
+    "- A scoring body that evaluates an AI agent's output for the task described in the document.",
+    "- Typically organized as a table or list of dimensions/weights/score bands (e.g. 优秀/良好/合格/不合格, A/B/C, 满分/部分分/零分).",
+    "- Common headings include: 评价准则, 评价标准, 评分标准, 评估标准, 评分准则, 评估准则, 评价量表, 评估量表, 评分量表, Rubric, Evaluation Criteria.",
+    "- Headings may have a numbering prefix (e.g. '5、评价准则', '### 5. 评价准则') or a parenthetical subtitle (e.g. '评价准则（基于智能体输出的评价维度）').",
+    "- A document may contain MULTIPLE rubric-like sections (e.g. one for process evaluation, one for result evaluation, one for AI output evaluation). You must include ALL of them.",
+    "",
+    "What is NOT a rubric section (exclude these):",
+    "- Task description, trigger scenarios, core problems, solutions, workflows.",
+    "- Case comparisons (案例对比), test scenarios (测试情景), regulatory references (规范依据), appendix (附录).",
+    "- Narrative summaries that describe rubric meaning without listing actual dimensions/weights/bands.",
+    "- Agent.md or SKILL.md content blocks embedded in the document.",
+  ].join("\n");
+}
+
+export function buildRubricLocatorUserPrompt(
+  input: RubricLocatorPromptInput,
+): string {
+  return [
+    "Locate the rubric section inside the document below.",
+    "The document is shown with line numbers in the format `LINE\\tCONTENT`.",
+    `Line numbers in the window below range from ${input.windowStartLine} to ${input.windowEndLine}.`,
+    `Document: ${input.documentName}`,
+    "",
+    "Your task:",
+    "1. Identify every continuous block that constitutes a rubric scoring body (dimensions + weights + score bands, or equivalent).",
+    "2. If multiple rubric blocks exist, merge them into one continuous range that covers all of them (including the lines between them if they belong to the same overall rubric section).",
+    "3. Return the start and end line numbers (inclusive) of the merged range.",
+    "4. If no rubric section exists in the window, return startLine=0 and endLine=0 with confidence=\"none\".",
+    "",
+    "Return one JSON object with this schema:",
+    `{"startLine":number,"endLine":number,"confidence":"high"|"medium"|"low"|"none","reason":"short reason in Chinese, max 60 chars"}`,
+    "",
+    "Rules:",
+    "- startLine and endLine must be integers within the window range shown below.",
+    "- endLine must be >= startLine.",
+    "- Do not include the heading line of a non-rubric section that follows the rubric (e.g. '### 6、案例对比' should be excluded).",
+    "- Do include the rubric heading line itself (e.g. '### 5、评价准则').",
+    "- Include weight tables, dimension tables, score band tables, and scoring notes that are part of the rubric.",
+    "- Exclude narrative text before the rubric heading and after the rubric ends.",
+    "- If the rubric clearly extends beyond the window boundary, set confidence=\"medium\" and note it in the reason.",
+    "- Keep the reason field concise: at most 60 Chinese characters.",
+    "",
+    "Document with line numbers:",
+    input.numberedWindow,
   ].join("\n");
 }
 

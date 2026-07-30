@@ -1,18 +1,20 @@
-﻿import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type {
   AgentPackageSnapshot,
+  ArenaAnswerOptimizationSummary,
   ArenaMessage,
   OptimizationResult,
 } from '@educlaw/shared';
 import type { VersionCompareResult, LineDiff } from '../../api/lite-api';
 import { computeLineDiff } from '../../api/lite-api';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Wrench } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import type { Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
+import { getAnswerOptimizationButtonState } from './answer-skill-optimization-state';
 
 export type PackagePreview = { type: string; name: string; content: string };
 export type PackagePreviewDelta = { type: string; name: string; delta: string };
@@ -424,12 +426,21 @@ export function ConversationBoard({
   packageName,
   sideLabels,
   mode = 'compare',
+  answerOptimizations = [],
+  onOptimizeAnswer,
 }: {
   messages: ArenaMessage[];
   sideStreaming: { baseline: boolean; enhanced: boolean };
   packageName?: string;
   sideLabels?: { baseline: string; enhanced: string };
   mode?: 'compare' | 'agent' | 'baseline';
+  answerOptimizations?: ArenaAnswerOptimizationSummary[];
+  onOptimizeAnswer?: (input: {
+    question: ArenaMessage;
+    baseline: ArenaMessage | null;
+    enhanced: ArenaMessage;
+    summary: ArenaAnswerOptimizationSummary;
+  }) => void;
 }) {
   const turns: Array<{
     shared: ArenaMessage;
@@ -447,6 +458,12 @@ export function ConversationBoard({
     if (message.side === 'enhanced') current.enhanced = message;
   }
   const scrollRef = useRef<HTMLDivElement>(null);
+  const optimizationByAnswerId = new Map(
+    answerOptimizations.map((summary) => [
+      summary.enhancedAnswerMessageId,
+      summary,
+    ]),
+  );
   useEffect(() => {
     scrollRef.current?.scrollTo({
       top: scrollRef.current.scrollHeight,
@@ -477,6 +494,13 @@ export function ConversationBoard({
       {turns.map(
         ({ shared, baseline: baselineMsg, enhanced: enhancedMsg }, idx) => {
           const isLatest = idx === turns.length - 1;
+          const optimizationSummary =
+            enhancedMsg && typeof enhancedMsg.id === 'number'
+              ? optimizationByAnswerId.get(enhancedMsg.id)
+              : undefined;
+          const optimizationButton = optimizationSummary
+            ? getAnswerOptimizationButtonState(optimizationSummary)
+            : null;
 
           return (
             <div key={shared.id} className="space-y-3">
@@ -534,6 +558,30 @@ export function ConversationBoard({
                         </span>
                       )}
                     </div>
+                    {enhancedMsg &&
+                      optimizationSummary &&
+                      optimizationButton &&
+                      !(sideStreaming.enhanced && isLatest) && (
+                        <div className="mt-3 flex items-center justify-end border-t border-border/60 pt-2">
+                          <button
+                            type="button"
+                            className="inline-flex min-h-8 items-center gap-1.5 rounded-[8px] px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+                            disabled={optimizationButton.disabled}
+                            title={optimizationButton.hint}
+                            onClick={() =>
+                              onOptimizeAnswer?.({
+                                question: shared,
+                                baseline: baselineMsg || null,
+                                enhanced: enhancedMsg,
+                                summary: optimizationSummary,
+                              })
+                            }
+                          >
+                            <Wrench className="size-3.5" />
+                            {optimizationButton.label}
+                          </button>
+                        </div>
+                      )}
                   </div>
                 )}
               </div>

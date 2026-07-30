@@ -560,6 +560,24 @@ describe("skill arena runtime", () => {
           rowCount: 2,
         };
       }
+      // Skill Arena 线程详情会附带版本绑定信息（getSkillArenaVersionInfo）
+      if (sql.startsWith("select atv.side,")) {
+        return {
+          rows: [
+            {
+              side: "left",
+              bound_version_number: 1,
+              latest_version_number: 1,
+            },
+            {
+              side: "right",
+              bound_version_number: 2,
+              latest_version_number: 2,
+            },
+          ],
+          rowCount: 2,
+        };
+      }
       if (sql.startsWith("insert into arena_messages")) {
         return {
           rows: [{ id: 1 }],
@@ -583,11 +601,12 @@ describe("skill arena runtime", () => {
     expect(getPackageMock).not.toHaveBeenCalled();
     expect(resolveBaselineModelMock).not.toHaveBeenCalled();
     expect(streamTextMock).toHaveBeenCalledTimes(2);
-    expect(streamTextMock.mock.calls[0]?.[0]?.systemPrompt).toContain("## Skill A");
+    // buildSkillArenaPrompt 使用 [SKILL.md: <skillName>] 格式输出绑定的 Skill
+    expect(streamTextMock.mock.calls[0]?.[0]?.systemPrompt).toContain("[SKILL.md: Skill A]");
     expect(streamTextMock.mock.calls[0]?.[0]?.systemPrompt).not.toContain(
-      "## Current Skill",
+      "Current Skill",
     );
-    expect(streamTextMock.mock.calls[1]?.[0]?.systemPrompt).toContain("## Skill B");
+    expect(streamTextMock.mock.calls[1]?.[0]?.systemPrompt).toContain("[SKILL.md: Skill B]");
   });
 
   it("generates reports with fixed skill labels from the bound versions", async () => {
@@ -725,6 +744,24 @@ describe("skill arena runtime", () => {
                 skillMd: "Skill B body",
               },
               created_at: "2026-07-24T00:00:00.000Z",
+            },
+          ],
+          rowCount: 2,
+        };
+      }
+      // Skill Arena 线程详情会附带版本绑定信息（getSkillArenaVersionInfo）
+      if (sql.startsWith("select atv.side,")) {
+        return {
+          rows: [
+            {
+              side: "left",
+              bound_version_number: 1,
+              latest_version_number: 1,
+            },
+            {
+              side: "right",
+              bound_version_number: 2,
+              latest_version_number: 2,
             },
           ],
           rowCount: 2,

@@ -21,6 +21,8 @@ import {
   buildBaseMetadataUserPrompt,
   buildRubricBoundaryReviewSystemPrompt,
   buildRubricBoundaryReviewUserPrompt,
+  buildRubricLocatorSystemPrompt,
+  buildRubricLocatorUserPrompt,
   buildRubricSystemPrompt,
   buildRubricUserPrompt,
   buildSkillSystemPrompt,
@@ -74,6 +76,13 @@ interface RubricBoundaryReviewResult {
   linesDown?: number;
 }
 
+interface RubricLocatorResult {
+  startLine: number;
+  endLine: number;
+  confidence: 'high' | 'medium' | 'low' | 'none';
+  reason?: string;
+}
+
 function emptyPackageSnapshot(): AgentPackageSnapshot {
   return {
     name: '',
@@ -90,6 +99,10 @@ const MAX_SKILL_DOCUMENT_CHARS = 8_000;
 const MAX_GENERATED_SKILLS = 2;
 const MAX_SOURCE_RUBRIC_CHARS = 12_000;
 const MAX_GENERATED_PACKAGE_NAME_CHARS = 10;
+// AI 兜底定位 rubric 的窗口大小与触发阈值
+const RUBRIC_LOCATOR_WINDOW_CHARS = 6_000;
+const RUBRIC_LOCATOR_MIN_QUALITY_SIGNALS = 2;
+const RUBRIC_LOCATOR_MIN_EXTRACTED_CHARS = 100;
 const RUBRIC_SECTION_KEYWORDS = [
   'rubric',
   'evaluation criteria',
@@ -207,6 +220,8 @@ function normalizeSectionHeading(line: string): string {
     .trim()
     .replace(/^#{1,6}\s*/, '')
     .replace(/^[\d.\-()（）一二三四五六七八九十、\s]+/, '')
+    // 剥掉末尾的括号副标题，如 "评价准则（基于智能体输出的评价维度）" → "评价准则"
+    .replace(/\s*[（(][^（）()]*[)）]\s*$/, '')
     .replace(/[:：]\s*$/, '')
     .trim()
     .toLowerCase();
@@ -304,7 +319,8 @@ function isLikelyStandaloneRubricStart(line: string): boolean {
   if (isRubricSectionHeading(line)) return true;
 
   const normalized = normalizeSectionHeading(line);
-  return /(?:evaluation criteria|rubric|评估|评价|评分).*(?:标准|准则|量表)?/i.test(
+  // 第二组（标准|准则|量表）不再可选，避免"问题评估""方案评估"等非 rubric 章节误匹配
+  return /(?:evaluation criteria|rubric|评估|评价|评分).*(?:标准|准则|量表)/i.test(
     normalized,
   );
 }
@@ -374,7 +390,16 @@ function collectRubricBlock(lines: string[], startIndex: number): string {
       }
 
       if (headingLevel === null) {
-        if (currentHeadingLevel !== null && !rubricBodyLine) break;
+        // 起始行不是 markdown 标题（如编号标题 "1. 评分标准"）。
+        // 遇到 markdown 子标题时，只有当它级别较浅（h1-h3）且不是 rubric body 时才 break；
+        // h4+ 视为 rubric 内部子章节（如 "#### 评分细则"），继续收集。
+        if (
+          currentHeadingLevel !== null &&
+          currentHeadingLevel <= 3 &&
+          !rubricBodyLine
+        ) {
+          break;
+        }
         if (
           rubricSignalCount > 0 &&
           isLikelyNumberedSectionHeading(currentLine) &&
@@ -416,7 +441,7 @@ function extractRubricSectionFromText(content: string): string {
   if (!normalizedContent) return '';
 
   const lines = normalizedContent.split(/\r?\n/);
-  const candidates: Array<{ extracted: string; score: number }> = [];
+  const candidates: Array<{ startIndex: number; endIndex: number; extracted: string; score: number }> = [];
 
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index] ?? '';
@@ -429,13 +454,48 @@ function extractRubricSectionFromText(content: string): string {
 
     const score = scoreRubricCandidate(line, extracted);
     if (score > 0) {
-      candidates.push({ extracted, score });
+      // 记录起止行号用于合并
+      const blockLines = extracted.split(/\r?\n/);
+      candidates.push({
+        startIndex: index,
+        endIndex: index + blockLines.length - 1,
+        extracted,
+        score,
+      });
     }
   }
 
   if (candidates.length > 0) {
-    candidates.sort((left, right) => right.score - left.score);
-    return candidates[0]!.extracted;
+    // 按文档出现顺序排序，合并重叠/相邻的段落
+    candidates.sort((left, right) => left.startIndex - right.startIndex);
+    const merged: Array<{ startIndex: number; endIndex: number; extracted: string }> = [];
+    for (const cand of candidates) {
+      const last = merged[merged.length - 1];
+      if (last && cand.startIndex <= last.endIndex + 2) {
+        // 重叠或相邻（间隔≤1行），合并
+        // 检查间隔区是否含 rubric 边界行（如"## 案例对比"），含则不合并
+        const gapLines = lines.slice(last.endIndex + 1, cand.startIndex);
+        if (gapLines.some((l) => isLikelyRubricBoundaryLine(l))) {
+          merged.push({
+            startIndex: cand.startIndex,
+            endIndex: cand.endIndex,
+            extracted: cand.extracted,
+          });
+          continue;
+        }
+        // 直接拼接 extracted，避免重新切片引入 collectRubricBlock 已排除的边界行
+        const newEnd = Math.max(last.endIndex, cand.endIndex);
+        last.endIndex = newEnd;
+        last.extracted = `${last.extracted}\n\n${cand.extracted}`;
+      } else {
+        merged.push({
+          startIndex: cand.startIndex,
+          endIndex: cand.endIndex,
+          extracted: cand.extracted,
+        });
+      }
+    }
+    return merged.map((m) => m.extracted).join('\n\n').trim();
   }
 
   for (let index = 0; index < lines.length; index += 1) {
@@ -484,11 +544,138 @@ function stripRubricSupportTail(content: string): string {
   return kept.join('\n').trim() || normalized;
 }
 
+/**
+ * 检测并重组 mammoth/extractRawText 输出的扁平表格单元格序列。
+ *
+ * docx 经 mammoth.extractRawText 转换后，Word 表格的每个单元格会输出为独立一行，
+ * 既无 \t 也无 | 分隔，导致前端 splitStructuredCells 无法识别表格结构。
+ *
+ * 本函数检测"连续短行 + 含 rubric 表头信号词"的模式，按列数把扁平行重新拼成 \t 分隔行。
+ * 仅在检测到明确的表头信号（维度/权重/优秀/良好/合格/不合格等）时触发，避免误改普通段落。
+ */
+function reconstructDocxFlatTable(content: string): string {
+  const lines = content.split(/\r?\n/);
+  if (lines.length < 4) return content; // 太短不可能是表格
+
+  // 表头信号词：连续两行中至少出现这些词，才认为是 rubric 表头
+  // 允许尾部带括号修饰，如 "维度（一级）" / "权重(%)"
+  const HEADER_SIGNAL_WORDS =
+    /^(?:维度|一级维度|二级维度|权重|分值|评分等级|评级标准|优秀|良好|合格|不合格|待改进|满分标准|权威文献依据|评估要点|评分要点)(?:[（(].*?[)）])?$/i;
+
+  // 等级/权重信号行：单独一行的百分比或等级描述
+  const VALUE_SIGNAL_WORDS =
+    /^(?:\d{1,3}\s*%|优秀|良好|合格|不合格|待改进|严重失误|满分|\d{1,2}\s*分|[①②③④⑤⑥⑦⑧⑨⑩])/;
+
+  /**
+   * 收集连续的扁平单元格行。
+   * 允许单元格之间有 1 个空行间隔（mammoth 常见输出格式）。
+   * 遇到 markdown 标题、编号章节标题、或 2+ 连续空行时停止。
+   */
+  function collectFlatCells(startIdx: number): { cells: string[]; nextIdx: number } {
+    const cells: string[] = [];
+    let j = startIdx;
+    let lastBlank = false;
+    while (j < lines.length) {
+      const cur = (lines[j] ?? '').trim();
+      if (!cur) {
+        // 连续 2 个空行 → 结束
+        if (lastBlank) break;
+        // 空行后还有内容 → 允许跳过 1 个空行
+        if (j + 1 < lines.length && (lines[j + 1] ?? '').trim() && cells.length > 0) {
+          lastBlank = true;
+          j += 1;
+          continue;
+        }
+        break;
+      }
+      lastBlank = false;
+      // 遇到 markdown 标题或编号章节标题 → 结束（但第一行允许是标题）
+      if (cells.length > 0 && /^(?:#{1,6}\s|\d+\s*[、.)）])/.test(cur)) break;
+      // 超长行可能不是单元格 → 结束
+      if (cur.length > 200) break;
+      cells.push(cur);
+      j += 1;
+    }
+    return { cells, nextIdx: j };
+  }
+
+  /**
+   * 将扁平单元格按 columnCount 组合为 \t 分隔的表格行。
+   */
+  function reassembleRows(cells: string[], columnCount: number): string[] {
+    const rows: string[] = [];
+    for (let k = 0; k < cells.length; k += columnCount) {
+      const chunk = cells.slice(k, k + columnCount);
+      if (chunk.length === columnCount) {
+        rows.push(chunk.join('\t'));
+      } else if (chunk.length > 0) {
+        // 末尾不足一行的，保留原样
+        rows.push(...chunk);
+      }
+    }
+    return rows;
+  }
+
+  const output: string[] = [];
+  let i = 0;
+  let modified = false;
+
+  while (i < lines.length) {
+    const line = lines[i] ?? '';
+    const trimmed = line.trim();
+
+    // 检测表头起点：短行命中 HEADER_SIGNAL_WORDS
+    if (trimmed && trimmed.length <= 30 && HEADER_SIGNAL_WORDS.test(trimmed)) {
+      // 收集表头 + 后续所有扁平单元格
+      const { cells: blockLines, nextIdx: j } = collectFlatCells(i);
+
+      // 判断是否为 rubric 表头：至少 4 行，含 ≥2 个表头信号词
+      const headerSignalCount = blockLines.filter((l) =>
+        HEADER_SIGNAL_WORDS.test(l),
+      ).length;
+
+      if (blockLines.length >= 4 && headerSignalCount >= 2) {
+        // 推断列数：表头信号词的连续段长度
+        const headerEnd = blockLines.findIndex(
+          (l, idx) =>
+            idx > 0 &&
+            !HEADER_SIGNAL_WORDS.test(l) &&
+            !VALUE_SIGNAL_WORDS.test(l),
+        );
+        const columnCount =
+          headerEnd === -1
+            ? blockLines.findIndex((l, idx) => idx > 0 && !HEADER_SIGNAL_WORDS.test(l))
+            : headerEnd;
+        if (columnCount < 3 || columnCount > 10) {
+          output.push(line);
+          i += 1;
+          continue;
+        }
+
+        // 把所有扁平行按 columnCount 重新组合为 \t 分隔行
+        const rows = reassembleRows(blockLines, columnCount);
+        output.push(...rows);
+        i = j;
+        modified = true;
+        continue;
+      }
+    }
+
+    output.push(line);
+    i += 1;
+  }
+
+  return modified ? output.join('\n') : content;
+}
+
 export function extractRubricSectionFromContent(content: string): string {
   const normalizedContent = content.trim();
   if (!normalizedContent) return '';
 
-  const rawRubricSection = extractRawRubricSection(normalizedContent);
+  // 预处理：重组 docx 扁平表格（mammoth.extractRawText 把表格每个单元格拆成独立行）
+  const reconstructed = reconstructDocxFlatTable(normalizedContent);
+
+  const rawRubricSection = extractRawRubricSection(reconstructed);
   if (rawRubricSection) {
     const extractedRawRubric = extractRubricSectionFromText(rawRubricSection);
     if (extractedRawRubric && countRubricSignals(extractedRawRubric) >= 2) {
@@ -496,7 +683,7 @@ export function extractRubricSectionFromContent(content: string): string {
     }
   }
 
-  const extracted = extractRubricSectionFromText(normalizedContent);
+  const extracted = extractRubricSectionFromText(reconstructed);
   if (extracted) return stripRubricSupportTail(extracted);
 
   return '';
@@ -669,6 +856,142 @@ async function reviewRubricExtractionBoundary(
   }
 }
 
+/**
+ * 判断规则抽取结果质量是否达标。
+ * 返回 true 表示质量低，需要触发 AI 兜底定位。
+ */
+function isRuleExtractedLowQuality(extracted: string): boolean {
+  if (!extracted) return true;
+  if (extracted.length < RUBRIC_LOCATOR_MIN_EXTRACTED_CHARS) return true;
+  if (countRubricSignals(extracted) < RUBRIC_LOCATOR_MIN_QUALITY_SIGNALS) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * 在原文中粗定位含 rubric 关键词的窗口，避免把超长文档全文交给 LLM。
+ * 返回窗口的起止行号（0-based, inclusive）与带行号的文本。
+ * 若无法粗定位，则返回以文档中段为中心的默认窗口。
+ */
+function locateRubricWindow(
+  content: string,
+  maxWindowChars = RUBRIC_LOCATOR_WINDOW_CHARS,
+): { startLine: number; endLine: number; numberedWindow: string } {
+  const lines = content.split(/\r?\n/);
+  const keywordPattern =
+    /(?:评价|评估|评分|rubric|evaluation criteria|准则|标准|量表|维度|权重|分值|优秀|合格|不合格|待改进|满分)/i;
+  const hitIndexes: number[] = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    if (keywordPattern.test(lines[i] ?? '')) hitIndexes.push(i);
+  }
+
+  let startLine = 0;
+  let endLine = lines.length - 1;
+
+  if (hitIndexes.length > 0) {
+    const first = hitIndexes[0];
+    const last = hitIndexes[hitIndexes.length - 1];
+    // 以首个命中行前 8 行为窗口起点，末个命中行后 30 行为终点
+    startLine = Math.max(0, first - 8);
+    endLine = Math.min(lines.length - 1, last + 30);
+  }
+
+  // 按字符预算收窄窗口
+  let windowChars = 0;
+  let trimmedEnd = endLine;
+  for (let i = startLine; i <= endLine; i += 1) {
+    windowChars += (lines[i] ?? '').length + 8; // 行号 + \t + \n
+    if (windowChars > maxWindowChars) {
+      trimmedEnd = Math.max(startLine + 5, i - 1);
+      break;
+    }
+  }
+  endLine = trimmedEnd;
+
+  const numberedWindow = lines
+    .slice(startLine, endLine + 1)
+    .map((line, idx) => `${startLine + idx + 1}\t${line}`)
+    .join('\n');
+
+  return { startLine, endLine, numberedWindow };
+}
+
+/**
+ * 调用 LLM 从文档窗口中精确定位 rubric 起止行号。
+ * 失败或低置信度时返回 null。
+ */
+async function aiLocateRubricSection(
+  documentName: string,
+  content: string,
+): Promise<string | null> {
+  // 预处理：重组 docx 扁平表格，确保 AI 看到的是结构化行而非散行
+  const reconstructed = reconstructDocxFlatTable(content.trim());
+  if (!reconstructed) return null;
+
+  const { startLine: windowStart, endLine: windowEnd, numberedWindow } =
+    locateRubricWindow(reconstructed);
+  if (!numberedWindow.trim()) return null;
+
+  try {
+    const result = await generateJson<RubricLocatorResult>({
+      systemPrompt: buildRubricLocatorSystemPrompt(),
+      userPrompt: buildRubricLocatorUserPrompt({
+        documentName,
+        windowStartLine: windowStart + 1,
+        windowEndLine: windowEnd + 1,
+        numberedWindow,
+      }),
+      temperature: 0,
+      maxTokens: 2000,
+    });
+
+    if (
+      !result ||
+      result.confidence === 'none' ||
+      result.confidence === 'low' ||
+      !Number.isInteger(result.startLine) ||
+      !Number.isInteger(result.endLine)
+    ) {
+      return null;
+    }
+
+    // 行号是 1-based，转换为 0-based 数组索引
+    const startIdx = result.startLine - 1;
+    const endIdx = result.endLine - 1;
+    const lines = reconstructed.split(/\r?\n/);
+    if (
+      startIdx < 0 ||
+      endIdx < 0 ||
+      startIdx >= lines.length ||
+      endIdx >= lines.length ||
+      endIdx < startIdx ||
+      // 必须落在 LLM 可见的窗口范围内，防止幻觉行号
+      startIdx < windowStart ||
+      endIdx > windowEnd
+    ) {
+      return null;
+    }
+
+    const located = lines.slice(startIdx, endIdx + 1).join('\n').trim();
+    if (!located) return null;
+
+    // 校验：AI 抽取结果必须包含足够的 rubric 信号词，避免误定位
+    if (countRubricSignals(located) < RUBRIC_LOCATOR_MIN_QUALITY_SIGNALS) {
+      return null;
+    }
+
+    return located;
+  } catch (error) {
+    getLogger({ component: 'package-generation' }).warn({
+      event: 'packages.generate.rubric.ai_locator_failed',
+      documentName,
+      error: safeError(error),
+    });
+    return null;
+  }
+}
+
 async function buildReviewedSourceRubricExcerpt(
   documents?: Array<{ name: string; content: string }>,
   maxChars = MAX_SOURCE_RUBRIC_CHARS,
@@ -682,12 +1005,28 @@ async function buildReviewedSourceRubricExcerpt(
     if (remaining <= 0) break;
 
     const document = documents[index];
+    const documentName = String(document?.name || `Document ${index + 1}`);
     const content = String(document?.content || '');
-    const extracted = extractRubricSectionFromContent(content);
+    let extracted = extractRubricSectionFromContent(content);
+
+    // 规则抽取失败或质量低时，触发 AI 兜底定位
+    if (isRuleExtractedLowQuality(extracted)) {
+      const aiLocated = await aiLocateRubricSection(documentName, content);
+      if (aiLocated && aiLocated.length > extracted.length) {
+        getLogger({ component: 'package-generation' }).info({
+          event: 'packages.generate.rubric.ai_locator_used',
+          documentName,
+          ruleExtractedLen: extracted.length,
+          aiLocatedLen: aiLocated.length,
+        });
+        extracted = aiLocated;
+      }
+    }
+
     if (!extracted) continue;
 
     const reviewed = await reviewRubricExtractionBoundary(
-      String(document?.name || `Document ${index + 1}`),
+      documentName,
       content,
       extracted,
     );
@@ -1323,11 +1662,28 @@ function normalizeSkillMdMissingSections(
 
   const sectionTemplates: Array<{ title: string; lines: string[] }> = [
     {
+      title: 'Instructions',
+      lines: [
+        `- 围绕“${skillName}”处理用户请求，先确认问题场景、对象、限制条件和用户真正需要的结果。`,
+        `- 依据“${safeDescription}”整理可用原则、步骤与边界，避免脱离材料编造。`,
+        '- 对涉及安全、心理危机、违法、紧急风险或未成年人保护的内容，给出保守建议并提示寻求学校、监护人或专业人员支持。',
+      ],
+    },
+    {
       title: 'Workflow',
       lines: [
-        `1. 识别用户是否属于“${skillName}”负责的场景。`,
-        `2. 根据“${safeDescription}”整理处理步骤与关键约束。`,
-        '3. 输出前检查边界、风险提示与后续建议是否完整。',
+        '1. 识别用户输入中的场景、角色、时间线、证据线索和核心诉求。',
+        `2. 对照“${safeDescription}”提取可用原则、处理步骤、话术、记录要求和边界条件。`,
+        '3. 将建议组织成可执行步骤，区分立即行动、沟通记录、后续跟进和必要的升级转介。',
+        '4. 检查输出是否符合本技能边界，避免越权判断，并补充必要的安全注意事项。',
+      ],
+    },
+    {
+      title: 'Output Format',
+      lines: [
+        '- 先用一两句话概括判断和处理重点。',
+        '- 按步骤列出建议，每一步说明目的、做法和注意事项。',
+        '- 如存在风险或信息不足，单独列出需要补充的信息、升级转介条件和保守处理建议。',
       ],
     },
     {
@@ -1342,6 +1698,7 @@ function normalizeSkillMdMissingSections(
       lines: [
         '- 信息不足：先追问缺失条件，不要直接假设。',
         '- 请求越界：明确说明不适用范围，并引导到更合适的能力或人工处理。',
+        '- 风险升级：涉及持续伤害、严重威胁、自伤他伤、违法或紧急安全风险时，应提示尽快联系学校管理者、监护人或专业机构。',
       ],
     },
   ];
@@ -1355,6 +1712,34 @@ function normalizeSkillMdMissingSections(
   }
 
   return frontmatter ? `${frontmatter}\n\n${body.trim()}`.trim() : body.trim();
+}
+
+/**
+ * 修复并标准化 SKILL.md：先补齐/校正 frontmatter，再补齐缺失的必要章节。
+ * 供交互式反馈优化等外部流程使用。repairContext.name 可用于在缺失章节模板中
+ * 填入技能显示名（不传则使用 dirName）。
+ */
+export function normalizeAndRepairSkillMd(
+  skillMd: string,
+  dirName: string,
+  description: string,
+  repairContext?: { name?: string; sourceContext?: string },
+): string {
+  const skillName = repairContext?.name || dirName;
+  const withFrontmatter = normalizeSkillMdFrontmatter(
+    skillMd,
+    dirName,
+    description,
+  );
+  return normalizeSkillMdMissingSections(withFrontmatter, skillName, description);
+}
+
+/** 对外暴露的 SKILL.md 标准校验，供交互式反馈优化等流程复用。 */
+export function validatePackageSkillMd(
+  skillMd: string,
+  dirName: string,
+): string[] {
+  return validateSkillMdStandard(skillMd, dirName);
 }
 
 function normalizeSnapshot(
@@ -1526,15 +1911,18 @@ function getCompactSkillTemplatePrompt(): string {
 }
 
 function extractFrontmatterValue(skillMd: string, key: string): string | null {
-  const match = skillMd.match(/^---\s*\n([\s\S]*?)\n---/);
+  const match = skillMd.match(/^---\s*\r?\n([\s\S]*?)\r?\n---/);
   if (!match) return null;
-  const line = match[1].split('\n').find((l) => l.trim().startsWith(`${key}:`));
+  const line = match[1].split(/\r?\n/).find((l) => l.trim().startsWith(`${key}:`));
   if (!line) return null;
   const value = line.slice(line.indexOf(':') + 1).trim();
   return value.replace(/^["']|["']$/g, '');
 }
 
-function validateSkillMdStandard(skillMd: string, dirName: string): string[] {
+export function validateSkillMdStandard(
+  skillMd: string,
+  dirName: string,
+): string[] {
   const errors: string[] = [];
 
   // 1. 检查是否以 YAML frontmatter 开头
@@ -1744,6 +2132,17 @@ export async function listPackages(userId: string) {
 export async function getPackage(userId: string, packageId: string | number) {
   const { row, version } = await getPackageRow(userId, packageId);
   return toDetail(row, version);
+}
+
+export async function getPackageWithVersionId(
+  userId: string,
+  packageId: string | number,
+): Promise<{ package: AgentPackageDetail; versionId: number }> {
+  const { row, version } = await getPackageRow(userId, packageId);
+  return {
+    package: toDetail(row, version),
+    versionId: version.id,
+  };
 }
 
 export async function renamePackage(
@@ -2343,7 +2742,7 @@ export async function applyOptimizedSnapshot(
     if (!pkg) throw new Error('智能体不存在');
 
     const versions = await client.query<DbRowPackageVersion>(
-      'select * from agent_package_versions where package_id = $1 order by version_number desc limit 1',
+      'select * from agent_package_versions where package_id = $1 order by version_number desc limit 1 for update',
       [packageId],
     );
     const nextVersion = (versions.rows[0]?.version_number || 0) + 1;
@@ -2572,13 +2971,14 @@ export async function applyManualMarkdownEdit(
   }
 
   const currentSkill = nextSnapshot.skills[skillIndex]!;
-  if (content === currentSkill.skillMd.trim())
+  const normalizedContent = content.replace(/\r\n/g, '\n');
+  if (normalizedContent === currentSkill.skillMd.trim())
     throw new Error('内容没有变化，无需保存新版本');
   nextSnapshot.skills[skillIndex] = {
     ...currentSkill,
     name: fmName,
     description: fmDescription,
-    skillMd: content,
+    skillMd: normalizedContent,
   };
 
   return applyOptimizedSnapshot(

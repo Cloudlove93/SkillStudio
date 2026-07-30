@@ -203,6 +203,113 @@ export const schemaStatements = [
     create index if not exists idx_arena_messages_user_id on arena_messages (user_id)
   `,
   `
+    create table if not exists arena_answer_runs (
+      id bigserial primary key,
+      user_id text not null,
+      thread_id bigint not null,
+      package_id bigint not null,
+      package_version_id bigint not null,
+      question_message_id bigint not null,
+      enhanced_answer_message_id bigint not null unique,
+      baseline_answer_message_id bigint,
+      used_skill_ids jsonb not null,
+      context_message_ids jsonb,
+      enhanced_model text,
+      created_at timestamptz not null default now(),
+      constraint arena_answer_runs_used_skill_ids_string_array check (
+        jsonb_typeof(used_skill_ids) = 'array'
+        and not jsonb_path_exists(
+          used_skill_ids,
+          '$[*] ? (@.type() != "string")'
+        )
+      ),
+      constraint arena_answer_runs_context_message_ids_positive_integer_array check (
+        context_message_ids is null
+        or (
+          jsonb_typeof(context_message_ids) = 'array'
+          and not jsonb_path_exists(
+            context_message_ids,
+            '$[*] ? (@.type() != "number" || @ <= 0 || @.floor() != @)'
+          )
+        )
+      ),
+      constraint arena_answer_runs_enhanced_model_nonempty check (
+        enhanced_model is null or char_length(btrim(enhanced_model)) > 0
+      )
+    )
+  `,
+  `
+    create index if not exists idx_arena_answer_runs_user_enhanced
+      on arena_answer_runs (user_id, enhanced_answer_message_id)
+  `,
+  `
+    create index if not exists idx_arena_answer_runs_thread_id
+      on arena_answer_runs (thread_id)
+  `,
+  `
+    create table if not exists answer_skill_optimization_runs (
+      id bigserial primary key,
+      user_id text not null,
+      package_id bigint not null,
+      thread_id bigint not null,
+      base_version_id bigint not null,
+      question_message_id bigint not null,
+      enhanced_answer_message_id bigint not null,
+      baseline_answer_message_id bigint,
+      user_feedback text not null,
+      target_skill_id text,
+      result_json jsonb not null default '{}'::jsonb,
+      status text not null default 'processing',
+      revision integer not null default 1,
+      create_request_key text not null,
+      create_request_hash text not null,
+      final_version_id bigint,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now(),
+      constraint answer_skill_optimization_runs_status_check check (
+        status in (
+          'processing',
+          'target_selection_required',
+          'draft_ready',
+          'test_ready',
+          'completed',
+          'cancelled',
+          'failed'
+        )
+      ),
+      constraint answer_skill_optimization_runs_revision_check check (
+        revision >= 1
+      ),
+      constraint answer_skill_optimization_runs_result_object_check check (
+        jsonb_typeof(result_json) = 'object'
+      ),
+      constraint answer_skill_optimization_runs_feedback_check check (
+        char_length(btrim(user_feedback)) between 1 and 2000
+      ),
+      constraint answer_skill_optimization_runs_user_create_key_unique unique (
+        user_id,
+        create_request_key
+      )
+    )
+  `,
+  `
+    create index if not exists idx_answer_skill_optimization_runs_user_status
+      on answer_skill_optimization_runs (user_id, status)
+  `,
+  `
+    create index if not exists idx_answer_skill_optimization_runs_user_enhanced
+      on answer_skill_optimization_runs (user_id, enhanced_answer_message_id)
+  `,
+  `
+    create unique index if not exists uq_answer_skill_optimization_runs_non_cancelled_answer
+      on answer_skill_optimization_runs (user_id, enhanced_answer_message_id)
+      where status <> 'cancelled'
+  `,
+  `
+    create index if not exists idx_answer_skill_optimization_runs_package_id
+      on answer_skill_optimization_runs (package_id)
+  `,
+  `
     create table if not exists arena_runs (
       id bigserial primary key,
       session_id text not null,
@@ -518,6 +625,48 @@ export const migrationStatements = [
   `alter table arena_threads alter column updated_at type timestamptz using updated_at::timestamptz`,
   // arena_messages
   `alter table arena_messages alter column created_at type timestamptz using created_at::timestamptz`,
+  // arena_answer_runs
+  `alter table arena_answer_runs add column if not exists context_message_ids jsonb`,
+  `alter table arena_answer_runs add column if not exists enhanced_model text`,
+  `
+    do $$
+    begin
+      if not exists (
+        select 1
+        from pg_constraint
+        where conname = 'arena_answer_runs_context_message_ids_positive_integer_array'
+      ) then
+        alter table arena_answer_runs
+          add constraint arena_answer_runs_context_message_ids_positive_integer_array check (
+            context_message_ids is null
+            or (
+              jsonb_typeof(context_message_ids) = 'array'
+              and not jsonb_path_exists(
+                context_message_ids,
+                '$[*] ? (@.type() != "number" || @ <= 0 || @.floor() != @)'
+              )
+            )
+          );
+      end if;
+    end
+    $$
+  `,
+  `
+    do $$
+    begin
+      if not exists (
+        select 1
+        from pg_constraint
+        where conname = 'arena_answer_runs_enhanced_model_nonempty'
+      ) then
+        alter table arena_answer_runs
+          add constraint arena_answer_runs_enhanced_model_nonempty check (
+            enhanced_model is null or char_length(btrim(enhanced_model)) > 0
+          );
+      end if;
+    end
+    $$
+  `,
   // arena_runs
   `alter table arena_runs alter column created_at type timestamptz using created_at::timestamptz`,
   `alter table arena_runs alter column updated_at type timestamptz using updated_at::timestamptz`,

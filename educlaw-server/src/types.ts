@@ -64,6 +64,42 @@ export interface DbRowMessage {
   created_at: string;
 }
 
+export interface DbRowArenaAnswerRun {
+  id: number;
+  user_id: string;
+  thread_id: number;
+  package_id: number;
+  package_version_id: number;
+  question_message_id: number;
+  enhanced_answer_message_id: number;
+  baseline_answer_message_id: number | null;
+  used_skill_ids: unknown;
+  context_message_ids: unknown | null;
+  enhanced_model: string | null;
+  created_at: string;
+}
+
+export interface DbRowAnswerSkillOptimizationRun {
+  id: number;
+  user_id: string;
+  package_id: number;
+  thread_id: number;
+  base_version_id: number;
+  question_message_id: number;
+  enhanced_answer_message_id: number;
+  baseline_answer_message_id: number | null;
+  user_feedback: string;
+  target_skill_id: string | null;
+  result_json: unknown;
+  status: string;
+  revision: number;
+  create_request_key: string;
+  create_request_hash: string;
+  final_version_id: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface DbRowInteractiveOptimizationSession {
   id: number;
   user_id: string;

@@ -1,6 +1,13 @@
-﻿import type { AgentPackageSnapshot } from "@educlaw/shared";
-import { generateChat, type ChatMessage } from "./llm-service.js";
-import { assertRubricConfigured, getPackage, applyOptimizedSnapshot } from "./package-service.js";
+import type { AgentPackageDetail, AgentPackageSnapshot, PackageSkill } from "@educlaw/shared";
+import { generateChat, generateJson, generateText, type ChatMessage } from "./llm-service.js";
+import {
+  assertRubricConfigured,
+  getPackage,
+  applyOptimizedSnapshot,
+  listVersions,
+  normalizeAndRepairSkillMd,
+  validatePackageSkillMd,
+} from "./package-service.js";
 import { getThreadDetail } from "./arena-service.js";
 import { query } from "./db.js";
 import type { DbRowInteractiveOptimizationSession } from "../types.js";
@@ -435,7 +442,10 @@ function buildInteractiveSnapshotFromAdoptions(
 
       nextSnapshot.skills[skillIndex] = {
         ...currentSkill,
-        name: normalized.frontmatterName,
+        // 注意:不要用 frontmatterName 覆盖 skill 的显示名。
+        // frontmatter 的 name 字段是目录名格式(如 immediate-control),
+        // 而 snapshot.skills[].name 是中文显示名(如"即时控场与秩序恢复"),
+        // 两者语义不同,混用会导致前端版本列表名字错乱。
         description: normalized.frontmatterDescription,
         skillMd: normalized.skillMd,
       };
@@ -513,7 +523,9 @@ function parseMarkers(reply: string): {
     cleanLines.push(line);
   }
 
-  // Attach modified content from <MODIFIED> blocks to matching adoptions
+  // Attach modified content from <MODIFIED> blocks to matching adoptions.
+  // LLM 经常只输出 <MODIFIED> 块而漏掉 [ADOPT] 标记,导致 skill 修改被静默丢弃。
+  // 这里对没有对应 [ADOPT] 的 <MODIFIED> 块自动补一条 adoption,保证修改能被采纳。
   const modifiedBlocks = parseModifiedBlocks(reply);
   for (const adoption of adoptions) {
     const match = modifiedBlocks.find(
@@ -521,6 +533,19 @@ function parseMarkers(reply: string): {
     );
     if (match) {
       adoption.modifiedContent = match.content;
+    }
+  }
+  for (const block of modifiedBlocks) {
+    const hasAdoption = adoptions.some(
+      (a) => a.target === block.target && (a.targetId || "") === (block.targetId || ""),
+    );
+    if (!hasAdoption) {
+      adoptions.push({
+        target: block.target,
+        targetId: block.targetId,
+        summary: "",
+        modifiedContent: block.content,
+      });
     }
   }
 
@@ -682,14 +707,15 @@ export async function chatOptimize(
     "2. 除非用户明确要求同时修改多个地方，否则每次只提出一个具体的修改建议",
     "3. 修改建议要简短聚焦，不要在一次回复中罗列多个问题或大量细节",
     "4. 说明修改的原因和预期效果（每段不超过 3 句话）",
-    "5. 向用户说明修改建议时，用通俗、口语化的方式解释，就像跟朋友聊天一样。只说明改了什么、为什么改、预期效果如何。不要展示完整的技术文档，不要贴大段代码或 markdown 原文。",
-    "6. 当你提出具体修改建议时，在回复末尾用 <MODIFIED> 标签包裹修改后的完整内容供系统内部使用（用户看不到这部分）。只修改被明确指出的部分，未被提及的内容必须保持原样，尤其不要随意压缩 package description 或其他概述性说明：",
+    "5. 向用户说明修改建议时，用通俗、口语化的方式解释，就像跟朋友聊天一样。只说明改了什么、为什么改、预期效果如何。不要在对话正文里贴大段代码或 markdown 原文（修改后的完整内容必须通过 <MODIFIED> 块提交，见规则 6）。",
+    "6. 【强制】只要你提出了具体的修改建议（即描述了改什么），就必须在回复末尾用 <MODIFIED> 标签包裹修改后的完整内容供系统内部使用（用户看不到这部分）。缺了 <MODIFIED> 块，你的修改建议会被系统丢弃，等于没改。只修改被明确指出的部分，未被提及的内容必须保持原样，尤其不要随意压缩 package description 或其他概述性说明：",
     "   <MODIFIED target=\"agent\" targetId=\"\">",
     "   ```markdown",
-    "   修改后的完整内容",
+    "   修改后的完整内容（含 frontmatter）",
     "   ```",
     "   </MODIFIED>",
-    "7. 如果用户确认采纳某个修改建议，你必须在回复末尾同时输出 <MODIFIED> 块（包含完整修改后内容）和 [ADOPT] 标记。两者缺一不可。",
+    "   修改 skill 时 target=\"skill\" targetId=\"skill的dirName\"，修改 rubric 时 target=\"rubric\" targetId=\"\"。",
+    "7. 如果用户确认采纳某个修改建议，你必须在回复末尾同时输出 <MODIFIED> 块（包含完整修改后内容）和 [ADOPT] 标记。两者缺一不可。即使你之前已经输出过 <MODIFIED> 块，用户确认采纳时也要再次输出，确保系统能拿到最终版本。",
     "8. 如果用户拒绝，输出：[REJECT:target:targetId]",
     "9. 当前话题结束后，输出：[NEXT] 继续下一个",
     "10. 所有修改完成后，输出：[DONE]",
@@ -701,12 +727,24 @@ export async function chatOptimize(
     "- [NEXT]",
     "- [DONE]",
     "",
+    "## <MODIFIED> 块示例（必须严格遵守）",
+    "<MODIFIED target=\"skill\" targetId=\"immediate-control\">",
+    "```markdown",
+    "---",
+    "name: immediate-control",
+    "description: ...",
+    "---",
+    "# Skill",
+    "修改后的完整正文",
+    "```",
+    "</MODIFIED>",
+    "",
     "## 重要",
     "- 回复正文必须是自然的中文对话，不要提及、解释或暴露 <MODIFIED>、[ADOPT]、[REJECT]、[NEXT]、[DONE] 这些标记的存在",
     "- 不要在对话正文中说\"我会标记\"、\"请确认 adop\"、\"输出 adopt\"之类的话",
     "- 只有当用户明确同意采纳某个具体修改时，才在回复末尾输出 [ADOPT] 标记；用户没有同意时，绝不输出任何标记",
     "- 输出 [ADOPT] 时必须同时输出 <MODIFIED> 块，确保系统能获取完整的修改后内容",
-    "- <MODIFIED> 代码块只在真正提出具体修改预览时使用，普通讨论时不要出现",
+    "- 【最关键】只要你在正文里描述了具体改了什么，就必须在末尾输出对应的 <MODIFIED> 块。没有 <MODIFIED> 块的修改建议会被系统静默丢弃，用户保存时不会生效。",
     "- 所有标记必须单独一行，严格位于回复最末尾，正文里绝对不要出现",
     "- 如果用户要求修改已采纳的内容，可以再次输出 [ADOPT] 覆盖",
   ].join("\n");
@@ -719,25 +757,33 @@ export async function chatOptimize(
   const reply = await generateChat(messages, model, 0.5);
   const parsed = parseMarkers(reply);
 
-  // 将 adoptions 转换为 AdoptedChange
-  const newAdoptions: AdoptedChange[] = parsed.adoptions.map((a) => {
+  // 将 adoptions 转换为 AdoptedChange。
+  // 跳过没有 <MODIFIED> 块的 [ADOPT] 标记:LLM 偶尔只输出 [ADOPT] 而漏掉内容,
+  // 此时 modified 会等于 original,属于无效采纳,不应写入 session.adoptedChanges。
+  const newAdoptions: AdoptedChange[] = [];
+  for (const a of parsed.adoptions) {
     const target = a.target as "agent" | "rubric" | "skill";
     const current = resolveCurrentContentForAdoption(pkg, input.adoptedChanges, target, a.targetId);
     const original = current.content;
 
-    // Use the full modified content from <MODIFIED> block if available, otherwise fallback to original
-    const modified = a.modifiedContent !== undefined ? a.modifiedContent : original;
+    if (a.modifiedContent === undefined) {
+      continue;
+    }
+    const modified = a.modifiedContent;
+    if (modified.trim() === original.trim()) {
+      continue;
+    }
 
-    return {
+    newAdoptions.push({
       id: `${target}-${a.targetId || ""}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       target,
       targetId: a.targetId,
       targetName: current.targetName || a.targetId,
       original,
       modified,
-      reason: a.summary,
-    };
-  });
+      reason: a.summary || `修改 ${target}${a.targetId ? `/${a.targetId}` : ""}`,
+    });
+  }
 
   const persistedMessages = [
     ...input.messages.filter((message) => message.role !== "system"),
@@ -774,7 +820,6 @@ export async function applyInteractiveChanges(
   const normalizedSnapshot = buildInteractiveSnapshotFromAdoptions(pkg, changes);
 
   await applyOptimizedSnapshot(userId, packageId, normalizedSnapshot, "interactive", note);
-  const { listVersions } = await import("./package-service.js");
   const versions = await listVersions(userId, packageId);
   const latest = versions[0]!;
 
@@ -788,4 +833,708 @@ export async function applyInteractiveChanges(
   }
 
   return { versionId: latest.id, versionNumber: latest.versionNumber };
+}
+
+/* ── feedback optimization（反馈式优化：基于对单条回答的反馈生成 Skill 草稿） ── */
+/* 与诊断式优化（diagnosePackage → chatOptimize → applyInteractiveChanges）互补：
+   诊断式面向整段对话轨迹做多轮多目标优化；反馈式面向单条回答做一次性 Skill 草稿，
+   可测试后直接落盘为新版本，不进入交互会话表。 */
+
+export type FeedbackScope =
+  | "reusable_preference"
+  | "single_turn_feedback"
+  | "unsafe_or_unclear";
+export type FeedbackPatchOp =
+  | "append_to_section"
+  | "replace_in_section"
+  | "add_section";
+
+export interface FeedbackPatchOperation {
+  op: FeedbackPatchOp;
+  targetSection: string;
+  oldText?: string;
+  content: string;
+  rationale?: string;
+}
+
+export interface FeedbackOptimizationInput {
+  threadId?: string;
+  turnIndex?: number;
+  userQuestion?: string;
+  agentAnswer?: string;
+  baselineAnswer?: string;
+  userFeedback: string;
+  targetSkillId?: string;
+}
+
+interface FeedbackLineDiff {
+  type: "same" | "removed" | "added";
+  text: string;
+}
+
+export interface FeedbackOptimizationResult {
+  issueSummary: string;
+  feedbackScope: FeedbackScope;
+  targetSkillId: string;
+  targetSkillName: string;
+  targetSections: string[];
+  patchOperations: FeedbackPatchOperation[];
+  rationale: string;
+  evidenceFromAnswer: string[];
+  riskNotes: string[];
+  originalSkillMd: string;
+  optimizedSkillMd: string;
+  optimizedSnapshot: AgentPackageSnapshot;
+  validationErrors: string[];
+  diff: FeedbackLineDiff[];
+}
+
+export interface FeedbackDraftTestResult {
+  optimizedAnswer: string;
+}
+
+export interface FeedbackDraftApplyResult {
+  versionId: string;
+  versionNumber: number;
+  package: AgentPackageDetail;
+}
+
+interface FeedbackTurnContext {
+  threadId?: string;
+  turnIndex?: number;
+  userQuestion: string;
+  agentAnswer: string;
+  baselineAnswer?: string;
+  userFeedback: string;
+}
+
+function computeFeedbackLineDiff(
+  oldText: string,
+  newText: string,
+): FeedbackLineDiff[] {
+  const oldLines = oldText.split("\n");
+  const newLines = newText.split("\n");
+  const result: FeedbackLineDiff[] = [];
+  let i = 0;
+  let j = 0;
+
+  while (i < oldLines.length || j < newLines.length) {
+    const oldLine = i < oldLines.length ? oldLines[i] : undefined;
+    const newLine = j < newLines.length ? newLines[j] : undefined;
+    if (oldLine === newLine) {
+      result.push({ type: "same", text: oldLine || "" });
+      i += 1;
+      j += 1;
+      continue;
+    }
+
+    if (oldLine !== undefined && newLine !== undefined) {
+      const newIndexAhead = newLines.slice(j + 1).indexOf(oldLine);
+      const oldIndexAhead = oldLines.slice(i + 1).indexOf(newLine);
+      if (
+        newIndexAhead !== -1 &&
+        (oldIndexAhead === -1 || newIndexAhead <= oldIndexAhead)
+      ) {
+        result.push({ type: "removed", text: oldLine });
+        i += 1;
+      } else if (
+        oldIndexAhead !== -1 &&
+        (newIndexAhead === -1 || oldIndexAhead < newIndexAhead)
+      ) {
+        result.push({ type: "added", text: newLine });
+        j += 1;
+      } else {
+        result.push({ type: "removed", text: oldLine });
+        result.push({ type: "added", text: newLine });
+        i += 1;
+        j += 1;
+      }
+      continue;
+    }
+
+    if (oldLine !== undefined) {
+      result.push({ type: "removed", text: oldLine });
+      i += 1;
+    } else if (newLine !== undefined) {
+      result.push({ type: "added", text: newLine });
+      j += 1;
+    }
+  }
+
+  return result;
+}
+
+function normalizeFeedbackScope(value: unknown): FeedbackScope {
+  return value === "single_turn_feedback" || value === "unsafe_or_unclear"
+    ? value
+    : "reusable_preference";
+}
+
+function normalizePatchOperations(
+  value: unknown,
+): FeedbackPatchOperation[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      const raw =
+        item && typeof item === "object"
+          ? (item as Record<string, unknown>)
+          : {};
+      const op: FeedbackPatchOp =
+        raw.op === "replace_in_section" || raw.op === "add_section"
+          ? raw.op
+          : "append_to_section";
+      return {
+        op,
+        targetSection:
+          String(raw.targetSection || raw.section || "Workflow").trim() ||
+          "Workflow",
+        oldText: typeof raw.oldText === "string" ? raw.oldText : undefined,
+        content: String(raw.content || "").trim(),
+        rationale:
+          typeof raw.rationale === "string" ? raw.rationale : undefined,
+      };
+    })
+    .filter((item) => item.content.trim().length > 0);
+}
+
+function arrayOfStrings(value: unknown, fallback: string[] = []): string[] {
+  if (!Array.isArray(value)) return fallback;
+  return value
+    .map(String)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function compactText(value: string, maxChars: number) {
+  const text = value.replace(/\s+/g, " ").trim();
+  return text.length > maxChars ? `${text.slice(0, maxChars)}...` : text;
+}
+
+function findSkillByIdOrName(
+  skills: PackageSkill[],
+  value?: string,
+): PackageSkill | undefined {
+  if (!value) return undefined;
+  const lowered = value.toLowerCase();
+  return skills.find(
+    (skill) =>
+      skill.id === value ||
+      skill.dirName === value ||
+      skill.name === value ||
+      skill.id.toLowerCase() === lowered ||
+      skill.dirName.toLowerCase() === lowered ||
+      skill.name.toLowerCase() === lowered,
+  );
+}
+
+async function resolveFeedbackTurnContext(
+  userId: string,
+  packageId: string | number,
+  input: FeedbackOptimizationInput,
+): Promise<FeedbackTurnContext> {
+  let userQuestion = String(input.userQuestion || "").trim();
+  let agentAnswer = String(input.agentAnswer || "").trim();
+  let baselineAnswer =
+    String(input.baselineAnswer || "").trim() || undefined;
+  const userFeedback = String(input.userFeedback || "").trim();
+  if (!userFeedback) throw new Error("缺少用户反馈");
+
+  if (input.threadId) {
+    const detail = await getThreadDetail(userId, input.threadId);
+    if (String(detail.thread.packageId) !== String(packageId)) {
+      throw new Error("当前 Arena 对话不属于这个智能体");
+    }
+    const userMessages = detail.messages.filter(
+      (m) => m.side === "shared" && m.role === "user",
+    );
+    const baselineMessages = detail.messages.filter(
+      (m) => m.side === "baseline" && m.role === "assistant",
+    );
+    const enhancedMessages = detail.messages.filter(
+      (m) => m.side === "enhanced" && m.role === "assistant",
+    );
+    const turnIndex = Number.isFinite(input.turnIndex)
+      ? Number(input.turnIndex)
+      : userMessages.length - 1;
+    if (!userQuestion) userQuestion = userMessages[turnIndex]?.content || "";
+    if (!agentAnswer) agentAnswer = enhancedMessages[turnIndex]?.content || "";
+    if (!baselineAnswer)
+      baselineAnswer =
+        baselineMessages[turnIndex]?.content || undefined;
+    return {
+      threadId: input.threadId,
+      turnIndex,
+      userQuestion,
+      agentAnswer,
+      baselineAnswer,
+      userFeedback,
+    };
+  }
+
+  if (!userQuestion || !agentAnswer) {
+    throw new Error("缺少当前轮次的问题或智能体回答");
+  }
+  return { userQuestion, agentAnswer, baselineAnswer, userFeedback };
+}
+
+function skillBundleForPrompt(skills: PackageSkill[]) {
+  return skills
+    .map((skill, index) =>
+      [
+        `### Skill ${index + 1}`,
+        `id: ${skill.id}`,
+        `dirName: ${skill.dirName}`,
+        `name: ${skill.name}`,
+        `description: ${skill.description}`,
+        "SKILL.md:",
+        "```markdown",
+        skill.skillMd.slice(0, 7000),
+        "```",
+      ].join("\n"),
+    )
+    .join("\n\n");
+}
+
+function buildDraftEnhancedPrompt(snapshot: AgentPackageSnapshot) {
+  return [
+    "You are an EduClaw agent answering a teacher's question.",
+    "Strictly follow the provided agent.md and SKILL.md content. Prefer Chinese unless the user asks otherwise.",
+    "",
+    "[agent.md]",
+    snapshot.agentMd,
+    ...(snapshot.skills.length > 0 ? ["", "[available skills]"] : []),
+    ...snapshot.skills.flatMap((skill) => [
+      "",
+      `### ${skill.name}`,
+      `Trigger scenario: ${skill.description}`,
+      "",
+      skill.skillMd,
+    ]),
+  ].join("\n");
+}
+
+function getSectionHeader(sectionName: string) {
+  const trimmed = sectionName.trim();
+  return trimmed.startsWith("#") ? trimmed : `## ${trimmed}`;
+}
+
+function findMarkdownSectionBounds(
+  lines: string[],
+  sectionName: string,
+): [number, number] | null {
+  const normalized = sectionName.replace(/^#{1,6}\s+/, "").trim();
+  const headerRe = new RegExp(
+    `^#{1,6}\\s+${normalized.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*$`,
+    "i",
+  );
+  let start = -1;
+  for (let i = 0; i < lines.length; i += 1) {
+    if (headerRe.test(lines[i]!.trim())) {
+      start = i;
+      break;
+    }
+  }
+  if (start === -1) return null;
+  const level = lines[start]!.match(/^(#{1,6})/)?.[1]?.length || 2;
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i += 1) {
+    const match = lines[i]!.match(/^(#{1,6})\s+/);
+    if (match && match[1]!.length <= level) {
+      end = i;
+      break;
+    }
+  }
+  return [start, end];
+}
+
+function appendToMarkdownSection(
+  markdown: string,
+  sectionName: string,
+  content: string,
+) {
+  const lines = markdown.split("\n");
+  const bounds = findMarkdownSectionBounds(lines, sectionName);
+  if (!bounds)
+    return `${markdown.trimEnd()}\n\n${getSectionHeader(sectionName)}\n\n${content.trim()}`.trim();
+  const [start, end] = bounds;
+  let insertAt = end;
+  while (insertAt > start + 1 && !lines[insertAt - 1]!.trim()) insertAt -= 1;
+  return [
+    ...lines.slice(0, insertAt),
+    "",
+    content.trim(),
+    ...lines.slice(insertAt),
+  ]
+    .join("\n")
+    .trim();
+}
+
+function replaceInMarkdownSection(
+  markdown: string,
+  sectionName: string,
+  oldText: string | undefined,
+  content: string,
+) {
+  const lines = markdown.split("\n");
+  const bounds = findMarkdownSectionBounds(lines, sectionName);
+  if (!bounds)
+    return `${markdown.trimEnd()}\n\n${getSectionHeader(sectionName)}\n\n${content.trim()}`.trim();
+  const [start, end] = bounds;
+  const sectionText = lines.slice(start, end).join("\n");
+  if (oldText && sectionText.includes(oldText)) {
+    return [
+      ...lines.slice(0, start),
+      ...sectionText.replace(oldText, content.trim()).split("\n"),
+      ...lines.slice(end),
+    ]
+      .join("\n")
+      .trim();
+  }
+  const nextSection = content.trim().startsWith("#")
+    ? content.trim()
+    : `${getSectionHeader(sectionName)}\n\n${content.trim()}`;
+  return [...lines.slice(0, start), ...nextSection.split("\n"), ...lines.slice(end)].join("\n").trim();
+}
+
+function applyFeedbackPatchOperations(
+  originalSkillMd: string,
+  operations: FeedbackPatchOperation[],
+) {
+  let current = originalSkillMd;
+  for (const operation of operations) {
+    if (operation.op === "replace_in_section") {
+      current = replaceInMarkdownSection(
+        current,
+        operation.targetSection,
+        operation.oldText,
+        operation.content,
+      );
+    } else if (operation.op === "add_section") {
+      const section = operation.content.trim().startsWith("#")
+        ? operation.content.trim()
+        : `${getSectionHeader(operation.targetSection)}\n\n${operation.content.trim()}`;
+      current = `${current.trimEnd()}\n\n${section}`.trim();
+    } else {
+      current = appendToMarkdownSection(
+        current,
+        operation.targetSection,
+        operation.content,
+      );
+    }
+  }
+  return current;
+}
+
+function normalizeDraftSnapshot(
+  input: unknown,
+  fallback: AgentPackageSnapshot,
+): AgentPackageSnapshot {
+  const raw =
+    input && typeof input === "object"
+      ? (input as Partial<AgentPackageSnapshot>)
+      : {};
+  return {
+    name: String(raw.name || fallback.name || ""),
+    description: String(raw.description || fallback.description || ""),
+    versionLabel: String(raw.versionLabel || fallback.versionLabel || "draft"),
+    agentMd: typeof raw.agentMd === "string" ? raw.agentMd : fallback.agentMd,
+    rubricMd:
+      typeof raw.rubricMd === "string" ? raw.rubricMd : fallback.rubricMd,
+    skills: Array.isArray(raw.skills)
+      ? raw.skills.map((skill, index) => {
+          const fallbackSkill = fallback.skills[index];
+          const record =
+            skill && typeof skill === "object"
+              ? (skill as Partial<PackageSkill>)
+              : {};
+          return {
+            id: String(
+              record.id || fallbackSkill?.id || `skill-${index + 1}`,
+            ),
+            dirName: String(
+              record.dirName ||
+                fallbackSkill?.dirName ||
+                `skill-${index + 1}`,
+            ),
+            name: String(
+              record.name || fallbackSkill?.name || `Skill ${index + 1}`,
+            ),
+            description: String(
+              record.description || fallbackSkill?.description || "",
+            ),
+            skillMd:
+              typeof record.skillMd === "string"
+                ? record.skillMd
+                : fallbackSkill?.skillMd || "",
+          };
+        })
+      : fallback.skills.map((skill) => ({ ...skill })),
+  };
+}
+
+function validateSnapshotSkills(snapshot: AgentPackageSnapshot) {
+  const errors: string[] = [];
+  snapshot.skills.forEach((skill, index) => {
+    const skillErrors = validatePackageSkillMd(skill.skillMd, skill.dirName);
+    skillErrors.forEach((error) => errors.push(`skills[${index}] ${error}`));
+  });
+  return errors;
+}
+
+/**
+ * 基于用户对单条回答的反馈，生成一份 Skill 优化草稿。
+ * 与诊断式优化（diagnosePackage）的区别：
+ * - 诊断式分析整段对话轨迹找问题，多轮讨论后采纳多处修改；
+ * - 反馈式只看当前一问一答 + 用户反馈，一次性生成单个 Skill 的优化草稿，
+ *   不写入 interactive_optimization_sessions，可测试后直接落盘。
+ */
+export async function createFeedbackOptimization(
+  userId: string,
+  packageId: string | number,
+  input: FeedbackOptimizationInput,
+  model?: string,
+): Promise<FeedbackOptimizationResult> {
+  const pkg = await getPackage(userId, packageId);
+  const turn = await resolveFeedbackTurnContext(userId, packageId, input);
+  if (!turn.userQuestion.trim()) throw new Error("缺少当前轮次的问题");
+  if (!turn.agentAnswer.trim()) throw new Error("缺少当前轮次的智能体回答");
+
+  const preferredSkill = findSkillByIdOrName(
+    pkg.snapshot.skills,
+    input.targetSkillId,
+  );
+  const llmResult = await generateJson<{
+    issueSummary?: string;
+    feedbackScope?: FeedbackScope;
+    targetSkillId?: string;
+    targetSkillName?: string;
+    targetSections?: string[];
+    patchOperations?: FeedbackPatchOperation[];
+    rationale?: string;
+    evidenceFromAnswer?: string[];
+    riskNotes?: string[];
+    optimizedSkillMd?: string;
+  }>({
+    model,
+    systemPrompt: [
+      "你是 EduClaw 的交互式 Skill 优化专家。",
+      "给定一个用户问题、当前智能体回答、教师反馈、package rubric 和所有 SKILL.md 文件，产出一份最小化的可复用 Skill 改进草稿。",
+      "本 MVP 阶段不修改 agent.md 或 rubric.md。选择最相关的一个 Skill，返回该 Skill 完整的优化后 SKILL.md。",
+      "优先做章节级修改。保留 Skill frontmatter 的 name/description。优化后的 SKILL.md 必须保留这些精确的英文标题：## Instructions, ## Workflow, ## Output Format, ## Examples, ## Common Issues。",
+      "反馈分类规则：reusable_preference（应影响未来类似回答）、single_turn_feedback（仅针对本次情况）、unsafe_or_unclear（要求不安全、不可能或模糊的行为）。",
+      "所有诊断文本（issueSummary、rationale、evidenceFromAnswer、riskNotes、patchOperations.rationale）必须用中文输出，不要用英文。",
+      "SKILL.md 正文在英文标题下使用中文内容。",
+      "只返回严格的 JSON，不要额外说明。",
+    ].join("\n"),
+    userPrompt: [
+      "## Package",
+      `packageId: ${pkg.id}`,
+      `name: ${pkg.name}`,
+      `description: ${pkg.description}`,
+      "",
+      "## Current Turn",
+      `turnIndex: ${turn.turnIndex ?? ""}`,
+      "User question:",
+      turn.userQuestion,
+      "",
+      "Agent answer:",
+      turn.agentAnswer.slice(0, 6000),
+      "",
+      "Baseline answer:",
+      turn.baselineAnswer?.slice(0, 4000) || "(none)",
+      "",
+      "User feedback:",
+      turn.userFeedback,
+      "",
+      "## Preferred Target Skill",
+      preferredSkill
+        ? `${preferredSkill.dirName} / ${preferredSkill.name}`
+        : "(none; infer from all skills)",
+      "",
+      "## Rubric",
+      pkg.snapshot.rubricMd.slice(0, 5000),
+      "",
+      "## Skills",
+      skillBundleForPrompt(pkg.snapshot.skills),
+      "",
+      "## JSON Output Shape",
+      JSON.stringify(
+        {
+          issueSummary: "一段简洁的中文诊断说明",
+          feedbackScope:
+            "reusable_preference | single_turn_feedback | unsafe_or_unclear",
+          targetSkillId: "skill id 或 dirName",
+          targetSkillName: "显示名",
+          targetSections: ["Workflow", "Output Format"],
+          patchOperations: [
+            {
+              op: "append_to_section | replace_in_section | add_section",
+              targetSection: "Workflow",
+              oldText: "可选，replace_in_section 时需要精确匹配的原文",
+              content: "最小化的新章节内容或替换内容（中文）",
+              rationale: "为什么这个修改有帮助（中文）",
+            },
+          ],
+          rationale: "为什么这个 Skill 和章节需要修改（中文）",
+          evidenceFromAnswer: ["来自回答的简短证据或缺失行为（中文）"],
+          riskNotes: ["风险或安全提示（中文）"],
+          optimizedSkillMd: "目标 Skill 的完整优化后 SKILL.md",
+        },
+        null,
+        2,
+      ),
+      "",
+      "规则：",
+      "- 保持优化后的 SKILL.md 简洁且可复用。不要硬编码特定学生姓名或一次性事实，除非反馈是可复用的。",
+      "- 如果反馈要求输出结构，通常更新 Workflow、Output Format 和 Examples。",
+      "- 如果回答遗漏了安全边界，更新 Common Issues。",
+      "- 所有诊断文本必须用中文，SKILL.md 正文在英文标题下使用中文内容。",
+    ].join("\n"),
+    temperature: 0.25,
+    maxTokens: 8000,
+  });
+
+  const targetSkill =
+    preferredSkill ||
+    findSkillByIdOrName(pkg.snapshot.skills, llmResult.targetSkillId) ||
+    findSkillByIdOrName(pkg.snapshot.skills, llmResult.targetSkillName) ||
+    pkg.snapshot.skills[0];
+  if (!targetSkill) throw new Error("当前智能体没有可优化的 Skill");
+
+  const patchOperations = normalizePatchOperations(llmResult.patchOperations);
+  const rawOptimizedSkillMd =
+    String(llmResult.optimizedSkillMd || "").trim() ||
+    applyFeedbackPatchOperations(targetSkill.skillMd, patchOperations);
+  if (!rawOptimizedSkillMd.trim()) {
+    throw new Error("模型没有返回可用的 optimizedSkillMd");
+  }
+
+  const optimizedSkillMd = normalizeAndRepairSkillMd(
+    rawOptimizedSkillMd,
+    targetSkill.dirName,
+    targetSkill.description,
+    {
+      name: targetSkill.name,
+      sourceContext: [
+        `User question: ${turn.userQuestion}`,
+        `Agent answer: ${turn.agentAnswer}`,
+        `User feedback: ${turn.userFeedback}`,
+      ]
+        .join("\n")
+        .slice(0, 2000),
+    },
+  );
+  const validationErrors = validatePackageSkillMd(
+    optimizedSkillMd,
+    targetSkill.dirName,
+  );
+  if (validationErrors.length > 0) {
+    console.warn("[interactive.feedback] optimized skill validation failed", {
+      packageId,
+      targetSkillId: targetSkill.id,
+      targetSkillDirName: targetSkill.dirName,
+      validationErrors,
+    });
+    throw new Error(
+      `优化草稿未通过 Skill 校验：\n${validationErrors.map((error) => `- ${error}`).join("\n")}`,
+    );
+  }
+
+  const optimizedSnapshot: AgentPackageSnapshot = {
+    ...pkg.snapshot,
+    skills: pkg.snapshot.skills.map((skill) =>
+      skill.id === targetSkill.id || skill.dirName === targetSkill.dirName
+        ? { ...skill, skillMd: optimizedSkillMd }
+        : { ...skill },
+    ),
+  };
+
+  return {
+    issueSummary: String(
+      llmResult.issueSummary || "根据当前回答和用户反馈生成了 Skill 优化建议。",
+    ).trim(),
+    feedbackScope: normalizeFeedbackScope(llmResult.feedbackScope),
+    targetSkillId: targetSkill.id || targetSkill.dirName,
+    targetSkillName: targetSkill.name,
+    targetSections: arrayOfStrings(
+      llmResult.targetSections,
+      patchOperations.map((op) => op.targetSection),
+    ),
+    patchOperations,
+    rationale: String(llmResult.rationale || "").trim(),
+    evidenceFromAnswer: arrayOfStrings(llmResult.evidenceFromAnswer, [
+      compactText(turn.agentAnswer, 160),
+    ]),
+    riskNotes: arrayOfStrings(llmResult.riskNotes),
+    originalSkillMd: targetSkill.skillMd,
+    optimizedSkillMd,
+    optimizedSnapshot,
+    validationErrors: [],
+    diff: computeFeedbackLineDiff(targetSkill.skillMd, optimizedSkillMd),
+  };
+}
+
+/** 用草稿快照重测当前问题，对比优化前后回答。 */
+export async function testFeedbackOptimizationDraft(
+  userId: string,
+  packageId: string | number,
+  input: {
+    draftSnapshot?: unknown;
+    userQuestion?: string;
+    model?: string;
+  },
+): Promise<FeedbackDraftTestResult> {
+  const pkg = await getPackage(userId, packageId);
+  const draftSnapshot = normalizeDraftSnapshot(input.draftSnapshot, pkg.snapshot);
+  const validationErrors = validateSnapshotSkills(draftSnapshot);
+  if (validationErrors.length > 0) {
+    throw new Error(
+      `优化草稿未通过 Skill 校验：\n${validationErrors.map((error) => `- ${error}`).join("\n")}`,
+    );
+  }
+  const userQuestion = String(input.userQuestion || "").trim();
+  if (!userQuestion) throw new Error("缺少用于重测的问题");
+
+  const optimizedAnswer = await generateText({
+    model: input.model,
+    systemPrompt: buildDraftEnhancedPrompt(draftSnapshot),
+    userPrompt: userQuestion,
+    temperature: 0.3,
+    maxTokens: 3000,
+  });
+
+  return { optimizedAnswer: optimizedAnswer.trim() };
+}
+
+/** 将反馈式优化草稿落盘为新版本（source = interactive）。 */
+export async function applyFeedbackOptimizationDraft(
+  userId: string,
+  packageId: string | number,
+  input: { draftSnapshot?: unknown; changeSummary?: string },
+): Promise<FeedbackDraftApplyResult> {
+  const pkg = await getPackage(userId, packageId);
+  const draftSnapshot = normalizeDraftSnapshot(input.draftSnapshot, pkg.snapshot);
+  const validationErrors = validateSnapshotSkills(draftSnapshot);
+  if (validationErrors.length > 0) {
+    throw new Error(
+      `优化草稿未通过 Skill 校验：\n${validationErrors.map((error) => `- ${error}`).join("\n")}`,
+    );
+  }
+
+  const detail = await applyOptimizedSnapshot(
+    userId,
+    packageId,
+    draftSnapshot,
+    "interactive",
+    String(input.changeSummary || "交互式反馈优化").trim() ||
+      "交互式反馈优化",
+  );
+  const versions = await listVersions(userId, packageId);
+  const latest = versions[0]!;
+  return {
+    versionId: String(latest.id),
+    versionNumber: latest.versionNumber,
+    package: detail,
+  };
 }

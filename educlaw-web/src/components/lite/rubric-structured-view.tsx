@@ -75,7 +75,7 @@ function StructuredTable({
           <tr>
             {columns.map((column, index) => (
               <th
-                key={column}
+                key={`${column}-${index}`}
                 className={`px-3 py-3 text-left text-xs font-semibold text-foreground ${
                   index > 0 ? 'border-l border-border/60' : ''
                 }`}
@@ -134,8 +134,8 @@ function ScoreBandSections({
 }) {
   return (
     <div className="space-y-4">
-      {dimensions.map((dimension) => (
-        <SectionSurface key={`${dimension.title}-${dimension.weight || ''}`}>
+      {dimensions.map((dimension, index) => (
+        <SectionSurface key={`${dimension.title}-${index}`}>
           <div className="flex flex-wrap items-center gap-2 border-b border-border/60 bg-muted/35 px-4 py-3">
             <div className="text-sm font-semibold text-foreground">
               {dimension.title}
@@ -201,9 +201,9 @@ function CriteriaTable({
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
+          {rows.map((row, index) => (
             <tr
-              key={`${row.title}-${row.weight || ''}`}
+              key={`${row.title}-${index}`}
               className="align-top border-t border-border/60 even:bg-muted/20"
             >
               <td className="px-3 py-3 font-medium text-foreground">
@@ -222,6 +222,30 @@ function CriteriaTable({
         </tbody>
       </TableShell>
     </SectionSurface>
+  );
+}
+
+function ParagraphSections({
+  paragraphs,
+}: {
+  paragraphs: Array<{ heading: string; weight?: string; body: string }>;
+}) {
+  return (
+    <div className="space-y-4">
+      {paragraphs.map((para, index) => (
+        <SectionSurface key={`${para.heading}-${index}`}>
+          <div className="flex flex-wrap items-center gap-2 border-b border-border/60 bg-muted/35 px-4 py-3">
+            <div className="text-sm font-semibold text-foreground">
+              {para.heading}
+            </div>
+            {para.weight && <WeightTag value={para.weight} />}
+          </div>
+          <div className="px-4 py-4">
+            <MarkdownContent content={para.body} />
+          </div>
+        </SectionSurface>
+      ))}
+    </div>
   );
 }
 
@@ -252,8 +276,12 @@ export function RubricStructuredView({ content }: { content: string }) {
         <ScoreBandSections dimensions={parsed.dimensions} />
       ) : parsed.kind === 'criteria' ? (
         <CriteriaTable rows={parsed.rows} />
+      ) : parsed.kind === 'paragraph' ? (
+        <ParagraphSections paragraphs={parsed.paragraphs} />
       ) : (
-        <MarkdownContent content={parsed.raw} />
+        <SectionSurface className="px-4 py-4">
+          <MarkdownContent content={parsed.raw} />
+        </SectionSurface>
       )}
     </div>
   );

@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import type {
   AgentPackageSnapshot,
+  ArenaAnswerOptimizationUnavailableReason,
   ArenaChatResult,
   ArenaKind,
   ArenaMessage,
@@ -8,16 +9,71 @@ import type {
   ArenaReportSide,
   ArenaThread,
   ArenaThreadDetail,
+  PackageSkill,
   SkillArenaConfig,
 } from "@educlaw/shared";
 import { query, type Queryable, withTransaction } from "./db.js";
-import { generateJson, resolveBaselineModel, streamText } from "./llm-service.js";
-import { assertRubricConfigured, getPackage } from "./package-service.js";
-import type { DbRowArenaThreadVariant, DbRowMessage, DbRowPackageVersion, DbRowThread } from "../types.js";
+import {
+  generateJson,
+  resolveBaselineModel,
+  resolveEnhancedModel,
+  streamText,
+} from "./llm-service.js";
+import {
+  assertRubricConfigured,
+  getPackage,
+  getPackageWithVersionId,
+} from "./package-service.js";
+import type {
+  DbRowArenaAnswerRun,
+  DbRowArenaThreadVariant,
+  DbRowMessage,
+  DbRowPackageVersion,
+  DbRowThread,
+} from "../types.js";
 import { parseDbJson } from "../utils/json.js";
 
 export type ArenaStreamSide = "baseline" | "enhanced";
 export type ArenaMode = "compare" | "agent" | "baseline";
+
+export interface ArenaAnswerRun {
+  id: number;
+  userId: string;
+  threadId: number;
+  packageId: number;
+  packageVersionId: number;
+  questionMessageId: number;
+  enhancedAnswerMessageId: number;
+  baselineAnswerMessageId: number | null;
+  usedSkillIds: string[];
+  contextMessageIds: number[] | null;
+  enhancedModel: string | null;
+  createdAt: string;
+}
+
+export type ArenaAnswerReplayProvenance = Pick<
+  ArenaAnswerRun,
+  "contextMessageIds" | "enhancedModel"
+>;
+
+export interface ArenaAnswerOptimizationAvailability {
+  available: boolean;
+  reason: ArenaAnswerOptimizationUnavailableReason | null;
+}
+
+export interface ArenaSidePromptContext {
+  historyMessages: ArenaMessage[];
+  contextMessageIds: number[];
+  question: ArenaMessage;
+  userPrompt: string;
+}
+
+export class ArenaAnswerRunNotFoundError extends Error {
+  constructor() {
+    super("Arena answer run not found");
+    this.name = "ArenaAnswerRunNotFoundError";
+  }
+}
 
 export type ArenaChatStreamEvent =
   | { event: "phase"; data: { label: string } }
@@ -67,6 +123,7 @@ interface DbResolvedArenaThreadVariantRow extends DbRowArenaThreadVariant {
 interface ArenaRuntimeContext {
   arenaKind: ArenaKind;
   packageSnapshot: AgentPackageSnapshot;
+  packageVersionId: number;
   baselineSnapshot: AgentPackageSnapshot | null;
   enhancedSnapshot: AgentPackageSnapshot | null;
   labels: {
@@ -185,6 +242,14 @@ function buildFallbackRecommendation(
   return [firstSentence, secondSentence, thirdSentence, fourthSentence].join("");
 }
 
+function toPositiveSafeInteger(value: unknown, field: string): number {
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < 1) {
+    throw new Error(`Invalid ${field}`);
+  }
+  return parsed;
+}
+
 function toThread(row: DbRowThread): ArenaThread {
   const arenaKind: ArenaKind =
     row.arena_kind === "skill_arena" ? "skill_arena" : "package_arena";
@@ -209,8 +274,8 @@ function toThread(row: DbRowThread): ArenaThread {
 
 function toMessage(row: DbRowMessage): ArenaMessage {
   return {
-    id: row.id,
-    threadId: row.thread_id,
+    id: toPositiveSafeInteger(row.id, "arena message ID"),
+    threadId: toPositiveSafeInteger(row.thread_id, "arena thread ID"),
     side: row.side as ArenaMessage["side"],
     role: row.role as ArenaMessage["role"],
     content: row.content,
@@ -218,8 +283,102 @@ function toMessage(row: DbRowMessage): ArenaMessage {
   };
 }
 
+function parseUsedSkillIds(value: unknown): string[] {
+  const parsed: unknown = typeof value === "string" ? JSON.parse(value) : value;
+  if (!Array.isArray(parsed) || parsed.some((item) => typeof item !== "string")) {
+    throw new Error("Invalid arena answer run skill IDs");
+  }
+  return parsed;
+}
+
+export function parseArenaAnswerContextMessageIds(
+  value: unknown,
+): number[] | null {
+  if (value === null) return null;
+  const parsed: unknown = typeof value === "string" ? JSON.parse(value) : value;
+  if (
+    !Array.isArray(parsed) ||
+    parsed.some(
+      (item) =>
+        typeof item !== "number" ||
+        !Number.isSafeInteger(item) ||
+        item < 1,
+    )
+  ) {
+    throw new Error("Invalid arena answer run context message IDs");
+  }
+  const ids = parsed.map((item) => Number(item));
+  if (new Set(ids).size !== ids.length) {
+    throw new Error("Duplicate arena answer run context message IDs");
+  }
+  return ids;
+}
+
+export function parseArenaAnswerEnhancedModel(value: unknown): string | null {
+  if (value === null) return null;
+  if (typeof value !== "string") {
+    throw new Error("Invalid arena answer run enhanced model");
+  }
+  return value.trim();
+}
+
+export function getAnswerOptimizationAvailability(
+  answerRun: ArenaAnswerReplayProvenance | null,
+): ArenaAnswerOptimizationAvailability {
+  if (!answerRun) {
+    return { available: false, reason: "missing_answer_run" };
+  }
+  if (answerRun.contextMessageIds === null) {
+    return { available: false, reason: "replay_context_unavailable" };
+  }
+  if (!answerRun.enhancedModel?.trim()) {
+    return { available: false, reason: "replay_model_unavailable" };
+  }
+  return { available: true, reason: null };
+}
+
+function toAnswerRun(row: DbRowArenaAnswerRun): ArenaAnswerRun {
+  return {
+    id: Number(row.id),
+    userId: row.user_id,
+    threadId: Number(row.thread_id),
+    packageId: Number(row.package_id),
+    packageVersionId: Number(row.package_version_id),
+    questionMessageId: Number(row.question_message_id),
+    enhancedAnswerMessageId: Number(row.enhanced_answer_message_id),
+    baselineAnswerMessageId:
+      row.baseline_answer_message_id === null
+        ? null
+        : Number(row.baseline_answer_message_id),
+    usedSkillIds: parseUsedSkillIds(row.used_skill_ids),
+    contextMessageIds: parseArenaAnswerContextMessageIds(
+      row.context_message_ids,
+    ),
+    enhancedModel: parseArenaAnswerEnhancedModel(row.enhanced_model),
+    createdAt: row.created_at,
+  };
+}
+
 function tokenize(text: string) {
-  return Array.from(new Set(text.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean)));
+  const tokens = new Set<string>();
+  const segments = text
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(Boolean);
+  for (const segment of segments) {
+    tokens.add(segment);
+    for (const match of segment.matchAll(/[\p{Script=Han}]+/gu)) {
+      const run = match[0];
+      if (run.length === 1) {
+        tokens.add(run);
+        continue;
+      }
+      for (let index = 0; index < run.length - 1; index += 1) {
+        tokens.add(run.slice(index, index + 2));
+      }
+    }
+  }
+  return Array.from(tokens);
 }
 
 function buildRequestHash(value: unknown): string {
@@ -356,7 +515,10 @@ async function completeIdempotencyKey(
   );
 }
 
-function selectRelevantSkills(snapshot: AgentPackageSnapshot, prompt: string) {
+export function selectRelevantSkills(
+  snapshot: AgentPackageSnapshot,
+  prompt: string,
+): PackageSkill[] {
   const tokens = tokenize(prompt);
   return snapshot.skills
     .map((skill) => {
@@ -380,11 +542,55 @@ function buildHistory(messages: ArenaMessage[], side: ArenaStreamSide) {
   return lines.join("\n");
 }
 
-function buildEnhancedPrompt(snapshot: AgentPackageSnapshot, prompt: string) {
-  const skills =
-    snapshot.skills.length <= 1
-      ? snapshot.skills
-      : selectRelevantSkills(snapshot, prompt);
+function isHistoryMessageForSide(
+  message: ArenaMessage,
+  side: ArenaStreamSide,
+): boolean {
+  return (
+    (message.side === "shared" && message.role === "user") ||
+    (message.side === side && message.role === "assistant")
+  );
+}
+
+function formatArenaMessages(messages: ArenaMessage[]): string {
+  return messages
+    .map((message) => {
+      const speaker = message.role === "user" ? "User" : "Assistant";
+      return `${speaker}: ${message.content}`;
+    })
+    .join("\n");
+}
+
+export function buildArenaSidePromptContext(
+  messages: ArenaMessage[],
+  side: ArenaStreamSide,
+  question: ArenaMessage,
+): ArenaSidePromptContext {
+  if (question.side !== "shared" || question.role !== "user") {
+    throw new Error("Arena prompt question must be a shared user message");
+  }
+  const historyMessages = messages.filter((message) =>
+    isHistoryMessageForSide(message, side),
+  );
+  if (historyMessages.some((message) => message.id === question.id)) {
+    throw new Error("Arena prompt history must not contain the current question");
+  }
+  const contextMessageIds = historyMessages.map((message) => message.id);
+  if (new Set(contextMessageIds).size !== contextMessageIds.length) {
+    throw new Error("Arena prompt history contains duplicate messages");
+  }
+  return {
+    historyMessages,
+    contextMessageIds,
+    question,
+    userPrompt: formatArenaMessages([...historyMessages, question]),
+  };
+}
+
+export function buildEnhancedPrompt(
+  snapshot: AgentPackageSnapshot,
+  selectedSkills: PackageSkill[],
+) {
   return [
     "你是一个基于可复用 Markdown 智能体工作的增强助手。",
     "请严格遵循智能体中的设定，同时保持回答自然流畅。",
@@ -394,8 +600,22 @@ function buildEnhancedPrompt(snapshot: AgentPackageSnapshot, prompt: string) {
     "",
     "[rubric.md]",
     snapshot.rubricMd,
-    ...(skills.length > 0 ? ["", "[selected skills]"] : []),
-    ...skills.flatMap((skill) => ["", `## ${skill.name}`, skill.skillMd]),
+    ...(selectedSkills.length > 0 ? ["", "[selected skills]"] : []),
+    ...selectedSkills.flatMap((skill) => ["", `## ${skill.name}`, skill.skillMd]),
+  ].join("\n");
+}
+
+function buildSkillArenaPrompt(snapshot: AgentPackageSnapshot) {
+  const skill = snapshot.skills[0];
+  const skillName = skill?.name || skill?.dirName || "未命名技能";
+  const skillMd = skill?.skillMd || "";
+  return [
+    "你是一个基于可复用 Markdown 技能工作的助手。",
+    "请严格遵循下方技能（SKILL.md）中的设定进行回答，不要自行扩展技能未描述的内容。",
+    "如果技能内容过于简短或缺少具体指令，请如实说明该技能当前无法支撑完整回复，而不是自行编造详细流程。",
+    "",
+    `[SKILL.md: ${skillName}]`,
+    skillMd,
   ].join("\n");
 }
 
@@ -571,15 +791,67 @@ async function getResolvedSkillArenaVariants(
   return { left, right };
 }
 
+// 查询 Skill Arena 线程绑定的版本号与对应 skill 的最新 active 版本号
+// 用于前端显示"已过期"提示，引导用户用最新版本重建
+async function getSkillArenaVersionInfo(
+  threadId: string | number,
+  packageId: string | number,
+): Promise<{
+  left: { boundSkillVersionNumber: number; latestSkillVersionNumber: number };
+  right: { boundSkillVersionNumber: number; latestSkillVersionNumber: number };
+} | null> {
+  const result = await query<{
+    side: string;
+    bound_version_number: number;
+    latest_version_number: number;
+  }>(
+    `select atv.side,
+       sv.version_number as bound_version_number,
+       coalesce((
+         select max(sv2.version_number)
+         from agent_skill_versions sv2
+         where sv2.skill_id = atv.skill_id
+           and sv2.package_id = atv.package_id
+           and sv2.status = 'active'
+       ), sv.version_number) as latest_version_number
+     from arena_thread_variants atv
+     join agent_skill_versions sv
+       on sv.id = atv.skill_version_id
+       and sv.skill_id = atv.skill_id
+       and sv.package_id = atv.package_id
+     where atv.thread_id = $1
+       and atv.package_id = $2`,
+    [threadId, packageId],
+  );
+  const left = result.rows.find((row) => row.side === "left");
+  const right = result.rows.find((row) => row.side === "right");
+  if (!left || !right) return null;
+  return {
+    left: {
+      boundSkillVersionNumber: left.bound_version_number,
+      latestSkillVersionNumber: left.latest_version_number,
+    },
+    right: {
+      boundSkillVersionNumber: right.bound_version_number,
+      latestSkillVersionNumber: right.latest_version_number,
+    },
+  };
+}
+
 async function resolveThreadRuntime(
   userId: string,
   thread: ArenaThread,
 ): Promise<ArenaRuntimeContext> {
   if (thread.arenaKind !== "skill_arena") {
-    const pkg = await getPackage(userId, thread.packageId);
+    const packageContext = await getPackageWithVersionId(
+      userId,
+      thread.packageId,
+    );
+    const pkg = packageContext.package;
     return {
       arenaKind: "package_arena",
       packageSnapshot: pkg.snapshot,
+      packageVersionId: packageContext.versionId,
       baselineSnapshot: null,
       enhancedSnapshot: pkg.snapshot,
       labels: {
@@ -637,6 +909,7 @@ async function resolveThreadRuntime(
   return {
     arenaKind: "skill_arena",
     packageSnapshot: baseSnapshot,
+    packageVersionId: Number(basePackageVersionId),
     baselineSnapshot: cloneSnapshotWithSkill(baseSnapshot, leftSkill),
     enhancedSnapshot: cloneSnapshotWithSkill(baseSnapshot, rightSkill),
     labels: {
@@ -843,7 +1116,10 @@ export async function createArenaThread(
   });
 }
 
-export async function getThreadDetail(userId: string, threadId: string | number): Promise<ArenaThreadDetail> {
+export async function getThreadDetail(
+  userId: string,
+  threadId: string | number,
+): Promise<Omit<ArenaThreadDetail, "answerOptimizations">> {
   const threadResult = await query<DbRowThread>(
     "select * from arena_threads where id = $1 and user_id = $2",
     [threadId, userId],
@@ -852,16 +1128,41 @@ export async function getThreadDetail(userId: string, threadId: string | number)
   if (!thread) throw new Error("Arena thread not found");
 
   const messages = await query<DbRowMessage>(
-    "select * from arena_messages where thread_id = $1 and user_id = $2 order by created_at asc",
+    "select * from arena_messages where thread_id = $1 and user_id = $2 order by created_at asc, id asc",
     [threadId, userId],
   );
 
-  return { thread: toThread(thread), messages: messages.rows.map(toMessage) };
+  const detail: Omit<ArenaThreadDetail, "answerOptimizations"> = {
+    thread: toThread(thread),
+    messages: messages.rows.map(toMessage),
+  };
+  // Skill Arena 线程：附带绑定版本号与最新 active 版本号，供前端显示过期提示
+  if (detail.thread.arenaKind === "skill_arena") {
+    detail.skillVersionInfo = await getSkillArenaVersionInfo(
+      threadId,
+      thread.package_id,
+    );
+  }
+  return detail;
+}
+
+export async function getArenaAnswerRunByEnhancedMessage(
+  userId: string,
+  enhancedAnswerMessageId: string | number,
+): Promise<ArenaAnswerRun> {
+  const result = await query<DbRowArenaAnswerRun>(
+    `select * from arena_answer_runs
+     where user_id = $1 and enhanced_answer_message_id = $2`,
+    [userId, enhancedAnswerMessageId],
+  );
+  const row = result.rows[0];
+  if (!row) throw new ArenaAnswerRunNotFoundError();
+  return toAnswerRun(row);
 }
 
 export async function getArenaThreadDetail(
   input: GetArenaThreadDetailInput,
-): Promise<ArenaThreadDetail> {
+): Promise<Omit<ArenaThreadDetail, "answerOptimizations">> {
   const packageId = positiveId(input.packageId, "packageId");
   const threadId = positiveId(input.threadId, "threadId");
   const detail = await getThreadDetail(input.authUserId, threadId);
@@ -916,6 +1217,18 @@ export async function* streamMessage(
   };
 
   const fullHistory = [...detail.messages, shared];
+  const packageArenaEnhanced =
+    runtime.arenaKind !== "skill_arena" && sides.includes("enhanced");
+  const enhancedSelectedSkills = packageArenaEnhanced
+    ? selectRelevantSkills(runtime.packageSnapshot, prompt)
+    : [];
+  const usedSkillIds = enhancedSelectedSkills.map((skill) => skill.id);
+  const enhancedPromptContext = packageArenaEnhanced
+    ? buildArenaSidePromptContext(detail.messages, "enhanced", shared)
+    : null;
+  const enhancedModel = packageArenaEnhanced
+    ? resolveEnhancedModel(model || detail.thread.model || undefined)
+    : null;
   const queue: Array<Exclude<ArenaChatStreamEvent, { event: "done" }>> = [];
   let pending = sides.length;
   let wake: (() => void) | null = null;
@@ -963,9 +1276,8 @@ export async function* streamMessage(
     void runSide(
       "baseline",
       runtime.arenaKind === "skill_arena"
-        ? buildEnhancedPrompt(
+        ? buildSkillArenaPrompt(
             runtime.baselineSnapshot || runtime.packageSnapshot,
-            shared.content,
           )
         : BASELINE_SYSTEM_PROMPT,
       buildHistory(fullHistory, "baseline"),
@@ -975,15 +1287,26 @@ export async function* streamMessage(
     );
   }
   if (sides.includes("enhanced")) {
-    void runSide(
-      "enhanced",
-      buildEnhancedPrompt(
-        runtime.enhancedSnapshot || runtime.packageSnapshot,
-        shared.content,
-      ),
-      buildHistory(fullHistory, "enhanced"),
-      model || detail.thread.model || undefined,
-    );
+    if (runtime.arenaKind === "skill_arena") {
+      void runSide(
+        "enhanced",
+        buildSkillArenaPrompt(
+          runtime.enhancedSnapshot || runtime.packageSnapshot,
+        ),
+        buildHistory(fullHistory, "enhanced"),
+        model || detail.thread.model || undefined,
+      );
+    } else {
+      void runSide(
+        "enhanced",
+        buildEnhancedPrompt(
+          runtime.enhancedSnapshot || runtime.packageSnapshot,
+          enhancedSelectedSkills,
+        ),
+        enhancedPromptContext!.userPrompt,
+        enhancedModel!,
+      );
+    }
   }
 
   while (pending > 0 || queue.length > 0) {
@@ -995,27 +1318,68 @@ export async function* streamMessage(
   }
 
   const savedAt = new Date().toISOString();
-  const assistantMessages: ArenaMessage[] = [];
+  const assistantMessages = await withTransaction(async (client) => {
+    const messages: ArenaMessage[] = [];
+    let baselineAnswerMessageId: number | null = null;
+    let enhancedAnswerMessageId: number | null = null;
 
-  for (const side of sides) {
-    const result = await query<{ id: number }>(
-      "insert into arena_messages (thread_id, user_id, side, role, content, created_at) values ($1, $2, $3, $4, $5, $6) returning id",
-      [threadId, userId, side, "assistant", sideContents[side], savedAt],
+    for (const side of sides) {
+      const result = await client.query<{ id: number | string }>(
+        "insert into arena_messages (thread_id, user_id, side, role, content, created_at) values ($1, $2, $3, $4, $5, $6) returning id",
+        [threadId, userId, side, "assistant", sideContents[side], savedAt],
+      );
+      const messageId = toPositiveSafeInteger(
+        result.rows[0].id,
+        "arena message ID",
+      );
+      if (side === "baseline") baselineAnswerMessageId = messageId;
+      if (side === "enhanced") enhancedAnswerMessageId = messageId;
+      messages.push({
+        id: messageId,
+        threadId: Number(threadId),
+        side,
+        role: "assistant",
+        content: sideContents[side],
+        createdAt: savedAt,
+      });
+    }
+
+    if (packageArenaEnhanced) {
+      if (enhancedAnswerMessageId === null) {
+        throw new Error("Enhanced answer was not saved");
+      }
+      if (!enhancedPromptContext || !enhancedModel) {
+        throw new Error("Enhanced answer provenance is unavailable");
+      }
+      await client.query(
+        `insert into arena_answer_runs
+           (user_id, thread_id, package_id, package_version_id,
+            question_message_id, enhanced_answer_message_id,
+            baseline_answer_message_id, used_skill_ids,
+            context_message_ids, enhanced_model, created_at)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+        [
+          userId,
+          threadId,
+          detail.thread.packageId,
+          runtime.packageVersionId,
+          shared.id,
+          enhancedAnswerMessageId,
+          baselineAnswerMessageId,
+          JSON.stringify(usedSkillIds),
+          JSON.stringify(enhancedPromptContext.contextMessageIds),
+          enhancedModel,
+          savedAt,
+        ],
+      );
+    }
+
+    await client.query(
+      "update arena_threads set updated_at = $1 where id = $2 and user_id = $3",
+      [savedAt, threadId, userId],
     );
-    assistantMessages.push({
-      id: result.rows[0].id,
-      threadId: Number(threadId),
-      side,
-      role: "assistant",
-      content: sideContents[side],
-      createdAt: savedAt,
-    });
-  }
-
-  await query(
-    "update arena_threads set updated_at = $1 where id = $2 and user_id = $3",
-    [savedAt, threadId, userId],
-  );
+    return messages;
+  });
 
   yield {
     event: "done",

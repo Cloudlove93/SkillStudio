@@ -39,6 +39,19 @@ export type RubricCriteriaPresentation = {
   }>;
 };
 
+export type RubricParagraphPresentation = {
+  kind: 'paragraph';
+  raw: string;
+  title: string;
+  dimensionCount: number;
+  weighted: boolean;
+  paragraphs: Array<{
+    heading: string;
+    weight?: string;
+    body: string;
+  }>;
+};
+
 export type RubricMarkdownPresentation = {
   kind: 'markdown';
   raw: string;
@@ -51,6 +64,7 @@ export type RubricPresentation =
   | RubricLevelTablePresentation
   | RubricScoreBandPresentation
   | RubricCriteriaPresentation
+  | RubricParagraphPresentation
   | RubricMarkdownPresentation;
 
 const SUPPORT_ONLY_SECTION_PATTERNS = [
@@ -115,7 +129,7 @@ function extractTitle(lines: string[]): string {
   for (const rawLine of lines) {
     const line = normalizeDisplayTitle(rawLine);
     if (!line) continue;
-    if (/^(?:维度|权重|分值|评分等级|评级标准)\b/.test(line)) continue;
+    if (/^(?:维度|权重|分值|评分等级|评级标准)(?=\W|$)/.test(line)) continue;
     return line;
   }
 
@@ -123,19 +137,27 @@ function extractTitle(lines: string[]): string {
 }
 
 function splitStructuredCells(line: string): string[] {
-  if (line.includes('\t')) {
-    const cells = line
+  // 优先按出现次数更多的分隔符切分，避免含 tab 的 markdown 单元格误判
+  const tabCount = (line.match(/\t/g) || []).length;
+  const pipeCount = (line.match(/\|/g) || []).length;
+
+  if (tabCount > 0 && tabCount >= pipeCount) {
+    // 仅去除首尾空，保留中间空单元格避免列错位
+    const trimmed = line.replace(/^\t+/, '').replace(/\t+$/, '');
+    const cells = trimmed
       .split('\t')
       .map((cell) => cleanPresentationText(cell))
-      .filter(Boolean);
+      .map((cell) => cell || '');
     return isMarkdownDividerRow(cells) ? [] : cells;
   }
 
-  if (line.includes('|')) {
-    const cells = line
+  if (pipeCount > 0) {
+    // 剥离 markdown 表格行首尾的 |，保留中间空单元格
+    const trimmed = line.replace(/^\s*\|/, '').replace(/\|\s*$/, '');
+    const cells = trimmed
       .split('|')
       .map((cell) => cleanPresentationText(cell))
-      .filter(Boolean);
+      .map((cell) => cell || '');
     return isMarkdownDividerRow(cells) ? [] : cells;
   }
 
@@ -167,6 +189,7 @@ function parseLevelTable(
     const rows: Array<{ cells: string[] }> = [];
     for (let cursor = index + 1; cursor < lines.length; cursor += 1) {
       const rawLine = lines[cursor] || '';
+      if (!rawLine.trim()) continue;
       const cells = splitStructuredCells(rawLine);
       if (!cells.length && hasStructuredDelimiter(rawLine)) continue;
       if (!cells.length || cells.length < 2) break;
@@ -208,7 +231,7 @@ function parseScoreBandLine(
   const match = line
     .trim()
     .match(
-      /^(优秀(?:\s*\(\d+\))?|良好(?:\s*\(\d+\))?|合格(?:\s*\(\d+\))?|待改进(?:\s*\(\d+\))?|不合格(?:\s*\(\d+\))?|严重失误(?:\s*\(\d+\))?|[1-5]分)\s+(.+)$/,
+      /^(优秀(?:\s*[（(]\d+[)）])?|良好(?:\s*[（(]\d+[)）])?|合格(?:\s*[（(]\d+[)）])?|待改进(?:\s*[（(]\d+[)）])?|不合格(?:\s*[（(]\d+[)）])?|严重失误(?:\s*[（(]\d+[)）])?|[1-9]\d?\s*分)\s+(.+)$/,
     );
   if (!match) return null;
 
@@ -265,12 +288,12 @@ function parseScoreBands(
 }
 
 function isCriteriaHeading(line: string): boolean {
-  return /^(?:[①②③④⑤⑥⑦⑧⑨⑩]|\d+[、.)）])\s*/.test(line.trim());
+  return /^(?:[①②③④⑤⑥⑦⑧⑨⑩]|[（(]?\d+[、.)））])\s*/.test(line.trim());
 }
 
 function cleanCriteriaTitle(line: string): { title: string; weight?: string } {
   const trimmed = cleanPresentationText(
-    line.trim().replace(/^(?:[①②③④⑤⑥⑦⑧⑨⑩]|\d+[、.)）])\s*/, ''),
+    line.trim().replace(/^(?:[①②③④⑤⑥⑦⑧⑨⑩]|[（(]?\d+[、.)））])\s*/, ''),
   );
   const weightMatch = trimmed.match(/（?\s*权重[:：]?\s*([^）)]+)\s*）?/);
   const title = trimmed
@@ -364,6 +387,107 @@ function parseCriteria(
   };
 }
 
+/**
+ * 解析段落式 rubric：每个维度以"第N个方面/维度"开头，后接段落描述评分标准。
+ * 支持两种格式：
+ * - 多行：标题行 + 后续段落为正文
+ * - 单行：标题与正文在同一行用句号分隔，例如
+ *   "第一个方面是回应的针对性，占三成。好的回应...合格的...不合格的..."
+ */
+function parseParagraphRubric(
+  lines: string[],
+  raw: string,
+): RubricParagraphPresentation | null {
+  const paragraphs: RubricParagraphPresentation['paragraphs'] = [];
+  let current: RubricParagraphPresentation['paragraphs'][number] | null = null;
+  let bodyBuffer: string[] = [];
+
+  const flushBody = () => {
+    if (current && bodyBuffer.length > 0) {
+      current.body = bodyBuffer.join('\n').trim();
+      bodyBuffer = [];
+    }
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) continue;
+
+    // 检测维度段落起点：支持中文/阿拉伯数字，分隔符允许 是/:：/、/，
+    const headingMatch = line.match(
+      /^第[一二三四五六七八九十百0-9]+[个条]?(?:方面|维度|项|条)\s*(?:是|[:：、，])\s*(.+)$/,
+    );
+    if (headingMatch) {
+      flushBody();
+      if (current) paragraphs.push(current);
+
+      const rest = headingMatch[1] || '';
+      // 按句号切分：首句作为 heading（含权重），其余作为 body
+      const segments = rest
+        .split(/。/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const headSeg = segments.shift() || rest;
+
+      // 提取权重："占三成" / "占30%" / "权重30%" / "占四成"
+      const weightMatch = headSeg.match(
+        /(?:占|权重|占比|比例)\s*(\d{1,3}\s*%|[一二三四五六七八九十半]成?|半)/,
+      );
+      let weight: string | undefined;
+      let heading: string;
+      if (weightMatch) {
+        weight = weightMatch[1];
+        heading = headSeg
+          .replace(weightMatch[0], '')
+          .replace(/[，,；;]\s*$/, '')
+          .trim();
+      } else {
+        heading = headSeg.replace(/[，,；;]\s*$/, '').trim();
+      }
+
+      current = {
+        heading: cleanPresentationText(heading),
+        weight: weight ? cleanPresentationText(weight) : undefined,
+        body: '',
+      };
+
+      // 单行格式：剩余分句作为 body
+      if (segments.length > 0) {
+        bodyBuffer.push(segments.join('。'));
+      }
+      continue;
+    }
+
+    // 检测支持性章节边界
+    if (SUPPORT_ONLY_SECTION_PATTERNS.some((p) => p.test(line))) {
+      flushBody();
+      if (current) {
+        paragraphs.push(current);
+        current = null;
+      }
+      break;
+    }
+
+    if (!current) continue;
+    bodyBuffer.push(line);
+  }
+
+  flushBody();
+  if (current) paragraphs.push(current);
+
+  const valid = paragraphs.filter((p) => p.heading && p.body);
+  if (!valid.length) return null;
+
+  return {
+    kind: 'paragraph',
+    raw,
+    title: extractTitle(lines),
+    dimensionCount: valid.length,
+    weighted: valid.some((p) => Boolean(p.weight)),
+    paragraphs: valid,
+  };
+}
+
 export function parseRubricPresentation(content: string): RubricPresentation {
   const raw = content.trim();
   const lines = normalizeLines(raw);
@@ -371,7 +495,8 @@ export function parseRubricPresentation(content: string): RubricPresentation {
   return (
     parseLevelTable(lines, raw) ||
     parseScoreBands(lines, raw) ||
-    parseCriteria(lines, raw) || {
+    parseCriteria(lines, raw) ||
+    parseParagraphRubric(lines, raw) || {
       kind: 'markdown',
       raw,
       title: extractTitle(lines),

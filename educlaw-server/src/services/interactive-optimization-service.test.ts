@@ -1,4 +1,4 @@
-﻿import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 const getPackageMock = vi.fn();
 const applyOptimizedSnapshotMock = vi.fn();
@@ -134,9 +134,96 @@ describe("interactive-optimization-service", () => {
     const snapshot = applyOptimizedSnapshotMock.mock.calls[0]![2];
     expect(snapshot.description).toBe("这是一段较完整的 package description，保存时不应被压短。");
     expect(snapshot.name).toBe("原始智能体");
-    expect(snapshot.skills[0].name).toBe("skill-one");
+    // skill 中文名不应被 frontmatter 的 name(目录名格式)覆盖
+    expect(snapshot.skills[0].name).toBe("技能一");
     expect(snapshot.skills[0].description).toBe("仅补充触发条件");
     expect(snapshot.skills[0].skillMd).toContain("更新后的技能正文");
+  });
+
+  it("auto-adopts <MODIFIED> blocks even when LLM omits [ADOPT] markers", async () => {
+    getPackageMock.mockResolvedValue({
+      snapshot: {
+        name: "原始智能体",
+        description: "原始 package description",
+        versionLabel: "v1",
+        agentMd: "---\nname: original-agent\n---\n\n# Agent\n原始内容",
+        rubricMd: "# Rubric\n原始评分标准",
+        skills: [
+          {
+            id: "skill-1",
+            dirName: "immediate-control",
+            name: "immediate-control",
+            description: "原始技能描述",
+            skillMd: "---\nname: immediate-control\ndescription: 原始技能描述\n---\n\n# Skill\n原始技能正文",
+          },
+        ],
+      },
+    });
+    generateChatMock.mockResolvedValue(
+      [
+        "我已经调整了 immediate-control,把反应时长从 15 秒缩短到 3-5 秒。",
+        "",
+        "<MODIFIED target=\"skill\" targetId=\"immediate-control\">",
+        "```markdown",
+        "---",
+        "name: immediate-control",
+        "description: 原始技能描述",
+        "---",
+        "",
+        "# Skill",
+        "更新后的技能正文,反应时长 3-5 秒",
+        "```",
+        "</MODIFIED>",
+        "",
+        "[NEXT]",
+      ].join("\n"),
+    );
+
+    const { chatOptimize } = await loadService();
+
+    const result = await chatOptimize("user-1", "package-1", {
+      messages: [{ role: "user", content: "缩短反应时长" }],
+      adoptedChanges: [],
+    });
+
+    expect(result.newAdoptions).toHaveLength(1);
+    const adoption = result.newAdoptions[0]!;
+    expect(adoption.target).toBe("skill");
+    expect(adoption.targetId).toBe("immediate-control");
+    expect(adoption.modified).toContain("更新后的技能正文");
+    expect(adoption.modified).not.toContain("原始技能正文");
+    expect(adoption.original).toContain("原始技能正文");
+    expect(result.isDone).toBe(false);
+    // cleanReply 不应包含 <MODIFIED> 块或 [NEXT] 标记(都被 parseMarkers 过滤)
+    expect(result.reply).not.toContain("<MODIFIED");
+    expect(result.reply).not.toContain("更新后的技能正文");
+    expect(result.reply).not.toContain("[NEXT]");
+    expect(result.reply).toContain("缩短到 3-5 秒");
+  });
+
+  it("skips [ADOPT] markers without matching <MODIFIED> blocks", async () => {
+    getPackageMock.mockResolvedValue({
+      snapshot: {
+        name: "原始智能体",
+        description: "原始 package description",
+        versionLabel: "v1",
+        agentMd: "---\nname: original-agent\n---\n\n# Agent\n原始内容",
+        rubricMd: "# Rubric\n原始评分标准",
+        skills: [],
+      },
+    });
+    // LLM 只输出 [ADOPT] 标记但没有 <MODIFIED> 块
+    generateChatMock.mockResolvedValue("[ADOPT:agent::优化了角色定义]\n\n[NEXT]");
+
+    const { chatOptimize } = await loadService();
+
+    const result = await chatOptimize("user-1", "package-1", {
+      messages: [{ role: "user", content: "优化 agent" }],
+      adoptedChanges: [],
+    });
+
+    // 没有实际修改内容,不应产生 adoption
+    expect(result.newAdoptions).toHaveLength(0);
   });
 
   it("preserves existing skill frontmatter when adopted change only provides body content", async () => {

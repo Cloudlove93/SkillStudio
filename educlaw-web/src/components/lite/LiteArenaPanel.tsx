@@ -1,4 +1,4 @@
-﻿import {
+import {
   type CSSProperties,
   useCallback,
   useEffect,
@@ -6,9 +6,11 @@
   useState,
 } from 'react';
 import { flushSync } from 'react-dom';
+import { toast } from 'sonner';
 import type {
   AgentPackageDetail,
   AgentPackageSummary,
+  ArenaAnswerOptimizationSummary,
   ArenaMessage,
   ArenaReport,
   ArenaThread,
@@ -77,6 +79,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
+  ArenaThreadCreatorDialog,
+} from '../arena/ArenaThreadCreatorDialog';
+import { useArenaThreadList } from '../arena/useArenaThreadList';
+import {
   Sparkles,
   Send,
   Upload,
@@ -97,7 +103,16 @@ import {
   Pencil,
   X,
   LogOut,
+  Plus,
+  History,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react';
+import {
+  AnswerSkillOptimizationDialog,
+  type AnswerOptimizationDialogTarget,
+} from './AnswerSkillOptimizationDialog';
+import type { ConfirmAnswerOptimizationResult } from '../../api/answer-skill-optimizations';
 
 type ManualEditState = {
   target: 'agent' | 'rubric' | 'skill';
@@ -316,6 +331,12 @@ export default function LiteArenaPanel() {
     useState(false);
   const [skillActionPendingId, setSkillActionPendingId] = useState('');
   const skillActionPendingIdRef = useRef('');
+  const [packageVersionActionPendingId, setPackageVersionActionPendingId] =
+    useState('');
+  const packageVersionActionPendingIdRef = useRef('');
+  const [versionSubTab, setVersionSubTab] = useState<'package' | 'skill'>(
+    'package',
+  );
 
   const [instruction, setInstruction] = useState('');
   const [input, setInput] = useState('');
@@ -337,6 +358,7 @@ export default function LiteArenaPanel() {
   const [rightSidebarOpen, setRightSidebarOpen] = useState(prefersWideLayout);
   const [leftWidth, setLeftWidth] = useState(400);
   const [rightWidth, setRightWidth] = useState(450);
+  const [rightExpanded, setRightExpanded] = useState(false);
   const [documents, setDocuments] = useState<
     Array<{ name: string; content: string }>
   >([]);
@@ -369,24 +391,6 @@ export default function LiteArenaPanel() {
     'chat' | 'issues' | 'adopted' | 'history'
   >('chat');
   const [arenaMode, setArenaMode] = useState<ArenaMode>('compare');
-  const [arenaComposerKind, setArenaComposerKind] = useState<
-    'package_arena' | 'skill_arena'
-  >('package_arena');
-  const [skillArenaLeftSkillId, setSkillArenaLeftSkillId] = useState('');
-  const [skillArenaRightSkillId, setSkillArenaRightSkillId] = useState('');
-  const [skillArenaLeftVersions, setSkillArenaLeftVersions] = useState<
-    SkillVersionDetail[]
-  >([]);
-  const [skillArenaRightVersions, setSkillArenaRightVersions] = useState<
-    SkillVersionDetail[]
-  >([]);
-  const [skillArenaLeftVersionId, setSkillArenaLeftVersionId] = useState('');
-  const [skillArenaRightVersionId, setSkillArenaRightVersionId] = useState('');
-  const [skillArenaLoading, setSkillArenaLoading] = useState({
-    left: false,
-    right: false,
-  });
-  const [skillArenaCreatePending, setSkillArenaCreatePending] = useState(false);
   const [manualEdit, setManualEdit] = useState<ManualEditState | null>(null);
   const [manualEditSaving, setManualEditSaving] = useState(false);
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
@@ -403,8 +407,6 @@ export default function LiteArenaPanel() {
     threadRef.current = thread;
   }, [thread]);
   const skillVersionsRequestIdRef = useRef(0);
-  const skillArenaLeftRequestIdRef = useRef(0);
-  const skillArenaRightRequestIdRef = useRef(0);
 
   // Center preview mode (view file in main panel)
   const [centerPreview, setCenterPreview] = useState<CenterPreviewState | null>(
@@ -418,6 +420,9 @@ export default function LiteArenaPanel() {
   const [compareResult, setCompareResult] =
     useState<VersionCompareResult | null>(null);
   const [compareLoading, setCompareLoading] = useState(false);
+  const [answerOptimizationOpen, setAnswerOptimizationOpen] = useState(false);
+  const [answerOptimizationTarget, setAnswerOptimizationTarget] =
+    useState<AnswerOptimizationDialogTarget | null>(null);
 
   const messages = threadDetail?.messages || [];
   const selectedSkill =
@@ -442,16 +447,51 @@ export default function LiteArenaPanel() {
     skillVersions.find((version) => version.id === skillVersionsCurrentId) ||
     skillVersions[0] ||
     null;
+  // 计算"被回退跳过"的版本 id：skillVersions 已按 versionNumber 降序返回，
+  // 取第一个 status === 'active' 且非当前的版本——它比当前版本更新，却被回退操作跳过
+  const rolledBackSkippedSkillVersionId = skillVersions.find(
+    (version) =>
+      version.status === 'active' &&
+      version.id !== skillVersionsCurrentId,
+  )?.id || '';
   const currentPackageVersionId =
     versions.find(
       (version) => version.versionNumber === selectedPackage?.versionNumber,
     )?.id || '';
+  const [creatorOpen, setCreatorOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  // 重建场景：预选当前 Skill Arena 线程的左右 Skill，并优先使用最新版本
+  const [creatorInitialLeft, setCreatorInitialLeft] = useState('');
+  const [creatorInitialRight, setCreatorInitialRight] = useState('');
+  const [creatorPreferLatest, setCreatorPreferLatest] = useState(false);
+  const arenaThreadList = useArenaThreadList({
+    token: token || '',
+    packageId: selectedPackageId,
+    onThreadSwitched: (nextThread, nextDetail) => {
+      setThread(nextThread);
+      setThreadDetail(nextDetail);
+      setReport(null);
+      setCenterPreview((prev) => (prev?.type === 'report' ? null : prev));
+      setArenaMode('compare');
+      setStatus('');
+    },
+  });
+  // 当 openPackage 拉取到当前 thread 时，同步给 arenaThreadList
+  useEffect(() => {
+    if (thread?.id) {
+      arenaThreadList.setCurrentThreadId(String(thread.id));
+    }
+  }, [thread?.id, arenaThreadList]);
   const arenaSideLabels = getArenaSideLabels(
     thread,
     selectedPackage?.name,
     report,
   );
   const isSkillArenaThread = thread?.arenaKind === 'skill_arena';
+  // Skill Arena 线程的版本绑定信息：用于显示绑定版本号
+  const skillVersionInfo = isSkillArenaThread
+    ? threadDetail?.skillVersionInfo ?? null
+    : null;
   const rubricText = selectedPackage?.snapshot.rubricMd || '';
   const rubricDisplayText = extractDisplayRubricContent(rubricText);
   const rubricPreviewContent = rubricText.trim() || rubricDisplayText;
@@ -497,7 +537,9 @@ export default function LiteArenaPanel() {
   const showGeneratePreviews =
     progress?.active && progress.title === '\u751f\u6210\u667a\u80fd\u4f53';
   const sidebarStyle = { '--sidebar-width': `${leftWidth}px` } as CSSProperties;
-  const detailStyle = { '--detail-width': `${rightWidth}px` } as CSSProperties;
+  const detailStyle = {
+    '--detail-width': `${rightWidth}px`,
+  } as CSSProperties;
 
   useEffect(() => {
     const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
@@ -511,6 +553,7 @@ export default function LiteArenaPanel() {
       if (!wide) {
         setSidebarOpen(false);
         setRightSidebarOpen(false);
+        setRightExpanded(false);
       }
     };
     syncLayout();
@@ -667,79 +710,6 @@ export default function LiteArenaPanel() {
     [showDiscardedSkillVersions, token],
   );
 
-  const loadSkillArenaVersions = useCallback(
-    async (
-      side: 'left' | 'right',
-      packageId: string,
-      skillRecordId: string,
-      preferredVersionId?: string,
-    ) => {
-      if (!token || !packageId || !skillRecordId) return;
-      const requestRef =
-        side === 'left'
-          ? skillArenaLeftRequestIdRef
-          : skillArenaRightRequestIdRef;
-      const requestId = requestRef.current + 1;
-      requestRef.current = requestId;
-      setSkillArenaLoading((prev) => ({ ...prev, [side]: true }));
-      try {
-        const result = await liteApi.listSkillVersions(token, packageId, skillRecordId, {
-          includeDiscarded: showDiscardedSkillVersions,
-        });
-        if (
-          requestRef.current !== requestId ||
-          selectedPackageIdRef.current !== packageId
-        ) {
-          return;
-        }
-        const setVersions =
-          side === 'left' ? setSkillArenaLeftVersions : setSkillArenaRightVersions;
-        const setVersionId =
-          side === 'left'
-            ? setSkillArenaLeftVersionId
-            : setSkillArenaRightVersionId;
-        setVersions(result.items);
-        setVersionId((current) => {
-          if (
-            preferredVersionId &&
-            result.items.some((item) => item.id === preferredVersionId)
-          ) {
-            return preferredVersionId;
-          }
-          if (current && result.items.some((item) => item.id === current)) {
-            return current;
-          }
-          if (
-            result.currentVersionId &&
-            result.items.some((item) => item.id === result.currentVersionId)
-          ) {
-            return result.currentVersionId;
-          }
-          return result.items[0]?.id || '';
-        });
-      } catch {
-        if (
-          requestRef.current !== requestId ||
-          selectedPackageIdRef.current !== packageId
-        ) {
-          return;
-        }
-        if (side === 'left') {
-          setSkillArenaLeftVersions([]);
-          setSkillArenaLeftVersionId('');
-        } else {
-          setSkillArenaRightVersions([]);
-          setSkillArenaRightVersionId('');
-        }
-      } finally {
-        if (requestRef.current === requestId) {
-          setSkillArenaLoading((prev) => ({ ...prev, [side]: false }));
-        }
-      }
-    },
-    [showDiscardedSkillVersions, token],
-  );
-
   const openPackage = useCallback(
     async (packageId: string, snapshotList?: AgentPackageSummary[]) => {
       if (!token || !packageId) return;
@@ -847,6 +817,8 @@ export default function LiteArenaPanel() {
       setCenterPreview(null);
     }
     setManualEdit(null);
+    setAnswerOptimizationOpen(false);
+    setAnswerOptimizationTarget(null);
     setInteractiveInput('');
     setInteractivePhase('idle');
     if (switchDecision.clearProgress) {
@@ -869,20 +841,13 @@ export default function LiteArenaPanel() {
       setInteractiveMessages([]);
       setInteractiveAdopted([]);
       setInteractiveIssues([]);
+      setInteractiveView('chat');
       setPackageSkills([]);
       setSkillVersions([]);
       setSkillVersionsCurrentId('');
       setSelectedSkillVersionId('');
       setSkillVersionsLoading(false);
       setSkillVersionsError('');
-      setSkillArenaLeftSkillId('');
-      setSkillArenaRightSkillId('');
-      setSkillArenaLeftVersions([]);
-      setSkillArenaRightVersions([]);
-      setSkillArenaLeftVersionId('');
-      setSkillArenaRightVersionId('');
-      setSkillArenaLoading({ left: false, right: false });
-      setSkillArenaCreatePending(false);
       return;
     }
     setInteractiveMode(false);
@@ -892,6 +857,7 @@ export default function LiteArenaPanel() {
     setInteractiveMessages([]);
     setInteractiveAdopted([]);
     setInteractiveIssues([]);
+    setInteractiveView('chat');
     void loadInteractiveSessions(selectedPackageId, false);
   }, [loadInteractiveSessions, selectedPackageId, token]);
 
@@ -911,31 +877,6 @@ export default function LiteArenaPanel() {
   }, [packageSkills, selectedPackage?.snapshot.skills, selectedSkillId]);
 
   useEffect(() => {
-    if (!packageSkills.length) {
-      setSkillArenaLeftSkillId('');
-      setSkillArenaRightSkillId('');
-      return;
-    }
-    const currentSkillUid =
-      selectedPackage?.snapshot.skills[0]?.id ||
-      packageSkills[0]?.skillUid ||
-      '';
-    const alternateSkillUid =
-      packageSkills.find((skill) => skill.skillUid !== currentSkillUid)?.skillUid ||
-      currentSkillUid;
-    setSkillArenaLeftSkillId((current) =>
-      current && packageSkills.some((skill) => skill.skillUid === current)
-        ? current
-        : currentSkillUid,
-    );
-    setSkillArenaRightSkillId((current) =>
-      current && packageSkills.some((skill) => skill.skillUid === current)
-        ? current
-        : alternateSkillUid,
-    );
-  }, [packageSkills, selectedPackage?.snapshot.skills]);
-
-  useEffect(() => {
     if (!selectedPackageId || !selectedSkillRecord?.id) {
       skillVersionsRequestIdRef.current += 1;
       setSkillVersions([]);
@@ -951,68 +892,6 @@ export default function LiteArenaPanel() {
     selectedPackageId,
     selectedSkillRecord?.id,
     showDiscardedSkillVersions,
-  ]);
-
-  useEffect(() => {
-    const leftRecord = packageSkills.find(
-      (skill) => skill.skillUid === skillArenaLeftSkillId,
-    );
-    if (!selectedPackageId || !leftRecord?.id) {
-      skillArenaLeftRequestIdRef.current += 1;
-      setSkillArenaLeftVersions([]);
-      setSkillArenaLeftVersionId('');
-      setSkillArenaLoading((prev) => ({ ...prev, left: false }));
-      return;
-    }
-    void loadSkillArenaVersions('left', selectedPackageId, leftRecord.id);
-  }, [
-    loadSkillArenaVersions,
-    packageSkills,
-    selectedPackageId,
-    skillArenaLeftSkillId,
-    showDiscardedSkillVersions,
-  ]);
-
-  useEffect(() => {
-    const rightRecord = packageSkills.find(
-      (skill) => skill.skillUid === skillArenaRightSkillId,
-    );
-    if (!selectedPackageId || !rightRecord?.id) {
-      skillArenaRightRequestIdRef.current += 1;
-      setSkillArenaRightVersions([]);
-      setSkillArenaRightVersionId('');
-      setSkillArenaLoading((prev) => ({ ...prev, right: false }));
-      return;
-    }
-    void loadSkillArenaVersions('right', selectedPackageId, rightRecord.id);
-  }, [
-    loadSkillArenaVersions,
-    packageSkills,
-    selectedPackageId,
-    skillArenaRightSkillId,
-    showDiscardedSkillVersions,
-  ]);
-
-  useEffect(() => {
-    if (
-      skillArenaLeftSkillId &&
-      skillArenaLeftSkillId === skillArenaRightSkillId &&
-      skillArenaLeftVersionId &&
-      skillArenaLeftVersionId === skillArenaRightVersionId
-    ) {
-      const alternativeVersionId = skillArenaRightVersions.find(
-        (version) => version.id !== skillArenaLeftVersionId,
-      )?.id;
-      if (alternativeVersionId) {
-        setSkillArenaRightVersionId(alternativeVersionId);
-      }
-    }
-  }, [
-    skillArenaLeftSkillId,
-    skillArenaLeftVersionId,
-    skillArenaRightSkillId,
-    skillArenaRightVersionId,
-    skillArenaRightVersions,
   ]);
 
   useEffect(() => {
@@ -1152,14 +1031,6 @@ export default function LiteArenaPanel() {
     setSelectedSkillVersionId('');
     setSkillVersionsLoading(false);
     setSkillVersionsError('');
-    setSkillArenaLeftSkillId('');
-    setSkillArenaRightSkillId('');
-    setSkillArenaLeftVersions([]);
-    setSkillArenaRightVersions([]);
-    setSkillArenaLeftVersionId('');
-    setSkillArenaRightVersionId('');
-    setSkillArenaLoading({ left: false, right: false });
-    setSkillArenaCreatePending(false);
     setCenterPreview(null);
     setManualEdit(null);
     setInteractiveMode(false);
@@ -1171,6 +1042,100 @@ export default function LiteArenaPanel() {
     setInteractiveIssues([]);
     setInput('');
     setSideStreaming({ baseline: false, enhanced: false });
+    setRightExpanded(false);
+    setAnswerOptimizationOpen(false);
+    setAnswerOptimizationTarget(null);
+  }
+
+  const refreshAnswerOptimizationSummaries = useCallback(
+    async (enhancedAnswerMessageId: number) => {
+      const currentThread = threadRef.current;
+      if (!token || !currentThread?.id) return null;
+      const nextDetail = await liteApi.getThread(
+        token,
+        String(currentThread.id),
+      );
+      if (threadRef.current?.id === currentThread.id) {
+        setThreadDetail(nextDetail);
+      }
+      return (
+        nextDetail.answerOptimizations.find(
+          (summary) =>
+            summary.enhancedAnswerMessageId === enhancedAnswerMessageId,
+        ) || null
+      );
+    },
+    [token],
+  );
+
+  const handleAnswerOptimizationConfirmed = useCallback(
+    async (result: ConfirmAnswerOptimizationResult) => {
+      const packageId = selectedPackageIdRef.current;
+      const currentThread = threadRef.current;
+      if (!token || !packageId || !currentThread?.id) return;
+      const [packageDetail, versionList, nextThreadDetail] = await Promise.all([
+        liteApi.getPackage(token, packageId),
+        liteApi.listVersions(token, packageId),
+        liteApi.getThread(token, String(currentThread.id)),
+      ]);
+      if (selectedPackageIdRef.current !== packageId) return;
+      setSelectedPackage(packageDetail);
+      setVersions(versionList);
+      if (threadRef.current?.id === currentThread.id) {
+        setThreadDetail(nextThreadDetail);
+      }
+      setPackages((previous) =>
+        previous.map((item) =>
+          item.id === packageDetail.id
+            ? {
+                ...item,
+                name: packageDetail.name,
+                description: packageDetail.description,
+                versionNumber: result.versionNumber,
+                updatedAt: packageDetail.updatedAt,
+              }
+            : item,
+        ),
+      );
+    },
+    [token],
+  );
+
+  function openAnswerOptimization(input: {
+    question: ArenaMessage;
+    baseline: ArenaMessage | null;
+    enhanced: ArenaMessage;
+    summary: ArenaAnswerOptimizationSummary;
+  }) {
+    if (
+      !selectedPackage ||
+      !thread ||
+      typeof input.enhanced.id !== 'number' ||
+      !input.summary.canOptimize ||
+      input.summary.action === 'unavailable' ||
+      input.summary.action === 'completed'
+    ) {
+      return;
+    }
+    setAnswerOptimizationTarget({
+      packageId: Number(selectedPackage.id),
+      threadId: Number(thread.id),
+      questionMessageId: Number(input.question.id),
+      enhancedAnswerMessageId: input.enhanced.id,
+      baselineAnswerMessageId:
+        input.baseline && typeof input.baseline.id === 'number'
+          ? input.baseline.id
+          : null,
+      feedback: '',
+      optimizationId:
+        input.summary.action === 'resume'
+          ? input.summary.optimizationId
+          : null,
+      completedVersionNumber: input.summary.versionNumber,
+      questionContent: input.question.content,
+      answerContent: input.enhanced.content,
+    });
+    setAnswerOptimizationOpen(true);
   }
 
   function startResizeLeft(e: React.MouseEvent) {
@@ -1191,11 +1156,12 @@ export default function LiteArenaPanel() {
 
   function startResizeRight(e: React.MouseEvent) {
     e.preventDefault();
+    if (rightExpanded) return;
     const startX = e.clientX;
     const startWidth = rightWidth;
     function onMove(moveEvent: MouseEvent) {
       const delta = startX - moveEvent.clientX;
-      setRightWidth(Math.max(200, Math.min(450, startWidth + delta)));
+      setRightWidth(Math.max(280, Math.min(1100, startWidth + delta)));
     }
     function onUp() {
       document.removeEventListener('mousemove', onMove);
@@ -1402,73 +1368,6 @@ export default function LiteArenaPanel() {
     }
   }
 
-  async function handleCreateArenaThread() {
-    const currentPkgId = selectedPackageIdRef.current || selectedPackageId;
-    if (!token || !currentPkgId || skillArenaCreatePending) return;
-    setSkillArenaCreatePending(true);
-    try {
-      let nextThread: ArenaThread;
-      let nextDetail: ArenaThreadDetail;
-      if (arenaComposerKind === 'skill_arena') {
-        const leftRecord = packageSkills.find(
-          (skill) => skill.skillUid === skillArenaLeftSkillId,
-        );
-        const rightRecord = packageSkills.find(
-          (skill) => skill.skillUid === skillArenaRightSkillId,
-        );
-        if (
-          !currentPackageVersionId ||
-          !leftRecord?.id ||
-          !rightRecord?.id ||
-          !skillArenaLeftVersionId ||
-          !skillArenaRightVersionId
-        ) {
-          throw new Error('请先选择左右 Skill 及其版本');
-        }
-        nextThread = await liteApi.createArenaThread(token, currentPkgId, {
-          idempotencyKey: createClientIdempotencyKey(),
-          basePackageVersionId: currentPackageVersionId,
-          left: {
-            skillId: leftRecord.id,
-            skillVersionId: skillArenaLeftVersionId,
-          },
-          right: {
-            skillId: rightRecord.id,
-            skillVersionId: skillArenaRightVersionId,
-          },
-        });
-        nextDetail = await liteApi.getArenaThreadDetail(
-          token,
-          currentPkgId,
-          String(nextThread.id),
-        );
-      } else {
-        nextThread = await liteApi.createThread(token, currentPkgId);
-        nextDetail = await liteApi.getThread(token, String(nextThread.id));
-      }
-      if (selectedPackageIdRef.current !== currentPkgId) {
-        return;
-      }
-      setThread(nextThread);
-      setThreadDetail(nextDetail);
-      setReport(null);
-      setCenterPreview((prev) => (prev?.type === 'report' ? null : prev));
-      setArenaMode('compare');
-      setStatus(
-        nextThread.warning ||
-          (arenaComposerKind === 'skill_arena'
-            ? 'Skill Arena 已创建'
-            : '标准 Arena 已创建'),
-      );
-    } catch (error) {
-      setStatus(error instanceof Error ? error.message : '创建 Arena 线程失败');
-    } finally {
-      if (selectedPackageIdRef.current === currentPkgId) {
-        setSkillArenaCreatePending(false);
-      }
-    }
-  }
-
   async function handleReport() {
     if (!token || !thread?.id) return;
     if (!canGenerateReport) {
@@ -1595,7 +1494,7 @@ export default function LiteArenaPanel() {
     });
     flushSync(() => {
       setThreadDetail({
-        thread: threadDetail.thread,
+        ...threadDetail,
         messages: [...threadDetail.messages, ...tempMessages],
       });
     });
@@ -1701,6 +1600,12 @@ export default function LiteArenaPanel() {
             );
             setSideStreaming({ baseline: false, enhanced: false });
             setStatus('\u56de\u590d\u5df2\u751f\u6210');
+            void liteApi
+              .getThread(token, String(currentThreadId))
+              .then((savedDetail) => {
+                if (isCurrentReplyThread()) setThreadDetail(savedDetail);
+              })
+              .catch(() => undefined);
             return;
           }
           if (event.event === 'error')
@@ -1790,6 +1695,7 @@ export default function LiteArenaPanel() {
   function startManualEditAgent() {
     if (!selectedPackage) return;
     setInteractiveMode(false);
+    setRightExpanded(false);
     setCenterPreview(null);
     setManualEdit({
       target: 'agent',
@@ -1802,6 +1708,7 @@ export default function LiteArenaPanel() {
   function startManualEditSkill() {
     if (!selectedSkill) return;
     setInteractiveMode(false);
+    setRightExpanded(false);
     setCenterPreview(null);
     setManualEdit({
       target: 'skill',
@@ -1814,6 +1721,7 @@ export default function LiteArenaPanel() {
 
   function startManualEditRubric(seedContent?: string) {
     setInteractiveMode(false);
+    setRightExpanded(false);
     setCenterPreview(null);
     setManualEdit({
       target: 'rubric',
@@ -1827,16 +1735,6 @@ export default function LiteArenaPanel() {
         }),
       ),
       preview: false,
-    });
-  }
-
-  function openReportPreview(currentReport: ArenaReport | null) {
-    if (!currentReport) return;
-    setDetailTab('report');
-    setCenterPreview({
-      type: 'report',
-      name: '评估报告',
-      report: currentReport,
     });
   }
 
@@ -1894,7 +1792,7 @@ export default function LiteArenaPanel() {
       return '';
     }
     if (edit.target === 'skill') {
-      const frontmatter = content.match(/^---\s*\n([\s\S]*?)\n---/);
+      const frontmatter = content.match(/^---\s*\r?\n([\s\S]*?)\r?\n---/);
       if (!frontmatter)
         return 'SKILL.md \u5fc5\u987b\u4fdd\u7559\u9876\u90e8\u7684 YAML frontmatter';
       if (!/^name\s*:/m.test(frontmatter[1]))
@@ -1911,19 +1809,15 @@ export default function LiteArenaPanel() {
     if (error) {
       setStatus(error);
       failProgress(error);
+      toast.error(error);
       return;
     }
-    const defaultNote =
+    const note =
       manualEdit.target === 'agent'
         ? '\u624b\u52a8\u7f16\u8f91 agent.md'
         : manualEdit.target === 'rubric'
           ? '\u624b\u52a8\u7f16\u8f91 rubric.md'
           : '\u624b\u52a8\u7f16\u8f91 SKILL.md';
-    const note = window.prompt(
-      '\u8bf7\u8f93\u5165\u65b0\u7248\u672c\u5907\u6ce8\uff08\u53ef\u9009\uff09\uff1a',
-      defaultNote,
-    );
-    if (note === null) return;
 
     setManualEditSaving(true);
     startProgress(
@@ -1937,14 +1831,32 @@ export default function LiteArenaPanel() {
         {
           target: manualEdit.target,
           skillId: manualEdit.skillId,
-          content: manualEdit.content,
+          content: manualEdit.content.replace(/\r\n/g, '\n'),
           note,
         },
       );
+      const editedSkillId = manualEdit.skillId;
+      const editedTarget = manualEdit.target;
       setSelectedPackage(detail);
       await refreshPackages(detail.id);
       setManualEdit(null);
       setDetailTab('versions');
+      setVersionSubTab(editedTarget === 'skill' ? 'skill' : 'package');
+      if (editedTarget === 'skill' && editedSkillId) {
+        const latestSkillList = await liteApi.listPackageSkills(
+          token,
+          selectedPackageId,
+          true,
+        );
+        setPackageSkills(latestSkillList);
+        const skillRecord = latestSkillList.find(
+          (s) => s.skillUid === editedSkillId,
+        );
+        if (skillRecord) {
+          setSelectedSkillId(editedSkillId);
+          await loadSkillVersions(selectedPackageId, skillRecord.id);
+        }
+      }
       finishProgress(
         `\u5df2\u4fdd\u5b58\u4e3a\u65b0\u7248\u672c v${detail.versionNumber}`,
       );
@@ -1956,6 +1868,7 @@ export default function LiteArenaPanel() {
         error instanceof Error ? error.message : '\u4fdd\u5b58\u5931\u8d25';
       failProgress(message);
       setStatus(message);
+      toast.error(message);
     } finally {
       setManualEditSaving(false);
     }
@@ -1963,12 +1876,13 @@ export default function LiteArenaPanel() {
 
   async function startInteractive(forceNew = false) {
     if (!token || !thread?.id || !selectedPackageId) return;
-    if (replyGenerating) {
+    if (replyGenerating || interactivePhase !== 'idle') {
       setStatus(interactiveRequiredMessage);
       return;
     }
     if (!ensureRubricConfigured('\u4ea4\u4e92\u5f0f\u4f18\u5316')) return;
     setInteractiveMode(true);
+    setRightExpanded(false);
     setCenterPreview(null);
     const latestActive =
       interactiveSessions.find((session) => session.status === 'active') ||
@@ -2018,10 +1932,11 @@ export default function LiteArenaPanel() {
       const welcomeMsg = { role: 'assistant', content: result.welcomeMessage };
       saveInteractiveState(currentPkgId, [welcomeMsg], [], result.issues);
       if (result.session) {
-        setInteractiveSessionId(result.session.id);
+        const newSession = result.session;
+        setInteractiveSessionId(newSession.id);
         setInteractiveSessions((prev) => [
-          result.session!,
-          ...prev.filter((session) => session.id !== result.session!.id),
+          newSession,
+          ...prev.filter((session) => session.id !== newSession.id),
         ]);
       }
       if (selectedPackageIdRef.current === currentPkgId) {
@@ -2143,10 +2058,11 @@ export default function LiteArenaPanel() {
       );
 
       if (result.session) {
-        setInteractiveSessionId(result.session.id);
+        const newSession = result.session;
+        setInteractiveSessionId(newSession.id);
         setInteractiveSessions((prev) => [
-          result.session!,
-          ...prev.filter((session) => session.id !== result.session!.id),
+          newSession,
+          ...prev.filter((session) => session.id !== newSession.id),
         ]);
       }
 
@@ -2212,7 +2128,8 @@ export default function LiteArenaPanel() {
       if (selectedPackageIdRef.current === currentPkgId) {
         setInteractiveMode(false);
         setOptimization(null);
-        setDetailTab('optimization');
+        setDetailTab('versions');
+        setVersionSubTab('package');
       }
       finishProgress(`已保存为新版本 v${result.versionNumber}`);
     } catch (error) {
@@ -2290,7 +2207,8 @@ export default function LiteArenaPanel() {
       );
       finishProgress(`已创建新版本 v${result.versionNumber}`);
       setStatus(`已回退并创建新版本 v${result.versionNumber}`);
-      setDetailTab('skills');
+      setDetailTab('versions');
+      setVersionSubTab('skill');
     } catch (error) {
       const apiError = error instanceof LiteApiError ? error : null;
       if (apiError?.code === 'PACKAGE_VERSION_CONFLICT') {
@@ -2310,6 +2228,65 @@ export default function LiteArenaPanel() {
         skillActionPendingIdRef.current = '';
       }
       setSkillActionPendingId((current) =>
+        current === actionId ? '' : current,
+      );
+    }
+  }
+
+  async function handleRollbackPackageVersion(version: PackageVersion) {
+    if (!token || !selectedPackageId || !currentPackageVersionId) return;
+    if (
+      !window.confirm(
+        `确认回退到智能体版本 v${version.versionNumber} 吗？系统会前向创建一个新的智能体版本，内容将完全替换为 v${version.versionNumber} 的快照。`,
+      )
+    ) {
+      return;
+    }
+    const note = window.prompt('请输入回退备注（可选）：', '智能体版本回退');
+    if (note === null) return;
+    const currentPkgId = selectedPackageId;
+    const actionId = `pkg-rollback:${version.id}`;
+    if (packageVersionActionPendingIdRef.current === actionId) return;
+    const idempotencyKey = createClientIdempotencyKey();
+    packageVersionActionPendingIdRef.current = actionId;
+    setPackageVersionActionPendingId(actionId);
+    startProgress('回退智能体版本', '正在创建新的智能体版本...');
+    try {
+      const result = await liteApi.rollbackPackageVersion(
+        token,
+        currentPkgId,
+        {
+          versionId: String(version.id),
+          expectedPackageVersionId: currentPackageVersionId,
+          idempotencyKey,
+          note: note.trim() || undefined,
+        },
+      );
+      await refreshPackages(currentPkgId);
+      finishProgress(`已回退到 v${result.rolledBackFromVersionNumber} 并创建新版本 v${result.versionNumber}`);
+      setStatus(
+        `已回退到 v${result.rolledBackFromVersionNumber} 并创建新版本 v${result.versionNumber}`,
+      );
+      setDetailTab('versions');
+      setVersionSubTab('package');
+    } catch (error) {
+      const apiError = error instanceof LiteApiError ? error : null;
+      if (apiError?.code === 'PACKAGE_VERSION_CONFLICT') {
+        const message =
+          '当前智能体包已被其他操作更新。页面会先刷新到最新版本，请确认后重新执行回退。';
+        await refreshPackages(currentPkgId);
+        failProgress(message);
+        setStatus(message);
+        return;
+      }
+      const message = error instanceof Error ? error.message : '回退失败';
+      failProgress(message);
+      setStatus(message);
+    } finally {
+      if (packageVersionActionPendingIdRef.current === actionId) {
+        packageVersionActionPendingIdRef.current = '';
+      }
+      setPackageVersionActionPendingId((current) =>
         current === actionId ? '' : current,
       );
     }
@@ -2374,38 +2351,6 @@ export default function LiteArenaPanel() {
         current === actionId ? '' : current,
       );
     }
-  }
-
-  function buildDiffMarkdown(result: VersionCompareResult): string {
-    const lines: string[] = [
-      `# 版本对比：v${result.baseVersion.versionNumber} -> v${result.targetVersion.versionNumber}`,
-      '',
-      '## AI 总结',
-      '',
-      result.summary || '暂无总结',
-      '',
-      '---',
-      '',
-    ];
-    const pushDiff = (title: string, diffs: LineDiff[]) => {
-      const changes = diffs.filter((d) => d.type !== 'same');
-      if (changes.length === 0) return;
-      lines.push(`## ${title}`);
-      lines.push('```diff');
-      for (const d of diffs) {
-        if (d.type === 'same') lines.push(` ${d.text}`);
-        else if (d.type === 'removed') lines.push(`-${d.text}`);
-        else if (d.type === 'added') lines.push(`+${d.text}`);
-      }
-      lines.push('```');
-      lines.push('');
-    };
-    pushDiff('agent.md', result.diffs.agentMd);
-    pushDiff('rubric.md', result.diffs.rubricMd);
-    for (const skill of result.diffs.skills) {
-      pushDiff(`${skill.name} (${skill.dirName})`, skill.diff);
-    }
-    return lines.join('\n');
   }
 
   function formatAdoptedTarget(change: AdoptedChange) {
@@ -2474,8 +2419,8 @@ export default function LiteArenaPanel() {
     const rows = getFocusedDiffRows(preview.diffs);
 
     return (
-      <div className="mx-auto max-w-5xl space-y-4">
-        <div className="rounded-[18px] border border-primary/20 bg-primary/5 px-4 py-3">
+      <div className="space-y-4">
+        <div className="rounded-[14px] border border-primary/20 bg-primary/5 px-4 py-3">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
@@ -2498,7 +2443,7 @@ export default function LiteArenaPanel() {
             </div>
           </div>
         </div>
-        <div className="overflow-hidden rounded-[18px] border border-border/70 bg-card/80">
+        <div className="overflow-hidden rounded-[14px] border border-border/70 bg-card/80">
           <div className="border-b border-border/70 bg-muted/40 px-4 py-2 text-xs text-muted-foreground">
             修改痕迹
           </div>
@@ -2586,144 +2531,428 @@ export default function LiteArenaPanel() {
     const sideTitles = isSkillArenaThread
       ? { baseline: '左侧版本', enhanced: '右侧版本' }
       : { baseline: '基础回答', enhanced: '增强回答' };
-    const titleClass = compact ? 'text-lg' : 'text-xl';
+    const baselineCard = sideCards.find((c) => c.key === 'baseline')!;
+    const enhancedCard = sideCards.find((c) => c.key === 'enhanced')!;
+    const baselineMaxTotal = rows.reduce(
+      (sum, r) => sum + r.baselineMaxScore,
+      0,
+    );
+    const enhancedMaxTotal = rows.reduce(
+      (sum, r) => sum + r.enhancedMaxScore,
+      0,
+    );
+    const baselineWin = currentReport.winningSide === 'baseline';
+    const enhancedWin = currentReport.winningSide === 'enhanced';
 
-    return (
-      <div className={compact ? 'space-y-4' : 'mx-auto max-w-5xl space-y-5'}>
-        <section className="rounded-[16px] border border-border/70 bg-card/90 px-4 py-4 shadow-sm">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="min-w-0 flex-1">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                评估报告
+    if (compact) {
+      return (
+        <div className="space-y-3">
+          <div className="relative overflow-hidden rounded-[12px] border border-primary/20 bg-gradient-to-br from-primary/10 to-card px-3.5 py-3">
+            <div className="absolute inset-x-0 top-0 h-[2px] bg-primary" />
+            <div className="ec-eyebrow text-[10px]">VERDICT</div>
+            <div className="mt-0.5 font-serif-display text-[15px] font-semibold leading-tight text-primary">
+              {winnerLabel}
+            </div>
+            <div className="mt-1.5 line-clamp-4 text-[11.5px] leading-relaxed text-foreground/80">
+              {currentReport.recommendation || '暂无综合判断。'}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div
+              className={`relative overflow-hidden rounded-[10px] border px-2.5 py-2 ${
+                baselineWin
+                  ? 'border-primary/25 bg-primary/10'
+                  : 'border-border bg-card'
+              }`}
+            >
+              {baselineWin && (
+                <div className="absolute inset-x-0 top-0 h-[2px] bg-primary" />
+              )}
+              <div className="font-mono-meta text-[9px] text-muted-foreground">
+                BASELINE
+              </div>
+              <div className="mt-0.5 truncate font-serif-display text-[12px] font-semibold text-foreground">
+                {baselineCard.label}
+              </div>
+              <div className="mt-1 font-serif-display text-[20px] font-semibold leading-none text-foreground">
+                {baselineCard.total.toFixed(2)}
+                <span className="ml-1 font-mono-meta text-[10px] text-muted-foreground">
+                  /{baselineMaxTotal.toFixed(0)}
+                </span>
+              </div>
+            </div>
+            <div
+              className={`relative overflow-hidden rounded-[10px] border px-2.5 py-2 ${
+                enhancedWin
+                  ? 'border-primary/25 bg-primary/10'
+                  : 'border-border bg-card'
+              }`}
+            >
+              {enhancedWin && (
+                <div className="absolute inset-x-0 top-0 h-[2px] bg-primary" />
+              )}
+              <div className="font-mono-meta text-[9px] text-muted-foreground">
+                ENHANCED
               </div>
               <div
-                className={`mt-1 font-semibold text-foreground ${titleClass}`}
+                className={`mt-0.5 truncate font-serif-display text-[12px] font-semibold ${
+                  enhancedWin ? 'text-primary' : 'text-foreground'
+                }`}
               >
-                {winnerLabel}
+                {enhancedCard.label}
+              </div>
+              <div
+                className={`mt-1 font-serif-display text-[20px] font-semibold leading-none ${
+                  enhancedWin ? 'text-primary' : 'text-foreground'
+                }`}
+              >
+                {enhancedCard.total.toFixed(2)}
+                <span className="ml-1 font-mono-meta text-[10px] text-muted-foreground">
+                  /{enhancedMaxTotal.toFixed(0)}
+                </span>
               </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {sideCards.map((card) => (
+          </div>
+
+          <div className="overflow-hidden rounded-[12px] border border-border bg-card">
+            <div className="flex items-center justify-between border-b border-border bg-muted px-3 py-2">
+              <span className="font-mono-meta text-[9.5px] text-muted-foreground">
+                DIMENSIONS
+              </span>
+              <span className="font-mono-meta text-[10px] text-muted-foreground">
+                {rows.length} 项
+              </span>
+            </div>
+            {rows.map((row) => {
+              const diff = row.enhancedScore - row.baselineScore;
+              const enhWin = diff > 0;
+              const baseWin = diff < 0;
+              const tie = diff === 0;
+              return (
                 <div
-                  key={card.key}
-                  className="min-w-[108px] rounded-[14px] border border-border/70 bg-muted/30 px-3 py-2.5 text-right"
+                  key={row.key}
+                  className="border-b border-border px-3 py-2 last:border-b-0"
                 >
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                    {card.label}
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11.5px] font-medium text-foreground">
+                      {row.name}
+                    </span>
+                    <span
+                      className={`rounded-[3px] px-1.5 py-px font-mono-meta text-[9.5px] font-semibold ${
+                        tie
+                          ? 'bg-muted text-muted-foreground'
+                          : enhWin
+                            ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                            : 'bg-red-500/10 text-red-700 dark:text-red-300'
+                      }`}
+                    >
+                      {tie ? '0' : `${enhWin ? '+' : ''}${diff}`}
+                    </span>
                   </div>
-                  <div className="mt-1 text-lg font-bold leading-none text-foreground">
-                    {card.total.toFixed(2)}
+                  <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+                    <div className="flex flex-col gap-0.5">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="font-mono-meta text-[8.5px] text-muted-foreground/70">
+                          BASE
+                        </span>
+                        <span
+                          className={`font-mono-meta text-[11px] ${
+                            baseWin
+                              ? 'font-semibold text-primary'
+                              : 'text-foreground/80'
+                          }`}
+                        >
+                          {row.baselineScore}/{row.baselineMaxScore}
+                        </span>
+                      </div>
+                      <div className="h-[3px] overflow-hidden rounded-full bg-foreground/5">
+                        <div
+                          className={`h-full rounded-full ${baseWin ? 'bg-primary' : 'bg-muted-foreground/40'}`}
+                          style={{
+                            width: `${row.baselineMaxScore > 0 ? (row.baselineScore / row.baselineMaxScore) * 100 : 0}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="font-mono-meta text-[8.5px] text-muted-foreground/70">
+                          ENH
+                        </span>
+                        <span
+                          className={`font-mono-meta text-[11px] ${
+                            enhWin
+                              ? 'font-semibold text-primary'
+                              : 'text-foreground/80'
+                          }`}
+                        >
+                          {row.enhancedScore}/{row.enhancedMaxScore}
+                        </span>
+                      </div>
+                      <div className="h-[3px] overflow-hidden rounded-full bg-foreground/5">
+                        <div
+                          className={`h-full rounded-full ${enhWin ? 'bg-primary' : 'bg-muted-foreground/40'}`}
+                          style={{
+                            width: `${row.enhancedMaxScore > 0 ? (row.enhancedScore / row.enhancedMaxScore) * 100 : 0}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
-              ))}
-            </div>
+              );
+            })}
           </div>
-          <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-            <div className="rounded-[14px] border border-border/60 bg-muted/20 px-4 py-3">
-              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                综合判断
-              </div>
-              <div className="mt-2 text-sm leading-6 text-foreground">
-                {currentReport.recommendation ||
-                  '\u6682\u65e0\u7efc\u5408\u5224\u65ad\u3002'}
-              </div>
+
+          {!rubricConfigured && (
+            <div className="rounded-[10px] border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-[11px] leading-5 text-amber-900 dark:text-amber-200">
+              {reportHintMessage}
             </div>
-            <div className="rounded-[14px] border border-border/60 bg-muted/20 px-4 py-3">
-              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                阅读方式
-              </div>
-              <div className="mt-2 text-sm leading-6 text-muted-foreground">
-                先看两边的整体总结，再对照每个维度的分数和理由，就能比较快地判断当前智能体哪里更强、下一步该补哪里。
-              </div>
-              {!rubricConfigured && (
-                <div className="mt-3 rounded-[14px] border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs leading-5 text-amber-800 dark:text-amber-200">
-                  {reportHintMessage}
-                </div>
-              )}
-            </div>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-4">
+        <section className="relative overflow-hidden rounded-[14px] border border-primary/20 bg-gradient-to-br from-primary/10 via-card to-card px-4 py-4 shadow-sm">
+          <div className="absolute inset-x-0 top-0 h-[3px] bg-primary" />
+          <div className="ec-eyebrow text-[10.5px]">
+            EVALUATION REPORT · VERDICT
           </div>
+          <div className="mt-1 font-serif-display text-xl font-semibold leading-tight text-foreground">
+            推荐选择 {winnerLabel}
+          </div>
+          <div className="mt-2 text-[13px] leading-relaxed text-foreground/85">
+            {currentReport.recommendation || '暂无综合判断。'}
+          </div>
+          {!rubricConfigured && (
+            <div className="mt-3 rounded-[10px] border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-[11px] leading-5 text-amber-900 dark:text-amber-200">
+              {reportHintMessage}
+            </div>
+          )}
         </section>
 
-        <section className="grid gap-4 lg:grid-cols-2">
-          {sideCards.map((card) => (
-            <article
-              key={card.key}
-              className="rounded-[16px] border border-border/70 bg-card/90 px-4 py-4 shadow-sm"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                    {card.key === 'baseline'
-                      ? sideTitles.baseline
-                      : sideTitles.enhanced}
+        <section className="grid gap-3 lg:grid-cols-2">
+          {sideCards.map((card) => {
+            const isBaseline = card.key === 'baseline';
+            const isWinner =
+              (isBaseline && baselineWin) || (!isBaseline && enhancedWin);
+            const maxTotal = isBaseline ? baselineMaxTotal : enhancedMaxTotal;
+            const pct =
+              maxTotal > 0 ? Math.min(100, (card.total / maxTotal) * 100) : 0;
+            const roleLabel = isBaseline ? 'BASELINE' : 'ENHANCED';
+            const sideTitle = isBaseline
+              ? sideTitles.baseline
+              : sideTitles.enhanced;
+            return (
+              <article
+                key={card.key}
+                className={`relative overflow-hidden rounded-[14px] border px-4 py-3.5 shadow-sm transition-colors ${
+                  isWinner
+                    ? 'border-primary/25 bg-primary/[0.04]'
+                    : 'border-border bg-card'
+                }`}
+              >
+                {isWinner && (
+                  <div className="absolute inset-x-0 top-0 h-[2px] bg-primary" />
+                )}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`rounded-[4px] px-1.5 py-px font-mono-meta text-[9.5px] font-medium tracking-[0.06em] ${
+                          isWinner
+                            ? 'bg-card text-primary'
+                            : 'bg-muted text-muted-foreground'
+                        }`}
+                      >
+                        {roleLabel}
+                        {isWinner ? ' · WINNER' : ''}
+                      </span>
+                      <span className="font-mono-meta text-[10px] text-muted-foreground">
+                        {sideTitle}
+                      </span>
+                    </div>
+                    <div
+                      className={`mt-1.5 truncate font-serif-display text-[15px] font-semibold ${
+                        isWinner ? 'text-primary' : 'text-foreground'
+                      }`}
+                    >
+                      {card.label}
+                    </div>
                   </div>
-                  <div className="mt-1 text-sm font-medium text-foreground">
-                    {card.label}
+                  <div className="flex shrink-0 items-baseline gap-1">
+                    <span
+                      className={`font-serif-display text-[26px] font-semibold leading-none tracking-tight ${
+                        isWinner ? 'text-primary' : 'text-foreground'
+                      }`}
+                    >
+                      {card.total.toFixed(2)}
+                    </span>
+                    <span className="font-mono-meta text-[11px] text-muted-foreground">
+                      /{maxTotal.toFixed(0)}
+                    </span>
                   </div>
                 </div>
-              </div>
-              <div className="mt-3 rounded-[14px] border border-border/60 bg-muted/20 px-4 py-3 text-sm leading-6 text-foreground">
-                {card.summary || '\u6682\u65e0\u8bc4\u4ef7\u3002'}
-              </div>
-            </article>
-          ))}
+                <div className="mt-2.5 text-[12.5px] leading-relaxed text-foreground/80">
+                  {card.summary || '暂无评价。'}
+                </div>
+                <div className="mt-3 h-1 overflow-hidden rounded-full bg-foreground/5">
+                  <div
+                    className={`h-full rounded-full ${
+                      isWinner
+                        ? 'bg-gradient-to-r from-primary to-blue-500'
+                        : 'bg-muted-foreground/40'
+                    }`}
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+              </article>
+            );
+          })}
         </section>
 
-        <section className="overflow-hidden rounded-[16px] border border-border/70 bg-card/90 shadow-sm">
-          <div className="border-b border-border/70 bg-muted/35 px-4 py-3">
-            <div className="text-sm font-medium text-foreground">
+        <section className="overflow-hidden rounded-[14px] border border-border bg-card shadow-sm">
+          <div className="border-b border-border px-4 py-3">
+            <div className="ec-eyebrow text-[10px]">DIMENSIONS</div>
+            <div className="mt-0.5 font-serif-display text-[15px] font-semibold text-foreground">
               维度逐项对比
             </div>
-            <div className="mt-1 text-xs leading-5 text-muted-foreground">
-              分数告诉你差距，理由告诉你为什么会有这个差距。
-            </div>
           </div>
-          <div className="divide-y divide-border/70">
-            {rows.map((row) => (
-              <div key={row.key} className="px-4 py-4">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <div className="font-medium text-foreground">
-                      {row.name}
-                    </div>
-                    {!compact && (
-                      <div className="mt-1 text-xs leading-5 text-muted-foreground">
+          <div className="divide-y divide-border">
+            {rows.map((row) => {
+              const diff = row.enhancedScore - row.baselineScore;
+              const enhWin = diff > 0;
+              const baseWin = diff < 0;
+              const tie = diff === 0;
+              const baselinePctRow =
+                row.baselineMaxScore > 0
+                  ? (row.baselineScore / row.baselineMaxScore) * 100
+                  : 0;
+              const enhancedPctRow =
+                row.enhancedMaxScore > 0
+                  ? (row.enhancedScore / row.enhancedMaxScore) * 100
+                  : 0;
+              return (
+                <div key={row.key} className="px-4 py-3.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="font-mono-meta text-[10px] text-muted-foreground/70">
                         {row.key}
                       </div>
-                    )}
+                      <div className="font-serif-display text-[14px] font-semibold text-foreground">
+                        {row.name}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <div className="font-mono-meta text-[9px] text-muted-foreground">
+                          BASELINE
+                        </div>
+                        <div
+                          className={`font-mono-meta text-[13px] ${
+                            baseWin
+                              ? 'font-semibold text-primary'
+                              : 'text-foreground/80'
+                          }`}
+                        >
+                          {row.baselineScore} / {row.baselineMaxScore}
+                        </div>
+                      </div>
+                      <span
+                        className={`rounded-[4px] px-2 py-0.5 font-mono-meta text-[11px] font-semibold ${
+                          tie
+                            ? 'bg-muted text-muted-foreground'
+                            : enhWin
+                              ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                              : 'bg-red-500/10 text-red-700 dark:text-red-300'
+                        }`}
+                      >
+                        {tie ? '±0' : `${enhWin ? '+' : ''}${diff}`}
+                      </span>
+                      <div className="text-right">
+                        <div className="font-mono-meta text-[9px] text-muted-foreground">
+                          ENHANCED
+                        </div>
+                        <div
+                          className={`font-mono-meta text-[13px] ${
+                            enhWin
+                              ? 'font-semibold text-primary'
+                              : 'text-foreground/80'
+                          }`}
+                        >
+                          {row.enhancedScore} / {row.enhancedMaxScore}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                    <div className="rounded-[10px] border border-border/60 bg-muted/30 px-3 py-2.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-mono-meta text-[9.5px] text-muted-foreground">
+                          BASELINE
+                        </span>
+                        <span
+                          className={`font-mono-meta text-[11px] ${
+                            baseWin ? 'text-primary' : 'text-foreground/70'
+                          }`}
+                        >
+                          {row.baselineScore}/{row.baselineMaxScore}
+                        </span>
+                      </div>
+                      <div className="mt-1.5 h-[5px] overflow-hidden rounded-full bg-foreground/5">
+                        <div
+                          className={`h-full rounded-full ${
+                            baseWin
+                              ? 'bg-gradient-to-r from-primary to-blue-500'
+                              : 'bg-muted-foreground/40'
+                          }`}
+                          style={{ width: `${baselinePctRow}%` }}
+                        />
+                      </div>
+                      <div className="mt-2 text-[11.5px] leading-relaxed text-muted-foreground">
+                        {row.baselineReason || '暂无说明。'}
+                      </div>
+                    </div>
+                    <div
+                      className={`rounded-[10px] border px-3 py-2.5 ${
+                        enhWin
+                          ? 'border-primary/20 bg-primary/5'
+                          : 'border-border/60 bg-muted/30'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-mono-meta text-[9.5px] text-muted-foreground">
+                          ENHANCED
+                        </span>
+                        <span
+                          className={`font-mono-meta text-[11px] ${
+                            enhWin ? 'text-primary' : 'text-foreground/70'
+                          }`}
+                        >
+                          {row.enhancedScore}/{row.enhancedMaxScore}
+                        </span>
+                      </div>
+                      <div className="mt-1.5 h-[5px] overflow-hidden rounded-full bg-foreground/5">
+                        <div
+                          className={`h-full rounded-full ${
+                            enhWin
+                              ? 'bg-gradient-to-r from-primary to-blue-500'
+                              : 'bg-muted-foreground/40'
+                          }`}
+                          style={{ width: `${enhancedPctRow}%` }}
+                        />
+                      </div>
+                      <div className="mt-2 text-[11.5px] leading-relaxed text-muted-foreground">
+                        {row.enhancedReason || '暂无说明。'}
+                      </div>
+                    </div>
                   </div>
                 </div>
-
-                <div className="mt-3 grid gap-4 lg:grid-cols-2">
-                  <article className="rounded-[14px] border border-border/60 bg-muted/20 px-3 py-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                        {sideTitles.baseline}
-                      </div>
-                      <div className="rounded-full border border-border/80 bg-background/85 px-2.5 py-1 text-sm font-semibold text-foreground">
-                        {row.baselineScore}/{row.baselineMaxScore}
-                      </div>
-                    </div>
-                    <div className="mt-2 text-sm leading-6 text-muted-foreground">
-                      {row.baselineReason || '\u6682\u65e0\u8bf4\u660e\u3002'}
-                    </div>
-                  </article>
-                  <article className="rounded-[14px] border border-primary/15 bg-primary/5 px-3 py-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                        {sideTitles.enhanced}
-                      </div>
-                      <div className="rounded-full border border-primary/20 bg-background/90 px-2.5 py-1 text-sm font-semibold text-foreground">
-                        {row.enhancedScore}/{row.enhancedMaxScore}
-                      </div>
-                    </div>
-                    <div className="mt-2 text-sm leading-6 text-muted-foreground">
-                      {row.enhancedReason || '\u6682\u65e0\u8bf4\u660e\u3002'}
-                    </div>
-                  </article>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
       </div>
@@ -2732,7 +2961,10 @@ export default function LiteArenaPanel() {
 
   return (
     <div className="relative flex h-full min-h-0 w-full overflow-hidden">
-      {!isWideLayout && (sidebarOpen || rightSidebarOpen) && (
+      {!isWideLayout &&
+        !manualEdit &&
+        !interactiveMode &&
+        (sidebarOpen || rightSidebarOpen) && (
         <button
           type="button"
           aria-label="关闭面板"
@@ -2740,6 +2972,7 @@ export default function LiteArenaPanel() {
           onClick={() => {
             setSidebarOpen(false);
             setRightSidebarOpen(false);
+            setRightExpanded(false);
           }}
         />
       )}
@@ -2748,7 +2981,7 @@ export default function LiteArenaPanel() {
         <>
           <aside
             style={sidebarStyle}
-            className="absolute inset-y-0 left-0 z-30 flex w-[min(22rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] flex-col border-r border-border/70 bg-card/95 shadow-xl backdrop-blur lg:relative lg:z-auto lg:w-[var(--sidebar-width)] lg:max-w-none lg:bg-card/40 lg:shadow-none lg:backdrop-blur-0"
+            className="absolute inset-y-0 left-0 z-30 flex w-[min(22rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] flex-col border-r border-border/70 bg-card shadow-xl lg:relative lg:z-auto lg:w-[var(--sidebar-width)] lg:max-w-none lg:shadow-none"
           >
             <div className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-border/70 px-3">
               {authUser ? (
@@ -2786,7 +3019,7 @@ export default function LiteArenaPanel() {
             <ScrollArea className="flex-1 min-h-0">
               <div className="space-y-4 overflow-x-hidden p-4">
                 <div className="space-y-2">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                  <div className="text-[11px] font-semibold tracking-[0.05em] text-muted-foreground">
                     生成 Agent / Skill
                   </div>
                   <Textarea
@@ -2946,24 +3179,24 @@ export default function LiteArenaPanel() {
                 </div>
                 <div className="h-px bg-border/70" />
                 <div className="space-y-2">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                    仓库 ({packages.length})
+                  <div className="text-[11px] font-semibold tracking-[0.05em] text-muted-foreground">
+                    仓库 · {packages.length}
                   </div>
                   <div className="space-y-1.5">
                     {packages.map((pkg) => (
                       <div
                         key={pkg.id}
-                        className={`flex w-full items-center gap-2 rounded-xl border px-2 py-2 transition-colors ${pkg.id === selectedPackageId ? 'border-primary/30 bg-primary/5' : 'border-transparent hover:bg-muted'}`}
+                        className={`flex w-full items-center gap-2 rounded-[12px] px-2 py-2 transition-colors ${pkg.id === selectedPackageId ? 'bg-primary/10' : 'hover:bg-muted'}`}
                       >
                         <button
                           onClick={() => void openPackage(pkg.id)}
                           className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
                         >
-                          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary font-bold text-xs">
+                          <div className={`flex size-8 shrink-0 items-center justify-center rounded-[10px] font-bold text-xs transition-colors ${pkg.id === selectedPackageId ? 'bg-primary text-primary-foreground' : 'bg-primary/10 text-primary'}`}>
                             {pkg.name.charAt(0).toUpperCase()}
                           </div>
                           <div className="min-w-0">
-                            <div className="truncate text-sm font-medium">
+                            <div className={`truncate text-sm font-medium ${pkg.id === selectedPackageId ? 'text-primary' : ''}`}>
                               {pkg.name}
                             </div>
                             <div className="truncate text-[11px] text-muted-foreground">
@@ -2974,8 +3207,8 @@ export default function LiteArenaPanel() {
                         <button
                           onClick={() =>
                             void handleRenamePackage(pkg.id, pkg.name)
-                          }
-                          className="flex size-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+                        }
+                          className="flex size-7 shrink-0 items-center justify-center rounded-[10px] text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
                           title="\u91cd\u547d\u540d"
                         >
                           <Pencil className="size-3.5" />
@@ -2983,7 +3216,7 @@ export default function LiteArenaPanel() {
                       </div>
                     ))}
                     {packages.length === 0 && (
-                      <div className="rounded-xl border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
+                      <div className="rounded-[14px] border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
                         暂无智能体
                       </div>
                     )}
@@ -3010,10 +3243,10 @@ export default function LiteArenaPanel() {
       )}
 
       {/* Main Arena */}
-      <main className="flex min-w-0 flex-1 flex-col bg-card/20">
+      <main className={`flex min-w-0 flex-1 flex-col bg-card/20 ${manualEdit || interactiveMode ? 'relative z-40' : ''} ${rightExpanded && !manualEdit && !interactiveMode ? 'hidden lg:hidden' : ''}`}>
         {manualEdit ? (
           <>
-            <div className="flex min-h-12 shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border/70 bg-card/40 px-14 py-2 lg:px-5">
+            <div className="relative z-50 flex min-h-12 shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border/70 bg-card/40 px-14 py-2 lg:px-5">
               <div className="flex min-w-0 items-center gap-3">
                 <div className="truncate text-sm font-semibold">
                   编辑 {manualEdit.title}
@@ -3053,7 +3286,7 @@ export default function LiteArenaPanel() {
                   {manualEditSaving && (
                     <Loader2 className="mr-1.5 size-3.5 animate-spin" />
                   )}
-                  保存为新版本
+                  保存
                 </Button>
               </div>
             </div>
@@ -3064,7 +3297,7 @@ export default function LiteArenaPanel() {
             )}
             <div className="flex-1 overflow-hidden p-3 sm:p-5">
               {manualEdit.preview ? (
-                <div className="h-full overflow-auto rounded-[18px] border border-border/70 bg-card/70 p-5 text-sm">
+                <div className="h-full overflow-auto rounded-[14px] border border-border/70 bg-card/70 p-5 text-sm">
                   {manualEdit.target === 'skill' ? (
                     <SkillMarkdownContent content={manualEdit.content} />
                   ) : manualEdit.target === 'rubric' ? (
@@ -3082,7 +3315,7 @@ export default function LiteArenaPanel() {
                     )
                   }
                   spellCheck={false}
-                  className="h-full min-h-[520px] resize-none rounded-[18px] border-border/70 bg-card/80 font-mono text-xs leading-5"
+                  className="h-full min-h-[520px] resize-none rounded-[14px] border-border/70 bg-card/80 font-mono text-xs leading-5"
                 />
               )}
             </div>
@@ -3194,7 +3427,7 @@ export default function LiteArenaPanel() {
                   {interactiveIssues.map((issue) => (
                     <div
                       key={issue.id}
-                      className="rounded-[18px] border border-border/70 bg-card/70 p-4 text-sm"
+                      className="rounded-[14px] border border-border/70 bg-card/70 p-4 text-sm"
                     >
                       <div className="font-semibold">{issue.title}</div>
                       <div className="mt-1 text-xs text-muted-foreground">
@@ -3221,7 +3454,7 @@ export default function LiteArenaPanel() {
                     <button
                       key={change.id}
                       onClick={() => showAdoptedChangeDiff(change)}
-                      className="block w-full rounded-[18px] border border-border/70 bg-card/70 p-4 text-left text-sm hover:border-primary/30 hover:bg-primary/5"
+                      className="block w-full rounded-[14px] border border-border/70 bg-card/70 p-4 text-left text-sm hover:border-primary/30 hover:bg-primary/5"
                     >
                       <div className="flex items-center gap-2">
                         <Badge variant="secondary">
@@ -3248,7 +3481,7 @@ export default function LiteArenaPanel() {
                     <button
                       key={session.id}
                       onClick={() => applyInteractiveSession(session, true)}
-                      className={`block w-full rounded-[18px] border p-4 text-left text-sm transition-colors ${interactiveSessionId === session.id ? 'border-primary/30 bg-primary/5' : 'border-border/70 bg-card/70 hover:border-primary/25'}`}
+                      className={`block w-full rounded-[14px] border p-4 text-left text-sm transition-colors ${interactiveSessionId === session.id ? 'border-primary/30 bg-primary/5' : 'border-border/70 bg-card/70 hover:border-primary/25'}`}
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div className="font-medium">
@@ -3468,7 +3701,7 @@ export default function LiteArenaPanel() {
                 renderArenaReportView(centerPreview.report)
               ) : (
                 <div className="max-w-3xl mx-auto">
-                  <div className="rounded-[20px] border border-border/70 bg-muted/50 p-5 text-sm">
+                  <div className="rounded-[14px] border border-border/70 bg-muted/50 p-5 text-sm">
                     {(() => {
                       const previewContent = normalizePreviewContent(
                         centerPreview.content,
@@ -3490,29 +3723,33 @@ export default function LiteArenaPanel() {
         ) : (
           <>
             <div className="flex min-h-12 shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border/70 bg-card/40 px-14 py-2 lg:px-5">
-              <div className="flex min-w-0 items-center gap-3">
-                <div className="flex min-w-0 items-center gap-1.5">
-                  <div className="truncate text-sm font-semibold">
-                    {selectedPackage?.name || '\u5de5\u4f5c\u53f0'}
+              <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                <div className="truncate text-sm font-semibold">
+                  {selectedPackage?.name || '\u5de5\u4f5c\u53f0'}
+                </div>
+                {selectedPackage && (
+                  <button
+                    onClick={() =>
+                      void handleRenamePackage(
+                        selectedPackage.id,
+                        selectedPackage.name,
+                      )
+                    }
+                    className="flex size-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    title="\u91cd\u547d\u540d"
+                  >
+                    <Pencil className="size-3.5" />
+                  </button>
+                )}
+                {/* Skill Arena 线程：显示绑定的 Skill 版本号 */}
+                {isSkillArenaThread && skillVersionInfo && (
+                  <div className="flex flex-wrap items-center gap-1.5 pl-1 text-xs text-muted-foreground">
+                    <span>
+                      绑定版本：v{skillVersionInfo.left.boundSkillVersionNumber}{' '}
+                      / v{skillVersionInfo.right.boundSkillVersionNumber}
+                    </span>
                   </div>
-                  {selectedPackage && (
-                    <button
-                      onClick={() =>
-                        void handleRenamePackage(
-                          selectedPackage.id,
-                          selectedPackage.name,
-                        )
-                      }
-                      className="flex size-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                      title="\u91cd\u547d\u540d"
-                    >
-                      <Pencil className="size-3.5" />
-                    </button>
-                  )}
-                </div>
-                <div className="hidden text-xs text-muted-foreground sm:block">
-                  输入问题，测试智能体效果
-                </div>
+                )}
               </div>
               <div className="flex flex-wrap items-center justify-end gap-2">
                 <div className="inline-flex rounded-[12px] border border-border/70 bg-muted/40 p-0.5">
@@ -3530,29 +3767,12 @@ export default function LiteArenaPanel() {
                     <button
                       key={mode.key}
                       onClick={() => setArenaMode(mode.key)}
-                      className={`rounded-[9px] px-2.5 py-1 text-xs font-medium transition-colors ${arenaMode === mode.key ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                      className={`rounded-[10px] px-2.5 py-1 text-xs font-medium transition-colors ${arenaMode === mode.key ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
                     >
                       {mode.label}
                     </button>
                   ))}
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="rounded-[12px]"
-                  onClick={() => void handleReport()}
-                  disabled={!canOpenReport}
-                  title={
-                    !rubricConfigured
-                      ? rubricRequiredMessage
-                      : !canGenerateReport
-                        ? reportRequiredMessage
-                        : '生成评估报告'
-                  }
-                >
-                  <BarChart3 className="mr-1.5 size-3.5" />
-                  评估报告
-                </Button>
                 <Button
                   size="sm"
                   variant="outline"
@@ -3566,12 +3786,99 @@ export default function LiteArenaPanel() {
                     <span className="ml-1 text-[10px] opacity-70">(继续)</span>
                   )}
                 </Button>
+                <Button
+                  size="sm"
+                  className="gap-1.5 rounded-[12px]"
+                  onClick={() => setCreatorOpen(true)}
+                  disabled={!currentPackageVersionId}
+                >
+                  <Plus className="size-3.5" />
+                  新建对比
+                </Button>
+                {/* 历史线程下拉 */}
+                <div className="relative">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5 rounded-[12px]"
+                    onClick={() => setHistoryOpen((v) => !v)}
+                    disabled={arenaThreadList.threads.length === 0}
+                    title="历史对比"
+                  >
+                    <History className="size-3.5" />
+                  </Button>
+                  {historyOpen && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-40"
+                        onClick={() => setHistoryOpen(false)}
+                      />
+                      <div className="absolute right-0 top-full z-50 mt-1 max-h-72 w-72 overflow-y-auto rounded-[12px] border border-border/70 bg-card p-1 shadow-[var(--shadow-lg)]">
+                        {arenaThreadList.loading && (
+                          <div className="px-3 py-2 text-xs text-muted-foreground">
+                            加载中...
+                          </div>
+                        )}
+                        {!arenaThreadList.loading &&
+                          arenaThreadList.threads.length === 0 && (
+                            <div className="px-3 py-2 text-xs text-muted-foreground">
+                              暂无历史线程
+                            </div>
+                          )}
+                        {arenaThreadList.threads.map((t) => {
+                          const isActive =
+                            String(t.id) === arenaThreadList.currentThreadId;
+                          return (
+                            <button
+                              key={t.id}
+                              onClick={() => {
+                                setHistoryOpen(false);
+                                void arenaThreadList.switchThread(String(t.id));
+                              }}
+                              className={`w-full rounded-[8px] px-3 py-2 text-left transition-colors ${
+                                isActive
+                                  ? 'bg-primary-soft text-primary'
+                                  : 'hover:bg-muted'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="truncate text-xs font-medium">
+                                  {t.arenaKind === 'skill_arena'
+                                    ? 'Skill Arena'
+                                    : '标准 Arena'}
+                                </span>
+                                <span className="shrink-0 text-[10px] text-muted-foreground">
+                                  {new Date(t.updatedAt).toLocaleString(
+                                    'zh-CN',
+                                    {
+                                      month: '2-digit',
+                                      day: '2-digit',
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                    },
+                                  )}
+                                </span>
+                              </div>
+                              {t.arenaKind === 'skill_arena' &&
+                                t.skillArenaConfig && (
+                                  <div className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                                    {t.skillArenaConfig.left.skillName} vs{' '}
+                                    {t.skillArenaConfig.right.skillName}
+                                  </div>
+                                )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
 
             {progress && (
               <div
-                className={`mx-5 mt-3 rounded-[20px] border px-5 py-3 ${progress.isError ? 'border-destructive/20 bg-destructive/5' : progress.active ? 'border-primary/15 bg-primary/5' : 'border-emerald-500/15 bg-emerald-500/5'}`}
+                className={`mx-5 mt-3 rounded-[14px] border px-5 py-3 ${progress.isError ? 'border-destructive/20 bg-destructive/5' : progress.active ? 'border-primary/15 bg-primary/5' : 'border-emerald-500/15 bg-emerald-500/5'}`}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-sm font-semibold">
@@ -3625,132 +3932,47 @@ export default function LiteArenaPanel() {
               previews={showGeneratePreviews ? generatePreviews : []}
             />
 
-            {selectedPackage && (
-              <div className="mx-5 mt-3 rounded-[16px] border border-border/70 bg-card/70 px-4 py-3">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                      Arena 线程
-                    </div>
-                    <div className="mt-1 text-sm text-foreground">
-                      {thread?.arenaKind === 'skill_arena'
-                        ? `${arenaSideLabels.baseline} vs ${arenaSideLabels.enhanced}`
-                        : '标准 Arena'}
-                    </div>
-                  </div>
-                  <div className="inline-flex rounded-[12px] border border-border/70 bg-muted/40 p-0.5">
-                    {[
-                      { key: 'package_arena' as const, label: '标准 Arena' },
-                      { key: 'skill_arena' as const, label: 'Skill Arena' },
-                    ].map((kind) => (
-                      <button
-                        key={kind.key}
-                        onClick={() => setArenaComposerKind(kind.key)}
-                        className={`rounded-[9px] px-2.5 py-1 text-xs font-medium transition-colors ${arenaComposerKind === kind.key ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
-                      >
-                        {kind.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {arenaComposerKind === 'skill_arena' && (
-                  <div className="mt-3 grid gap-3 lg:grid-cols-2">
-                    <div className="space-y-2">
-                      <div className="text-[11px] font-medium text-muted-foreground">
-                        左侧 Skill
-                      </div>
-                      <select
-                        className="w-full rounded-[10px] border border-border/70 bg-background px-3 py-2 text-sm"
-                        value={skillArenaLeftSkillId}
-                        onChange={(e) => setSkillArenaLeftSkillId(e.target.value)}
-                      >
-                        <option value="">选择 Skill</option>
-                        {packageSkills.map((skill) => (
-                          <option key={skill.id} value={skill.skillUid}>
-                            {skill.name}
-                            {skill.status === 'removed' ? ' (已移除)' : ''}
-                          </option>
-                        ))}
-                      </select>
-                      <select
-                        className="w-full rounded-[10px] border border-border/70 bg-background px-3 py-2 text-sm"
-                        value={skillArenaLeftVersionId}
-                        onChange={(e) => setSkillArenaLeftVersionId(e.target.value)}
-                        disabled={skillArenaLoading.left || !skillArenaLeftVersions.length}
-                      >
-                        <option value="">
-                          {skillArenaLoading.left ? '加载版本中...' : '选择版本'}
-                        </option>
-                        {skillArenaLeftVersions.map((version) => (
-                          <option key={version.id} value={version.id}>
-                            v{version.versionNumber} ({version.source})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="text-[11px] font-medium text-muted-foreground">
-                        右侧 Skill
-                      </div>
-                      <select
-                        className="w-full rounded-[10px] border border-border/70 bg-background px-3 py-2 text-sm"
-                        value={skillArenaRightSkillId}
-                        onChange={(e) => setSkillArenaRightSkillId(e.target.value)}
-                      >
-                        <option value="">选择 Skill</option>
-                        {packageSkills.map((skill) => (
-                          <option key={skill.id} value={skill.skillUid}>
-                            {skill.name}
-                            {skill.status === 'removed' ? ' (已移除)' : ''}
-                          </option>
-                        ))}
-                      </select>
-                      <select
-                        className="w-full rounded-[10px] border border-border/70 bg-background px-3 py-2 text-sm"
-                        value={skillArenaRightVersionId}
-                        onChange={(e) => setSkillArenaRightVersionId(e.target.value)}
-                        disabled={skillArenaLoading.right || !skillArenaRightVersions.length}
-                      >
-                        <option value="">
-                          {skillArenaLoading.right ? '加载版本中...' : '选择版本'}
-                        </option>
-                        {skillArenaRightVersions.map((version) => (
-                          <option key={version.id} value={version.id}>
-                            v{version.versionNumber} ({version.source})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                )}
-
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                  <div className="text-xs text-muted-foreground">
-                    {arenaComposerKind === 'skill_arena'
-                      ? '线程会固定绑定当前 Package 版本与左右 Skill 版本，后续对话和报告都使用这份快照。'
-                      : '标准 Arena 使用当前智能体快照。'}
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="rounded-[10px]"
-                    onClick={() => void handleCreateArenaThread()}
-                    disabled={
-                      skillArenaCreatePending ||
-                      (arenaComposerKind === 'skill_arena' &&
-                        (!currentPackageVersionId ||
-                          !skillArenaLeftSkillId ||
-                          !skillArenaRightSkillId ||
-                          !skillArenaLeftVersionId ||
-                          !skillArenaRightVersionId))
-                    }
-                  >
-                    {skillArenaCreatePending ? '创建中...' : '创建线程'}
-                  </Button>
-                </div>
-              </div>
+            {selectedPackage && token && (
+              <ArenaThreadCreatorDialog
+                open={creatorOpen}
+                onOpenChange={(next) => {
+                  setCreatorOpen(next);
+                  if (!next) {
+                    // 关闭弹窗时重置重建场景下的预选状态，避免下次"新建对比"被污染
+                    setCreatorInitialLeft('');
+                    setCreatorInitialRight('');
+                    setCreatorPreferLatest(false);
+                  }
+                }}
+                token={token}
+                packageId={selectedPackageId}
+                currentPackageVersionId={currentPackageVersionId}
+                packageSkills={packageSkills}
+                includeDiscardedVersions={showDiscardedSkillVersions}
+                initialLeftSkillUid={creatorInitialLeft || undefined}
+                initialRightSkillUid={creatorInitialRight || undefined}
+                preferLatestVersion={creatorPreferLatest}
+                onCreated={(nextThread, nextDetail) => {
+                  setThread(nextThread);
+                  setThreadDetail(nextDetail);
+                  setReport(null);
+                  setCenterPreview((prev) =>
+                    prev?.type === 'report' ? null : prev,
+                  );
+                  setArenaMode('compare');
+                  setStatus(
+                    nextThread.warning ||
+                      (nextThread.arenaKind === 'skill_arena'
+                        ? 'Skill Arena 已创建'
+                        : '标准 Arena 已创建'),
+                  );
+                  arenaThreadList.notifyCreated(nextThread, nextDetail);
+                  // 创建完成后重置重建状态
+                  setCreatorInitialLeft('');
+                  setCreatorInitialRight('');
+                  setCreatorPreferLatest(false);
+                }}
+              />
             )}
 
             <div className="flex-1 overflow-auto">
@@ -3760,6 +3982,8 @@ export default function LiteArenaPanel() {
                 packageName={selectedPackage?.name}
                 sideLabels={arenaSideLabels}
                 mode={arenaMode}
+                answerOptimizations={threadDetail?.answerOptimizations || []}
+                onOptimizeAnswer={openAnswerOptimization}
               />
             </div>
 
@@ -3798,15 +4022,15 @@ export default function LiteArenaPanel() {
       </main>
 
       {/* Detail */}
-      {rightSidebarOpen ? (
+      {rightSidebarOpen && !(manualEdit || interactiveMode) ? (
         <>
           <div
-            className="hidden w-1 shrink-0 cursor-col-resize bg-border/30 transition-all hover:w-1.5 hover:bg-primary/30 lg:block"
+            className={`hidden w-1 shrink-0 cursor-col-resize bg-border/30 transition-all hover:w-1.5 hover:bg-primary/30 lg:block ${rightExpanded ? 'lg:hidden' : ''}`}
             onMouseDown={startResizeRight}
           />
           <aside
             style={detailStyle}
-            className="absolute inset-y-0 right-0 z-30 flex w-[min(24rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] flex-col border-l border-border/70 bg-card/95 shadow-xl backdrop-blur lg:relative lg:z-auto lg:w-[var(--detail-width)] lg:max-w-none lg:bg-card/40 lg:shadow-none lg:backdrop-blur-0"
+            className={`absolute inset-y-0 right-0 z-30 flex w-[min(24rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] flex-col border-l border-border/70 bg-card shadow-xl lg:relative lg:z-auto lg:max-w-none lg:shadow-none ${manualEdit || interactiveMode ? 'hidden lg:flex' : ''} ${rightExpanded ? 'lg:flex-1 lg:w-0' : 'lg:w-[var(--detail-width)]'}`}
           >
             <div className="flex min-h-12 shrink-0 items-center justify-between gap-2 border-b border-border/70 px-3 py-2 sm:px-4">
               <div className="flex min-w-0 items-center gap-1.5">
@@ -3848,7 +4072,25 @@ export default function LiteArenaPanel() {
                   <Trash2 className="size-3.5" />
                 </Button>
                 <button
-                  onClick={() => setRightSidebarOpen(false)}
+                  onClick={() => setRightExpanded((v) => !v)}
+                  className={`flex size-7 items-center justify-center rounded-lg transition-colors ${
+                    rightExpanded
+                      ? 'bg-primary/10 text-primary hover:bg-primary/15'
+                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                  }`}
+                  title={rightExpanded ? '恢复默认宽度' : '展开为宽面板'}
+                >
+                  {rightExpanded ? (
+                    <Minimize2 className="size-4" />
+                  ) : (
+                    <Maximize2 className="size-4" />
+                  )}
+                </button>
+                <button
+                  onClick={() => {
+                    setRightSidebarOpen(false);
+                    setRightExpanded(false);
+                  }}
                   className="flex size-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                   title="收起右侧面板"
                 >
@@ -3870,7 +4112,7 @@ export default function LiteArenaPanel() {
                   label: '版本',
                   icon: GitCompare,
                 },
-                { key: 'report' as DetailTab, label: '报告', icon: BarChart3 },
+                { key: 'report' as DetailTab, label: '评估报告', icon: BarChart3 },
               ].map((tab) => (
                 <button
                   key={tab.key}
@@ -3886,7 +4128,7 @@ export default function LiteArenaPanel() {
                     }
                     setDetailTab(tab.key);
                   }}
-                  className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-medium transition-colors ${detailTab === tab.key ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
+                  className={`inline-flex items-center gap-1 rounded-[10px] px-2.5 py-1 text-xs font-medium transition-colors ${detailTab === tab.key ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
                 >
                   <tab.icon className="size-3" />
                   {tab.label}
@@ -3902,41 +4144,33 @@ export default function LiteArenaPanel() {
                 )}
 
                 {selectedPackage && detailTab === 'agent' && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                        agent.md
+                  <div className="overflow-hidden rounded-[14px] border border-border/70 bg-card shadow-sm">
+                    <div className="flex items-start justify-between gap-3 border-b border-border/70 px-4 py-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="ec-eyebrow">AGENT.MD</div>
+                        <h3 className="font-serif-display text-[15.5px] font-semibold leading-tight text-foreground">
+                          智能体定义
+                        </h3>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="ec-actions">
                         <button
                           onClick={startManualEditAgent}
-                          className="text-[10px] text-primary hover:underline"
+                          className="ec-action"
                         >
                           编辑
-                        </button>
-                        <button
-                          onClick={() =>
-                            setCenterPreview({
-                              type: 'agent',
-                              name: 'agent.md',
-                              content: selectedPackage.snapshot.agentMd,
-                            })
-                          }
-                          className="text-[10px] text-primary hover:underline"
-                        >
-                          在中间打开
                         </button>
                       </div>
                     </div>
                     <div
-                      className="rounded-[20px] border border-border/70 bg-muted/50 p-4 text-sm cursor-pointer hover:border-primary/30 transition-colors overflow-auto max-h-[60vh]"
-                      onClick={() =>
+                      className="cursor-pointer p-4 text-sm transition-colors hover:bg-muted/50 overflow-auto max-h-[60vh]"
+                      onClick={() => {
+                        setRightExpanded(false);
                         setCenterPreview({
                           type: 'agent',
                           name: 'agent.md',
                           content: selectedPackage.snapshot.agentMd,
-                        })
-                      }
+                        });
+                      }}
                     >
                       <MarkdownContent
                         content={selectedPackage.snapshot.agentMd}
@@ -3946,37 +4180,32 @@ export default function LiteArenaPanel() {
                 )}
 
                 {selectedPackage && detailTab === 'rubric' && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                        rubric.md
+                  <div className="overflow-hidden rounded-[14px] border border-border/70 bg-card shadow-sm">
+                    <div className="flex items-start justify-between gap-3 border-b border-border/70 px-4 py-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="ec-eyebrow">RUBRIC.MD</div>
+                        <h3 className="font-serif-display text-[15.5px] font-semibold leading-tight text-foreground">
+                          评分规则
+                        </h3>
+                        <div className="ec-meta">
+                          {rubricHasContent
+                            ? '已配置'
+                            : '尚未配置'}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="ec-actions">
                         <button
                           onClick={() => startManualEditRubric()}
-                          className="text-[10px] text-primary hover:underline"
+                          className="ec-action"
                         >
                           编辑
                         </button>
+                        <span className="ec-action-divider" />
                         <button
                           onClick={() => rubricFileRef.current?.click()}
-                          className="text-[10px] text-primary hover:underline"
+                          className="ec-action"
                         >
-                          导入文件
-                        </button>
-                        <button
-                          onClick={() =>
-                            rubricHasContent &&
-                            setCenterPreview({
-                              type: 'rubric',
-                              name: 'rubric.md',
-                              content: rubricPreviewContent,
-                            })
-                          }
-                          disabled={!rubricHasContent}
-                          className="text-[10px] text-primary hover:underline disabled:pointer-events-none disabled:text-muted-foreground/70 disabled:no-underline"
-                        >
-                          在中间打开
+                          导入
                         </button>
                       </div>
                     </div>
@@ -3990,171 +4219,471 @@ export default function LiteArenaPanel() {
                         e.currentTarget.value = '';
                       }}
                     />
-                    {rubricHasContent ? (
-                      <div className="space-y-3">
-                        {rubricNeedsRepair && (
-                          <div className="rounded-[18px] border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-200">
-                            <div className="font-medium">
-                              当前 rubric 会按现有内容参与评分
+                    <div className="space-y-3 p-4">
+                      {rubricHasContent ? (
+                        <>
+                          {rubricNeedsRepair && (
+                            <div className="rounded-[10px] border border-amber-500/25 bg-amber-500/10 px-3 py-2.5 text-xs text-amber-900 dark:text-amber-200">
+                              <div className="font-medium">
+                                当前 rubric 会按现有内容参与评分
+                              </div>
+                              <div className="mt-1 leading-5">
+                                当前内容已经保留下来了。现在可以直接生成报告；如果想让评分更稳定，可以继续手动补充维度、权重或等级说明。
+                              </div>
                             </div>
-                            <div className="mt-1 text-xs leading-5">
-                              当前内容已经保留下来了。现在可以直接生成报告；如果想让评分更稳定，可以继续手动补充维度、权重或等级说明。
-                            </div>
-                          </div>
-                        )}
-                        <div
-                          className="rounded-[20px] border border-border/70 bg-muted/50 p-4 text-sm cursor-pointer hover:border-primary/30 transition-colors overflow-auto max-h-[60vh]"
-                          onClick={() =>
-                            setCenterPreview({
-                              type: 'rubric',
-                              name: 'rubric.md',
-                              content: rubricPreviewContent,
-                            })
-                          }
-                        >
-                          <RubricStructuredView content={rubricDisplayText} />
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="rounded-[20px] border border-dashed border-border bg-muted/35 p-4 text-sm">
-                        <div className="font-medium text-foreground">
-                          当前还没有配置 rubric
-                        </div>
-                        <div className="mt-2 leading-6 text-muted-foreground">
-                          这里保留手动编辑和导入文件两种方式。补好 rubric
-                          之后，就能直接生成评估报告；交互式优化仍建议使用结构更完整的
-                          rubric。
-                        </div>
-                        <div className="mt-4 rounded-[16px] border border-border/70 bg-card/70 p-3 text-xs leading-5 text-muted-foreground">
-                          <div className="font-medium text-foreground">
-                            手动填写时，通常至少补上这些部分：
-                          </div>
-                          <div className="mt-2 whitespace-pre-wrap">
-                            {[
-                              '评分目标',
-                              '角色贴合',
-                              'Skill 遵循',
-                              '回答质量',
-                              '安全边界',
-                              '使用说明',
-                            ]
-                              .map((item) => `- ${item}`)
-                              .join('\n')}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-                {selectedPackage && detailTab === 'skills' && (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                        技能文件
-                      </div>
-                      {selectedSkill && (
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={startManualEditSkill}
-                            className="text-[10px] text-primary hover:underline"
-                          >
-                            编辑
-                          </button>
-                          <button
-                            onClick={() =>
+                          )}
+                          <div
+                            className="cursor-pointer text-sm transition-colors hover:bg-muted/50 overflow-auto max-h-[60vh]"
+                            onClick={() => {
+                              setRightExpanded(false);
                               setCenterPreview({
-                                type: 'skill',
-                                name: selectedSkill.name,
-                                content: selectedSkill.skillMd,
-                              })
-                            }
-                            className="text-[10px] text-primary hover:underline"
+                                type: 'rubric',
+                                name: 'rubric.md',
+                                content: rubricPreviewContent,
+                              });
+                            }}
                           >
-                            在中间打开
-                          </button>
+                            <RubricStructuredView content={rubricDisplayText} />
+                          </div>
+                        </>
+                      ) : (
+                        <div className="rounded-[12px] border border-dashed border-border bg-muted/35 p-4 text-sm">
+                          <div className="font-medium text-foreground">
+                            当前还没有配置 rubric
+                          </div>
+                          <div className="mt-2 leading-6 text-muted-foreground">
+                            这里保留手动编辑和导入文件两种方式。补好 rubric
+                            之后，就能直接生成评估报告；交互式优化仍建议使用结构更完整的
+                            rubric。
+                          </div>
+                          <div className="mt-4 rounded-[10px] border border-border/70 bg-card p-3 text-xs leading-5 text-muted-foreground">
+                            <div className="font-medium text-foreground">
+                              手动填写时，通常至少补上这些部分：
+                            </div>
+                            <div className="mt-2 whitespace-pre-wrap">
+                              {[
+                                '评分目标',
+                                '角色贴合',
+                                'Skill 遵循',
+                                '回答质量',
+                                '安全边界',
+                                '使用说明',
+                              ]
+                                .map((item) => `- ${item}`)
+                                .join('\n')}
+                            </div>
+                          </div>
                         </div>
                       )}
                     </div>
-                    {packageSkills.length > 0 ? (
-                      <>
-                        <div className="flex gap-1.5 overflow-x-auto pb-1">
-                          {packageSkills.map((skill) => (
-                            <button
-                              key={skill.id}
-                              onClick={() => setSelectedSkillId(skill.skillUid)}
-                              title={skill.name}
-                              className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium whitespace-nowrap transition-colors ${selectedSkillId === skill.skillUid ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'}`}
-                            >
-                              <span className="max-w-[12rem] truncate">
-                                {skill.name}
-                              </span>
-                              {skill.status === 'removed' && (
-                                <span className="rounded-full border border-current/25 px-1.5 py-0.5 text-[10px] leading-none">
-                                  已移除
-                                </span>
-                              )}
-                            </button>
-                          ))}
-                        </div>
-                        {selectedSkill ? (
-                          <div
-                            className="rounded-[20px] border border-border/70 bg-muted/50 p-4 text-sm cursor-pointer hover:border-primary/30 transition-colors overflow-auto max-h-[60vh]"
-                            onClick={() =>
-                              setCenterPreview({
-                                type: 'skill',
-                                name: selectedSkill.name,
-                                content: selectedSkill.skillMd,
-                              })
-                            }
-                          >
-                            <SkillMarkdownContent
-                              content={
-                                selectedSkill?.skillMd ||
-                                '\u6682\u65e0\u6280\u80fd\u5185\u5bb9'
-                              }
-                            />
+                  </div>
+                )}
+                {selectedPackage && detailTab === 'skills' && (
+                  <div className="space-y-5">
+                    {/* 卡 1:技能内容 */}
+                    <div className="overflow-hidden rounded-[14px] border border-border/70 bg-card shadow-sm">
+                      <div className="flex items-start justify-between gap-3 border-b border-border/70 px-4 py-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="ec-eyebrow">SKILL.MD</div>
+                          <h3 className="font-serif-display text-[15.5px] font-semibold leading-tight text-foreground">
+                            技能内容
+                          </h3>
+                          <div className="ec-meta">
+                            {selectedSkill
+                              ? `${selectedSkill.name} · ${selectedSkill.dirName}`
+                              : '请选择技能'}
+                            <span className="ec-meta-sep">·</span>
+                            {packageSkills.length} 个技能
                           </div>
-                        ) : (
-                          <div className="rounded-[18px] border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-200">
-                            <div className="font-medium">
-                              当前 Skill 已不在最新智能体快照中
-                            </div>
-                            <div className="mt-1 text-xs leading-5">
-                              这个 Skill 仍然保留历史版本，可以继续查看、恢复到包内，或做历史审计。
-                            </div>
+                        </div>
+                        {selectedSkill && (
+                          <div className="ec-actions">
+                            <button
+                              onClick={startManualEditSkill}
+                              className="ec-action"
+                            >
+                              编辑
+                            </button>
                           </div>
                         )}
-                        <div className="space-y-3 rounded-[20px] border border-border/70 bg-card/50 p-3">
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="min-w-0">
-                              <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                                历史版本
-                              </div>
-                              <div className="mt-1 text-xs text-muted-foreground">
-                                {selectedSkillRecord
-                                  ? `${selectedSkillRecord.name} / ${selectedSkillRecord.dirName}`
-                                  : '请选择一个 Skill'}
-                              </div>
+                      </div>
+                      <div className="space-y-3 p-4">
+                        {packageSkills.length > 0 ? (
+                          <>
+                            <div className="flex gap-1.5 overflow-x-auto pb-1">
+                              {packageSkills.map((skill) => (
+                                <button
+                                  key={skill.id}
+                                  onClick={() => setSelectedSkillId(skill.skillUid)}
+                                  title={skill.name}
+                                  className={`inline-flex shrink-0 items-center gap-1.5 rounded-[10px] px-2.5 py-1 text-xs font-medium whitespace-nowrap transition-colors ${selectedSkillId === skill.skillUid ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'}`}
+                                >
+                                  <span className="max-w-[12rem] truncate">
+                                    {skill.name}
+                                  </span>
+                                  {skill.status === 'removed' && (
+                                    <span className="rounded-full border border-current/25 px-1.5 py-0.5 text-[10px] leading-none">
+                                      已移除
+                                    </span>
+                                  )}
+                                </button>
+                              ))}
                             </div>
-                            <label className="inline-flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
-                              <input
-                                type="checkbox"
-                                checked={showDiscardedSkillVersions}
-                                onChange={(e) =>
-                                  setShowDiscardedSkillVersions(e.target.checked)
-                                }
-                                className="size-3.5 rounded border-border/70"
-                              />
-                              显示已废弃
-                            </label>
+                            {selectedSkill ? (
+                              <div
+                                className="cursor-pointer text-sm transition-colors hover:bg-muted/50 overflow-auto max-h-[60vh]"
+                                onClick={() => {
+                                  setRightExpanded(false);
+                                  setCenterPreview({
+                                    type: 'skill',
+                                    name: selectedSkill.name,
+                                    content: selectedSkill.skillMd,
+                                  });
+                                }}
+                              >
+                                <SkillMarkdownContent
+                                  content={
+                                    selectedSkill?.skillMd ||
+                                    '\u6682\u65e0\u6280\u80fd\u5185\u5bb9'
+                                  }
+                                />
+                              </div>
+                            ) : (
+                              <div className="rounded-[12px] border border-amber-500/25 bg-amber-500/10 px-3 py-2.5 text-xs text-amber-900 dark:text-amber-200">
+                                <div className="font-medium">
+                                  当前 Skill 已不在最新智能体快照中
+                                </div>
+                                <div className="mt-1 leading-5">
+                                  这个 Skill 仍然保留历史版本，可以继续查看、恢复到包内，或做历史审计。
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <div className="rounded-[12px] border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
+                            暂无技能
                           </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {selectedPackage && detailTab === 'versions' && (
+                  <div className="space-y-5">
+                    {/* 子标签切换：智能体版本 / Skill 版本 */}
+                    <div className="inline-flex rounded-[12px] border border-border/70 bg-muted/40 p-0.5">
+                      {([
+                        { key: 'package' as const, label: '智能体版本' },
+                        { key: 'skill' as const, label: 'Skill 版本' },
+                      ]).map((tab) => (
+                        <button
+                          key={tab.key}
+                          onClick={() => setVersionSubTab(tab.key)}
+                          className={`rounded-[9px] px-3 py-1 text-xs font-medium transition-colors ${versionSubTab === tab.key ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                        >
+                          {tab.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {versionSubTab === 'package' && (
+                    <>
+                    {/* 卡 1: 版本对比 */}
+                    {versions.length >= 2 && (
+                      <div className="overflow-hidden rounded-[14px] border border-border/70 bg-card shadow-sm">
+                        <div className="flex items-start justify-between gap-3 border-b border-border/70 px-4 py-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="ec-eyebrow">COMPARE</div>
+                            <h3 className="font-serif-display text-[15.5px] font-semibold leading-tight text-foreground">
+                              版本对比
+                            </h3>
+                            <div className="ec-meta">
+                              {compareResult
+                                ? `v${compareResult.baseVersion.versionNumber} → v${compareResult.targetVersion.versionNumber}`
+                                : '选择两个版本生成差异报告'}
+                            </div>
+                          </div>
+                          {compareResult && (
+                            <div className="ec-actions">
+                              <button
+                                onClick={() => {
+                                  setCompareResult(null);
+                                  setCompareBaseId('');
+                                  setCompareTargetId('');
+                                }}
+                                className="ec-action"
+                              >
+                                清除对比
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        <div className="space-y-3 p-4">
+                          {!compareResult ? (
+                            <div className="flex flex-wrap items-center gap-2">
+                              <select
+                                className="min-w-0 flex-1 rounded-[10px] border border-border/70 bg-card px-2.5 py-1.5 text-xs"
+                                value={compareBaseId}
+                                onChange={(e) =>
+                                  setCompareBaseId(e.target.value)
+                                }
+                              >
+                                <option value="">选择基准版本</option>
+                                {versions.map((v) => (
+                                  <option key={v.id} value={v.id}>
+                                    v{v.versionNumber} ({v.source})
+                                  </option>
+                                ))}
+                              </select>
+                              <span className="text-muted-foreground">
+                                {'->'}
+                              </span>
+                              <select
+                                className="min-w-0 flex-1 rounded-[10px] border border-border/70 bg-card px-2.5 py-1.5 text-xs"
+                                value={compareTargetId}
+                                onChange={(e) =>
+                                  setCompareTargetId(e.target.value)
+                                }
+                              >
+                                <option value="">选择目标版本</option>
+                                {versions.map((v) => (
+                                  <option key={v.id} value={v.id}>
+                                    v{v.versionNumber} ({v.source})
+                                  </option>
+                                ))}
+                              </select>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 shrink-0 text-[11px] rounded-[10px]"
+                                disabled={
+                                  !compareBaseId ||
+                                  !compareTargetId ||
+                                  compareBaseId === compareTargetId ||
+                                  compareLoading
+                                }
+                                onClick={() => {
+                                  if (
+                                    !token ||
+                                    !selectedPackageId ||
+                                    !compareBaseId ||
+                                    !compareTargetId
+                                  )
+                                    return;
+                                  setCompareLoading(true);
+                                  const currentPkgId = selectedPackageId;
+                                  liteApi
+                                    .compareVersions(
+                                      token,
+                                      currentPkgId,
+                                      compareBaseId,
+                                      compareTargetId,
+                                    )
+                                    .then((res) => {
+                                      saveCompareState(
+                                        currentPkgId,
+                                        res,
+                                        compareBaseId,
+                                        compareTargetId,
+                                      );
+                                      if (
+                                        selectedPackageIdRef.current ===
+                                        currentPkgId
+                                      ) {
+                                        setCompareResult(res);
+                                      }
+                                    })
+                                    .catch((err) => {
+                                      alert(err.message || '对比失败');
+                                    })
+                                    .finally(() => {
+                                      if (
+                                        selectedPackageIdRef.current ===
+                                        currentPkgId
+                                      ) {
+                                        setCompareLoading(false);
+                                      }
+                                    });
+                                }}
+                              >
+                                {compareLoading ? '比较中...' : '比较'}
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between rounded-[10px] border border-primary/20 bg-primary/5 px-3 py-2 text-xs">
+                                <div>
+                                  <div className="font-medium">比较结果</div>
+                                  <div className="text-muted-foreground">
+                                    v{compareResult.baseVersion.versionNumber}{' '}
+                                    {'->'}{' '}
+                                    v{compareResult.targetVersion.versionNumber}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="rounded-[10px] border border-primary/15 bg-primary/5 px-3 py-2.5 text-xs">
+                                <div className="mb-2 flex items-center gap-1.5 font-medium text-primary">
+                                  <span className="inline-flex size-5 items-center justify-center rounded-md bg-primary/10 text-[10px]">
+                                    AI
+                                  </span>
+                                  AI 总结
+                                </div>
+                                <div className="text-muted-foreground leading-relaxed">
+                                  <MarkdownContent
+                                    content={compareResult.summary || '暂无总结'}
+                                  />
+                                </div>
+                              </div>
+                              <VersionDiffView result={compareResult} />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 卡 2: 版本列表 */}
+                    {!compareResult && (
+                      <div className="overflow-hidden rounded-[14px] border border-border/70 bg-card shadow-sm">
+                        <div className="flex items-start justify-between gap-3 border-b border-border/70 px-4 py-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="ec-eyebrow">VERSIONS</div>
+                            <h3 className="font-serif-display text-[15.5px] font-semibold leading-tight text-foreground">
+                              版本记录
+                            </h3>
+                            <div className="ec-meta">
+                              共 {versions.length} 个版本
+                            </div>
+                          </div>
+                        </div>
+                        <div className="space-y-1.5 p-3">
+                          {versions.map((v) => {
+                            const isCurrentVersion =
+                              String(v.id) === currentPackageVersionId;
+                            const rollbackPkgActionId = `pkg-rollback:${v.id}`;
+                            const isPkgRollbackPending =
+                              packageVersionActionPendingId ===
+                              rollbackPkgActionId;
+                            return (
+                            <div
+                              key={v.id}
+                              className={`rounded-[12px] border px-3 py-2 text-xs transition-colors ${compareBaseId === v.id || compareTargetId === v.id ? 'border-primary/30 bg-primary/10' : 'border-border/70 bg-muted hover:border-primary/20 hover:bg-primary/5'}`}
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-medium">
+                                  v{v.versionNumber}
+                                </span>
+                                {isCurrentVersion && (
+                                  <Badge
+                                    variant="outline"
+                                    className="h-5 rounded-full border-primary/30 bg-primary/10 px-2 text-[10px] text-primary"
+                                  >
+                                    当前
+                                  </Badge>
+                                )}
+                                {v.source === 'rollback' && (
+                                  <Badge
+                                    variant="outline"
+                                    className="h-5 rounded-full px-2 text-[10px]"
+                                  >
+                                    回退创建
+                                  </Badge>
+                                )}
+                                <span className="text-muted-foreground">
+                                  {v.source}
+                                </span>
+                                <span className="text-muted-foreground">
+                                  {new Date(v.createdAt).toLocaleString()}
+                                </span>
+                              </div>
+                              <div className="mt-1.5">
+                                {v.note ? (
+                                  <button
+                                    onClick={() =>
+                                      handleUpdateNote(v.id, v.note || '')
+                                    }
+                                    className="text-left text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                                    title="点击编辑备注"
+                                  >
+                                    {`备注：${v.note}`}
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => handleUpdateNote(v.id, '')}
+                                    className="text-[11px] text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+                                    title="点击添加备注"
+                                  >
+                                    + 添加备注
+                                  </button>
+                                )}
+                              </div>
+                              {!isCurrentVersion && (
+                                <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px]">
+                                  <button
+                                    type="button"
+                                    disabled={isPkgRollbackPending}
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      void handleRollbackPackageVersion(v);
+                                    }}
+                                    className="text-primary hover:underline disabled:pointer-events-none disabled:opacity-60"
+                                  >
+                                    {isPkgRollbackPending
+                                      ? '处理中...'
+                                      : '回退到此版本'}
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                            );
+                          })}
+                          {versions.length === 0 && (
+                            <div className="rounded-[12px] border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
+                              暂无版本记录
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    </>
+                    )}
+
+                    {versionSubTab === 'skill' && (
+                      <div className="overflow-hidden rounded-[14px] border border-border/70 bg-card shadow-sm">
+                        <div className="flex items-start justify-between gap-3 border-b border-border/70 px-4 py-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="ec-eyebrow">SKILL HISTORY</div>
+                            <h3 className="font-serif-display text-[15.5px] font-semibold leading-tight text-foreground">
+                              Skill 历史版本
+                            </h3>
+                            <div className="ec-meta">
+                              {selectedSkillRecord
+                                ? `${selectedSkillRecord.name} · ${selectedSkillRecord.dirName}`
+                                : '请先选择一个 Skill'}
+                              <span className="ec-meta-sep">·</span>
+                              {skillVersions.length} 个版本
+                            </div>
+                          </div>
+                          <label className="inline-flex shrink-0 items-center gap-2 text-[11px] text-muted-foreground cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={showDiscardedSkillVersions}
+                              onChange={(e) =>
+                                setShowDiscardedSkillVersions(e.target.checked)
+                              }
+                              className="size-3.5 rounded border-border/70"
+                            />
+                            显示已废弃
+                          </label>
+                        </div>
+                        <div className="space-y-2 p-4">
                           {skillVersionsError && (
-                            <div className="rounded-[16px] border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+                            <div className="rounded-[10px] border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive">
                               {skillVersionsError}
                             </div>
                           )}
                           {skillVersionsLoading ? (
-                            <div className="flex items-center gap-2 rounded-[16px] border border-border/70 bg-muted/40 px-3 py-3 text-xs text-muted-foreground">
+                            <div className="flex items-center gap-2 rounded-[10px] border border-border/70 bg-muted px-3 py-3 text-xs text-muted-foreground">
                               <Loader2 className="size-3.5 animate-spin" />
                               正在加载 Skill 历史...
                             </div>
@@ -4164,6 +4693,10 @@ export default function LiteArenaPanel() {
                                 {skillVersions.map((version) => {
                                   const isCurrent =
                                     version.id === skillVersionsCurrentId;
+                                  // 此版本是否为"被回退跳过"的最新版本（仅最新一个非当前 active 版本命中）
+                                  const isRolledBackSkipped =
+                                    version.id ===
+                                    rolledBackSkippedSkillVersionId;
                                   const isSelected =
                                     version.id === selectedSkillVersion?.id;
                                   const rollbackActionId = selectedSkillRecord
@@ -4208,7 +4741,7 @@ export default function LiteArenaPanel() {
                                           setSelectedSkillVersionId(version.id);
                                         }
                                       }}
-                                      className={`w-full rounded-lg border px-3 py-2 text-left text-xs transition-colors ${isSelected ? 'border-primary/30 bg-primary/5' : 'border-border/70 bg-muted/45 hover:border-primary/20 hover:bg-muted/65'}`}
+                                      className={`w-full rounded-[12px] border px-3 py-2 text-left text-xs transition-colors ${isSelected ? 'border-primary/30 bg-primary/10' : 'border-border/70 bg-muted hover:border-primary/20 hover:bg-primary/5'}`}
                                     >
                                       <div className="flex flex-wrap items-center justify-between gap-2">
                                         <div className="flex min-w-0 items-center gap-2">
@@ -4231,10 +4764,20 @@ export default function LiteArenaPanel() {
                                               已废弃
                                             </Badge>
                                           )}
-                                          {version.basedOnVersionId && (
+                                          {/* 被回退跳过：版本比当前更新，但被回退操作跳过（未作为当前版本） */}
+                                          {isRolledBackSkipped && (
                                             <Badge
                                               variant="outline"
-                                              className="h-5 rounded-full px-2 text-[10px]"
+                                              title="此版本比当前版本新，但被回退操作跳过"
+                                              className="h-5 rounded-full border-amber-500/50 bg-amber-500/20 px-2 text-[10px] text-amber-600 dark:text-amber-300"
+                                            >
+                                              被回退跳过
+                                            </Badge>
+                                          )}
+                                          {version.source === 'rollback' && (
+                                            <Badge
+                                              variant="outline"
+                                              className="h-5 rounded-full border-primary/30 bg-primary/10 px-2 text-[10px] text-primary"
                                             >
                                               回退创建
                                             </Badge>
@@ -4265,9 +4808,38 @@ export default function LiteArenaPanel() {
                                         )}
                                       </div>
                                       <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px]">
-                                        <span className="text-primary">
+                                        <button
+                                          type="button"
+                                          onClick={(event) => {
+                                            event.stopPropagation();
+                                            setInteractiveMode(false);
+                                            setRightExpanded(false);
+                                            setCenterPreview({
+                                              type: 'skill',
+                                              name: `版本预览 v${version.versionNumber}`,
+                                              content: version.skill.skillMd,
+                                            });
+                                          }}
+                                          onKeyDown={(event) => {
+                                            if (
+                                              event.key === 'Enter' ||
+                                              event.key === ' '
+                                            ) {
+                                              event.preventDefault();
+                                              event.stopPropagation();
+                                              setInteractiveMode(false);
+                                              setRightExpanded(false);
+                                              setCenterPreview({
+                                                type: 'skill',
+                                                name: `版本预览 v${version.versionNumber}`,
+                                                content: version.skill.skillMd,
+                                              });
+                                            }
+                                          }}
+                                          className="text-primary hover:underline"
+                                        >
                                           点击预览
-                                        </span>
+                                        </button>
                                         {!isCurrent &&
                                           version.status === 'active' && (
                                             <>
@@ -4358,7 +4930,7 @@ export default function LiteArenaPanel() {
                                 })}
                               </div>
                               {selectedSkillVersion && (
-                                <div className="space-y-2 rounded-[16px] border border-border/70 bg-muted/35 p-3">
+                                <div className="space-y-2 rounded-[12px] border border-border/70 bg-muted/35 p-3">
                                   <div className="flex items-center justify-between gap-2">
                                     <div className="min-w-0">
                                       <div className="text-xs font-medium">
@@ -4370,19 +4942,6 @@ export default function LiteArenaPanel() {
                                           : `来源：${formatSkillVersionSourceLabel(selectedSkillVersion.source)}`}
                                       </div>
                                     </div>
-                                    <button
-                                      onClick={() =>
-                                        setCenterPreview({
-                                          type: 'skill',
-                                          name: `${selectedSkillVersion.skill.name} / v${selectedSkillVersion.versionNumber}`,
-                                          content:
-                                            selectedSkillVersion.skill.skillMd,
-                                        })
-                                      }
-                                      className="shrink-0 text-[10px] text-primary hover:underline"
-                                    >
-                                      在中间打开
-                                    </button>
                                   </div>
                                   <div className="max-h-[60vh] overflow-auto rounded-[14px] border border-border/70 bg-card/70 p-3">
                                     <SkillMarkdownContent
@@ -4393,213 +4952,13 @@ export default function LiteArenaPanel() {
                               )}
                             </>
                           ) : (
-                            <div className="rounded-[16px] border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
-                              这个 Skill 还没有历史版本记录
+                            <div className="rounded-[12px] border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
+                              {selectedSkillRecord
+                                ? '这个 Skill 还没有历史版本记录'
+                                : '请在上方先选择一个 Skill'}
                             </div>
                           )}
                         </div>
-                      </>
-                    ) : (
-                      <div className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
-                        暂无技能文件
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {selectedPackage && detailTab === 'versions' && (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                        版本记录
-                      </div>
-                      {compareResult && (
-                        <button
-                          onClick={() => {
-                            setCompareResult(null);
-                            setCompareBaseId('');
-                            setCompareTargetId('');
-                          }}
-                          className="text-[10px] text-primary hover:underline"
-                        >
-                          清除对比
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Compare controls */}
-                    {versions.length >= 2 && !compareResult && (
-                      <div className="flex flex-wrap items-center gap-2 text-[10px]">
-                        <select
-                          className="min-w-0 flex-1 rounded-lg border border-border/70 bg-muted/50 px-2 py-1 text-xs"
-                          value={compareBaseId}
-                          onChange={(e) => setCompareBaseId(e.target.value)}
-                        >
-                          <option value="">选择基准版本</option>
-                          {versions.map((v) => (
-                            <option key={v.id} value={v.id}>
-                              v{v.versionNumber} ({v.source})
-                            </option>
-                          ))}
-                        </select>
-                        <span className="text-muted-foreground">{'->'}</span>
-                        <select
-                          className="min-w-0 flex-1 rounded-lg border border-border/70 bg-muted/50 px-2 py-1 text-xs"
-                          value={compareTargetId}
-                          onChange={(e) => setCompareTargetId(e.target.value)}
-                        >
-                          <option value="">选择目标版本</option>
-                          {versions.map((v) => (
-                            <option key={v.id} value={v.id}>
-                              v{v.versionNumber} ({v.source})
-                            </option>
-                          ))}
-                        </select>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 text-[10px] rounded-[8px]"
-                          disabled={
-                            !compareBaseId ||
-                            !compareTargetId ||
-                            compareBaseId === compareTargetId ||
-                            compareLoading
-                          }
-                          onClick={() => {
-                            if (
-                              !token ||
-                              !selectedPackageId ||
-                              !compareBaseId ||
-                              !compareTargetId
-                            )
-                              return;
-                            setCompareLoading(true);
-                            const currentPkgId = selectedPackageId;
-                            liteApi
-                              .compareVersions(
-                                token,
-                                currentPkgId,
-                                compareBaseId,
-                                compareTargetId,
-                              )
-                              .then((res) => {
-                                saveCompareState(
-                                  currentPkgId,
-                                  res,
-                                  compareBaseId,
-                                  compareTargetId,
-                                );
-                                if (
-                                  selectedPackageIdRef.current === currentPkgId
-                                ) {
-                                  setCompareResult(res);
-                                }
-                              })
-                              .catch((err) => {
-                                alert(err.message || '对比失败');
-                              })
-                              .finally(() => {
-                                if (
-                                  selectedPackageIdRef.current === currentPkgId
-                                ) {
-                                  setCompareLoading(false);
-                                }
-                              });
-                          }}
-                        >
-                          {compareLoading ? '比较中...' : '比较'}
-                        </Button>
-                      </div>
-                    )}
-
-                    {/* Compare result */}
-                    {compareResult && (
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs">
-                          <div>
-                            <div className="font-medium">比较结果</div>
-                            <div className="text-muted-foreground">
-                              v{compareResult.baseVersion.versionNumber} {'->'}{' '}
-                              v{compareResult.targetVersion.versionNumber}
-                            </div>
-                          </div>
-                          <button
-                            onClick={() =>
-                              setCenterPreview({
-                                type: 'diff',
-                                name: '版本对比',
-                                content: buildDiffMarkdown(compareResult),
-                              })
-                            }
-                            className="text-[10px] text-primary hover:underline"
-                          >
-                            在中间打开
-                          </button>
-                        </div>
-                        <div className="rounded-lg border border-primary/15 bg-primary/5 px-3 py-2.5 text-xs">
-                          <div className="flex items-center gap-1.5 font-medium text-primary mb-2">
-                            <span className="inline-flex size-5 items-center justify-center rounded-md bg-primary/10 text-[10px]">
-                              AI
-                            </span>
-                            AI 总结
-                          </div>
-                          <div className="text-muted-foreground leading-relaxed">
-                            <MarkdownContent
-                              content={compareResult.summary || '暂无总结'}
-                            />
-                          </div>
-                        </div>
-                        <VersionDiffView result={compareResult} />
-                      </div>
-                    )}
-
-                    {/* Version list */}
-                    {!compareResult && (
-                      <div className="space-y-1.5">
-                        {versions.map((v) => (
-                          <div
-                            key={v.id}
-                            className={`rounded-lg border px-3 py-2 text-xs ${compareBaseId === v.id || compareTargetId === v.id ? 'border-primary/30 bg-primary/5' : 'border-border/70 bg-muted/50'}`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="font-medium">
-                                v{v.versionNumber}
-                              </span>
-                              <span className="text-muted-foreground">
-                                {v.source}
-                              </span>
-                              <span className="text-muted-foreground">
-                                {new Date(v.createdAt).toLocaleString()}
-                              </span>
-                            </div>
-                            <div className="mt-1.5">
-                              {v.note ? (
-                                <button
-                                  onClick={() =>
-                                    handleUpdateNote(v.id, v.note || '')
-                                  }
-                                  className="text-left text-[11px] text-muted-foreground hover:text-foreground transition-colors"
-                                  title="点击编辑备注"
-                                >
-                                  {`备注：${v.note}`}
-                                </button>
-                              ) : (
-                                <button
-                                  onClick={() => handleUpdateNote(v.id, '')}
-                                  className="text-[11px] text-muted-foreground/60 hover:text-muted-foreground transition-colors"
-                                  title="点击添加备注"
-                                >
-                                  + 添加备注
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                        {versions.length === 0 && (
-                          <div className="text-center text-sm text-muted-foreground py-4">
-                            暂无版本记录
-                          </div>
-                        )}
                       </div>
                     )}
                   </div>
@@ -4607,179 +4966,285 @@ export default function LiteArenaPanel() {
 
                 {detailTab === 'report' &&
                   (report ? (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                          评估报告
+                    <div className="overflow-hidden rounded-[14px] border border-border/70 bg-card shadow-sm">
+                      <div className="flex items-start justify-between gap-3 border-b border-border/70 px-4 py-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="ec-eyebrow">EVALUATION</div>
+                          <h3 className="font-serif-display text-[15.5px] font-semibold leading-tight text-foreground">
+                            评估报告
+                          </h3>
+                          <div className="ec-meta">
+                            基于当前 rubric 与对话生成
+                          </div>
                         </div>
-                        <button
-                          onClick={() => void handleReport()}
-                          className="text-[10px] text-primary hover:underline"
-                        >
-                          重新生成
-                        </button>
-                        <button
-                          onClick={() => openReportPreview(report)}
-                          className="text-[10px] text-primary hover:underline"
-                        >
-                          在中间打开
-                        </button>
+                        <div className="ec-actions">
+                          <button
+                            onClick={() => void handleReport()}
+                            className="ec-action"
+                          >
+                            重新生成
+                          </button>
+                        </div>
                       </div>
-                      {(!rubricHasContent || rubricNeedsRepair) && (
-                        <div className="rounded-[18px] border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-200">
-                          <div className="font-medium">
-                            {rubricHasContent
-                              ? '当前 rubric 将按现有内容参与评分'
-                              : '当前还没有配置 rubric'}
+                      <div className="space-y-3 p-4">
+                        {(!rubricHasContent || rubricNeedsRepair) && (
+                          <div className="rounded-[10px] border border-amber-500/25 bg-amber-500/10 px-3 py-2.5 text-xs text-amber-900 dark:text-amber-200">
+                            <div className="font-medium">
+                              {rubricHasContent
+                                ? '当前 rubric 将按现有内容参与评分'
+                                : '当前还没有配置 rubric'}
+                            </div>
+                            <div className="mt-1 leading-5">
+                              {reportHintMessage}
+                            </div>
                           </div>
-                          <div className="mt-1 text-xs leading-5">
-                            {reportHintMessage}
-                          </div>
-                        </div>
-                      )}
-                      {renderArenaReportView(report, true)}
+                        )}
+                        {renderArenaReportView(report, true)}
+                      </div>
                     </div>
                   ) : (
-                    <div className="space-y-3">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                        评估报告
+                    <div className="overflow-hidden rounded-[14px] border border-border/70 bg-card shadow-sm">
+                      <div className="flex items-start justify-between gap-3 border-b border-border/70 px-4 py-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="ec-eyebrow">EVALUATION</div>
+                          <h3 className="font-serif-display text-[15.5px] font-semibold leading-tight text-foreground">
+                            评估报告
+                          </h3>
+                          <div className="ec-meta">尚未生成</div>
+                        </div>
                       </div>
-                      <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground space-y-3">
-                        <div>还没有生成报告</div>
-                        {!rubricHasContent && (
-                          <div className="text-xs text-amber-700 dark:text-amber-300">
-                            {rubricRequiredMessage}
+                      <div className="p-4">
+                        <div className="rounded-[12px] border border-dashed border-border bg-muted/35 p-5 text-sm space-y-3">
+                          <div className="text-center">
+                            <div className="mx-auto mb-3 flex size-9 items-center justify-center rounded-[10px] border border-border/70 bg-card font-serif-display text-base font-semibold text-primary">
+                              R
+                            </div>
+                            <div className="font-medium text-foreground">
+                              还没有生成报告
+                            </div>
+                            <div className="mt-1 text-[11.5px] text-muted-foreground">
+                              完成至少一轮对话后即可基于 rubric 生成评估
+                            </div>
                           </div>
-                        )}
-                        {rubricHasContent && !canGenerateReport && (
-                          <div className="text-xs text-amber-700 dark:text-amber-300">
-                            {reportRequiredMessage}
+                          {!rubricHasContent && (
+                            <div className="rounded-[10px] border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-200">
+                              {rubricRequiredMessage}
+                            </div>
+                          )}
+                          {rubricHasContent && !canGenerateReport && (
+                            <div className="rounded-[10px] border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-200">
+                              {reportRequiredMessage}
+                            </div>
+                          )}
+                          <div className="flex justify-center">
+                            <Button
+                              size="sm"
+                              variant="default"
+                              className="rounded-[8px]"
+                              onClick={() => void handleReport()}
+                              disabled={!canOpenReport}
+                              title={
+                                !rubricHasContent
+                                  ? rubricRequiredMessage
+                                  : !canGenerateReport
+                                    ? reportRequiredMessage
+                                    : '生成评估报告'
+                              }
+                            >
+                              生成评估报告
+                            </Button>
                           </div>
-                        )}
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="rounded-[8px]"
-                          onClick={() => void handleReport()}
-                          disabled={!canOpenReport}
-                          title={
-                            !rubricHasContent
-                              ? rubricRequiredMessage
-                              : !canGenerateReport
-                                ? reportRequiredMessage
-                                : '生成评估报告'
-                          }
-                        >
-                          生成评估报告
-                        </Button>
+                        </div>
                       </div>
                     </div>
                   ))}
 
                 {detailTab === 'optimization' &&
                   (optimization ? (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                          优化结果
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 text-xs rounded-[8px]"
-                          onClick={() => void startInteractive()}
-                          disabled={
-                            !thread || !rubricConfigured || replyGenerating
-                          }
-                          title={interactiveActionTitle}
-                        >
-                          开始交互式优化
-                        </Button>
-                      </div>
-                      {!rubricConfigured && (
-                        <div className="rounded-[18px] border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-200">
-                          <div className="font-medium">交互式优化暂不可用</div>
-                          <div className="mt-1 text-xs leading-5">
-                            {rubricRequiredMessage}
+                    <div className="space-y-5">
+                      <div className="overflow-hidden rounded-[14px] border border-border/70 bg-card shadow-sm">
+                        <div className="flex items-start justify-between gap-3 border-b border-border/70 px-4 py-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="ec-eyebrow">OPTIMIZATION</div>
+                            <h3 className="font-serif-display text-[15.5px] font-semibold leading-tight text-foreground">
+                              优化结果
+                            </h3>
+                            <div className="ec-meta">
+                              新版本 v{optimization.versionNumber}
+                              <span className="ec-meta-sep">·</span>
+                              {optimization.issues.length} 项改进
+                            </div>
+                          </div>
+                          <div className="ec-actions">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 px-2.5 text-[11.5px] font-medium text-primary rounded-[6px] hover:bg-accent"
+                              onClick={() => void startInteractive()}
+                              disabled={
+                                !thread || !rubricConfigured || replyGenerating
+                              }
+                              title={interactiveActionTitle}
+                            >
+                              交互式优化
+                            </Button>
                           </div>
                         </div>
-                      )}
-                      <div className="rounded-[20px] border border-border/70 bg-muted/50 p-3 text-sm">
-                        <strong>新版本：</strong>v{optimization.versionNumber}
-                      </div>
-                      <div className="space-y-2">
-                        {optimization.issues.map((issue, i) => (
-                          <div
-                            key={`${issue.expert}-${i}`}
-                            className="rounded-[20px] border border-border/70 bg-muted/50 p-3 text-sm"
-                          >
-                            <div className="font-medium">
-                              [{formatExpert(issue.expert)}] {issue.title}
+                        <div className="space-y-3 p-4">
+                          {!rubricConfigured && (
+                            <div className="rounded-[10px] border border-amber-500/25 bg-amber-500/10 px-3 py-2.5 text-xs text-amber-900 dark:text-amber-200">
+                              <div className="font-medium">
+                                交互式优化暂不可用
+                              </div>
+                              <div className="mt-1 leading-5">
+                                {rubricRequiredMessage}
+                              </div>
                             </div>
-                            <div className="mt-1 text-xs text-muted-foreground">
-                              <strong>目标：</strong>
-                              {formatTarget(issue.target)}
-                              {issue.targetId ? ` / ${issue.targetId}` : ''}
-                            </div>
-                            <div className="mt-1">{issue.reason}</div>
-                            {issue.evidence.length > 0 && (
-                              <div className="mt-1 text-xs text-muted-foreground">
-                                <strong>依据：</strong>
-                                {issue.evidence.join('; ')}
+                          )}
+                          <div className="space-y-2">
+                            {optimization.issues.map((issue, i) => (
+                              <div
+                                key={`${issue.expert}-${i}`}
+                                className="rounded-[10px] border border-border/70 border-l-2 border-l-primary bg-card p-3 text-sm shadow-sm"
+                              >
+                                <div className="mb-1 flex flex-wrap items-center gap-2">
+                                  <span className="inline-flex items-center rounded-[4px] bg-accent px-1.5 py-0.5 font-mono-meta text-[10px] uppercase tracking-wider text-primary">
+                                    {formatExpert(issue.expert)}
+                                  </span>
+                                  <span className="font-mono-meta text-[10.5px] text-muted-foreground">
+                                    → {formatTarget(issue.target)}
+                                    {issue.targetId ? ` / ${issue.targetId}` : ''}
+                                  </span>
+                                </div>
+                                <div className="font-medium text-foreground">
+                                  {issue.title}
+                                </div>
+                                <div className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+                                  {issue.reason}
+                                </div>
+                                {issue.evidence.length > 0 && (
+                                  <div className="mt-1 text-xs text-muted-foreground">
+                                    <strong>依据：</strong>
+                                    {issue.evidence.join('; ')}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                            {optimization.issues.length === 0 && (
+                              <div className="rounded-[10px] border border-dashed border-border bg-muted/35 px-4 py-4 text-center text-sm text-muted-foreground">
+                                当前没有额外优化项
                               </div>
                             )}
                           </div>
-                        ))}
-                        {optimization.issues.length === 0 && (
-                          <div className="text-sm text-muted-foreground">
-                            当前没有额外优化项
-                          </div>
-                        )}
+                        </div>
                       </div>
                       {optimization && selectedPackage && (
-                        <OptimizationDiffView
-                          oldSnapshot={selectedPackage.snapshot}
-                          optimization={optimization}
-                        />
+                        <div className="overflow-hidden rounded-[14px] border border-border/70 bg-card shadow-sm">
+                          <div className="flex items-start justify-between gap-3 border-b border-border/70 px-4 py-3">
+                            <div className="min-w-0 flex-1">
+                              <div className="ec-eyebrow">DIFF</div>
+                              <h3 className="font-serif-display text-[15.5px] font-semibold leading-tight text-foreground">
+                                优化对比
+                              </h3>
+                              <div className="ec-meta">
+                                原版本 → v{optimization.versionNumber}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="p-4">
+                            <OptimizationDiffView
+                              oldSnapshot={selectedPackage.snapshot}
+                              optimization={optimization}
+                            />
+                          </div>
+                        </div>
                       )}
                     </div>
                   ) : (
-                    <div className="space-y-3">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                        优化
+                    <div className="overflow-hidden rounded-[14px] border border-border/70 bg-card shadow-sm">
+                      <div className="flex items-start justify-between gap-3 border-b border-border/70 px-4 py-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="ec-eyebrow">OPTIMIZATION</div>
+                          <h3 className="font-serif-display text-[15.5px] font-semibold leading-tight text-foreground">
+                            优化
+                          </h3>
+                          <div className="ec-meta">尚未进行交互式优化</div>
+                        </div>
                       </div>
-                      <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground space-y-3">
-                        <div>还没有进行交互式优化</div>
-                        {!rubricConfigured && (
-                          <div className="text-xs text-amber-700 dark:text-amber-300">
-                            {rubricRequiredMessage}
+                      <div className="p-4">
+                        <div className="rounded-[12px] border border-dashed border-border bg-muted/35 p-5 text-sm space-y-3">
+                          <div className="text-center">
+                            <div className="mx-auto mb-3 flex size-9 items-center justify-center rounded-[10px] border border-border/70 bg-card font-serif-display text-base font-semibold text-primary">
+                              O
+                            </div>
+                            <div className="font-medium text-foreground">
+                              还没有进行交互式优化
+                            </div>
+                            <div className="mt-1 text-[11.5px] text-muted-foreground">
+                              配置 rubric 后即可开始多专家协作优化
+                            </div>
                           </div>
-                        )}
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="rounded-[8px]"
-                          onClick={() => void startInteractive()}
-                          disabled={
-                            !thread || !rubricConfigured || replyGenerating
-                          }
-                          title={interactiveActionTitle}
-                        >
-                          开始交互式优化
-                        </Button>
+                          {!rubricConfigured && (
+                            <div className="rounded-[10px] border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-200">
+                              {rubricRequiredMessage}
+                            </div>
+                          )}
+                          <div className="flex justify-center">
+                            <Button
+                              size="sm"
+                              variant="default"
+                              className="rounded-[8px]"
+                              onClick={() => void startInteractive()}
+                              disabled={
+                                !thread || !rubricConfigured || replyGenerating
+                              }
+                              title={interactiveActionTitle}
+                            >
+                              开始交互式优化
+                            </Button>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   ))}
 
                 {detailTab === 'diff' &&
                   (optimization && selectedPackage ? (
-                    <OptimizationDiffView
-                      oldSnapshot={selectedPackage.snapshot}
-                      optimization={optimization}
-                    />
+                    <div className="overflow-hidden rounded-[14px] border border-border/70 bg-card shadow-sm">
+                      <div className="flex items-start justify-between gap-3 border-b border-border/70 px-4 py-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="ec-eyebrow">DIFF</div>
+                          <h3 className="font-serif-display text-[15.5px] font-semibold leading-tight text-foreground">
+                            优化对比
+                          </h3>
+                          <div className="ec-meta">
+                            原版本 → v{optimization.versionNumber}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="p-4">
+                        <OptimizationDiffView
+                          oldSnapshot={selectedPackage.snapshot}
+                          optimization={optimization}
+                        />
+                      </div>
+                    </div>
                   ) : (
-                    <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
-                      还没有执行优化
+                    <div className="overflow-hidden rounded-[14px] border border-border/70 bg-card shadow-sm">
+                      <div className="flex items-start justify-between gap-3 border-b border-border/70 px-4 py-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="ec-eyebrow">DIFF</div>
+                          <h3 className="font-serif-display text-[15.5px] font-semibold leading-tight text-foreground">
+                            优化对比
+                          </h3>
+                          <div className="ec-meta">尚未执行优化</div>
+                        </div>
+                      </div>
+                      <div className="p-4">
+                        <div className="rounded-[12px] border border-dashed border-border bg-muted/35 px-5 py-6 text-center text-sm text-muted-foreground">
+                          还没有执行优化
+                        </div>
+                      </div>
                     </div>
                   ))}
               </div>
@@ -4797,6 +5262,14 @@ export default function LiteArenaPanel() {
           </button>
         </div>
       )}
+      <AnswerSkillOptimizationDialog
+        open={answerOptimizationOpen}
+        token={token}
+        target={answerOptimizationTarget}
+        onOpenChange={setAnswerOptimizationOpen}
+        onSummaryChanged={refreshAnswerOptimizationSummaries}
+        onConfirmed={handleAnswerOptimizationConfirmed}
+      />
     </div>
   );
 }

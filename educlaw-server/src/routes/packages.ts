@@ -33,6 +33,9 @@ import {
   diagnosePackage,
   chatOptimize,
   applyInteractiveChanges,
+  createFeedbackOptimization,
+  testFeedbackOptimizationDraft,
+  applyFeedbackOptimizationDraft,
   listInteractiveSessions,
   getInteractiveSession,
   type AdoptedChange,
@@ -455,6 +458,110 @@ router.post(
         .json({
           error: error instanceof Error ? error.message : '应用修改失败',
         });
+    }
+  },
+);
+
+// 反馈式优化：基于用户对单条回答的反馈生成 Skill 优化草稿
+router.post(
+  '/packages/:packageId/optimize/feedback',
+  requireAuth,
+  async (req, res) => {
+    try {
+      const result = await createFeedbackOptimization(
+        (req as AuthedRequest).userId || '',
+        one(req.params.packageId),
+        {
+          threadId:
+            typeof req.body?.threadId === 'string'
+              ? req.body.threadId
+              : undefined,
+          turnIndex:
+            typeof req.body?.turnIndex === 'number'
+              ? req.body.turnIndex
+              : undefined,
+          userQuestion:
+            typeof req.body?.userQuestion === 'string'
+              ? req.body.userQuestion
+              : undefined,
+          agentAnswer:
+            typeof req.body?.agentAnswer === 'string'
+              ? req.body.agentAnswer
+              : undefined,
+          baselineAnswer:
+            typeof req.body?.baselineAnswer === 'string'
+              ? req.body.baselineAnswer
+              : undefined,
+          userFeedback: String(req.body?.userFeedback || ''),
+          targetSkillId:
+            typeof req.body?.targetSkillId === 'string'
+              ? req.body.targetSkillId
+              : undefined,
+        },
+        typeof req.body?.model === 'string' ? req.body.model : undefined,
+      );
+      res.json(result);
+    } catch (error) {
+      res.status(400).json({
+        error:
+          error instanceof Error ? error.message : '反馈式优化失败',
+      });
+    }
+  },
+);
+
+// 反馈式优化：用草稿快照重测当前问题
+router.post(
+  '/packages/:packageId/optimize/test-draft',
+  requireAuth,
+  async (req, res) => {
+    try {
+      const result = await testFeedbackOptimizationDraft(
+        (req as AuthedRequest).userId || '',
+        one(req.params.packageId),
+        {
+          draftSnapshot: req.body?.draftSnapshot,
+          userQuestion:
+            typeof req.body?.userQuestion === 'string'
+              ? req.body.userQuestion
+              : undefined,
+          model:
+            typeof req.body?.model === 'string' ? req.body.model : undefined,
+        },
+      );
+      res.json(result);
+    } catch (error) {
+      res.status(400).json({
+        error:
+          error instanceof Error ? error.message : '草稿重测失败',
+      });
+    }
+  },
+);
+
+// 反馈式优化：将草稿落盘为新版本
+router.post(
+  '/packages/:packageId/optimize/apply-draft',
+  requireAuth,
+  async (req, res) => {
+    try {
+      const result = await applyFeedbackOptimizationDraft(
+        (req as AuthedRequest).userId || '',
+        one(req.params.packageId),
+        {
+          draftSnapshot: req.body?.draftSnapshot,
+          changeSummary:
+            typeof req.body?.changeSummary === 'string'
+              ? req.body.changeSummary
+              : undefined,
+        },
+      );
+      res.json(result);
+    } catch (error) {
+      res.status(400).json({
+        error:
+          error instanceof Error ? error.message : '保存草稿失败',
+      });
     }
   },
 );

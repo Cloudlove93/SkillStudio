@@ -1,5 +1,6 @@
 import type {
   AgentPackageDetail,
+  AgentPackageSnapshot,
   AgentPackageSummary,
   ArenaMessage,
   ArenaReport,
@@ -145,6 +146,41 @@ export interface VersionCompareResult {
     skills: SkillDiff[];
   };
   summary: string;
+}
+
+/* ── 反馈式优化（基于单条回答反馈的 Skill 优化草稿） ── */
+export type FeedbackScope =
+  | 'reusable_preference'
+  | 'single_turn_feedback'
+  | 'unsafe_or_unclear';
+export type FeedbackPatchOp =
+  | 'append_to_section'
+  | 'replace_in_section'
+  | 'add_section';
+
+export interface FeedbackPatchOperation {
+  op: FeedbackPatchOp;
+  targetSection: string;
+  oldText?: string;
+  content: string;
+  rationale?: string;
+}
+
+export interface FeedbackOptimizationResult {
+  issueSummary: string;
+  feedbackScope: FeedbackScope;
+  targetSkillId: string;
+  targetSkillName: string;
+  targetSections: string[];
+  patchOperations: FeedbackPatchOperation[];
+  rationale: string;
+  evidenceFromAnswer: string[];
+  riskNotes: string[];
+  originalSkillMd: string;
+  optimizedSkillMd: string;
+  optimizedSnapshot: AgentPackageSnapshot;
+  validationErrors: string[];
+  diff: LineDiff[];
 }
 
 export type PackageGeneratePreview = {
@@ -405,6 +441,23 @@ export const liteApi = {
       versionNumber: number;
       rolledBackSkillVersionId: string;
     }>(token, 'skill.version.rollback', packageId, payload),
+  rollbackPackageVersion: (
+    token: string,
+    packageId: string,
+    payload: {
+      versionId: string;
+      expectedPackageVersionId: string;
+      idempotencyKey: string;
+      note?: string;
+    },
+  ) =>
+    actionRequest<{
+      packageId: string;
+      packageVersionId: string;
+      versionNumber: number;
+      rolledBackPackageVersionId: string;
+      rolledBackFromVersionNumber: number;
+    }>(token, 'package.version.rollback', packageId, payload),
   discardSkillVersion: (
     token: string,
     packageId: string,
@@ -600,6 +653,55 @@ export const liteApi = {
       { method: 'POST', body: JSON.stringify({ sessionId, changes, note }) },
       token,
     ),
+  createFeedbackOptimization: (
+    token: string,
+    packageId: string,
+    data: {
+      threadId?: string;
+      turnIndex?: number;
+      userQuestion?: string;
+      agentAnswer?: string;
+      baselineAnswer?: string;
+      userFeedback: string;
+      targetSkillId?: string;
+      model?: string;
+    },
+  ) =>
+    request<FeedbackOptimizationResult>(
+      `/packages/${packageId}/optimize/feedback`,
+      { method: 'POST', body: JSON.stringify(data) },
+      token,
+    ),
+  testFeedbackOptimizationDraft: (
+    token: string,
+    packageId: string,
+    data: {
+      draftSnapshot: AgentPackageSnapshot;
+      userQuestion: string;
+      model?: string;
+    },
+  ) =>
+    request<{ optimizedAnswer: string }>(
+      `/packages/${packageId}/optimize/test-draft`,
+      { method: 'POST', body: JSON.stringify(data) },
+      token,
+    ),
+  applyFeedbackOptimizationDraft: (
+    token: string,
+    packageId: string,
+    data: {
+      draftSnapshot: AgentPackageSnapshot;
+      changeSummary?: string;
+    },
+  ) =>
+    request<{
+      versionId: string;
+      versionNumber: number;
+      package: AgentPackageDetail;
+    }>(`/packages/${packageId}/optimize/apply-draft`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, token),
   compareVersions: (
     token: string,
     packageId: string,

@@ -11,6 +11,7 @@ import {
   getSkillVersionDetail,
   listPackageSkills,
   listSkillVersions,
+  rollbackPackageVersion,
   rollbackSkillVersion,
   SkillVersionError,
   undiscardSkillVersion,
@@ -278,6 +279,32 @@ const actionMap = new Map<string, ApiHandler>([
         authUserId,
         packageId: parsed.packageId,
         skillId: asPositiveId(parsed.payload.skillId, 'skillId'),
+        versionId: asPositiveId(parsed.payload.versionId, 'versionId'),
+        expectedPackageVersionId: asPositiveId(
+          parsed.payload.expectedPackageVersionId,
+          'expectedPackageVersionId',
+        ),
+        idempotencyKey: requiredString(
+          parsed.payload.idempotencyKey,
+          'idempotencyKey',
+          120,
+        ),
+        note: optionalString(parsed.payload.note, 'note', 500),
+      });
+    },
+  ],
+  [
+    'package.version.rollback',
+    async ({ body, authUserId }) => {
+      const parsed = parseBase(body, [
+        'versionId',
+        'expectedPackageVersionId',
+        'idempotencyKey',
+        'note',
+      ]);
+      return rollbackPackageVersion({
+        authUserId,
+        packageId: parsed.packageId,
         versionId: asPositiveId(parsed.payload.versionId, 'versionId'),
         expectedPackageVersionId: asPositiveId(
           parsed.payload.expectedPackageVersionId,

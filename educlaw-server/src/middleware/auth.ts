@@ -1,4 +1,5 @@
 import type { NextFunction, Response } from "express";
+import { getRequestId } from "../lib/request-context.js";
 import type { AuthedRequest } from "../types.js";
 
 export interface GatewayAuthedRequest extends AuthedRequest {
@@ -25,7 +26,14 @@ function firstHeaderValue(value: string | string[] | undefined): string | undefi
 export function requireAuth(req: AuthedRequest, res: Response, next: NextFunction) {
   const userId = firstHeaderValue(req.headers["x-user-id"]);
   if (!userId) {
-    res.status(401).json({ error: "Authentication required" });
+    const requestId = getRequestId();
+    res
+      .status(401)
+      .json(
+        requestId
+          ? { error: "Authentication required", requestId }
+          : { error: "Authentication required" },
+      );
     return;
   }
 

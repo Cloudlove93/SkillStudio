@@ -18,6 +18,7 @@ import {
   streamMessage,
   type ArenaMode,
 } from "../services/arena-service.js";
+import { listAnswerOptimizationSummariesForThread } from "../services/answer-skill-optimization-service.js";
 
 const router: import("express").Router = Router();
 
@@ -52,11 +53,13 @@ router.post(ARENA_ROUTES.CREATE_THREAD, requireAuth, async (req, res) => {
 
 router.get(ARENA_ROUTES.THREAD_DETAIL, requireAuth, async (req, res) => {
   try {
-    const arenaThreadDetail = await getThreadDetail(
-      (req as AuthedRequest).userId || "",
-      one(req.query.threadId as string | string[] | undefined),
-    );
-    res.json(arenaThreadDetail);
+    const userId = (req as AuthedRequest).userId || "";
+    const threadId = one(req.query.threadId as string | string[] | undefined);
+    const [arenaThreadDetail, answerOptimizations] = await Promise.all([
+      getThreadDetail(userId, threadId),
+      listAnswerOptimizationSummariesForThread(userId, Number(threadId)),
+    ]);
+    res.json({ ...arenaThreadDetail, answerOptimizations });
   } catch (error) {
     res
       .status(404)

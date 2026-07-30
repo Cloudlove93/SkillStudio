@@ -1132,3 +1132,154 @@ export async function rollbackSkillVersion(input: {
     return response;
   });
 }
+
+export async function rollbackPackageVersion(input: {
+  authUserId: string;
+  packageId: string;
+  versionId: string;
+  expectedPackageVersionId: string;
+  idempotencyKey: string;
+  note?: string;
+}) {
+  const packageId = positiveId(input.packageId, 'packageId');
+  const versionId = positiveId(input.versionId, 'versionId');
+  const expectedPackageVersionId = positiveId(
+    input.expectedPackageVersionId,
+    'expectedPackageVersionId',
+  );
+  const idempotencyKey = String(input.idempotencyKey || '').trim();
+  if (!idempotencyKey || idempotencyKey.length > 120) {
+    throw new SkillVersionError(
+      'INVALID_ARGUMENT',
+      'idempotencyKey is required',
+      422,
+    );
+  }
+  const requestHash = buildRequestHash({
+    packageId,
+    versionId,
+    expectedPackageVersionId,
+    note: input.note || '',
+  });
+
+  return withTransaction(async (client) => {
+    const idempotency = await claimIdempotencyKey(client, {
+      authUserId: input.authUserId,
+      action: 'package.version.rollback',
+      packageId,
+      idempotencyKey,
+      requestHash,
+    });
+    if (idempotency.kind === 'replayed') {
+      return parseDbJson<Record<string, unknown>>(idempotency.responseJson, {});
+    }
+
+    const pkg = await getOwnedPackage(
+      client,
+      input.authUserId,
+      packageId,
+      true,
+    );
+    await ensurePackageSkillHistory(client, pkg);
+    if (String(pkg.current_version_id) !== expectedPackageVersionId) {
+      throw new SkillVersionError(
+        'PACKAGE_VERSION_CONFLICT',
+        'Package has changed. Refresh before retrying.',
+        409,
+        {
+          currentPackageVersionId: String(pkg.current_version_id),
+        },
+      );
+    }
+
+    if (String(versionId) === String(pkg.current_version_id)) {
+      throw new SkillVersionError(
+        'INVALID_ARGUMENT',
+        'Cannot rollback to current version',
+        422,
+      );
+    }
+
+    const sourceVersion = await getPackageVersion(client, packageId, versionId);
+    const sourceSnapshot = parseDbJson<AgentPackageSnapshot>(
+      sourceVersion.snapshot_json,
+      emptySnapshot(),
+    );
+    const currentVersion = await getPackageVersion(
+      client,
+      packageId,
+      pkg.current_version_id,
+    );
+    const nextVersionNumber = currentVersion.version_number + 1;
+    const nextSnapshot: AgentPackageSnapshot = {
+      ...sourceSnapshot,
+      versionLabel: `v${nextVersionNumber}`,
+    };
+    const now = new Date().toISOString();
+    const noteText =
+      (input.note && input.note.trim()) ||
+      `Rollback to v${sourceVersion.version_number}`;
+    const packageVersionResult = await client.query<{ id: string }>(
+      `insert into agent_package_versions
+        (package_id, version_number, source, snapshot_json, note, created_at)
+       values ($1, $2, 'rollback', $3, $4, $5)
+       returning id`,
+      [
+        packageId,
+        nextVersionNumber,
+        JSON.stringify(nextSnapshot),
+        noteText,
+        now,
+      ],
+    );
+    const nextPackageVersionId = packageVersionResult.rows[0]!.id;
+
+    await syncPackageVersionSkillsFromSnapshot(client, {
+      packageId,
+      packageVersionId: nextPackageVersionId,
+      packageVersionNumber: nextVersionNumber,
+      source: 'rollback',
+      snapshot: nextSnapshot,
+      note: noteText,
+    });
+
+    const packageUpdate = await client.query(
+      `update agent_packages
+       set current_version_id = $1, updated_at = $2
+       where id = $3 and user_id = $4 and current_version_id = $5`,
+      [
+        nextPackageVersionId,
+        now,
+        packageId,
+        input.authUserId,
+        expectedPackageVersionId,
+      ],
+    );
+    if ((packageUpdate.rowCount || 0) !== 1) {
+      throw new SkillVersionError(
+        'PACKAGE_VERSION_CONFLICT',
+        'Package has changed. Refresh before retrying.',
+        409,
+      );
+    }
+
+    const response = {
+      packageId,
+      packageVersionId: String(nextPackageVersionId),
+      versionNumber: nextVersionNumber,
+      rolledBackPackageVersionId: versionId,
+      rolledBackFromVersionNumber: sourceVersion.version_number,
+      snapshot: nextSnapshot,
+    };
+    await completeIdempotencyKey(client, {
+      authUserId: input.authUserId,
+      action: 'package.version.rollback',
+      packageId,
+      idempotencyKey,
+      requestHash,
+      responseStatus: 200,
+      responseJson: response,
+    });
+    return response;
+  });
+}

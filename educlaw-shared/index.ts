@@ -16,6 +16,15 @@ export const ARENA_ROUTES = {
   MESSAGE_STREAM: "/arena/threads/messages/stream",
 } as const;
 
+export const ANSWER_SKILL_OPTIMIZATION_ROUTES = {
+  CREATE: "/arena/answer-optimizations",
+  DETAIL: "/arena/answer-optimizations/:optimizationId",
+  REVISE: "/arena/answer-optimizations/:optimizationId/revise",
+  TEST: "/arena/answer-optimizations/:optimizationId/test",
+  CONFIRM: "/arena/answer-optimizations/:optimizationId/confirm",
+  CANCEL: "/arena/answer-optimizations/:optimizationId/cancel",
+} as const;
+
 export interface LoginRequest {
   username: string;
   password: string;
@@ -180,9 +189,52 @@ export interface ArenaMessage {
   createdAt: string;
 }
 
+export type ArenaAnswerOptimizationStatus =
+  | "processing"
+  | "target_selection_required"
+  | "draft_ready"
+  | "test_ready"
+  | "completed"
+  | "cancelled"
+  | "failed";
+
+export type ArenaAnswerOptimizationAction =
+  | "create"
+  | "resume"
+  | "restart"
+  | "completed"
+  | "unavailable";
+
+export type ArenaAnswerOptimizationUnavailableReason =
+  | "missing_answer_run"
+  | "replay_context_unavailable"
+  | "replay_model_unavailable";
+
+export interface ArenaAnswerOptimizationSummary {
+  enhancedAnswerMessageId: number;
+  optimizationId: number | null;
+  status: ArenaAnswerOptimizationStatus | null;
+  finalVersionId: number | null;
+  versionNumber: number | null;
+  canOptimize: boolean;
+  action: ArenaAnswerOptimizationAction;
+  unavailableReason: ArenaAnswerOptimizationUnavailableReason | null;
+}
+
+export interface ArenaThreadSideVersionInfo {
+  boundSkillVersionNumber: number;
+  latestSkillVersionNumber: number;
+}
+
 export interface ArenaThreadDetail {
   thread: ArenaThread;
   messages: ArenaMessage[];
+  answerOptimizations: ArenaAnswerOptimizationSummary[];
+  // Skill Arena 线程的版本绑定信息（仅 skill_arena 模式有值；package_arena 为 null）
+  skillVersionInfo?: {
+    left: ArenaThreadSideVersionInfo;
+    right: ArenaThreadSideVersionInfo;
+  } | null;
 }
 
 export interface ArenaChatResult {
