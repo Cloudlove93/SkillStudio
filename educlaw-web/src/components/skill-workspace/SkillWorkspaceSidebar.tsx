@@ -1,6 +1,7 @@
 import type { GuidedCreationSession } from '@educlaw/shared';
 import {
   Columns3,
+  FileText,
   FileUp,
   FlaskConical,
   History,
@@ -17,11 +18,17 @@ import {
   Search,
   Sparkles,
   WandSparkles,
+  ChevronRight,
 } from 'lucide-react';
 import { ThemeToggle } from '../theme-toggle';
 import type { SkillWorkspaceView } from './skill-workspace-state';
 
-export type SkillCreateMode = 'conversation' | 'template' | 'import' | 'manual';
+export type SkillCreateMode =
+  | 'conversation'
+  | 'document'
+  | 'template'
+  | 'import'
+  | 'manual';
 
 type Props = {
   sessions: GuidedCreationSession[];
@@ -35,7 +42,6 @@ type Props = {
   userName: string;
   onSearch: (value: string) => void;
   onToggle: () => void;
-  onNew: () => void;
   onRepository: () => void;
   onNavigate: (view: SkillWorkspaceView) => void;
   onCreateMode: (mode: SkillCreateMode) => void;
@@ -44,10 +50,36 @@ type Props = {
 };
 
 const creationModes = [
-  { mode: 'conversation', label: '自然对话创建', icon: MessageSquareText },
-  { mode: 'template', label: '模板创建', icon: LayoutTemplate },
-  { mode: 'import', label: '导入 Skill', icon: FileUp },
-  { mode: 'manual', label: '手动创建', icon: PencilLine },
+  {
+    mode: 'conversation',
+    label: '自然对话创建',
+    description: '通过问答逐步生成',
+    icon: MessageSquareText,
+  },
+  {
+    mode: 'document',
+    label: '从描述文档生成',
+    description: '一份文档生成一个 Skill',
+    icon: FileText,
+  },
+  {
+    mode: 'template',
+    label: '从模板创建',
+    description: '选择教育场景后调整',
+    icon: LayoutTemplate,
+  },
+  {
+    mode: 'import',
+    label: '导入已有 Skill',
+    description: '导入标准 Skill ZIP',
+    icon: FileUp,
+  },
+  {
+    mode: 'manual',
+    label: '空白创建',
+    description: '直接编辑 SKILL.md',
+    icon: PencilLine,
+  },
 ] as const;
 
 const skillActions = [
@@ -81,7 +113,6 @@ export function SkillWorkspaceSidebar({
   userName,
   onSearch,
   onToggle,
-  onNew,
   onRepository,
   onNavigate,
   onCreateMode,
@@ -111,30 +142,41 @@ export function SkillWorkspaceSidebar({
       </div>
 
       <nav className="skill-sidebar-commands" aria-label="Skill 工作区功能">
-        <button onClick={onNew} className={!repositoryActive && !selectedSessionId ? 'is-active' : ''}>
-          <Plus size={16} />{!collapsed && <span>新建 Skill</span>}
-        </button>
+        <details className="skill-create-menu">
+          <summary
+            className={!repositoryActive && !selectedSessionId ? 'is-active' : ''}
+            aria-haspopup="menu"
+            title="新建 Skill"
+          >
+            <Plus size={16} />{!collapsed && <span>新建 Skill</span>}
+          </summary>
+          <div className="skill-create-popover" role="menu" aria-label="新建 Skill 的方式">
+            <strong>新建 Skill</strong>
+            {creationModes.map(({ mode, label, description, icon: Icon }) => (
+              <button
+                key={mode}
+                type="button"
+                role="menuitem"
+                className={`skill-create-menu-item ${mode === selectedCreateMode ? 'is-active' : ''}`}
+                onClick={(event) => {
+                  event.currentTarget.closest('details')?.removeAttribute('open');
+                  onCreateMode(mode);
+                }}
+              >
+                <span className="skill-create-menu-icon"><Icon size={15} /></span>
+                <span className="skill-create-menu-copy">
+                  <strong>{label}</strong>
+                  <small>{description}</small>
+                </span>
+                <ChevronRight size={14} />
+              </button>
+            ))}
+          </div>
+        </details>
         <button onClick={onRepository} className={repositoryActive ? 'is-active' : ''}>
           <Library size={16} />{!collapsed && <span>Skill 仓库</span>}
         </button>
       </nav>
-
-      {activeView === 'create' && (
-        <nav className="skill-sidebar-subnav" aria-label="新建 Skill 的方式">
-          {!collapsed && <div className="skill-sidebar-heading"><span>开始方式</span></div>}
-          {creationModes.map(({ mode, label, icon: Icon }) => (
-            <button
-              key={mode}
-              className={mode === selectedCreateMode ? 'is-active' : ''}
-              onClick={() => onCreateMode(mode)}
-              title={label}
-            >
-              <Icon size={15} />
-              {!collapsed && <span>{label}</span>}
-            </button>
-          ))}
-        </nav>
-      )}
 
       {selectedSessionCompleted && !repositoryActive && (
         <nav className="skill-sidebar-subnav" aria-label="当前 Skill 功能">

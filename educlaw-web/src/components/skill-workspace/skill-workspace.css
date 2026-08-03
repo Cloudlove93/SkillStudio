@@ -72,9 +72,24 @@
 .skill-sidebar.is-collapsed .skill-new-button { width: 42px; }
 
 .skill-sidebar-commands { display: flex; flex-direction: column; gap: 2px; margin: 10px 0 5px; }
-.skill-sidebar-commands button { display: flex; width: 100%; height: 35px; align-items: center; gap: 9px; border: 0; border-radius: 8px; background: transparent; color: var(--muted-foreground); padding: 0 9px; font-size: 12px; cursor: pointer; }
-.skill-sidebar-commands button:hover, .skill-sidebar-commands button.is-active { background: var(--skill-hover); color: var(--primary); }
-.skill-sidebar.is-collapsed .skill-sidebar-commands button { width: 42px; justify-content: center; padding: 0; }
+.skill-sidebar-commands > button, .skill-create-menu > summary { display: flex; width: 100%; height: 35px; align-items: center; gap: 9px; border: 0; border-radius: 8px; background: transparent; color: var(--muted-foreground); padding: 0 9px; font-size: 12px; cursor: pointer; }
+.skill-sidebar-commands > button:hover, .skill-sidebar-commands > button.is-active, .skill-create-menu > summary:hover, .skill-create-menu > summary.is-active { background: var(--skill-hover); color: var(--primary); }
+.skill-sidebar.is-collapsed .skill-sidebar-commands > button, .skill-sidebar.is-collapsed .skill-create-menu > summary { width: 42px; justify-content: center; padding: 0; }
+.skill-create-menu { position: relative; }
+.skill-create-menu > summary { list-style: none; }
+.skill-create-menu > summary::-webkit-details-marker { display: none; }
+.skill-create-popover { position: absolute; z-index: 45; top: calc(100% + 6px); left: 0; display: flex; width: 260px; flex-direction: column; gap: 2px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); padding: 7px; box-shadow: var(--shadow-lg); }
+.skill-create-popover > strong { padding: 5px 8px 7px; color: var(--muted-foreground); font-size: 9px; font-weight: 600; }
+.skill-create-menu-item { display: grid; width: 100%; min-height: 48px; grid-template-columns: 30px minmax(0, 1fr) 14px; align-items: center; gap: 8px; border: 0; border-radius: 9px; background: transparent; color: var(--foreground); padding: 7px 8px; text-align: left; cursor: pointer; }
+.skill-create-menu-item:hover, .skill-create-menu-item.is-active { background: var(--skill-hover); }
+.skill-create-menu-icon { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 8px; background: var(--muted); color: var(--muted-foreground); }
+.skill-create-menu-item.is-active .skill-create-menu-icon { background: var(--card); color: var(--primary); box-shadow: var(--shadow-sm); }
+.skill-create-menu-copy { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
+.skill-create-menu-copy strong, .skill-create-menu-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.skill-create-menu-copy strong { font-size: 11px; font-weight: 590; }
+.skill-create-menu-copy small { color: var(--muted-foreground); font-size: 8px; }
+.skill-create-menu-item > svg { color: var(--muted-foreground); }
+.skill-sidebar.is-collapsed .skill-create-popover { top: 0; left: 48px; }
 
 .skill-sidebar-subnav { display: flex; flex-direction: column; gap: 2px; margin: 4px 0 5px; padding: 4px 0 6px 13px; border-left: 1px solid var(--border); }
 .skill-sidebar-subnav .skill-sidebar-heading { padding-left: 8px; }

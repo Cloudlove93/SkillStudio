@@ -550,7 +550,6 @@ export default function SkillFirstWorkspace() {
         userName={user?.username || '用户'}
         onSearch={setSearch}
         onToggle={() => setLeftCollapsed((value) => !value)}
-        onNew={() => newSkill()}
         onRepository={openRepository}
         onNavigate={(view) => dispatchWorkspace({ type: 'navigate', view })}
         onCreateMode={newSkill}
