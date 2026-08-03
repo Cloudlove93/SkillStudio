@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { liteApi, type GuidedCreationSseEvent } from '../api/lite-api';
 import { useAuthStore } from '../stores/auth';
 import { GuidedSkillCreationPanel } from '../components/skill-workspace/GuidedSkillCreationPanel';
+import { DocumentSkillCreationPanel } from '../components/skill-workspace/DocumentSkillCreationPanel';
 import {
   isGuidedFinalizationStale,
   isGuidedRunVisible,
@@ -583,6 +584,14 @@ export default function SkillFirstWorkspace() {
               versionsLoading={versionsLoading}
               onPublishUpdate={publishUpdate}
               onReloadVersions={loadVersions}
+            />
+          ) : createMode === 'document' ? (
+            <DocumentSkillCreationPanel
+              token={token}
+              onGenerated={async () => {
+                await refreshRepository();
+                dispatchWorkspace({ type: 'navigate', view: 'repository' });
+              }}
             />
           ) : (
             <GuidedSkillCreationPanel

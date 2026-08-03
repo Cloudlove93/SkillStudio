@@ -215,6 +215,44 @@
 .skill-send-button:hover { background: var(--primary-hover); }
 .skill-send-button:disabled { background: var(--muted); color: var(--muted-foreground); box-shadow: none; cursor: default; }
 
+.skill-document-create-page { width: min(780px, calc(100% - 64px)); margin: 0 auto; padding: 54px 0 38px; }
+.skill-document-create-header h1 { margin: 8px 0 7px; color: var(--foreground); font-size: 22px; font-weight: 620; letter-spacing: -.025em; }
+.skill-document-create-header p { max-width: 620px; margin: 0; color: var(--muted-foreground); font-size: 12px; line-height: 1.75; }
+.skill-document-create-dropzone { display: grid; width: 100%; min-height: 104px; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: 14px; margin-top: 28px; border: 1px dashed color-mix(in srgb, var(--primary) 30%, var(--border)); border-radius: 13px; background: color-mix(in srgb, var(--primary-soft) 20%, var(--card)); padding: 18px 20px; color: var(--foreground); text-align: left; cursor: pointer; }
+.skill-document-create-dropzone:hover { border-color: color-mix(in srgb, var(--primary) 52%, var(--border)); background: color-mix(in srgb, var(--primary-soft) 38%, var(--card)); }
+.skill-document-create-dropzone:disabled { opacity: .58; cursor: default; }
+.skill-document-create-dropzone > span:first-child { display: grid; width: 40px; height: 40px; place-items: center; border-radius: 11px; background: var(--primary-soft); color: var(--primary); }
+.skill-document-create-dropzone > span:nth-child(2) { display: flex; min-width: 0; flex-direction: column; gap: 5px; }
+.skill-document-create-dropzone strong { font-size: 12px; font-weight: 610; }
+.skill-document-create-dropzone small { overflow: hidden; color: var(--muted-foreground); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.skill-document-create-dropzone b { border: 1px solid var(--border); border-radius: 8px; background: var(--card); color: var(--muted-foreground); padding: 7px 10px; font-size: 9px; font-weight: 560; box-shadow: var(--shadow-sm); }
+.skill-document-create-files { margin-top: 10px; }
+.skill-document-create-files > div { display: grid; min-height: 46px; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; gap: 9px; border-bottom: 1px solid var(--border); padding: 7px 3px; }
+.skill-document-create-file-icon { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 8px; background: var(--muted); color: var(--muted-foreground); }
+.skill-document-create-files > div > span:nth-child(2) { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.skill-document-create-files strong, .skill-document-create-files small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.skill-document-create-files strong { font-size: 10px; }
+.skill-document-create-files small, .skill-document-create-files > p { color: var(--muted-foreground); font-size: 8px; }
+.skill-document-create-files > div > button { display: grid; width: 26px; height: 26px; place-items: center; border: 0; border-radius: 7px; background: transparent; color: var(--muted-foreground); cursor: pointer; }
+.skill-document-create-files > div > button:hover { background: var(--skill-hover); color: var(--destructive); }
+.skill-document-create-files > div > svg { color: var(--muted-foreground); }
+.skill-document-create-files > div > svg.is-success { color: var(--success); }
+.skill-document-create-files > div > svg.is-error { color: var(--destructive); }
+.skill-document-create-files > p { margin: 9px 3px 0; }
+.skill-document-create-instruction { display: block; margin-top: 23px; }
+.skill-document-create-instruction > span { display: block; margin-bottom: 8px; font-size: 10px; font-weight: 600; }
+.skill-document-create-instruction textarea { display: block; width: 100%; min-height: 74px; resize: none; border: 1px solid var(--border); border-radius: 12px; outline: 0; background: var(--card); padding: 11px 12px; color: var(--foreground); font: inherit; font-size: 10px; line-height: 1.65; }
+.skill-document-create-instruction textarea:focus { border-color: color-mix(in srgb, var(--primary) 35%, var(--border)); box-shadow: 0 0 0 4px var(--ring); }
+.skill-document-create-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 17px; }
+.skill-document-create-footer > span { color: var(--muted-foreground); font-size: 9px; }
+
+@media (max-width: 760px) {
+  .skill-document-create-page { width: calc(100% - 34px); padding-top: 38px; }
+  .skill-document-create-dropzone { grid-template-columns: 36px minmax(0, 1fr); padding: 15px; }
+  .skill-document-create-dropzone b { display: none; }
+  .skill-document-create-footer { align-items: flex-end; flex-direction: column; }
+}
+
 .skill-primary-button, .skill-secondary-button, .skill-text-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; border-radius: 9px; padding: 9px 14px; font-size: 12px; font-weight: 560; cursor: pointer; }
 .skill-primary-button { border: 1px solid var(--primary); background: var(--primary); color: var(--primary-foreground); box-shadow: 0 8px 18px color-mix(in srgb, var(--primary) 20%, transparent); }
 .skill-primary-button:hover { background: var(--primary-hover); }
