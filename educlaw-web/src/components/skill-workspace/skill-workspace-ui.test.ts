@@ -35,24 +35,42 @@ describe('Skill-first workspace UI contract', () => {
     expect(css).toContain('@media (max-width: 620px)');
   });
 
-  it('keeps creation and selected-Skill functions in the left sidebar', () => {
+  it('opens five Skill creation modes from a compact menu', () => {
     const source = read('./SkillWorkspaceSidebar.tsx');
 
+    expect(source).toContain('skill-create-menu');
     expect(source).toContain('自然对话创建');
-    expect(source).toContain('模板创建');
-    expect(source).toContain('导入 Skill');
+    expect(source).toContain('从描述文档生成');
+    expect(source).toContain('从模板创建');
+    expect(source).toContain('导入已有 Skill');
+    expect(source).toContain('空白创建');
+    expect(source).not.toContain('skill-sidebar-subnav" aria-label="新建 Skill 的方式');
+  });
+
+  it('keeps selected-Skill functions in the left sidebar', () => {
+    const source = read('./SkillWorkspaceSidebar.tsx');
+
     expect(source).toContain("view: 'run'");
     expect(source).toContain("view: 'arena'");
     expect(source).toContain('版本管理');
   });
 
-  it('keeps creation focused and makes teaching-material upload obvious', () => {
+  it('keeps teaching material upload as a compact reference attachment', () => {
     const source = read('./GuidedSkillCreationPanel.tsx');
 
     expect(source).not.toContain('skill-conversation-header');
-    expect(source).toContain('添加教学材料');
-    expect(source).toContain('DOCX、Markdown、TXT');
+    expect(source).toContain('skill-material-icon-button');
+    expect(source).toContain('title="添加教学材料"');
+    expect(source).not.toContain('<strong>{props.createMode');
+    expect(source).not.toContain('DOCX、Markdown、TXT，也可拖入');
     expect(source).toContain('onDrop');
+  });
+
+  it('renders document generation as a separate creation mode', () => {
+    const page = read('../../pages/SkillFirstWorkspace.tsx');
+
+    expect(page).toContain("createMode === 'document'");
+    expect(page).toContain('DocumentSkillCreationPanel');
   });
 
   it('loads the Skill repository from package Skill identities, not only creation sessions', () => {
