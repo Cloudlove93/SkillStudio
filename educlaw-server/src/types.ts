@@ -105,6 +105,7 @@ export interface DbRowInteractiveOptimizationSession {
   user_id: string;
   package_id: number;
   thread_id: number;
+  target_skill_dir_name: string | null;
   status: string;
   messages_json: unknown;
   issues_json: unknown;

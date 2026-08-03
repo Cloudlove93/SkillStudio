@@ -6,6 +6,16 @@ import type {
   ArenaReport,
   ArenaThread,
   ArenaThreadDetail,
+  GuidedCreationAction,
+  GuidedCreationCancelPayload,
+  GuidedCreationConfirmPayload,
+  GuidedCreationDetailPayload,
+  GuidedCreationListPayload,
+  GuidedCreationMessage,
+  GuidedCreationMessagePayload,
+  GuidedCreationSession,
+  GuidedCreationSessionDetail,
+  GuidedCreationStartPayload,
   OptimizationResult,
   PackageSkillRecord,
   PackageVersion,
@@ -202,6 +212,22 @@ export type PackageGenerateStreamEvent =
   | { event: 'error'; data: { error: string } }
   | { event: 'stream_end'; data: { ok: boolean } };
 
+export type GuidedCreationSseEvent =
+  | { event: 'phase'; data: { phase: string } }
+  | { event: 'message'; data: { message: GuidedCreationMessage } }
+  | { event: 'confirmation'; data: { session: GuidedCreationSessionDetail } }
+  | {
+      event: 'preview';
+      data: { files: Array<{ path: string; content: string }> };
+    }
+  | { event: 'done'; data: { session: GuidedCreationSessionDetail } }
+  | {
+      event: 'error';
+      data: { code: string; message: string; retryable: boolean };
+    }
+  | { event: 'stream_end'; data: Record<string, never> }
+  | { event: 'ping'; data: Record<string, never> };
+
 export type ArenaMessageStreamEvent =
   | { event: 'phase'; data: { label: string } }
   | { event: 'shared'; data: { message: ArenaMessage } }
@@ -306,6 +332,51 @@ async function actionRequest<T>(
   return body.data as T;
 }
 
+async function guidedActionRequest<T>(
+  token: string,
+  action: GuidedCreationAction,
+  payload: Record<string, unknown> = {},
+): Promise<T> {
+  const response = await apiFetch('/api', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ action, payload }),
+  });
+  const body = await response
+    .json()
+    .catch(() => ({ message: `HTTP ${response.status}` }));
+  if (!response.ok) {
+    throw new LiteApiError(
+      typeof body?.message === 'string' ? body.message : `HTTP ${response.status}`,
+      typeof body?.code === 'string' ? body.code : undefined,
+      response.status,
+      body && typeof body === 'object' ? body : undefined,
+    );
+  }
+  return body.data as T;
+}
+
+function guidedStreamRequest(
+  token: string,
+  action: GuidedCreationAction,
+  payload: Record<string, unknown>,
+  onEvent: (event: GuidedCreationSseEvent) => void,
+) {
+  return streamRequest<GuidedCreationSseEvent>(
+    '',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, payload }),
+    },
+    token,
+    onEvent,
+  );
+}
+
 async function streamRequest<TEvent>(
   path: string,
   init: RequestInit,
@@ -350,6 +421,62 @@ async function streamRequest<TEvent>(
 }
 
 export const liteApi = {
+  listGuidedCreations: (token: string, payload: GuidedCreationListPayload = {}) =>
+    guidedActionRequest<{
+      items: GuidedCreationSession[];
+      next_cursor: string | null;
+    }>(token, 'SkillGuidedCreationList', payload as unknown as Record<string, unknown>),
+  getGuidedCreationDetail: (
+    token: string,
+    payload: GuidedCreationDetailPayload,
+  ) =>
+    guidedActionRequest<GuidedCreationSessionDetail>(
+      token,
+      'SkillGuidedCreationDetail',
+      payload as unknown as Record<string, unknown>,
+    ),
+  cancelGuidedCreation: (
+    token: string,
+    payload: GuidedCreationCancelPayload,
+  ) =>
+    guidedActionRequest<GuidedCreationSessionDetail>(
+      token,
+      'SkillGuidedCreationCancel',
+      payload as unknown as Record<string, unknown>,
+    ),
+  startGuidedCreationStream: (
+    token: string,
+    payload: GuidedCreationStartPayload,
+    onEvent: (event: GuidedCreationSseEvent) => void,
+  ) =>
+    guidedStreamRequest(
+      token,
+      'SkillGuidedCreationStart',
+      payload as unknown as Record<string, unknown>,
+      onEvent,
+    ),
+  sendGuidedCreationMessageStream: (
+    token: string,
+    payload: GuidedCreationMessagePayload,
+    onEvent: (event: GuidedCreationSseEvent) => void,
+  ) =>
+    guidedStreamRequest(
+      token,
+      'SkillGuidedCreationMessage',
+      payload as unknown as Record<string, unknown>,
+      onEvent,
+    ),
+  confirmGuidedCreationStream: (
+    token: string,
+    payload: GuidedCreationConfirmPayload,
+    onEvent: (event: GuidedCreationSseEvent) => void,
+  ) =>
+    guidedStreamRequest(
+      token,
+      'SkillGuidedCreationConfirm',
+      payload as unknown as Record<string, unknown>,
+      onEvent,
+    ),
   me: (token: string) => request<UserSummary>('/auth/me', {}, token),
   listPackages: (token: string) =>
     request<AgentPackageSummary[]>(PACKAGE_ROUTES.LIST, {}, token),
@@ -613,10 +740,11 @@ export const liteApi = {
     packageId: string,
     threadId: string,
     model?: string,
+    targetSkillDirName?: string,
   ) =>
     request<DiagnosisResult & { session?: InteractiveOptimizationSession }>(
       `/packages/${packageId}/optimize/diagnose`,
-      { method: 'POST', body: JSON.stringify({ threadId, model }) },
+      { method: 'POST', body: JSON.stringify({ threadId, model, targetSkillDirName }) },
       token,
     ),
   listInteractiveSessions: (token: string, packageId: string) =>
@@ -632,12 +760,13 @@ export const liteApi = {
     messages: Array<{ role: string; content: string }>,
     adoptedChanges: AdoptedChange[],
     model?: string,
+    targetSkillDirName?: string,
   ) =>
     request<ChatOptimizeResult>(
       `/packages/${packageId}/optimize/chat`,
       {
         method: 'POST',
-        body: JSON.stringify({ sessionId, messages, adoptedChanges, model }),
+        body: JSON.stringify({ sessionId, messages, adoptedChanges, model, targetSkillDirName }),
       },
       token,
     ),
@@ -647,10 +776,11 @@ export const liteApi = {
     sessionId: string | undefined,
     changes: AdoptedChange[],
     note?: string,
+    targetSkillDirName?: string,
   ) =>
     request<{ versionId: string; versionNumber: number }>(
       `/packages/${packageId}/optimize/apply`,
-      { method: 'POST', body: JSON.stringify({ sessionId, changes, note }) },
+      { method: 'POST', body: JSON.stringify({ sessionId, changes, note, targetSkillDirName }) },
       token,
     ),
   createFeedbackOptimization: (

@@ -9,6 +9,7 @@ import Workspace from './pages/Workspace'
 import AgentProfileWorkflow from './pages/AgentProfileWorkflow'
 import AdminPage from './pages/AdminPage'
 import LoginPage from './pages/LoginPage'
+import SkillFirstWorkspace from './pages/SkillFirstWorkspace'
 import { useAuthStore } from './stores/auth'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -51,7 +52,9 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />} />
-      <Route path="/" element={<RequireAuth><Workspace /></RequireAuth>} />
+      <Route path="/" element={<RequireAuth><SkillFirstWorkspace /></RequireAuth>} />
+      <Route path="/skills" element={<RequireAuth><SkillFirstWorkspace /></RequireAuth>} />
+      <Route path="/legacy" element={<RequireAuth><Workspace /></RequireAuth>} />
       <Route path="/workflow" element={<RequireAuth><AgentProfileWorkflow /></RequireAuth>} />
       <Route path="/admin" element={<RequireAuth><AdminPage /></RequireAuth>} />
     </Routes>

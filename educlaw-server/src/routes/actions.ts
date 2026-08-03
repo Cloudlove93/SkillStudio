@@ -16,6 +16,14 @@ import {
   SkillVersionError,
   undiscardSkillVersion,
 } from '../services/skill-version-service.js';
+import { GuidedCreationError } from '../services/guided-creation-service.js';
+import {
+  handleGuidedCreationJsonAction,
+  handleGuidedCreationStreamAction,
+  isGuidedCreationAction,
+  isGuidedCreationStreamAction,
+  parseGuidedCreationRequest,
+} from './guided-creation-actions.js';
 
 type ApiHandler = (input: {
   body: Record<string, unknown>;
@@ -353,6 +361,24 @@ router.post('/', requireAuth, async (req, res, next) => {
         .json({ code: 'UNKNOWN_ACTION', message: 'Unknown action' });
       return;
     }
+    if (isGuidedCreationAction(body.action)) {
+      const request = parseGuidedCreationRequest(body);
+      const authUserId = (req as AuthedRequest).userId || '';
+      if (isGuidedCreationStreamAction(request.action)) {
+        await handleGuidedCreationStreamAction({
+          auth_user_id: authUserId,
+          request,
+          response: res,
+        });
+        return;
+      }
+      const data = await handleGuidedCreationJsonAction({
+        auth_user_id: authUserId,
+        request,
+      });
+      res.json({ success: true, data });
+      return;
+    }
     const handler = actionMap.get(body.action);
     if (!handler) {
       res
@@ -366,6 +392,14 @@ router.post('/', requireAuth, async (req, res, next) => {
     });
     res.json({ success: true, data });
   } catch (error) {
+    if (error instanceof GuidedCreationError) {
+      res.status(error.statusCode).json({
+        code: error.code,
+        message: error.message,
+        retryable: error.retryable,
+      });
+      return;
+    }
     if (error instanceof SkillVersionError) {
       res.status(error.status).json({
         code: error.code,

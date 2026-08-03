@@ -128,6 +128,96 @@ export const schemaStatements = [
       on agent_package_version_skills (package_version_id, sort_order)
   `,
   `
+    create table if not exists skill_guided_creation_sessions (
+      id bigserial primary key,
+      user_id text not null,
+      status text not null default 'collecting' check (
+        status in (
+          'collecting',
+          'ready_for_confirmation',
+          'finalizing',
+          'completed',
+          'failed',
+          'cancelled'
+        )
+      ),
+        model text,
+        start_client_message_id text,
+        documents_json jsonb not null default '[]'::jsonb check (
+        jsonb_typeof(documents_json) = 'array'
+      ),
+      draft_json jsonb not null default '{}'::jsonb check (
+        jsonb_typeof(draft_json) = 'object'
+      ),
+      field_states_json jsonb not null default '{}'::jsonb check (
+        jsonb_typeof(field_states_json) = 'object'
+      ),
+      confirmation_json jsonb,
+      generated_snapshot_json jsonb,
+      validation_result_json jsonb,
+      package_id bigint references agent_packages(id) on delete set null,
+      skill_id bigint references agent_package_skills(id) on delete set null,
+      skill_version_id bigint references agent_skill_versions(id) on delete set null,
+      error_json jsonb,
+      revision_no integer not null default 0 check (revision_no >= 0),
+      finalize_request_id text,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now(),
+      completed_at timestamptz,
+      check (confirmation_json is null or jsonb_typeof(confirmation_json) = 'object'),
+      check (generated_snapshot_json is null or jsonb_typeof(generated_snapshot_json) = 'object'),
+      check (validation_result_json is null or jsonb_typeof(validation_result_json) = 'object'),
+      check (error_json is null or jsonb_typeof(error_json) = 'object')
+      )
+    `,
+    `
+      alter table skill_guided_creation_sessions
+        add column if not exists start_client_message_id text
+    `,
+    `
+      create unique index if not exists uq_guided_session_start_message
+        on skill_guided_creation_sessions (user_id, start_client_message_id)
+        where start_client_message_id is not null
+    `,
+    `
+      create index if not exists idx_guided_sessions_user_status_updated
+      on skill_guided_creation_sessions (user_id, status, updated_at desc)
+  `,
+  `
+    create unique index if not exists uq_guided_session_package
+      on skill_guided_creation_sessions (package_id)
+      where package_id is not null
+  `,
+  `
+    create unique index if not exists uq_guided_session_skill
+      on skill_guided_creation_sessions (skill_id)
+      where skill_id is not null
+  `,
+  `
+    create table if not exists skill_guided_creation_messages (
+      id bigserial primary key,
+      session_id bigint not null references skill_guided_creation_sessions(id) on delete cascade,
+      message_no integer not null check (message_no > 0),
+      client_message_id text,
+      role text not null check (role in ('user', 'assistant')),
+      content text not null,
+      metadata_json jsonb not null default '{}'::jsonb check (
+        jsonb_typeof(metadata_json) = 'object'
+      ),
+      created_at timestamptz not null default now(),
+      unique (session_id, message_no)
+    )
+  `,
+  `
+    create unique index if not exists uq_guided_client_message
+      on skill_guided_creation_messages (session_id, client_message_id)
+      where client_message_id is not null
+  `,
+  `
+    create index if not exists idx_guided_messages_session_no
+      on skill_guided_creation_messages (session_id, message_no)
+  `,
+  `
     create table if not exists api_idempotency_keys (
       id bigserial primary key,
       user_id text not null,
@@ -352,6 +442,7 @@ export const schemaStatements = [
       user_id text not null,
       package_id bigint not null,
       thread_id bigint not null,
+      target_skill_dir_name text,
       status text not null default 'active',
       messages_json jsonb not null default '[]'::jsonb,
       issues_json jsonb not null default '[]'::jsonb,
@@ -435,6 +526,7 @@ export const migrationStatements = [
   `alter table interactive_optimization_sessions alter column adopted_json drop default`,
   `alter table interactive_optimization_sessions alter column adopted_json type jsonb using adopted_json::jsonb`,
   `alter table interactive_optimization_sessions alter column adopted_json set default '[]'::jsonb`,
+  `alter table interactive_optimization_sessions add column if not exists target_skill_dir_name text`,
   `alter table auto_eval_specs alter column questions_json drop default`,
   `alter table auto_eval_specs alter column questions_json type jsonb using questions_json::jsonb`,
   `alter table auto_eval_specs alter column questions_json set default '[]'::jsonb`,

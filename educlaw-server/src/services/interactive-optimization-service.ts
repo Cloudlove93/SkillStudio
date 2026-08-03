@@ -43,6 +43,7 @@ export interface ChatOptimizeInput {
   sessionId?: string;
   messages: Array<{ role: "system" | "user" | "assistant"; content: string }>;
   adoptedChanges: AdoptedChange[];
+  targetSkillDirName?: string;
 }
 
 export interface ChatOptimizeResult {
@@ -62,6 +63,7 @@ export interface InteractiveOptimizationSession {
   id: number;
   packageId: number;
   threadId: number;
+  targetSkillDirName?: string;
   status: string;
   messages: InteractiveOptimizationMessage[];
   issues: DiagnosisIssue[];
@@ -85,6 +87,7 @@ function toInteractiveSession(row: DbRowInteractiveOptimizationSession): Interac
     id: row.id,
     packageId: row.package_id,
     threadId: row.thread_id,
+    targetSkillDirName: row.target_skill_dir_name || undefined,
     status: row.status,
     messages: parseJsonArray<InteractiveOptimizationMessage>(row.messages_json),
     issues: parseJsonArray<DiagnosisIssue>(row.issues_json),
@@ -120,15 +123,16 @@ async function createInteractiveSession(
   messages: InteractiveOptimizationMessage[],
   issues: DiagnosisIssue[],
   adoptedChanges: AdoptedChange[] = [],
+  targetSkillDirName?: string,
 ) {
   const now = new Date().toISOString();
   const summary = buildSessionSummary(messages, adoptedChanges, issues);
 
   const result = await query<{ id: number }>(
     `insert into interactive_optimization_sessions
-      (user_id, package_id, thread_id, status, messages_json, issues_json, adopted_json, summary, version_id, version_number, created_at, updated_at)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) returning id`,
-    [userId, packageId, threadId, "active", JSON.stringify(messages), JSON.stringify(issues), JSON.stringify(adoptedChanges), summary, null, null, now, now],
+      (user_id, package_id, thread_id, target_skill_dir_name, status, messages_json, issues_json, adopted_json, summary, version_id, version_number, created_at, updated_at)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) returning id`,
+    [userId, packageId, threadId, targetSkillDirName || null, "active", JSON.stringify(messages), JSON.stringify(issues), JSON.stringify(adoptedChanges), summary, null, null, now, now],
   );
 
   const row: DbRowInteractiveOptimizationSession = {
@@ -136,6 +140,7 @@ async function createInteractiveSession(
     user_id: userId,
     package_id: Number(packageId),
     thread_id: Number(threadId),
+    target_skill_dir_name: targetSkillDirName || null,
     status: "active",
     messages_json: JSON.stringify(messages),
     issues_json: JSON.stringify(issues),
@@ -247,6 +252,24 @@ function buildPackageContext(
   ].join("\n");
 }
 
+function buildSkillOnlyContext(
+  pkg: Awaited<ReturnType<typeof getPackage>>,
+  targetSkillDirName: string,
+  adoptedChanges: AdoptedChange[] = [],
+) {
+  const current = buildCurrentEditableSnapshot(pkg, adoptedChanges);
+  const skill = current.skills.get(targetSkillDirName);
+  if (!skill) {
+    throw new Error(`Skill ${targetSkillDirName} 不存在`);
+  }
+  return [
+    `### Skill: ${skill.dirName} (${skill.name})`,
+    "```markdown",
+    skill.skillMd,
+    "```",
+  ].join("\n");
+}
+
 function buildCurrentEditableSnapshot(
   pkg: Awaited<ReturnType<typeof getPackage>>,
   adoptedChanges: AdoptedChange[] = [],
@@ -295,6 +318,18 @@ function resolveCurrentContentForAdoption(
     ? Array.from(current.skills.values()).find((item) => item.dirName === targetId || item.id === targetId)
     : undefined;
   return { content: skill?.skillMd || "", targetName: skill?.name };
+}
+
+function assertSkillOnlyChanges(
+  changes: AdoptedChange[],
+  targetSkillDirName: string,
+) {
+  const hasOutOfScopeChange = changes.some(
+    (change) => change.target !== "skill" || change.targetId !== targetSkillDirName,
+  );
+  if (hasOutOfScopeChange) {
+    throw new Error(`Skill 专用优化只能修改 ${targetSkillDirName}`);
+  }
 }
 
 function stripInternalMarkers(text: string): string {
@@ -565,9 +600,16 @@ export async function diagnosePackage(
   packageId: string | number,
   threadId: string | number,
   model?: string,
+  targetSkillDirName?: string,
 ): Promise<DiagnosisResult> {
   const pkg = await getPackage(userId, packageId);
-  assertRubricConfigured(pkg.snapshot.rubricMd, "交互式优化");
+  const normalizedTargetSkillDirName = targetSkillDirName?.trim();
+  if (!normalizedTargetSkillDirName) {
+    assertRubricConfigured(pkg.snapshot.rubricMd, "交互式优化");
+  }
+  const diagnosisContext = normalizedTargetSkillDirName
+    ? buildSkillOnlyContext(pkg, normalizedTargetSkillDirName)
+    : buildPackageContext(pkg);
   const detail = await getThreadDetail(userId, threadId);
 
   if (Number(detail.thread.packageId) !== Number(packageId)) {
@@ -589,7 +631,11 @@ export async function diagnosePackage(
     "",
     "## 智能体内容",
     "",
-    buildPackageContext(pkg),
+    diagnosisContext,
+    ...(normalizedTargetSkillDirName ? [
+      "",
+      `只诊断 target="skill" 且 targetId="${normalizedTargetSkillDirName}" 的问题，不分析 agent、rubric 或其他 Skill。`,
+    ] : []),
     "",
     "## Arena 对话轨迹（最近部分）",
     transcript.slice(0, 12000),
@@ -653,6 +699,12 @@ export async function diagnosePackage(
     // fallback: empty issues with a warning
   }
 
+  if (normalizedTargetSkillDirName) {
+    issues = issues.filter(
+      (issue) => issue.target === "skill" && issue.targetId === normalizedTargetSkillDirName,
+    );
+  }
+
   const welcomeMessage = [
     "👋 你好！我是智能体优化专家。",
     "",
@@ -676,6 +728,8 @@ export async function diagnosePackage(
     threadId,
     [{ role: "assistant", content: welcomeMessage }],
     issues,
+    [],
+    normalizedTargetSkillDirName,
   );
 
   return { welcomeMessage, issues, session };
@@ -690,14 +744,41 @@ export async function chatOptimize(
   model?: string,
 ): Promise<ChatOptimizeResult> {
   const pkg = await getPackage(userId, packageId);
-  assertRubricConfigured(pkg.snapshot.rubricMd, "交互式优化");
+  let targetSkillDirName = input.targetSkillDirName?.trim();
+  if (input.sessionId) {
+    const persistedSession = await getInteractiveSession(userId, input.sessionId);
+    if (Number(persistedSession.packageId) !== Number(packageId)) {
+      throw new Error("Optimization session does not belong to this package");
+    }
+    if (
+      persistedSession.targetSkillDirName &&
+      targetSkillDirName &&
+      persistedSession.targetSkillDirName !== targetSkillDirName
+    ) {
+      throw new Error("Optimization session is bound to a different Skill");
+    }
+    targetSkillDirName = persistedSession.targetSkillDirName || targetSkillDirName;
+  }
+  if (!targetSkillDirName) {
+    assertRubricConfigured(pkg.snapshot.rubricMd, "交互式优化");
+  } else {
+    assertSkillOnlyChanges(input.adoptedChanges, targetSkillDirName);
+  }
+  const editableContext = targetSkillDirName
+    ? buildSkillOnlyContext(pkg, targetSkillDirName, input.adoptedChanges)
+    : buildPackageContext(pkg, input.adoptedChanges);
 
   const systemPrompt = [
     "你是 EduClaw-lite 智能体优化专家。你正在与用户对话，帮助优化智能体。",
     "",
     "## 当前智能体内容（已应用已采纳的修改）",
     "",
-    buildPackageContext(pkg, input.adoptedChanges),
+    editableContext,
+    ...(targetSkillDirName ? [
+      "",
+      `当前是 Skill 专用优化模式。只能修改 target="skill" 且 targetId="${targetSkillDirName}" 的内容。`,
+      "禁止修改 agent、rubric 或其他 Skill。",
+    ] : []),
     "",
     "## 已采纳的修改",
     buildAdoptedContext(input.adoptedChanges),
@@ -763,6 +844,9 @@ export async function chatOptimize(
   const newAdoptions: AdoptedChange[] = [];
   for (const a of parsed.adoptions) {
     const target = a.target as "agent" | "rubric" | "skill";
+    if (targetSkillDirName && (target !== "skill" || a.targetId !== targetSkillDirName)) {
+      continue;
+    }
     const current = resolveCurrentContentForAdoption(pkg, input.adoptedChanges, target, a.targetId);
     const original = current.content;
 
@@ -815,8 +899,27 @@ export async function applyInteractiveChanges(
   model?: string,
   note?: string,
   sessionId?: string,
+  targetSkillDirName?: string,
 ): Promise<{ versionId: number; versionNumber: number }> {
   const pkg = await getPackage(userId, packageId);
+  let boundTargetSkillDirName = targetSkillDirName?.trim();
+  if (sessionId) {
+    const persistedSession = await getInteractiveSession(userId, sessionId);
+    if (Number(persistedSession.packageId) !== Number(packageId)) {
+      throw new Error("Optimization session does not belong to this package");
+    }
+    if (
+      persistedSession.targetSkillDirName &&
+      boundTargetSkillDirName &&
+      persistedSession.targetSkillDirName !== boundTargetSkillDirName
+    ) {
+      throw new Error("Optimization session is bound to a different Skill");
+    }
+    boundTargetSkillDirName = persistedSession.targetSkillDirName || boundTargetSkillDirName;
+  }
+  if (boundTargetSkillDirName) {
+    assertSkillOnlyChanges(changes, boundTargetSkillDirName);
+  }
   const normalizedSnapshot = buildInteractiveSnapshotFromAdoptions(pkg, changes);
 
   await applyOptimizedSnapshot(userId, packageId, normalizedSnapshot, "interactive", note);

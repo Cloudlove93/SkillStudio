@@ -224,9 +224,9 @@ describe("Arena answer run provenance", () => {
     expect(runValues.slice(0, 10)).toEqual([
       "user-1",
       101,
-      301,
+      "301",
       501,
-      1001,
+      "1001",
       2002,
       2001,
       JSON.stringify(["skill-bullying"]),

@@ -189,6 +189,9 @@ build_project() {
   pnpm --filter educlaw-server build
   pnpm --filter educlaw-web build
 
+  log "Applying database schema before service restart"
+  pnpm --filter educlaw-server db:init
+
   if [[ ! -d "$WEB_ROOT" ]]; then
     die "Frontend build output not found: $WEB_ROOT"
   fi

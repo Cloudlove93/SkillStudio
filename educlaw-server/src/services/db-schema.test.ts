@@ -117,6 +117,40 @@ describe('db schema initialization', () => {
     );
   });
 
+  it('defines persisted guided Skill creation sessions and messages', async () => {
+    const { schemaStatements } = await import('./db-schema.js');
+    const schemaSql = schemaStatements.join('\n').toLowerCase();
+
+    expect(schemaSql).toContain(
+      'create table if not exists skill_guided_creation_sessions',
+    );
+    expect(schemaSql).toContain(
+      'create table if not exists skill_guided_creation_messages',
+    );
+    expect(schemaSql).toContain("status text not null default 'collecting'");
+    expect(schemaSql).toContain("'ready_for_confirmation'");
+    expect(schemaSql).toContain("'finalizing'");
+    expect(schemaSql).toContain("'completed'");
+    expect(schemaSql).toContain("'failed'");
+    expect(schemaSql).toContain("'cancelled'");
+    expect(schemaSql).toContain("documents_json jsonb not null default '[]'::jsonb");
+    expect(schemaSql).toContain("draft_json jsonb not null default '{}'::jsonb");
+    expect(schemaSql).toContain(
+      "field_states_json jsonb not null default '{}'::jsonb",
+    );
+    expect(schemaSql).toContain('package_id bigint');
+    expect(schemaSql).toContain('skill_id bigint');
+    expect(schemaSql).toContain('skill_version_id bigint');
+    expect(schemaSql).toContain('start_client_message_id text');
+    expect(schemaSql).toContain(
+      'on skill_guided_creation_sessions (user_id, start_client_message_id)',
+    );
+    expect(schemaSql).toContain('unique (session_id, message_no)');
+    expect(schemaSql).toContain('where package_id is not null');
+    expect(schemaSql).toContain('where skill_id is not null');
+    expect(schemaSql).toContain('where client_message_id is not null');
+  });
+
   it('defines stored JSON columns as jsonb with jsonb defaults', async () => {
     const { schemaStatements, migrationStatements } =
       await import('./db-schema.js');
@@ -189,9 +223,13 @@ describe('db schema initialization', () => {
       'references agent_skill_versions(id, skill_id, package_id)',
     );
     expect(schemaSql).toContain('unique (thread_id, side)');
+    expect(schemaSql).toContain('target_skill_dir_name text');
 
     expect(migrationSql).toContain(
       "alter table arena_threads add column if not exists arena_kind text not null default 'package_arena'",
+    );
+    expect(migrationSql).toContain(
+      'alter table interactive_optimization_sessions add column if not exists target_skill_dir_name text',
     );
     expect(migrationSql).toContain(
       'alter table arena_threads add column if not exists base_package_version_id bigint',

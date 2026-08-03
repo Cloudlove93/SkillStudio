@@ -341,3 +341,141 @@ export interface OptimizationResult {
   issues: OptimizationIssue[];
   snapshot: AgentPackageSnapshot;
 }
+
+export type GuidedCreationAction =
+  | "SkillGuidedCreationStart"
+  | "SkillGuidedCreationList"
+  | "SkillGuidedCreationDetail"
+  | "SkillGuidedCreationMessage"
+  | "SkillGuidedCreationConfirm"
+  | "SkillGuidedCreationCancel";
+
+export type GuidedCreationStatus =
+  | "collecting"
+  | "ready_for_confirmation"
+  | "finalizing"
+  | "completed"
+  | "failed"
+  | "cancelled";
+
+export type GuidedDraftField =
+  | "roles"
+  | "goal"
+  | "usage_scenario"
+  | "input_contract"
+  | "output_contract"
+  | "core_capabilities"
+  | "workflow"
+  | "knowledge_evidence"
+  | "boundaries_permissions"
+  | "exception_recovery"
+  | "completion_evidence";
+
+export type GuidedFieldState =
+  | "explicit"
+  | "inferred"
+  | "defaulted"
+  | "missing"
+  | "conflicted";
+
+export type GuidedSkillDraft = Partial<Record<GuidedDraftField, string>>;
+
+export interface GuidedCreationDocument {
+  name: string;
+  content: string;
+  mime_type?: string;
+}
+
+export interface GuidedConfirmationSection {
+  key:
+    | "positioning"
+    | "scenario"
+    | "input_output"
+    | "capability_flow"
+    | "knowledge_boundary"
+    | "recovery_completion";
+  title: string;
+  content: string;
+}
+
+export interface GuidedConfirmationCard {
+  title: string;
+  sections: GuidedConfirmationSection[];
+}
+
+export interface GuidedCreationMessage {
+  id: string;
+  session_id: string;
+  message_no: number;
+  client_message_id: string | null;
+  role: "user" | "assistant";
+  content: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface GuidedCreationSession {
+  id: string;
+  status: GuidedCreationStatus;
+  model: string | null;
+  documents: GuidedCreationDocument[];
+  draft: GuidedSkillDraft;
+  field_states: Record<GuidedDraftField, GuidedFieldState>;
+  confirmation: GuidedConfirmationCard | null;
+  revision_no: number;
+  package_id: string | null;
+  skill_id: string | null;
+  skill_version_id: string | null;
+  error: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
+}
+
+export interface GuidedCreationSessionDetail extends GuidedCreationSession {
+  messages: GuidedCreationMessage[];
+}
+
+export interface GuidedCreationStartPayload {
+  content: string;
+  client_message_id: string;
+  model?: string;
+  documents?: GuidedCreationDocument[];
+}
+
+export interface GuidedCreationMessagePayload {
+  session_id: string;
+  client_message_id: string;
+  revision_no: number;
+  content: string;
+}
+
+export interface GuidedCreationConfirmPayload {
+  session_id: string;
+  revision_no: number;
+  request_id: string;
+}
+
+export interface GuidedCreationDetailPayload {
+  session_id: string;
+}
+
+export interface GuidedCreationListPayload {
+  status?: GuidedCreationStatus[];
+  limit?: number;
+  cursor?: string;
+}
+
+export interface GuidedCreationCancelPayload {
+  session_id: string;
+  revision_no: number;
+}
+
+export type GuidedCreationStreamEvent =
+  | { type: "phase"; phase: "understanding" | "questioning" | "generating" | "validating" | "saving" }
+  | { type: "message"; message: GuidedCreationMessage }
+  | { type: "confirmation"; session: GuidedCreationSession }
+  | { type: "preview"; files: Array<{ path: string; content: string }> }
+  | { type: "done"; session: GuidedCreationSession }
+  | { type: "error"; code: string; message: string; retryable: boolean }
+  | { type: "stream_end" };

@@ -257,6 +257,9 @@ main() {
   log "Building backend"
   pnpm --filter educlaw-server build
 
+  log "Applying database schema before service restart"
+  pnpm --filter educlaw-server db:init
+
   log "Stopping systemd backend if present"
   stop_systemd_backends
 

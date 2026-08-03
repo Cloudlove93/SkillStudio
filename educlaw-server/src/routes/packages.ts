@@ -395,6 +395,9 @@ router.post(
         one(req.params.packageId),
         String(req.body?.threadId || ''),
         typeof req.body?.model === 'string' ? req.body.model : undefined,
+        typeof req.body?.targetSkillDirName === 'string'
+          ? req.body.targetSkillDirName
+          : undefined,
       );
       res.json(result);
     } catch (error) {
@@ -422,6 +425,10 @@ router.post(
           adoptedChanges: Array.isArray(req.body?.adoptedChanges)
             ? req.body.adoptedChanges
             : [],
+          targetSkillDirName:
+            typeof req.body?.targetSkillDirName === 'string'
+              ? req.body.targetSkillDirName
+              : undefined,
         },
         typeof req.body?.model === 'string' ? req.body.model : undefined,
       );
@@ -449,6 +456,9 @@ router.post(
         typeof req.body?.note === 'string' ? req.body.note : undefined,
         typeof req.body?.sessionId === 'string'
           ? req.body.sessionId
+          : undefined,
+        typeof req.body?.targetSkillDirName === 'string'
+          ? req.body.targetSkillDirName
           : undefined,
       );
       res.json(result);

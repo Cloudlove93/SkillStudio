@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const queryMock = vi.fn();
 const generateJsonMock = vi.fn();
 const getPackageMock = vi.fn();
+const getPackageWithVersionIdMock = vi.fn();
 
 async function loadService() {
   vi.resetModules();
@@ -20,6 +21,7 @@ async function loadService() {
 
   vi.doMock("./package-service.js", () => ({
     getPackage: getPackageMock,
+    getPackageWithVersionId: getPackageWithVersionIdMock,
     assertRubricConfigured: (rubricMd: string | undefined | null, feature: string) => {
       if (!String(rubricMd || "").trim()) {
         throw new Error(`当前智能体还没有配置 rubric。请先在 Rubric 标签中补充评分规则后再使用${feature}。`);
@@ -38,6 +40,7 @@ afterEach(() => {
   queryMock.mockReset();
   generateJsonMock.mockReset();
   getPackageMock.mockReset();
+  getPackageWithVersionIdMock.mockReset();
 });
 
 describe("generateReport", () => {
@@ -47,7 +50,7 @@ describe("generateReport", () => {
         return {
           rows: [
             {
-              id: "thread-1",
+              id: 1,
               user_id: "user-1",
               package_id: "package-1",
               title: "Arena Thread",
@@ -64,17 +67,20 @@ describe("generateReport", () => {
       }
       throw new Error(`Unexpected query: ${sql}`);
     });
-    getPackageMock.mockResolvedValue({
+    getPackageWithVersionIdMock.mockResolvedValue({
+      versionId: 1,
+      package: {
       id: "package-1",
       snapshot: {
         name: "No Rubric Agent",
         rubricMd: "",
       },
+      },
     });
 
     const { generateReport } = await loadService();
 
-    await expect(generateReport("user-1", "thread-1")).rejects.toThrow("还没有配置 rubric");
+    await expect(generateReport("user-1", "1")).rejects.toThrow("还没有配置 rubric");
     expect(generateJsonMock).not.toHaveBeenCalled();
   });
 
@@ -84,7 +90,7 @@ describe("generateReport", () => {
         return {
           rows: [
             {
-              id: "thread-1",
+              id: 1,
               user_id: "user-1",
               package_id: "package-1",
               title: "Arena Thread",
@@ -101,8 +107,8 @@ describe("generateReport", () => {
         return {
           rows: [
             {
-              id: "message-1",
-              thread_id: "thread-1",
+              id: 1,
+              thread_id: "1",
               user_id: "user-1",
               side: "shared",
               role: "user",
@@ -110,8 +116,8 @@ describe("generateReport", () => {
               created_at: "2026-06-27T00:00:01.000Z",
             },
             {
-              id: "message-2",
-              thread_id: "thread-1",
+              id: 2,
+              thread_id: "1",
               user_id: "user-1",
               side: "baseline",
               role: "assistant",
@@ -119,8 +125,8 @@ describe("generateReport", () => {
               created_at: "2026-06-27T00:00:02.000Z",
             },
             {
-              id: "message-3",
-              thread_id: "thread-1",
+              id: 3,
+              thread_id: "1",
               user_id: "user-1",
               side: "enhanced",
               role: "assistant",
@@ -135,11 +141,14 @@ describe("generateReport", () => {
       throw new Error(`Unexpected query: ${sql}`);
     });
 
-    getPackageMock.mockResolvedValue({
+    getPackageWithVersionIdMock.mockResolvedValue({
+      versionId: 1,
+      package: {
       id: "package-1",
       snapshot: {
         name: "中职家校冲突处置顾问",
         rubricMd: "中职家校冲突处置顾问 - 评估量表",
+      },
       },
     });
 
@@ -186,7 +195,7 @@ describe("generateReport", () => {
     });
 
     const { generateReport } = await loadService();
-    const report = await generateReport("user-1", "thread-1");
+    const report = await generateReport("user-1", "1");
 
     expect(report.baseline.summary).toContain("Baseline当前总分为 18.00");
     expect(report.enhanced.summary).toContain("中职家校冲突处置顾问当前总分为 32.00");

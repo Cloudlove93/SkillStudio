@@ -74,7 +74,7 @@ export function useArenaThreadList({
   );
 
   const notifyCreated = useCallback(
-    (thread: ArenaThread, _detail: ArenaThreadDetail) => {
+    (thread: ArenaThread) => {
       setThreads((prev) => {
         const exists = prev.some((t) => t.id === thread.id);
         if (exists) {

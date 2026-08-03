@@ -450,6 +450,9 @@ describe("createArenaThread", () => {
 
 describe("skill arena runtime", () => {
   it("streams both sides from the fixed skill versions instead of the live package", async () => {
+    withTransactionMock.mockImplementation(async (work) =>
+      work({ query: queryMock }),
+    );
     getPackageMock.mockImplementation(() => {
       throw new Error("live package should not be loaded for skill arena");
     });

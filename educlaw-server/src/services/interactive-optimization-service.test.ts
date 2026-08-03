@@ -5,6 +5,7 @@ const applyOptimizedSnapshotMock = vi.fn();
 const listVersionsMock = vi.fn();
 const getThreadDetailMock = vi.fn();
 const generateChatMock = vi.fn();
+const queryMock = vi.fn();
 
 async function loadService() {
   vi.resetModules();
@@ -20,7 +21,7 @@ async function loadService() {
   }));
   vi.doMock("./db.js", () => ({
     newId: () => "test-id",
-    query: vi.fn(),
+    query: queryMock,
   }));
   vi.doMock("./arena-service.js", () => ({
     getThreadDetail: getThreadDetailMock,
@@ -43,6 +44,7 @@ afterEach(() => {
   listVersionsMock.mockReset();
   getThreadDetailMock.mockReset();
   generateChatMock.mockReset();
+  queryMock.mockReset();
 });
 
 describe("interactive-optimization-service", () => {
@@ -90,6 +92,124 @@ describe("interactive-optimization-service", () => {
       }),
     ).rejects.toThrow("还没有配置 rubric");
     expect(generateChatMock).not.toHaveBeenCalled();
+  });
+
+  it("allows skill-only chat without a rubric and ignores non-skill changes", async () => {
+    getPackageMock.mockResolvedValue({
+      snapshot: {
+        name: "Skill package",
+        description: "",
+        versionLabel: "v1",
+        agentMd: "# Agent",
+        rubricMd: "",
+        skills: [
+          {
+            id: "skill-1",
+            dirName: "lesson-plan",
+            name: "Lesson plan",
+            description: "Build a lesson plan",
+            skillMd: "# Skill\nOld lesson workflow",
+          },
+        ],
+      },
+    });
+    generateChatMock.mockResolvedValue([
+      "Updated the selected Skill.",
+      '<MODIFIED target="skill" targetId="lesson-plan">',
+      "```markdown",
+      "# Skill",
+      "New lesson workflow",
+      "```",
+      "</MODIFIED>",
+      '<MODIFIED target="agent" targetId="">',
+      "```markdown",
+      "# Agent changed",
+      "```",
+      "</MODIFIED>",
+    ].join("\n"));
+
+    const { chatOptimize } = await loadService();
+    const result = await chatOptimize("user-1", "package-1", {
+      messages: [{ role: "user", content: "Improve the workflow" }],
+      adoptedChanges: [],
+      targetSkillDirName: "lesson-plan",
+    });
+
+    expect(result.newAdoptions).toHaveLength(1);
+    expect(result.newAdoptions[0]).toMatchObject({
+      target: "skill",
+      targetId: "lesson-plan",
+    });
+    expect(generateChatMock.mock.calls[0]?.[0]?.[0]?.content).toContain("lesson-plan");
+  });
+
+  it("allows skill-only diagnosis without a rubric and keeps only the selected Skill", async () => {
+    getPackageMock.mockResolvedValue({
+      name: "Skill package",
+      snapshot: {
+        name: "Skill package",
+        description: "",
+        versionLabel: "v1",
+        agentMd: "",
+        rubricMd: "",
+        skills: [{
+          id: "skill-1",
+          dirName: "lesson-plan",
+          name: "Lesson plan",
+          description: "Build a lesson plan",
+          skillMd: "# Skill\nOld lesson workflow",
+        }],
+      },
+    });
+    getThreadDetailMock.mockResolvedValue({
+      thread: { packageId: "1" },
+      messages: [{ side: "shared", role: "user", content: "Create a lesson" }],
+    });
+    generateChatMock.mockResolvedValue(JSON.stringify({
+      issues: [
+        { id: "1", target: "skill", targetId: "lesson-plan", title: "Workflow", reason: "Too vague", suggestion: "Add steps" },
+        { id: "2", target: "agent", title: "Agent", reason: "Ignore", suggestion: "Ignore" },
+      ],
+    }));
+    queryMock.mockResolvedValue({ rows: [{ id: 7 }], rowCount: 1 });
+
+    const { diagnosePackage } = await loadService();
+    const result = await diagnosePackage("user-1", "1", "2", undefined, "lesson-plan");
+
+    expect(result.issues).toHaveLength(1);
+    expect(result.issues[0]).toMatchObject({ target: "skill", targetId: "lesson-plan" });
+    expect(result.session?.id).toBe(7);
+  });
+
+  it("rejects out-of-scope changes when saving a skill-only optimization", async () => {
+    getPackageMock.mockResolvedValue({
+      snapshot: {
+        name: "Skill package",
+        description: "",
+        versionLabel: "v1",
+        agentMd: "# Agent",
+        rubricMd: "",
+        skills: [{ id: "skill-1", dirName: "lesson-plan", name: "Lesson", description: "", skillMd: "# Skill" }],
+      },
+    });
+
+    const { applyInteractiveChanges } = await loadService();
+    await expect(applyInteractiveChanges(
+      "user-1",
+      "1",
+      [{
+        id: "bad-change",
+        target: "agent",
+        original: "# Agent",
+        modified: "# Changed agent",
+        reason: "out of scope",
+      }],
+      undefined,
+      undefined,
+      undefined,
+      "lesson-plan",
+    )).rejects.toThrow("只能修改 lesson-plan");
+    expect(applyOptimizedSnapshotMock).not.toHaveBeenCalled();
   });
 
   it("keeps untouched package metadata when saving adopted changes", async () => {

@@ -284,6 +284,44 @@ afterEach(() => {
 });
 
 describe('generatePackage', () => {
+  it('builds a one-Skill snapshot without persisting it', async () => {
+    generateJsonMock.mockResolvedValue({
+      name: '课堂反馈 Skill',
+      description: '帮助教师生成课堂反馈。',
+      skills: [
+        {
+          dirName: 'class-feedback',
+          name: '课堂反馈',
+          description: 'Use this when a teacher needs structured classroom feedback.',
+        },
+        {
+          dirName: 'extra-skill',
+          name: '额外能力',
+          description: '不应在引导创建模式中生成。',
+        },
+      ],
+    });
+    let streamCall = 0;
+    streamTextMock.mockImplementation(() => {
+      streamCall += 1;
+      return (async function* () {
+        yield streamCall === 1
+          ? '# Runtime\n\nInternal runtime instructions.\n'.repeat(20)
+          : makeLongSkillMarkdown();
+      })();
+    });
+
+    const { buildGeneratedPackageSnapshot } = await loadService();
+    const snapshot = await buildGeneratedPackageSnapshot({
+      instruction: '创建一个课堂反馈 Skill',
+      max_skills: 1,
+    });
+
+    expect(snapshot.skills).toHaveLength(1);
+    expect(snapshot.skills[0]?.name).toBe('课堂反馈');
+    expect(queryMock).not.toHaveBeenCalled();
+  });
+
   it('leaves rubric empty when no source rubric is provided', async () => {
     generateJsonMock.mockResolvedValue({
       name: 'Test Agent',

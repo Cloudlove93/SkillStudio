@@ -53,7 +53,7 @@ async function submitPasswordAuth(
     return persistPasswordAuth(tokens);
   } catch (err: unknown) {
     if (err instanceof Error) {
-      throw new Error(translateError(err.message));
+      throw new Error(translateError(err.message), { cause: err });
     }
     throw err;
   }

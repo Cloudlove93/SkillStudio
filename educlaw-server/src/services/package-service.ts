@@ -29,6 +29,7 @@ import {
   buildSkillUserPrompt,
 } from '../prompts/package-generation.js';
 import { randomUUID } from 'node:crypto';
+import type { PoolClient } from 'pg';
 import { query, withTransaction } from './db.js';
 import type { DbRowPackage, DbRowPackageVersion } from '../types.js';
 import { parseDbJson } from '../utils/json.js';
@@ -483,10 +484,14 @@ function extractRubricSectionFromText(content: string): string {
           });
           continue;
         }
-        // 直接拼接 extracted，避免重新切片引入 collectRubricBlock 已排除的边界行
+        // 用原始行范围重建合并块，避免多个重叠候选把同一段尾部反复拼接，
+        // 造成内容指数级膨胀。边界行已在上方 gap 检查中排除。
         const newEnd = Math.max(last.endIndex, cand.endIndex);
         last.endIndex = newEnd;
-        last.extracted = `${last.extracted}\n\n${cand.extracted}`;
+        last.extracted = lines
+          .slice(last.startIndex, newEnd + 1)
+          .join('\n')
+          .trim();
       } else {
         merged.push({
           startIndex: cand.startIndex,
@@ -1040,9 +1045,12 @@ async function buildReviewedSourceRubricExcerpt(
   return parts.join('\n\n').trim();
 }
 
-function normalizeSkillMetadata(skills: PackageBaseGenerationResult['skills']) {
+function normalizeSkillMetadata(
+  skills: PackageBaseGenerationResult['skills'],
+  maxSkills = MAX_GENERATED_SKILLS,
+) {
   const used = new Set<string>();
-  return skills.slice(0, MAX_GENERATED_SKILLS).map((skill, index) => {
+  return skills.slice(0, maxSkills).map((skill, index) => {
     const baseDirName = slugify(
       skill.dirName || skill.name || `skill-${index + 1}`,
     );
@@ -2232,53 +2240,74 @@ export async function updateVersionNote(
   };
 }
 
+export interface CreatedPackageSnapshotIds {
+  packageId: number;
+  packageVersionId: number;
+}
+
+export async function createPackageWithSnapshotTx(
+  client: PoolClient,
+  userId: string,
+  snapshot: AgentPackageSnapshot,
+  source: PackageVersion['source'],
+): Promise<CreatedPackageSnapshotIds> {
+  const now = new Date().toISOString();
+  const fixedSnapshot = ensureSkillIds(snapshot);
+  const pkgResult = await client.query<{ id: number }>(
+    'insert into agent_packages (user_id, name, description, current_version_id, created_at, updated_at) values ($1, $2, $3, 0, $4, $5) returning id',
+    [userId, fixedSnapshot.name, fixedSnapshot.description, now, now],
+  );
+  const packageId = pkgResult.rows[0].id;
+  const verResult = await client.query<{ id: number }>(
+    'insert into agent_package_versions (package_id, version_number, source, snapshot_json, created_at) values ($1, $2, $3, $4, $5) returning id',
+    [packageId, 1, source, JSON.stringify(fixedSnapshot), now],
+  );
+  const packageVersionId = verResult.rows[0].id;
+  await syncPackageVersionSkillsFromSnapshot(client, {
+    packageId,
+    packageVersionId,
+    packageVersionNumber: 1,
+    source,
+    snapshot: fixedSnapshot,
+  });
+  await client.query(
+    'update agent_packages set current_version_id = $1 where id = $2',
+    [packageVersionId, packageId],
+  );
+  return { packageId, packageVersionId };
+}
+
 async function createPackageWithSnapshot(
   userId: string,
   snapshot: AgentPackageSnapshot,
   source: PackageVersion['source'],
 ) {
-  const now = new Date().toISOString();
-  const fixedSnapshot = ensureSkillIds(snapshot);
-
-  const packageId = await withTransaction(async (client) => {
-    const pkgResult = await client.query<{ id: number }>(
-      'insert into agent_packages (user_id, name, description, current_version_id, created_at, updated_at) values ($1, $2, $3, 0, $4, $5) returning id',
-      [userId, fixedSnapshot.name, fixedSnapshot.description, now, now],
-    );
-    const nextPackageId = pkgResult.rows[0].id;
-
-    const verResult = await client.query<{ id: number }>(
-      'insert into agent_package_versions (package_id, version_number, source, snapshot_json, created_at) values ($1, $2, $3, $4, $5) returning id',
-      [nextPackageId, 1, source, JSON.stringify(fixedSnapshot), now],
-    );
-    const versionId = verResult.rows[0].id;
-
-    await syncPackageVersionSkillsFromSnapshot(client, {
-      packageId: nextPackageId,
-      packageVersionId: versionId,
-      packageVersionNumber: 1,
-      source,
-      snapshot: fixedSnapshot,
-    });
-
-    await client.query(
-      'update agent_packages set current_version_id = $1 where id = $2',
-      [versionId, nextPackageId],
-    );
-    return nextPackageId;
-  });
+  const { packageId } = await withTransaction((client) =>
+    createPackageWithSnapshotTx(client, userId, snapshot, source),
+  );
 
   return getPackage(userId, packageId);
 }
 
-export async function generatePackage(
-  userId: string,
-  instruction: string,
-  model?: string,
-  documents?: Array<{ name: string; content: string }>,
-  onPreview?: (preview: PackageGeneratePreview) => void,
-  onPreviewDelta?: (delta: PackageGeneratePreviewDelta) => void,
-) {
+export async function buildGeneratedPackageSnapshot(input: {
+  instruction: string;
+  model?: string;
+  documents?: Array<{ name: string; content: string }>;
+  max_skills?: number;
+  onPreview?: (preview: PackageGeneratePreview) => void;
+  onPreviewDelta?: (delta: PackageGeneratePreviewDelta) => void;
+}): Promise<AgentPackageSnapshot> {
+  const {
+    instruction,
+    model,
+    documents,
+    onPreview,
+    onPreviewDelta,
+  } = input;
+  const maxSkills = Math.min(
+    MAX_GENERATED_SKILLS,
+    Math.max(1, Math.trunc(input.max_skills ?? MAX_GENERATED_SKILLS)),
+  );
   const startedAt = Date.now();
   const docParts = buildDocumentContext(documents, MAX_BASE_DOCUMENT_CHARS);
   const skillDocParts = buildDocumentContext(
@@ -2290,7 +2319,6 @@ export async function generatePackage(
 
   getLogger({ component: 'package-generation' }).info({
     event: 'packages.generate.base.start',
-    userId,
     instructionLength: instruction.length,
     documentCount: documents?.length || 0,
     documentChars:
@@ -2326,7 +2354,7 @@ export async function generatePackage(
   }
 
   validateBaseGenerationResult(base);
-  const skillMetas = normalizeSkillMetadata(base.skills);
+  const skillMetas = normalizeSkillMetadata(base.skills, maxSkills);
   getLogger({ component: 'package-generation' }).info({
     event: 'packages.generate.base.done',
     durationMs: Date.now() - startedAt,
@@ -2456,6 +2484,24 @@ export async function generatePackage(
   getLogger({ component: 'package-generation' }).info({
     event: 'packages.generate.validate.done',
     durationMs: Date.now() - startedAt,
+  });
+  return snapshot;
+}
+
+export async function generatePackage(
+  userId: string,
+  instruction: string,
+  model?: string,
+  documents?: Array<{ name: string; content: string }>,
+  onPreview?: (preview: PackageGeneratePreview) => void,
+  onPreviewDelta?: (delta: PackageGeneratePreviewDelta) => void,
+) {
+  const snapshot = await buildGeneratedPackageSnapshot({
+    instruction,
+    model,
+    documents,
+    onPreview,
+    onPreviewDelta,
   });
   return createPackageWithSnapshot(userId, snapshot, 'generated');
 }
