@@ -6,7 +6,6 @@ import {
   FileUp,
   FlaskConical,
   History,
-  LayoutTemplate,
   Library,
   LogOut,
   MessageSquareText,
@@ -24,12 +23,8 @@ import {
 import { ThemeToggle } from '../theme-toggle';
 import type { SkillWorkspaceView } from './skill-workspace-state';
 
-export type SkillCreateMode =
-  | 'conversation'
-  | 'document'
-  | 'template'
-  | 'import'
-  | 'manual';
+export type SkillCreateMode = 'conversation' | 'document' | 'manual';
+export type SkillCreateAction = SkillCreateMode | 'import';
 
 type Props = {
   sessions: GuidedCreationSession[];
@@ -45,7 +40,7 @@ type Props = {
   onToggle: () => void;
   onRepository: () => void;
   onNavigate: (view: SkillWorkspaceView) => void;
-  onCreateMode: (mode: SkillCreateMode) => void;
+  onCreateMode: (mode: SkillCreateAction) => void;
   onSelect: (session: GuidedCreationSession) => void;
   onLogout: () => void;
 };
@@ -53,33 +48,27 @@ type Props = {
 const creationModes = [
   {
     mode: 'conversation',
-    label: '自然对话创建',
-    description: '通过问答逐步生成',
+    label: '对话共创',
+    description: '边聊边完善，也可从常用场景开始',
     icon: MessageSquareText,
   },
   {
     mode: 'document',
-    label: '从描述文档生成',
+    label: '文档生成',
     description: '一份文档生成一个 Skill',
     icon: FileText,
   },
   {
-    mode: 'template',
-    label: '从模板创建',
-    description: '选择教育场景后调整',
-    icon: LayoutTemplate,
+    mode: 'manual',
+    label: '完整填写',
+    description: '按字段一次填写需求',
+    icon: PencilLine,
   },
   {
     mode: 'import',
-    label: '导入已有 Skill',
+    label: '导入 Skill',
     description: '导入标准 Skill ZIP',
     icon: FileUp,
-  },
-  {
-    mode: 'manual',
-    label: '空白创建',
-    description: '直接编辑 SKILL.md',
-    icon: PencilLine,
   },
 ] as const;
 

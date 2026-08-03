@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type {
   GuidedCreationDocument,
   GuidedCreationSessionDetail,
@@ -13,14 +13,11 @@ import {
   Paperclip,
   RotateCcw,
   Sparkles,
-  UploadCloud,
   X,
 } from 'lucide-react';
-import type { SkillCreateMode } from './SkillWorkspaceSidebar';
 
 type Props = {
   session: GuidedCreationSessionDetail | null;
-  createMode: SkillCreateMode;
   documents: GuidedCreationDocument[];
   busy: boolean;
   phase: string | null;
@@ -30,7 +27,6 @@ type Props = {
   onConfirm: () => void;
   onRetry: () => void;
   onFiles: (files: FileList) => void;
-  onImport: (file: File) => void;
   onRemoveDocument: (index: number) => void;
 };
 
@@ -46,8 +42,6 @@ const educationTemplates = [
   ['练习题生成', '创建一个练习题生成 Skill，根据教学材料、知识点和难度生成带答案解析的练习。'],
 ] as const;
 
-const manualPrompt = 'Skill 名称：\n服务对象：\n使用场景：\n希望完成的任务：\n输入内容：\n期望输出：\n需要遵守的边界：';
-
 export function GuidedSkillCreationPanel(props: Props) {
   const [input, setInput] = useState('');
   const [showConversation, setShowConversation] = useState(false);
@@ -57,12 +51,6 @@ export function GuidedSkillCreationPanel(props: Props) {
   const isFinalizing = Boolean(
     props.busy && ['generating', 'validating', 'saving'].includes(props.phase || ''),
   );
-
-  useEffect(() => {
-    if (!props.session && props.createMode === 'manual' && !input.trim()) {
-      setInput(manualPrompt);
-    }
-  }, [input, props.createMode, props.session]);
 
   const send = () => {
     const value = input.trim();
@@ -150,8 +138,7 @@ export function GuidedSkillCreationPanel(props: Props) {
           if (documentsLocked) return;
           event.preventDefault();
           if (event.dataTransfer.files.length) {
-            if (props.createMode === 'import') props.onImport(event.dataTransfer.files[0]);
-            else props.onFiles(event.dataTransfer.files);
+            props.onFiles(event.dataTransfer.files);
           }
         }}
       >
@@ -164,38 +151,19 @@ export function GuidedSkillCreationPanel(props: Props) {
 
         <div className={`skill-message-list ${props.session ? '' : 'is-empty'}`}>
           {!props.session ? (
-            props.createMode === 'template' ? (
-              <div className="skill-template-start">
-                <span className="skill-eyebrow">选择教育场景</span>
-                <h2>从一个模板开始</h2>
-                <div>
+            <div className="skill-empty-conversation">
+              <div className="skill-empty-icon"><Sparkles size={24} /></div>
+              <h2>一起创建一个教育 Skill</h2>
+              <p>先简单描述目标，我会通过对话帮你逐步补全。</p>
+              <div className="skill-starter-section">
+                <span>从常用场景开始</span>
+                <div className="skill-starter-chips">
                   {educationTemplates.map(([label, prompt]) => (
-                    <button key={label} onClick={() => setInput(prompt)}>
-                      <strong>{label}</strong><span>选择后可继续对话调整</span>
-                    </button>
+                    <button key={label} onClick={() => setInput(prompt)}>{label}</button>
                   ))}
                 </div>
               </div>
-            ) : props.createMode === 'import' ? (
-              <button className="skill-import-dropzone" onClick={() => fileInputRef.current?.click()}>
-                <UploadCloud size={28} />
-                <strong>导入已有 Skill</strong>
-                <span>点击选择 ZIP，或把文件拖到这里</span>
-              </button>
-            ) : (
-              <div className="skill-empty-conversation">
-                <div className="skill-empty-icon"><Sparkles size={24} /></div>
-                <h2>{props.createMode === 'manual' ? '按结构填写 Skill 需求' : '先说说你想让它做什么'}</h2>
-                <p>{props.createMode === 'manual' ? '补全下方结构后发送，系统会检查并继续确认细节。' : '描述使用者、场景或目标中的任意一点，我会逐步帮你补全。'}</p>
-                {props.createMode === 'conversation' && (
-                  <div className="skill-starter-chips">
-                    {['帮教师设计课堂活动', '根据作业生成个性化反馈', '把教学材料整理成练习题'].map((item) => (
-                      <button key={item} onClick={() => setInput(item)}>{item}</button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )
+            </div>
           ) : (
             props.session.messages.map((message) => (
               <MessageBubble key={message.id} message={message} onOption={(option) => setInput(option)} />
@@ -221,7 +189,7 @@ export function GuidedSkillCreationPanel(props: Props) {
               ))}
             </div>
           )}
-          <div className={`skill-composer ${props.createMode === 'import' && !props.session ? 'is-import-mode' : ''}`}>
+          <div className="skill-composer">
             <textarea
               value={input}
               onChange={(event) => setInput(event.target.value)}
@@ -240,16 +208,15 @@ export function GuidedSkillCreationPanel(props: Props) {
                 hidden
                 type="file"
                 multiple
-                accept={props.createMode === 'import' ? '.zip,application/zip' : '.txt,.md,.docx,text/plain,text/markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document'}
+                accept=".txt,.md,.docx,text/plain,text/markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 onChange={(event) => {
                   if (event.target.files?.length) {
-                    if (props.createMode === 'import') props.onImport(event.target.files[0]);
-                    else props.onFiles(event.target.files);
+                    props.onFiles(event.target.files);
                   }
                   event.target.value = '';
                 }}
               />
-              {!documentsLocked && props.createMode !== 'import' && (
+              {!documentsLocked && (
                 <button
                   className="skill-material-icon-button"
                   onClick={() => fileInputRef.current?.click()}

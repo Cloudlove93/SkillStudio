@@ -10,6 +10,8 @@ import { liteApi, type GuidedCreationSseEvent } from '../api/lite-api';
 import { useAuthStore } from '../stores/auth';
 import { GuidedSkillCreationPanel } from '../components/skill-workspace/GuidedSkillCreationPanel';
 import { DocumentSkillCreationPanel } from '../components/skill-workspace/DocumentSkillCreationPanel';
+import { StructuredSkillCreationPanel } from '../components/skill-workspace/StructuredSkillCreationPanel';
+import { SkillImportDialog } from '../components/skill-workspace/SkillImportDialog';
 import {
   isGuidedFinalizationStale,
   isGuidedRunVisible,
@@ -17,6 +19,7 @@ import {
 import { SkillContextPanel } from '../components/skill-workspace/SkillContextPanel';
 import {
   SkillWorkspaceSidebar,
+  type SkillCreateAction,
   type SkillCreateMode,
 } from '../components/skill-workspace/SkillWorkspaceSidebar';
 import { SkillPinnedUpdate } from '../components/skill-workspace/SkillPinnedUpdate';
@@ -55,6 +58,8 @@ export default function SkillFirstWorkspace() {
   const [search, setSearch] = useState('');
   const [createMode, setCreateMode] = useState<SkillCreateMode>('conversation');
   const [leftCollapsed, setLeftCollapsed] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importBusy, setImportBusy] = useState(false);
   const [workspaceState, dispatchWorkspace] = useReducer(
     skillWorkspaceReducer,
     undefined,
@@ -451,7 +456,12 @@ export default function SkillFirstWorkspace() {
     };
   }, [refreshRepository, session, token]);
 
-  const newSkill = (mode: SkillCreateMode = 'conversation') => {
+  const newSkill = (mode: SkillCreateAction = 'conversation') => {
+    if (mode === 'import') {
+      setImportOpen(true);
+      return;
+    }
+    setImportOpen(false);
     activeRunRef.current = null;
     setCreateMode(mode);
     setSession(null);
@@ -505,16 +515,17 @@ export default function SkillFirstWorkspace() {
       toast.error('请选择标准 Skill ZIP 文件');
       return;
     }
-    setBusy(true);
+    setImportBusy(true);
     try {
       await liteApi.importPackage(token, file);
       await refreshRepository();
       toast.success('Skill 已导入并加入仓库');
+      setImportOpen(false);
       openRepository();
     } catch (importError) {
       toast.error(importError instanceof Error ? importError.message : 'Skill 导入失败');
     } finally {
-      setBusy(false);
+      setImportBusy(false);
     }
   };
 
@@ -585,18 +596,9 @@ export default function SkillFirstWorkspace() {
               onPublishUpdate={publishUpdate}
               onReloadVersions={loadVersions}
             />
-          ) : createMode === 'document' ? (
-            <DocumentSkillCreationPanel
-              token={token}
-              onGenerated={async () => {
-                await refreshRepository();
-                dispatchWorkspace({ type: 'navigate', view: 'repository' });
-              }}
-            />
-          ) : (
+          ) : session ? (
             <GuidedSkillCreationPanel
               session={session}
-              createMode={createMode}
               documents={documents}
               busy={busy}
               phase={phase}
@@ -606,7 +608,40 @@ export default function SkillFirstWorkspace() {
               onConfirm={confirm}
               onRetry={() => lastActionRef.current?.()}
               onFiles={(files) => void addFiles(files)}
-              onImport={(file) => void importSkill(file)}
+              onRemoveDocument={(index) =>
+                setDocuments((current) => current.filter((_, itemIndex) => itemIndex !== index))
+              }
+            />
+          ) : createMode === 'document' ? (
+            <DocumentSkillCreationPanel
+              token={token}
+              onGenerated={async () => {
+                await refreshRepository();
+                dispatchWorkspace({ type: 'navigate', view: 'repository' });
+              }}
+            />
+          ) : createMode === 'manual' ? (
+            <StructuredSkillCreationPanel
+              documents={documents}
+              busy={busy}
+              onSubmit={send}
+              onFiles={(files) => void addFiles(files)}
+              onRemoveDocument={(index) =>
+                setDocuments((current) => current.filter((_, itemIndex) => itemIndex !== index))
+              }
+            />
+          ) : (
+            <GuidedSkillCreationPanel
+              session={null}
+              documents={documents}
+              busy={busy}
+              phase={phase}
+              previews={previews}
+              error={error}
+              onSend={send}
+              onConfirm={confirm}
+              onRetry={() => lastActionRef.current?.()}
+              onFiles={(files) => void addFiles(files)}
               onRemoveDocument={(index) =>
                 setDocuments((current) => current.filter((_, itemIndex) => itemIndex !== index))
               }
@@ -629,6 +664,12 @@ export default function SkillFirstWorkspace() {
           dispatchWorkspace({ type: 'navigate', view: 'versions' });
           dispatchWorkspace({ type: 'close-context' });
         }}
+      />
+      <SkillImportDialog
+        open={importOpen}
+        busy={importBusy}
+        onClose={() => setImportOpen(false)}
+        onImport={(file) => void importSkill(file)}
       />
     </div>
   );

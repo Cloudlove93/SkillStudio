@@ -166,17 +166,8 @@
 .skill-empty-icon, .skill-generation-symbol { display: grid; width: 48px; height: 48px; margin: 0 auto 16px; place-items: center; border-radius: 15px; background: linear-gradient(135deg, var(--primary-soft), var(--info-soft)); color: var(--primary); box-shadow: 0 10px 24px color-mix(in srgb, var(--primary) 12%, transparent); }
 .skill-empty-conversation h2 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -.025em; }
 .skill-empty-conversation p { width: min(480px, 100%); margin: 10px auto 20px; color: var(--muted-foreground); font-size: 13px; line-height: 1.7; }
-.skill-template-start { width: min(560px, 100%); margin: auto; }
-.skill-template-start h2 { margin: 7px 0 18px; font-size: 20px; font-weight: 610; }
-.skill-template-start > div { border-top: 1px solid var(--border); }
-.skill-template-start button { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 18px; border: 0; border-bottom: 1px solid var(--border); background: transparent; color: var(--foreground); padding: 16px 3px; text-align: left; cursor: pointer; }
-.skill-template-start button:hover { background: color-mix(in srgb, var(--skill-hover) 55%, transparent); }
-.skill-template-start button strong { font-size: 12px; font-weight: 590; }
-.skill-template-start button span { color: var(--muted-foreground); font-size: 9px; }
-.skill-import-dropzone { display: grid; width: min(520px, 100%); min-height: 220px; margin: auto; place-items: center; align-content: center; gap: 9px; border: 1px dashed color-mix(in srgb, var(--primary) 34%, var(--border)); border-radius: 14px; background: color-mix(in srgb, var(--primary-soft) 24%, transparent); color: var(--primary); cursor: pointer; }
-.skill-import-dropzone:hover { background: color-mix(in srgb, var(--primary-soft) 50%, transparent); }
-.skill-import-dropzone strong { color: var(--foreground); font-size: 14px; }
-.skill-import-dropzone span { color: var(--muted-foreground); font-size: 10px; }
+.skill-starter-section { display: flex; align-items: center; justify-content: center; gap: 9px; flex-wrap: wrap; }
+.skill-starter-section > span { color: var(--muted-foreground); font-size: 9px; }
 .skill-starter-chips, .skill-option-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 7px; }
 .skill-starter-chips button, .skill-option-row button { border: 1px solid var(--border); border-radius: 999px; background: var(--card); color: var(--muted-foreground); font-size: 11px; padding: 7px 11px; cursor: pointer; }
 .skill-starter-chips button:hover, .skill-option-row button:hover { border-color: color-mix(in srgb, var(--primary) 30%, var(--border)); background: var(--primary-soft); color: var(--primary); }
@@ -395,8 +386,35 @@
 .skill-test-composer button:disabled { background: var(--muted); color: var(--muted-foreground); }
 .skill-material-icon-button { display: inline-grid; width: 29px; height: 29px; flex: 0 0 29px; place-items: center; border: 0; border-radius: 8px; background: transparent; color: var(--muted-foreground); cursor: pointer; }
 .skill-material-icon-button:hover { background: var(--skill-hover); color: var(--primary); }
-.skill-composer.is-import-mode textarea, .skill-composer.is-import-mode .skill-composer-actions > span, .skill-composer.is-import-mode .skill-send-button { display: none; }
-.skill-composer.is-import-mode .skill-composer-actions { width: 100%; }
+.skill-structured-form { width: min(800px, 100%); min-height: 100%; margin: 0 auto; padding: 44px 38px 36px; }
+.skill-structured-header { border-bottom: 1px solid var(--border); padding-bottom: 22px; }
+.skill-structured-header h1 { margin: 6px 0 5px; color: var(--foreground); font-size: 22px; font-weight: 620; letter-spacing: -.025em; }
+.skill-structured-header p { margin: 0; color: var(--muted-foreground); font-size: 11px; }
+.skill-structured-fields { border-bottom: 1px solid var(--border); }
+.skill-structured-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 22px; }
+.skill-structured-row { display: grid; min-width: 0; min-height: 48px; grid-template-columns: 112px minmax(0, 1fr); align-items: start; border-top: 1px solid var(--border); padding: 10px 4px; transition: background 150ms ease; }
+.skill-structured-row:focus-within { background: var(--skill-hover); }
+.skill-structured-pair .skill-structured-row { grid-template-columns: 88px minmax(0, 1fr); }
+.skill-structured-row > span { padding: 4px 8px 0 0; color: var(--muted-foreground); font-size: 10px; }
+.skill-structured-row > span small { margin-left: 3px; font-size: 8px; font-weight: 400; }
+.skill-structured-row input, .skill-structured-row textarea { min-width: 0; width: 100%; resize: vertical; border: 0; outline: 0; background: transparent; color: var(--foreground); padding: 3px 0; font: inherit; font-size: 11px; line-height: 1.6; }
+.skill-structured-row textarea { min-height: 42px; }
+.skill-structured-row input::placeholder, .skill-structured-row textarea::placeholder { color: var(--muted-foreground); opacity: .72; }
+.skill-structured-actions { display: flex; min-height: 58px; align-items: center; gap: 8px; }
+.skill-structured-actions > span { flex: 1; color: var(--muted-foreground); font-size: 9px; }
+.skill-structured-actions .skill-primary-button { min-width: 96px; }
+.skill-structured-form > .skill-document-row { margin-top: 12px; }
+.skill-import-dialog-backdrop { position: fixed; z-index: 80; inset: 0; display: grid; place-items: center; background: color-mix(in srgb, var(--foreground) 24%, transparent); padding: 20px; backdrop-filter: blur(3px); }
+.skill-import-dialog { width: min(420px, 100%); border: 1px solid var(--border); border-radius: 15px; background: var(--card); padding: 18px; box-shadow: var(--shadow-lg); }
+.skill-import-dialog > header { display: flex; align-items: flex-start; gap: 14px; }
+.skill-import-dialog > header > div { min-width: 0; flex: 1; }
+.skill-import-dialog h2 { margin: 0; color: var(--foreground); font-size: 15px; font-weight: 610; }
+.skill-import-dialog p { margin: 5px 0 0; color: var(--muted-foreground); font-size: 10px; line-height: 1.6; }
+.skill-import-dialog-dropzone { display: grid; width: 100%; min-height: 138px; margin-top: 17px; place-items: center; align-content: center; gap: 7px; border: 1px dashed var(--border); border-radius: 11px; background: var(--muted); color: var(--muted-foreground); cursor: pointer; }
+.skill-import-dialog-dropzone:hover { background: var(--skill-hover); color: var(--primary); }
+.skill-import-dialog-dropzone strong { max-width: 100%; overflow: hidden; color: var(--foreground); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.skill-import-dialog-dropzone span { font-size: 9px; }
+.skill-import-dialog > footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 .skill-version-list { padding-top: 24px; }
 .skill-version-line { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; gap: 10px; align-items: start; border: 1px solid var(--border); border-radius: 11px; background: var(--card); padding: 14px; box-shadow: var(--shadow-sm); }
 .skill-version-line > span { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 8px; background: var(--primary-soft); color: var(--primary); }
@@ -503,6 +521,9 @@
   .skill-main-stage { border-radius: 0 24px 24px 0; }
   .skill-pinned-update { margin-inline: 14px; }
   .skill-conversation-shell { padding-inline: 16px; }
+  .skill-structured-form { padding: 32px 22px; }
+  .skill-structured-pair { grid-template-columns: 1fr; column-gap: 0; }
+  .skill-structured-pair .skill-structured-row { grid-template-columns: 112px minmax(0, 1fr); }
   .skill-confirmation-view, .skill-generation-view, .skill-detail-view { padding: 28px 18px; }
   .skill-confirm-grid, .skill-overview-grid { grid-template-columns: 1fr; }
   .skill-overview-sections { grid-template-columns: 1fr; }
@@ -528,6 +549,9 @@
   .skill-repository-list > button { grid-template-columns: 32px minmax(0, 1fr) 16px; }
   .skill-repository-list time { display: none; }
   .skill-composer-actions > span { display: none; }
+  .skill-structured-row, .skill-structured-pair .skill-structured-row { grid-template-columns: 1fr; }
+  .skill-structured-row > span { padding-bottom: 5px; }
+  .skill-structured-actions > span { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
