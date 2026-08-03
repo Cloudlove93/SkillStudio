@@ -180,7 +180,7 @@ Expected: FAIL before the selection helper exists.
 
 - [ ] **Step 3: Implement test using the run executor**
 
-The `test` view uses the same fixed-version executor as `run`, but stores the prompt and result as a test record in local workspace state and labels the version explicitly.
+The `test` view uses the same fixed-version executor as `run`. Its prompt and result remain persisted as Arena thread messages on the backend; frontend state is reconstructed from the returned thread detail and labels the fixed version explicitly.
 
 - [ ] **Step 4: Implement Arena using compare mode**
 
