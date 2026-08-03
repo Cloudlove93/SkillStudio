@@ -393,11 +393,8 @@
 .skill-test-composer textarea { min-height: 50px; flex: 1; resize: none; border: 0; outline: 0; background: transparent; color: var(--foreground); padding: 6px; font: inherit; font-size: 11px; }
 .skill-test-composer button { display: grid; width: 30px; height: 30px; place-items: center; border: 0; border-radius: 8px; background: var(--primary); color: var(--primary-foreground); }
 .skill-test-composer button:disabled { background: var(--muted); color: var(--muted-foreground); }
-.skill-material-button { display: inline-flex; min-height: 38px; align-items: center; gap: 9px; border: 1px solid color-mix(in srgb, var(--primary) 18%, var(--border)); border-radius: 9px; background: color-mix(in srgb, var(--primary-soft) 42%, var(--card)); color: var(--primary); padding: 6px 10px; text-align: left; cursor: pointer; }
-.skill-material-button:hover { border-color: color-mix(in srgb, var(--primary) 32%, var(--border)); background: var(--primary-soft); }
-.skill-material-button > span { display: flex; flex-direction: column; }
-.skill-material-button strong { color: var(--foreground); font-size: 10px; font-weight: 590; }
-.skill-material-button small { margin-top: 2px; color: var(--muted-foreground); font-size: 8px; }
+.skill-material-icon-button { display: inline-grid; width: 29px; height: 29px; flex: 0 0 29px; place-items: center; border: 0; border-radius: 8px; background: transparent; color: var(--muted-foreground); cursor: pointer; }
+.skill-material-icon-button:hover { background: var(--skill-hover); color: var(--primary); }
 .skill-composer.is-import-mode textarea, .skill-composer.is-import-mode .skill-composer-actions > span, .skill-composer.is-import-mode .skill-send-button { display: none; }
 .skill-composer.is-import-mode .skill-composer-actions { width: 100%; }
 .skill-version-list { padding-top: 24px; }

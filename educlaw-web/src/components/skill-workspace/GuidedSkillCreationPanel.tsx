@@ -10,6 +10,7 @@ import {
   ChevronDown,
   FileText,
   Loader2,
+  Paperclip,
   RotateCcw,
   Sparkles,
   UploadCloud,
@@ -248,13 +249,14 @@ export function GuidedSkillCreationPanel(props: Props) {
                   event.target.value = '';
                 }}
               />
-              {!documentsLocked && (
-                <button className="skill-material-button" onClick={() => fileInputRef.current?.click()} title="添加教学材料">
-                  <UploadCloud size={16} />
-                  <span>
-                    <strong>{props.createMode === 'import' ? '选择 Skill ZIP' : '添加教学材料'}</strong>
-                    <small>{props.createMode === 'import' ? '导入后会加入 Skill 仓库' : 'DOCX、Markdown、TXT，也可拖入'}</small>
-                  </span>
+              {!documentsLocked && props.createMode !== 'import' && (
+                <button
+                  className="skill-material-icon-button"
+                  onClick={() => fileInputRef.current?.click()}
+                  title="添加教学材料"
+                  aria-label="添加教学材料"
+                >
+                  <Paperclip size={16} />
                 </button>
               )}
               <span>Enter 发送 · Shift + Enter 换行</span>
