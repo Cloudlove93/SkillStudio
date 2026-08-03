@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import type { GuidedCreationSession } from '@educlaw/shared';
 import {
   Columns3,
@@ -119,10 +120,28 @@ export function SkillWorkspaceSidebar({
   onSelect,
   onLogout,
 }: Props) {
+  const createMenuRef = useRef<HTMLDetailsElement>(null);
   const query = search.trim().toLowerCase();
   const visible = sessions.filter((session) =>
     getSessionName(session).toLowerCase().includes(query),
   );
+
+  useEffect(() => {
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (!createMenuRef.current?.contains(event.target as Node)) {
+        createMenuRef.current?.removeAttribute('open');
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') createMenuRef.current?.removeAttribute('open');
+    };
+    document.addEventListener('pointerdown', closeOnOutsideClick);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsideClick);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, []);
 
   return (
     <aside className={`skill-sidebar ${collapsed ? 'is-collapsed' : ''}`}>
@@ -142,7 +161,7 @@ export function SkillWorkspaceSidebar({
       </div>
 
       <nav className="skill-sidebar-commands" aria-label="Skill 工作区功能">
-        <details className="skill-create-menu">
+        <details ref={createMenuRef} className="skill-create-menu">
           <summary
             className={!repositoryActive && !selectedSessionId ? 'is-active' : ''}
             aria-haspopup="menu"
