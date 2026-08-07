@@ -102,7 +102,7 @@ interface CreateArenaThreadInput {
   right?: SkillArenaVariantSelection;
   model?: string;
   idempotencyKey?: string;
-  surface?: "run" | "arena";
+  surface?: "run" | "test" | "arena" | "optimize";
 }
 
 interface GetArenaThreadDetailInput {
@@ -775,11 +775,41 @@ async function getOwnedSkillArenaVariant(
   return row;
 }
 
+/**
+ * 根据会话用途生成统一的默认标题。
+ * - run / test / optimize：单版本场景，标题带功能前缀，等待前端用首条 prompt 重命名
+ * - arena：双版本对比，标题保留左右 Skill 名称
+ * - 未指定 surface：兼容旧逻辑
+ */
+function buildArenaThreadTitle(input: {
+  surface?: "run" | "test" | "arena" | "optimize";
+  leftSkillName: string;
+  rightSkillName: string;
+  warning: string | null;
+}): string {
+  switch (input.surface) {
+    case "run":
+      return `Skill 运行：${input.leftSkillName}`;
+    case "test":
+      return `Skill 测试：${input.leftSkillName}`;
+    case "optimize":
+      return `Skill 优化：${input.leftSkillName}`;
+    case "arena":
+      return input.warning
+        ? `Skill Arena: ${input.leftSkillName}`
+        : `Skill Arena: ${input.leftSkillName} vs ${input.rightSkillName}`;
+    default:
+      return input.warning
+        ? `Skill Arena: ${input.leftSkillName}`
+        : `Skill Arena: ${input.leftSkillName} vs ${input.rightSkillName}`;
+  }
+}
+
 function buildSkillArenaConfig(input: {
   basePackageVersionId: string;
   left: DbSkillArenaVariantRow;
   right: DbSkillArenaVariantRow;
-  surface?: "run" | "arena";
+  surface?: "run" | "test" | "arena" | "optimize";
 }) {
   const toVariant = (
     side: "left" | "right",
@@ -1130,6 +1160,7 @@ export async function createArenaThread(
       skillVersionId: rightSkillVersionId,
     },
     model: input.model || null,
+    surface: input.surface || null,
   });
 
   return withTransaction(async (client) => {
@@ -1172,10 +1203,12 @@ export async function createArenaThread(
         ? "Selected versions are identical"
         : null;
     const now = new Date().toISOString();
-    const title =
-      warning
-        ? `Skill Arena: ${skillArenaConfig.left.skillName}`
-        : `Skill Arena: ${skillArenaConfig.left.skillName} vs ${skillArenaConfig.right.skillName}`;
+    const title = buildArenaThreadTitle({
+      surface: input.surface,
+      leftSkillName: skillArenaConfig.left.skillName,
+      rightSkillName: skillArenaConfig.right.skillName,
+      warning,
+    });
     const threadResult = await client.query<{ id: number }>(
       `insert into arena_threads
         (user_id, package_id, title, model, arena_kind, base_package_version_id, arena_config_jsonb, created_at, updated_at)

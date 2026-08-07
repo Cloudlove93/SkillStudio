@@ -148,8 +148,8 @@ export interface ArenaThreadVariant {
 export interface SkillArenaConfig {
   mode: "skill_arena";
   compositionMode: "skill_only";
-  /** Ordinary single-Skill conversations use run; Arena comparisons use arena. */
-  surface?: "run" | "arena";
+  /** run: 单版本运行；test: 固定版本测试；arena: 双版本对比；optimize: 交互式优化 */
+  surface?: "run" | "test" | "arena" | "optimize";
   basePackageVersionId: string;
   left: ArenaThreadVariant;
   right: ArenaThreadVariant;

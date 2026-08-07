@@ -63,6 +63,38 @@ describe('guided creation conversation service', () => {
     expect(turn.content.match(/[？?]/g)).toHaveLength(1);
   });
 
+  it('uses confirmation options when step dimensions already have content', () => {
+    const turn = buildGuidedAssistantTurnV3({
+      current_draft: {},
+      completed_steps: [],
+      current_step: null,
+      user_message: '我想给初二学生做一个浮力实验指导 Skill',
+      extraction: {
+        operations: [
+          {
+            dimension: 'educational_goal',
+            content: '指导学生完成浮力实验',
+            source: 'user_explicit',
+            quote: '浮力实验指导',
+          },
+          {
+            dimension: 'audience_context',
+            content: '面向初二学生',
+            source: 'user_explicit',
+            quote: '初二学生',
+          },
+        ],
+        step_complete: true,
+        acknowledgement: '我理解你要设计初二浮力实验指导。',
+      },
+      phrasing: null,
+    });
+
+    // 两个维度都有内容 → 走确认句 → 选项应为确认类（而非引导类）
+    expect(turn.suggested_options).toContain('准确，继续');
+    expect(turn.suggested_options).not.toContain('理解关键概念');
+  });
+
   it('moves from role and context to teacher experience instead of ending', () => {
     const turn = buildGuidedAssistantTurnV3({
       current_draft: {
@@ -89,7 +121,7 @@ describe('guided creation conversation service', () => {
 
     expect(turn.completed_steps).toEqual(['intent_context']);
     expect(turn.current_step).toBe('teacher_experience');
-    expect(turn.content).toContain('实际带这个实验时');
+    expect(turn.content).toContain('实际教学时');
     expect(turn.status).toBe('collecting');
   });
 

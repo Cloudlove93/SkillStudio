@@ -129,13 +129,13 @@ function optionalLimit(value: unknown): number | undefined {
   return value;
 }
 
-function optionalArenaSurface(value: unknown): 'run' | 'arena' | undefined {
+function optionalArenaSurface(value: unknown): 'run' | 'test' | 'arena' | 'optimize' | undefined {
   const surface = optionalString(value, 'surface', 20);
   if (surface === undefined) return undefined;
-  if (surface !== 'run' && surface !== 'arena') {
+  if (surface !== 'run' && surface !== 'test' && surface !== 'arena' && surface !== 'optimize') {
     throw new SkillVersionError(
       'INVALID_ARGUMENT',
-      'surface must be run or arena',
+      'surface must be run, test, arena or optimize',
       422,
     );
   }

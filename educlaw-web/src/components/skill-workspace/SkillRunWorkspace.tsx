@@ -97,7 +97,7 @@ export function SkillRunWorkspace({ token, packageId, version, currentPackageVer
           basePackageVersionId: version.createdInPackageVersionId,
           left: { skillId: version.skillId, skillVersionId: version.id },
           right: { skillId: version.skillId, skillVersionId: version.id },
-          surface: 'run',
+          surface: purpose,
         });
         threadIdRef.current = String(thread.id);
         onRunStateChange?.(true, threadIdRef.current);

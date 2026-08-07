@@ -121,6 +121,15 @@ export function SkillContextPanel(props: Props) {
   );
 }
 
+const versionSourceLabels: Record<SkillVersionDetail['source'], string> = {
+  generated: '首次生成',
+  imported: '导入创建',
+  optimized: '自动优化',
+  manual: '手动修改',
+  interactive: '交互式优化',
+  rollback: '版本回退',
+};
+
 function ContextSummary({
   session,
   activeView,
@@ -129,9 +138,13 @@ function ContextSummary({
 }: Pick<Props, 'session' | 'activeView' | 'versions' | 'currentVersionId'>) {
   if (activeView === 'run' || activeView === 'test' || activeView === 'arena') {
     const current = versions.find((item) => item.id === currentVersionId);
+    const activeVersionCount = versions.filter((v) => v.status !== 'discarded').length;
     return (
       <div className="skill-context-scroll skill-context-mode-summary">
         <section><span>使用版本</span><strong>{current ? `v${current.versionNumber}` : '当前版本'}</strong></section>
+        <section><span>版本来源</span><strong>{current ? versionSourceLabels[current.source] : '—'}</strong></section>
+        <section><span>创建时间</span><strong>{current ? new Date(current.createdAt).toLocaleString() : '—'}</strong></section>
+        <section><span>版本总数</span><strong>{activeVersionCount} 个有效版本</strong></section>
         <section><span>工作方式</span><strong>{activeView === 'arena' ? '双版本对比' : activeView === 'test' ? '固定版本测试' : '固定版本运行'}</strong></section>
         <section><span>记录</span><strong>服务端自动保存</strong></section>
       </div>
@@ -218,7 +231,7 @@ function VersionSummary({
           <p className="skill-context-muted">当前 Skill 暂无可展示版本。</p>
         ) : (
           <div className="skill-context-version-list">
-            {versions.slice(0, 4).map((version) => (
+            {versions.slice(0, 8).map((version) => (
               <button key={version.id} onClick={onOpenVersionManager}>
                 <span className={version.id === currentVersionId ? 'is-current' : ''}>v{version.versionNumber}</span>
                 <div><strong>{version.id === currentVersionId ? '当前使用' : version.note || '历史版本'}</strong><small>{new Date(version.createdAt).toLocaleString()}</small></div>

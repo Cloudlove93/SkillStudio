@@ -1,12 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { ArenaThread } from '@educlaw/shared';
-import { getConversationTitle, isSkillConversationThread } from './skill-conversation-list';
+import { getConversationSurface, getConversationTitle, getSurfaceLabel, isSkillConversationThread } from './skill-conversation-list';
 
 const thread = (overrides: Partial<ArenaThread>): ArenaThread => ({
   id: 1,
   packageId: 7,
   title: 'Skill Arena: Physics',
-  model: null,
   arenaKind: 'skill_arena',
   basePackageVersionId: '10',
   skillArenaConfig: {
@@ -22,10 +21,13 @@ const thread = (overrides: Partial<ArenaThread>): ArenaThread => ({
 });
 
 describe('Skill conversation list helpers', () => {
-  it('keeps only run conversations for the selected Skill', () => {
+  it('keeps only run/test conversations for the selected Skill', () => {
     const base = thread({});
     expect(isSkillConversationThread(thread({}), 'physics')).toBe(true);
+    expect(isSkillConversationThread(thread({ skillArenaConfig: { ...base.skillArenaConfig!, surface: 'run' } }), 'physics')).toBe(true);
+    expect(isSkillConversationThread(thread({ skillArenaConfig: { ...base.skillArenaConfig!, surface: 'test' } }), 'physics')).toBe(true);
     expect(isSkillConversationThread(thread({ skillArenaConfig: { ...base.skillArenaConfig!, surface: 'arena' } }), 'physics')).toBe(false);
+    expect(isSkillConversationThread(thread({ skillArenaConfig: { ...base.skillArenaConfig!, surface: 'optimize' } }), 'physics')).toBe(false);
     expect(isSkillConversationThread(thread({ skillArenaConfig: { ...base.skillArenaConfig!, left: { ...base.skillArenaConfig!.left, skillId: 'chemistry' } } }), 'physics')).toBe(false);
   });
 
@@ -33,6 +35,21 @@ describe('Skill conversation list helpers', () => {
     const base = thread({});
     expect(isSkillConversationThread(thread({}), 'physics')).toBe(true);
     expect(isSkillConversationThread(thread({ skillArenaConfig: { ...base.skillArenaConfig!, right: { ...base.skillArenaConfig!.right, skillVersionId: '2' } } }), 'physics')).toBe(false);
+  });
+
+  it('derives a surface label from the config or version parity', () => {
+    const base = thread({});
+    expect(getConversationSurface(thread({ skillArenaConfig: { ...base.skillArenaConfig!, surface: 'test' } }))).toBe('test');
+    expect(getConversationSurface(thread({ skillArenaConfig: { ...base.skillArenaConfig!, surface: 'optimize' } }))).toBe('optimize');
+    // legacy same-version → run
+    expect(getConversationSurface(thread({}))).toBe('run');
+    // legacy different-version → arena
+    expect(getConversationSurface(thread({ skillArenaConfig: { ...base.skillArenaConfig!, right: { ...base.skillArenaConfig!.right, skillVersionId: '2' } } }))).toBe('arena');
+    expect(getSurfaceLabel('run')).toBe('运行');
+    expect(getSurfaceLabel('test')).toBe('测试');
+    expect(getSurfaceLabel('optimize')).toBe('优化');
+    expect(getSurfaceLabel('arena')).toBe('对比');
+    expect(getSurfaceLabel(null)).toBe('');
   });
 
   it('creates a readable title from the first user prompt', () => {

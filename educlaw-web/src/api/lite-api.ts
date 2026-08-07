@@ -668,7 +668,7 @@ export const liteApi = {
       left: SkillArenaSelectionPayload;
       right: SkillArenaSelectionPayload;
       model?: string;
-      surface?: 'run' | 'arena';
+      surface?: 'run' | 'test' | 'arena' | 'optimize';
     },
   ) =>
     actionRequest<ArenaThread>(token, 'arena.thread.create', packageId, {

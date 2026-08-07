@@ -75,7 +75,7 @@
   --card-foreground: rgba(244, 246, 255, 0.96);
   --popover: rgba(18, 22, 44, 0.98);
   --popover-foreground: rgba(244, 246, 255, 0.96);
-  --primary: #8085ff;
+  --primary: #555aff;
   --primary-foreground: #ffffff;
   --secondary: rgba(85, 90, 255, 0.18);
   --secondary-foreground: rgba(244, 246, 255, 0.96);
@@ -87,9 +87,9 @@
   --destructive-foreground: #ffffff;
   --border: rgba(226, 230, 248, 0.12);
   --input: rgba(226, 230, 248, 0.12);
-  --ring: rgba(128, 133, 255, 0.3);
-  --primary-hover: #7378ff;
-  --primary-active: #696ef6;
+  --ring: rgba(85, 90, 255, 0.3);
+  --primary-hover: #4e53eb;
+  --primary-active: #474cd6;
   --primary-soft: rgba(85, 90, 255, 0.18);
   --secondary-soft: rgba(140, 85, 255, 0.16);
   --success-soft: rgba(30, 180, 120, 0.16);

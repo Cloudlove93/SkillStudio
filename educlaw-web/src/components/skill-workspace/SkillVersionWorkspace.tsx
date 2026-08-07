@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react';
+import { createPatch } from 'diff';
 import type { SkillVersionDetail } from '@educlaw/shared';
 import { ArrowLeft, Check, GitCompare, History, Loader2, RotateCcw, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { liteApi } from '../../api/lite-api';
+import DiffView from '../editor/DiffView';
 import {
   canDiscardSkillVersion,
   canRollbackSkillVersion,
@@ -78,15 +80,21 @@ export function SkillVersionWorkspace(props: Props) {
   };
 
   if (compare && current) {
+    const diffText = createPatch(
+      current.skill.name || 'skill.md',
+      compare.skill.skillMd,
+      current.skill.skillMd,
+      `历史版本 · v${compare.versionNumber}`,
+      `当前版本 · v${current.versionNumber}`,
+    );
     return (
       <div className="skill-version-page skill-view-enter">
         <header className="skill-version-compare-head">
           <button className="skill-text-button" onClick={() => setCompare(null)}><ArrowLeft size={15} />返回版本列表</button>
           <div><span className="skill-eyebrow">内容对比</span><h2>v{current.versionNumber} 与 v{compare.versionNumber}</h2></div>
         </header>
-        <div className="skill-version-compare-grid">
-          <VersionDocument title={`当前版本 · v${current.versionNumber}`} version={current} />
-          <VersionDocument title={`历史版本 · v${compare.versionNumber}`} version={compare} />
+        <div className="skill-version-compare-diff">
+          <DiffView diff={diffText} />
         </div>
       </div>
     );
@@ -135,10 +143,6 @@ export function SkillVersionWorkspace(props: Props) {
       )}
     </div>
   );
-}
-
-function VersionDocument({ title, version }: { title: string; version: SkillVersionDetail }) {
-  return <section><h3>{title}</h3><p>{version.skill.name}</p><pre>{version.skill.skillMd}</pre></section>;
 }
 
 function actionTitle(action: PendingAction) {

@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import type { SkillVersionDetail } from '@educlaw/shared';
+import type { ArenaThread, SkillVersionDetail } from '@educlaw/shared';
 import { ArrowUp, Check, Loader2, Save, Sparkles } from 'lucide-react';
 import { liteApi } from '../../api/lite-api';
 import { createSkillOptimizeState, skillOptimizeReducer } from './skill-optimize-state';
 import { ConversationTurnNavigation } from './ConversationTurnNavigation';
 import { collectConversationTurns } from './conversation-turn-navigation';
+import { getConversationTitle } from './skill-conversation-list';
 
 type Props = {
   token: string;
   packageId: string;
   version: SkillVersionDetail | undefined;
   onSaved: (versionNumber: number) => void;
+  onThreadCreated?: (thread: ArenaThread) => void;
 };
 
 function requestId() {
@@ -18,10 +20,12 @@ function requestId() {
   return `skill-optimize-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-export function SkillOptimizeWorkspace({ token, packageId, version, onSaved }: Props) {
+export function SkillOptimizeWorkspace({ token, packageId, version, onSaved, onThreadCreated }: Props) {
   const [state, dispatch] = useReducer(skillOptimizeReducer, undefined, createSkillOptimizeState);
   const [initializing, setInitializing] = useState(true);
   const sessionIdRef = useRef<string | undefined>(undefined);
+  const threadIdRef = useRef<string | null>(null);
+  const renamedRef = useRef(false);
   const messageListRef = useRef<HTMLDivElement>(null);
   const conversationTurns = useMemo(() => collectConversationTurns(
     state.messages.map((message, index) => ({
@@ -44,7 +48,10 @@ export function SkillOptimizeWorkspace({ token, packageId, version, onSaved }: P
           basePackageVersionId: version.createdInPackageVersionId,
           left: { skillId: version.skillId, skillVersionId: version.id },
           right: { skillId: version.skillId, skillVersionId: version.id },
+          surface: 'optimize',
         });
+        threadIdRef.current = String(thread.id);
+        onThreadCreated?.(thread);
         const diagnosis = await liteApi.diagnosePackage(
           token,
           packageId,
@@ -90,6 +97,20 @@ export function SkillOptimizeWorkspace({ token, packageId, version, onSaved }: P
       },
     ];
     dispatch({ type: 'submit', content });
+    if (threadIdRef.current && !renamedRef.current) {
+      renamedRef.current = true;
+      try {
+        const renamed = await liteApi.renameArenaThread(
+          token,
+          packageId,
+          threadIdRef.current,
+          getConversationTitle(content),
+        );
+        onThreadCreated?.(renamed);
+      } catch {
+        // 标题为便捷元数据，重命名失败不应阻塞优化流程
+      }
+    }
     try {
       const result = await liteApi.chatOptimize(
         token,

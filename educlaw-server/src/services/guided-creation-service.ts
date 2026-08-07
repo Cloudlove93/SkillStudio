@@ -539,7 +539,7 @@ const STEP_FALLBACK_QUESTIONS: Record<GuidedCreationStep, string> = {
   intent_context:
     '完成这个 Skill 后，你最希望学生发生什么变化，它会在怎样的真实教学情境中使用？',
   teacher_experience:
-    '你实际带这个实验时，学生最容易卡在哪里，你通常会怎样判断并处理？',
+    '你实际教学时，学生最容易卡在哪里，你通常会怎样判断并处理？',
   strategy_co_creation:
     '结合你的经验，你希望这个 Skill 采用怎样的教学方式来推动学生真正理解？',
   action_adjustment:
@@ -594,14 +594,13 @@ function parseEducationPhrasing(
   const stepHasContent = STEP_DIMENSIONS[step].every((dimension) =>
     Boolean(draft[dimension]?.content?.trim()),
   );
-  const question =
-    step === 'intent_context'
-      ? '我先确认一下：你的目标和使用对象，这个方向准确吗？'
-      : stepHasContent
-      ? STEP_CONFIRMATION_QUESTIONS[step]
-      : usesExpectedStep && firstQuestion.length > 0 && firstQuestion.length <= 180
-      ? firstQuestion.replace(/\?$/, '？')
-      : intentFallback;
+  const question = stepHasContent
+    ? step === 'intent_context'
+      ? intentFallback
+      : STEP_CONFIRMATION_QUESTIONS[step]
+    : usesExpectedStep && firstQuestion.length > 0 && firstQuestion.length <= 180
+    ? firstQuestion.replace(/\?$/, '？')
+    : intentFallback;
   const candidateOptions = Array.isArray(phrasing?.suggested_options)
     ? phrasing.suggested_options
         .filter((option): option is string => typeof option === 'string')
@@ -614,7 +613,9 @@ function parseEducationPhrasing(
     suggested_options:
       candidateOptions.length >= 2
         ? candidateOptions
-        : STEP_FALLBACK_OPTIONS[step],
+        : stepHasContent
+          ? STAGE_CONFIRMATION_OPTIONS
+          : STEP_FALLBACK_OPTIONS[step],
   };
 }
 

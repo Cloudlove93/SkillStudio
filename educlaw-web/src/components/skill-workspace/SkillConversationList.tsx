@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import type { ArenaThread } from '@educlaw/shared';
 import { Loader2, MoreHorizontal, PencilLine, Plus, Trash2 } from 'lucide-react';
-import { getConversationTitle } from './skill-conversation-list';
+import { getConversationSurface, getConversationTitle, getSurfaceLabel } from './skill-conversation-list';
 import { SkillContextMenu } from './SkillContextMenu';
+
+const DEFAULT_TITLE_PREFIXES = ['Skill Arena:', 'Skill 运行：', 'Skill 测试：', 'Skill 优化：'];
 
 type Props = {
   conversations: ArenaThread[];
@@ -34,7 +36,8 @@ export function SkillConversationList({
   const beginRename = (thread: ArenaThread) => {
     setMenu(null);
     setEditingId(String(thread.id));
-    setEditingTitle(thread.title.startsWith('Skill Arena:') ? '' : thread.title);
+    const isDefaultTitle = DEFAULT_TITLE_PREFIXES.some((prefix) => thread.title.startsWith(prefix));
+    setEditingTitle(isDefaultTitle ? '' : thread.title);
   };
 
   const submitRename = async (thread: ArenaThread) => {
@@ -56,6 +59,8 @@ export function SkillConversationList({
           const isRunning = id === runningConversationId;
           const isComplete = completedConversationIds?.has(id) ?? false;
           const status = isRunning ? 'running' : isComplete ? 'complete' : null;
+          const surface = getConversationSurface(thread);
+          const surfaceLabel = getSurfaceLabel(surface);
           return (
             <div
               className={`skill-conversation-item ${selected ? 'is-selected' : ''}`}
@@ -80,8 +85,13 @@ export function SkillConversationList({
               ) : (
                 <>
                   <button type="button" className="skill-conversation-item-main" onClick={() => onConversationSelect(id)}>
-                    <span className="skill-conversation-item-name">
-                      {thread.title === 'New Arena Conversation' ? '新建对话' : thread.title}
+                    <span className="skill-conversation-item-head">
+                      {surfaceLabel ? (
+                        <span className={`skill-conversation-badge is-${surface}`} title={`${surfaceLabel}会话`}>{surfaceLabel}</span>
+                      ) : null}
+                      <span className="skill-conversation-item-name">
+                        {thread.title === 'New Arena Conversation' ? '新建对话' : thread.title}
+                      </span>
                     </span>
                   </button>
                   <span

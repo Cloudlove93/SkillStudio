@@ -47,6 +47,7 @@ function buildCreateArenaThreadHash() {
           skillVersionId: "202",
         },
         model: "gpt-5",
+        surface: null,
       }),
     )
     .digest("hex");
