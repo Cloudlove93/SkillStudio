@@ -17,6 +17,7 @@ import {
   confirmAnswerSkillOptimization,
   createAnswerSkillOptimization,
   getAnswerSkillOptimizationDetail,
+  rebaseAnswerSkillOptimization,
   reviseAnswerSkillOptimization,
   testAnswerSkillOptimization,
   type CancelAnswerSkillOptimizationInput,
@@ -86,6 +87,8 @@ function parseCreateBody(
     "questionMessageId",
     "enhancedAnswerMessageId",
     "baselineAnswerMessageId",
+    "answerSide",
+    "answerMessageId",
     "feedback",
   ]);
   return {
@@ -103,6 +106,20 @@ function parseCreateBody(
     baselineAnswerMessageId: optionalBaselineMessageId(
       body.baselineAnswerMessageId,
     ),
+    answerSide:
+      body.answerSide === undefined
+        ? undefined
+        : body.answerSide === "baseline" || body.answerSide === "enhanced"
+          ? body.answerSide
+          : (() => {
+              throw new AnswerSkillOptimizationValidationError(
+                "answerSide must be baseline or enhanced",
+              );
+            })(),
+    answerMessageId:
+      body.answerMessageId === undefined
+        ? undefined
+        : positiveInteger(body.answerMessageId, "answerMessageId"),
     feedback: requiredString(body.feedback, "feedback"),
     idempotencyKey,
   };
@@ -496,6 +513,32 @@ router.post(
           idempotencyKey(req),
         ),
       );
+      res.json({ data, requestId: requestId() });
+    } catch (error) {
+      sendError(res, error);
+    }
+  },
+);
+
+router.post(
+  ANSWER_SKILL_OPTIMIZATION_ROUTES.REBASE,
+  requireAuth,
+  async (req, res) => {
+    try {
+      assertJsonRequest(req);
+      const body = asObject(req.body);
+      assertOnlyKeys(body, ["expectedRevision"]);
+      const data = await rebaseAnswerSkillOptimization({
+        userId: authenticatedUserId(req),
+        optimizationId: positiveInteger(
+          Number(req.params.optimizationId),
+          "optimizationId",
+        ),
+        expectedRevision: positiveInteger(
+          body.expectedRevision,
+          "expectedRevision",
+        ),
+      });
       res.json({ data, requestId: requestId() });
     } catch (error) {
       sendError(res, error);

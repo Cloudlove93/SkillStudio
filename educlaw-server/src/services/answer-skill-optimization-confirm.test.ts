@@ -13,6 +13,7 @@ const generateJsonMock = vi.fn();
 const generateTextMock = vi.fn();
 const validateSkillMock = vi.fn();
 const getArenaAnswerRunMock = vi.fn();
+const syncPackageVersionSkillsMock = vi.fn();
 
 const createdAt = "2026-07-24T08:00:00.000Z";
 const confirmKey = "66666666-6666-4666-8666-666666666666";
@@ -370,6 +371,10 @@ async function loadService() {
     getVersion: vi.fn(),
     validateSkillMdStandard: validateSkillMock,
   }));
+  vi.doMock("./skill-version-service.js", () => ({
+    getSkillVersionDetail: vi.fn(),
+    syncPackageVersionSkillsFromSnapshot: syncPackageVersionSkillsMock,
+  }));
   return import("./answer-skill-optimization-service.js");
 }
 
@@ -389,6 +394,7 @@ beforeEach(() => {
   failurePoint = null;
   transactionTail = Promise.resolve();
   queryMock.mockReset();
+  syncPackageVersionSkillsMock.mockReset().mockResolvedValue(undefined);
   queryMock.mockImplementation(async (sql: string, values: unknown[] = []) => {
     if (
       sql.includes("from answer_skill_optimization_runs") &&
@@ -497,6 +503,16 @@ describe("answer optimization confirm transaction", () => {
     expect(finalSnapshot.skills[0]?.skillMd).toBe(patchedSkillMd);
     expect(finalSnapshot.skills[1]).toEqual(baseSnapshot.skills[1]);
     expect(state.versions[1]?.note).toBe("Add ordered response steps.");
+    expect(syncPackageVersionSkillsMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        packageId: 123,
+        packageVersionId: 11,
+        packageVersionNumber: 2,
+        source: "interactive",
+        snapshot: finalSnapshot,
+      }),
+    );
     expect(generateJsonMock).not.toHaveBeenCalled();
     expect(generateTextMock).not.toHaveBeenCalled();
   });

@@ -3,6 +3,10 @@ import {
   applyDraftOperations,
   buildConfirmationCard,
   evaluateDraft,
+  evaluateGuidedFlow,
+  nextGuidedStage,
+  sanitizeDraftOperations,
+  validateExplicitEvidence,
 } from './guided-creation-policy.js';
 
 describe('guided creation draft policy', () => {
@@ -99,5 +103,114 @@ describe('guided creation draft policy', () => {
       'knowledge_boundary',
       'recovery_completion',
     ]);
+  });
+
+  it('requires all six user-confirmed stages even when the model fills every field', () => {
+    const completeDraft = {
+      roles: '实验设计助手',
+      goal: '指导初中浮力实验',
+      usage_scenario: '初中物理分组实验',
+      input_contract: '年级、器材和实验目标',
+      output_contract: '实验方案和记录表',
+      core_capabilities: '拆解实验并识别风险',
+      workflow: '分析条件、设计步骤、检查安全',
+      knowledge_evidence: '教材和课程标准',
+      boundaries_permissions: '不建议危险操作',
+      exception_recovery: '器材不足时给出替代方案',
+      completion_evidence: '步骤可执行且结论可核查',
+    };
+    const allInferred = Object.fromEntries(
+      Object.keys(completeDraft).map((field) => [field, 'inferred']),
+    );
+
+    const evaluation = evaluateGuidedFlow(
+      completeDraft,
+      allInferred,
+      [],
+    );
+
+    expect(evaluation.ready_for_confirmation).toBe(false);
+    expect(evaluation.next_stage).toBe('positioning');
+  });
+
+  it('advances through the six stages in a stable order', () => {
+    expect(nextGuidedStage([])).toBe('positioning');
+    expect(nextGuidedStage(['positioning'])).toBe('scenario_input');
+    expect(
+      nextGuidedStage([
+        'positioning',
+        'scenario_input',
+        'expected_result',
+        'working_method',
+        'evidence_scope',
+        'boundaries_completion',
+      ]),
+    ).toBeNull();
+  });
+
+  it('accepts explicit evidence only when it comes from the current user message', () => {
+    expect(validateExplicitEvidence('帮教师设计实验', '教师')).toBe(true);
+    expect(
+      validateExplicitEvidence('帮教师设计实验', '学生自主探究'),
+    ).toBe(false);
+  });
+
+  it('downgrades unsupported explicit content and protects explicit user choices', () => {
+    const operations = sanitizeDraftOperations({ roles: '教师助手' }, {
+      roles: 'explicit',
+    }, [
+      {
+        op: 'replace',
+        path: 'roles',
+        value: '学生助手',
+        state: 'inferred',
+      },
+      {
+        op: 'set',
+        path: 'usage_scenario',
+        value: '学生自主探究',
+        state: 'explicit',
+        evidence: '学生自主探究',
+      },
+    ], '我想让学生自主探究');
+
+    expect(operations).toEqual([
+      {
+        op: 'set',
+        path: 'usage_scenario',
+        value: '学生自主探究',
+        state: 'explicit',
+        evidence: '学生自主探究',
+      },
+    ]);
+
+    expect(sanitizeDraftOperations({}, {}, [{
+      op: 'set',
+      path: 'workflow',
+      value: '先讲解再实验',
+      state: 'explicit',
+      evidence: '用户没有说过的原话',
+    }], '请你设计流程')[0]?.state).toBe('inferred');
+  });
+
+  it('adds compatible user details without erasing an earlier explicit goal', () => {
+    const operations = sanitizeDraftOperations(
+      { goal: '初中物理浮力实验指导' },
+      { goal: 'explicit' },
+      [
+        {
+          op: 'set',
+          path: 'goal',
+          value: '把实验教学经验整理成学生能执行的指导方案',
+          state: 'explicit',
+          evidence: '把实验教学经验整理成学生能执行的指导方案',
+        },
+      ],
+      '希望它帮我把实验教学经验整理成学生能执行的指导方案',
+    );
+
+    expect(operations[0]?.value).toBe(
+      '初中物理浮力实验指导；把实验教学经验整理成学生能执行的指导方案',
+    );
   });
 });

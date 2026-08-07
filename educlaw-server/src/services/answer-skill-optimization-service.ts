@@ -30,6 +30,7 @@ import {
   buildArenaSidePromptContext,
   buildEnhancedPrompt,
   getAnswerOptimizationAvailability,
+  getArenaAnswerRunByMessage,
   getArenaAnswerRunByEnhancedMessage,
   parseArenaAnswerContextMessageIds,
   parseArenaAnswerEnhancedModel,
@@ -47,6 +48,10 @@ import {
   getVersion,
   validateSkillMdStandard,
 } from "./package-service.js";
+import {
+  getSkillVersionDetail,
+  syncPackageVersionSkillsFromSnapshot,
+} from "./skill-version-service.js";
 import {
   applyAnswerSkillPatch,
   AnswerSkillPatchApplicationError,
@@ -119,6 +124,11 @@ export interface AnswerSkillOptimizationRun {
   questionMessageId: number;
   enhancedAnswerMessageId: number;
   baselineAnswerMessageId: number | null;
+  answerSide: "baseline" | "enhanced";
+  answerMessageId: number;
+  evidenceVersionId: number;
+  answerSkillVersionId: number | null;
+  workingSkillVersionId: number | null;
   userFeedback: string;
   targetSkillId: string | null;
   result: AnswerSkillOptimizationResult;
@@ -136,6 +146,8 @@ export interface CreateAnswerSkillOptimizationRunInput {
   questionMessageId: number;
   enhancedAnswerMessageId: number;
   baselineAnswerMessageId?: number | null;
+  answerSide?: "baseline" | "enhanced";
+  answerMessageId?: number;
   feedback: string;
   idempotencyKey: string;
 }
@@ -324,6 +336,11 @@ export interface AnswerSkillOptimizationDetailDto {
   packageId: number;
   threadId: number;
   baseVersionId: number;
+  evidenceVersionId: number;
+  answerSide: "baseline" | "enhanced";
+  answerMessageId: number;
+  answerSkillVersionId: number | null;
+  workingSkillVersionId: number | null;
   status: AnswerSkillOptimizationStatus;
   revision: number;
   feedback: string;
@@ -363,6 +380,7 @@ export interface ConfirmAnswerSkillOptimizationDto {
   baseVersionId: number;
   finalVersionId: number;
   versionNumber: number;
+  skillVersionNumber: number;
   source: "interactive";
   completedAt: string;
   advancedToNextTarget?: boolean;
@@ -464,6 +482,8 @@ const CREATE_INPUT_FIELDS = new Set([
   "questionMessageId",
   "enhancedAnswerMessageId",
   "baselineAnswerMessageId",
+  "answerSide",
+  "answerMessageId",
   "feedback",
   "idempotencyKey",
 ]);
@@ -629,6 +649,24 @@ function toAnswerSkillOptimizationRun(
       row.baseline_answer_message_id,
       "baseline_answer_message_id",
     ),
+    answerSide:
+      row.answer_side === "baseline" ? "baseline" : "enhanced",
+    answerMessageId: toPositiveSafeInteger(
+      row.answer_message_id ?? row.enhanced_answer_message_id,
+      "answer_message_id",
+    ),
+    evidenceVersionId: toPositiveSafeInteger(
+      row.evidence_version_id ?? row.base_version_id,
+      "evidence_version_id",
+    ),
+    answerSkillVersionId: toNullablePositiveSafeInteger(
+      row.answer_skill_version_id ?? null,
+      "answer_skill_version_id",
+    ),
+    workingSkillVersionId: toNullablePositiveSafeInteger(
+      row.working_skill_version_id ?? null,
+      "working_skill_version_id",
+    ),
     userFeedback: normalizeFeedback(row.user_feedback),
     targetSkillId: normalizeNullableTargetSkillId(row.target_skill_id),
     result: parseResultObject(row.result_json),
@@ -643,10 +681,42 @@ function toAnswerSkillOptimizationRun(
   };
 }
 
+function answerRunSideProvenance(
+  answerRun: ArenaAnswerRun,
+  side: "baseline" | "enhanced",
+) {
+  return side === "baseline"
+    ? {
+        answerMessageId: answerRun.baselineAnswerMessageId,
+        usedSkillIds: answerRun.baselineUsedSkillIds ?? [],
+        contextMessageIds: answerRun.baselineContextMessageIds ?? null,
+        model: answerRun.baselineModel ?? null,
+        skillVersionId: answerRun.baselineSkillVersionId ?? null,
+      }
+    : {
+        answerMessageId: answerRun.enhancedAnswerMessageId,
+        usedSkillIds: answerRun.usedSkillIds,
+        contextMessageIds: answerRun.contextMessageIds,
+        model: answerRun.enhancedModel,
+        skillVersionId: answerRun.enhancedSkillVersionId ?? null,
+      };
+}
+
+export interface RebaseAnswerSkillOptimizationInput {
+  userId: string;
+  optimizationId: number;
+  expectedRevision: number;
+}
+
 function assertAnswerOptimizationReplayAvailable(
   answerRun: ArenaAnswerRun,
+  side: "baseline" | "enhanced" = "enhanced",
 ): void {
-  const availability = getAnswerOptimizationAvailability(answerRun);
+  const provenance = answerRunSideProvenance(answerRun, side);
+  const availability = getAnswerOptimizationAvailability({
+    contextMessageIds: provenance.contextMessageIds,
+    enhancedModel: provenance.model,
+  });
   if (availability.available) return;
   if (availability.reason === "missing_answer_run" || availability.reason === null) {
     throw new AnswerSkillOptimizationNotFoundError(
@@ -769,7 +839,8 @@ function buildCreateRequestHash(input: {
   packageId: number;
   threadId: number;
   questionMessageId: number;
-  enhancedAnswerMessageId: number;
+  answerSide: "baseline" | "enhanced";
+  answerMessageId: number;
   baselineAnswerMessageId: number | null;
   feedback: string;
 }): string {
@@ -777,7 +848,8 @@ function buildCreateRequestHash(input: {
     packageId: input.packageId,
     threadId: input.threadId,
     questionMessageId: input.questionMessageId,
-    enhancedAnswerMessageId: input.enhancedAnswerMessageId,
+    answerSide: input.answerSide,
+    answerMessageId: input.answerMessageId,
     baselineAnswerMessageId: input.baselineAnswerMessageId,
     feedback: input.feedback,
   });
@@ -830,18 +902,21 @@ async function findByCreateRequestKey(
 
 async function findNonCancelledByAnswer(
   userId: string,
-  enhancedAnswerMessageId: number,
+  answerMessageId: number,
 ): Promise<DbRowExistingAnswerOptimization | null> {
   const result = await query<DbRowExistingAnswerOptimization>(
     `select r.*, v.version_number as final_version_number
        from answer_skill_optimization_runs r
        left join agent_package_versions v on v.id = r.final_version_id
       where r.user_id = $1
-        and r.enhanced_answer_message_id = $2
+        and (
+          r.answer_message_id = $2
+          or (r.answer_message_id is null and r.enhanced_answer_message_id = $2)
+        )
         and r.status <> 'cancelled'
       order by r.id desc
       limit 1`,
-    [userId, enhancedAnswerMessageId],
+    [userId, answerMessageId],
   );
   return result.rows[0] ?? null;
 }
@@ -898,15 +973,27 @@ export async function createAnswerSkillOptimizationRunWithOutcome(
           input.baselineAnswerMessageId,
           "baselineAnswerMessageId",
         );
+  const answerSide = input.answerSide ?? "enhanced";
+  if (answerSide !== "baseline" && answerSide !== "enhanced") {
+    throw new AnswerSkillOptimizationValidationError(
+      "answerSide must be baseline or enhanced",
+    );
+  }
+  const answerMessageId = toPositiveSafeInteger(
+    input.answerMessageId
+      ?? (answerSide === "baseline"
+        ? requestedBaselineAnswerMessageId
+        : enhancedAnswerMessageId),
+    "answerMessageId",
+  );
   const feedback = normalizeFeedback(input.feedback);
   const idempotencyKey = normalizeIdempotencyKey(input.idempotencyKey);
 
   let answerRun: ArenaAnswerRun;
   try {
-    answerRun = await getArenaAnswerRunByEnhancedMessage(
-      userId,
-      enhancedAnswerMessageId,
-    );
+    answerRun = answerSide === "enhanced"
+      ? await getArenaAnswerRunByEnhancedMessage(userId, answerMessageId)
+      : await getArenaAnswerRunByMessage(userId, answerMessageId);
   } catch (error) {
     if (error instanceof ArenaAnswerRunNotFoundError) {
       throw new AnswerSkillOptimizationNotFoundError(
@@ -943,6 +1030,7 @@ export async function createAnswerSkillOptimizationRunWithOutcome(
     answerRun.packageVersionId,
     "arenaAnswerRun.packageVersionId",
   );
+  const sideProvenance = answerRunSideProvenance(answerRun, answerSide);
 
   assertMatchingId("packageId", packageId, recordedPackageId);
   assertMatchingId("threadId", threadId, recordedThreadId);
@@ -950,6 +1038,14 @@ export async function createAnswerSkillOptimizationRunWithOutcome(
     "questionMessageId",
     questionMessageId,
     recordedQuestionMessageId,
+  );
+  assertMatchingId(
+    "answerMessageId",
+    answerMessageId,
+    toPositiveSafeInteger(
+      sideProvenance.answerMessageId,
+      "arenaAnswerRun.answerMessageId",
+    ),
   );
   assertMatchingId(
     "enhancedAnswerMessageId",
@@ -969,14 +1065,15 @@ export async function createAnswerSkillOptimizationRunWithOutcome(
     packageId,
     threadId,
     questionMessageId,
-    enhancedAnswerMessageId,
+    answerSide,
+    answerMessageId,
     baselineAnswerMessageId: recordedBaselineAnswerMessageId,
     feedback,
   });
   const now = new Date().toISOString();
   let existingForAnswer = await findNonCancelledByAnswer(
     userId,
-    enhancedAnswerMessageId,
+    answerMessageId,
   );
   if (existingForAnswer) {
     const existingRun = toAnswerSkillOptimizationRun(existingForAnswer);
@@ -993,7 +1090,7 @@ export async function createAnswerSkillOptimizationRunWithOutcome(
     }
   }
 
-  assertAnswerOptimizationReplayAvailable(answerRun);
+  assertAnswerOptimizationReplayAvailable(answerRun, answerSide);
 
   if (existingForAnswer) {
     const existingRun = toAnswerSkillOptimizationRun(existingForAnswer);
@@ -1002,7 +1099,7 @@ export async function createAnswerSkillOptimizationRunWithOutcome(
       existingForAnswer =
         (await findNonCancelledByAnswer(
           userId,
-          enhancedAnswerMessageId,
+          answerMessageId,
         )) ?? existingForAnswer;
     }
     if (existingForAnswer.create_request_key === idempotencyKey) {
@@ -1023,13 +1120,15 @@ export async function createAnswerSkillOptimizationRunWithOutcome(
     const result = await query<DbRowAnswerSkillOptimizationRun>(
       `insert into answer_skill_optimization_runs
          (user_id, package_id, thread_id, base_version_id,
-          question_message_id, enhanced_answer_message_id,
-          baseline_answer_message_id, user_feedback, target_skill_id,
-          result_json, status, revision, create_request_key,
-          create_request_hash, final_version_id, created_at, updated_at)
+           question_message_id, enhanced_answer_message_id,
+           baseline_answer_message_id, user_feedback, target_skill_id,
+           result_json, status, revision, create_request_key,
+           create_request_hash, final_version_id, created_at, updated_at,
+           answer_side, answer_message_id, evidence_version_id,
+           answer_skill_version_id, working_skill_version_id)
        values
-         ($1, $2, $3, $4, $5, $6, $7, $8, $9,
-          $10, $11, $12, $13, $14, $15, $16, $17)
+         ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
+          $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
        returning *`,
       [
         userId,
@@ -1049,6 +1148,11 @@ export async function createAnswerSkillOptimizationRunWithOutcome(
         null,
         now,
         now,
+        answerSide,
+        answerMessageId,
+        baseVersionId,
+        sideProvenance.skillVersionId,
+        sideProvenance.skillVersionId,
       ],
     );
     const row = result.rows[0];
@@ -1069,7 +1173,7 @@ export async function createAnswerSkillOptimizationRunWithOutcome(
 
     const concurrent = await findNonCancelledByAnswer(
       userId,
-      enhancedAnswerMessageId,
+      answerMessageId,
     );
     if (!concurrent) throw error;
     if (concurrent.create_request_key === idempotencyKey) {
@@ -1436,7 +1540,7 @@ function assertRunMatchesProvenance(
     answerRun.userId === run.userId &&
     answerRun.packageId === run.packageId &&
     answerRun.threadId === run.threadId &&
-    answerRun.packageVersionId === run.baseVersionId &&
+    answerRun.packageVersionId === run.evidenceVersionId &&
     answerRun.questionMessageId === run.questionMessageId &&
     answerRun.enhancedAnswerMessageId === run.enhancedAnswerMessageId &&
     answerRun.baselineAnswerMessageId === run.baselineAnswerMessageId;
@@ -1453,10 +1557,9 @@ async function getVerifiedArenaAnswerRun(
 ): Promise<ArenaAnswerRun> {
   let answerRun: ArenaAnswerRun;
   try {
-    answerRun = await getArenaAnswerRunByEnhancedMessage(
-      run.userId,
-      run.enhancedAnswerMessageId,
-    );
+    answerRun = run.answerSide === "enhanced"
+      ? await getArenaAnswerRunByEnhancedMessage(run.userId, run.answerMessageId)
+      : await getArenaAnswerRunByMessage(run.userId, run.answerMessageId);
   } catch (error) {
     if (error instanceof ArenaAnswerRunNotFoundError) {
       throw new AnswerSkillOptimizationNotFoundError(
@@ -1499,6 +1602,26 @@ async function loadAnswerSkillOptimizationContext(
     id: toPositiveSafeInteger(version.id, "version.id"),
     packageId: toPositiveSafeInteger(version.packageId, "version.package_id"),
   };
+  if (
+    run.answerSkillVersionId !== null
+    && run.baseVersionId === run.evidenceVersionId
+  ) {
+    const skillVersion = await getSkillVersionDetail({
+      authUserId: run.userId,
+      packageId: String(run.packageId),
+      versionId: String(run.answerSkillVersionId),
+    });
+    const evidenceSkill = skillVersion.skill;
+    version = {
+      ...version,
+      snapshot: {
+        ...version.snapshot,
+        skills: version.snapshot.skills.map((skill) =>
+          skill.id === evidenceSkill.id ? evidenceSkill : skill,
+        ),
+      },
+    };
+  }
   if (version.id !== run.baseVersionId || version.packageId !== run.packageId) {
     throw new AnswerSkillOptimizationDraftError(
       "Loaded Package version does not match the optimization base version",
@@ -1507,7 +1630,11 @@ async function loadAnswerSkillOptimizationContext(
   }
   const skills = validateBaseSkills(version.snapshot.skills);
   const skillIds = new Set(skills.map((skill) => skill.id));
-  if (answerRun.usedSkillIds.some((skillId) => !skillIds.has(skillId))) {
+  const sideProvenance = answerRunSideProvenance(
+    answerRun,
+    run.answerSide,
+  );
+  if (sideProvenance.usedSkillIds.some((skillId) => !skillIds.has(skillId))) {
     throw new AnswerSkillOptimizationDraftError(
       "Recorded Skill is missing from the base Package version",
       "context_invalid",
@@ -1524,18 +1651,21 @@ async function loadAnswerSkillOptimizationContext(
   const originalAnswer = await getOwnedArenaMessage(
     run.userId,
     run.threadId,
-    run.enhancedAnswerMessageId,
-    "enhanced",
+    run.answerMessageId,
+    run.answerSide,
     "assistant",
   );
+  const comparisonMessageId = run.answerSide === "baseline"
+    ? run.enhancedAnswerMessageId
+    : run.baselineAnswerMessageId;
   const baselineAnswer =
-    run.baselineAnswerMessageId === null
+    comparisonMessageId === null
       ? null
       : await getOwnedArenaMessage(
           run.userId,
           run.threadId,
-          run.baselineAnswerMessageId,
-          "baseline",
+          comparisonMessageId,
+          run.answerSide === "baseline" ? "enhanced" : "baseline",
           "assistant",
         );
 
@@ -1547,7 +1677,7 @@ async function loadAnswerSkillOptimizationContext(
     originalAnswer,
     baselineAnswer,
     skills,
-    usedSkillIds: [...answerRun.usedSkillIds],
+    usedSkillIds: [...sideProvenance.usedSkillIds],
   };
 }
 
@@ -1594,14 +1724,24 @@ function toDetailDto(
   run: AnswerSkillOptimizationRun,
   context: AnswerSkillOptimizationContext,
 ): AnswerSkillOptimizationDetailDto {
-  const replayAvailability = getAnswerOptimizationAvailability(
+  const replayProvenance = answerRunSideProvenance(
     context.answerRun,
+    run.answerSide,
   );
+  const replayAvailability = getAnswerOptimizationAvailability({
+    contextMessageIds: replayProvenance.contextMessageIds,
+    enhancedModel: replayProvenance.model,
+  });
   return {
     optimizationId: run.id,
     packageId: run.packageId,
     threadId: run.threadId,
     baseVersionId: run.baseVersionId,
+    evidenceVersionId: run.evidenceVersionId,
+    answerSide: run.answerSide,
+    answerMessageId: run.answerMessageId,
+    answerSkillVersionId: run.answerSkillVersionId,
+    workingSkillVersionId: run.workingSkillVersionId,
     status: run.status,
     revision: run.revision,
     feedback: run.userFeedback,
@@ -2308,6 +2448,132 @@ export async function getAnswerSkillOptimizationDetail(
   const run = await recoverStaleAnswerSkillOptimizationRun(storedRun);
   const context = await loadAnswerSkillOptimizationContext(run);
   return toDetailDto(run, context);
+}
+
+export async function rebaseAnswerSkillOptimization(
+  input: RebaseAnswerSkillOptimizationInput,
+): Promise<AnswerSkillOptimizationDetailDto> {
+  const userId = normalizeUserId(input.userId);
+  const optimizationId = toPositiveSafeInteger(
+    input.optimizationId,
+    "optimizationId",
+  );
+  const expectedRevision = toPositiveSafeInteger(
+    input.expectedRevision,
+    "expectedRevision",
+  );
+  const run = await getAnswerSkillOptimizationRun(userId, optimizationId);
+  assertRevision(run, expectedRevision);
+  if (run.status !== "draft_ready" && run.status !== "test_ready") {
+    throw new AnswerSkillOptimizationDraftError(
+      `Cannot apply an optimization in ${run.status} status to the current version`,
+    );
+  }
+  const patch = run.result.patch;
+  const targetSkill = run.result.targetSkill;
+  if (!patch || !targetSkill) {
+    throw new AnswerSkillOptimizationDraftError(
+      "Optimization draft is unavailable for applying to the current version",
+    );
+  }
+
+  const packageResult = await query<{ current_version_id: number | string }>(
+    `select current_version_id from agent_packages
+     where id = $1 and user_id = $2`,
+    [run.packageId, userId],
+  );
+  const currentVersionId = toPositiveSafeInteger(
+    packageResult.rows[0]?.current_version_id,
+    "Package current version ID",
+  );
+  if (currentVersionId === run.baseVersionId) {
+    return getAnswerSkillOptimizationDetail(userId, optimizationId);
+  }
+
+  const currentVersion = await getVersion(
+    userId,
+    run.packageId,
+    String(currentVersionId),
+  );
+  const currentSkill = currentVersion.snapshot.skills.find(
+    (skill) => skill.id === targetSkill.skillId,
+  );
+  if (!currentSkill) {
+    throw new AnswerSkillOptimizationConflictError(
+      "The Skill used by this answer is not available in the current version",
+    );
+  }
+  let applied: AppliedAnswerSkillPatch;
+  try {
+    applied = applyAnswerSkillPatch(currentSkill, patch);
+  } catch (error) {
+    if (error instanceof AnswerSkillPatchApplicationError) {
+      throw new AnswerSkillOptimizationConflictError(
+        "The current version has conflicting changes. Review the improvement again before saving.",
+      );
+    }
+    throw error;
+  }
+  if (!applied.draft.validation.valid) {
+    throw new AnswerSkillOptimizationDraftError(
+      "The improvement is not valid when applied to the current Skill version",
+      "skill_validation_failed",
+    );
+  }
+  const workingSkillVersionResult = await query<{
+    skill_version_id: number | string;
+  }>(
+    `select pvs.skill_version_id
+       from agent_package_version_skills pvs
+       join agent_package_skills s on s.id = pvs.skill_id
+      where pvs.package_version_id = $1
+        and pvs.package_id = $2
+        and s.skill_uid = $3`,
+    [currentVersionId, run.packageId, targetSkill.skillId],
+  );
+  const workingSkillVersionId = workingSkillVersionResult.rows[0]
+    ? toPositiveSafeInteger(
+        workingSkillVersionResult.rows[0].skill_version_id,
+        "working Skill version ID",
+      )
+    : null;
+  const nextRevision = run.revision + 1;
+  const updatedResult: AnswerSkillOptimizationResult = {
+    ...run.result,
+    draft: applied.draft,
+    diff: applied.diff,
+    testResult: null,
+    testFailure: null,
+    failure: null,
+  };
+  const updated = await query<DbRowAnswerSkillOptimizationRun>(
+    `update answer_skill_optimization_runs
+        set base_version_id = $1, working_skill_version_id = $2,
+            result_json = $3, status = 'draft_ready', revision = $4,
+            updated_at = $5
+      where id = $6 and user_id = $7 and revision = $8
+        and status in ('draft_ready', 'test_ready')
+      returning *`,
+    [
+      currentVersionId,
+      workingSkillVersionId,
+      JSON.stringify(updatedResult),
+      nextRevision,
+      new Date().toISOString(),
+      optimizationId,
+      userId,
+      run.revision,
+    ],
+  );
+  const row = updated.rows[0];
+  if (!row) {
+    throw new AnswerSkillOptimizationConflictError(
+      "Optimization changed while it was being applied to the current version",
+    );
+  }
+  const rebasedRun = toAnswerSkillOptimizationRun(row);
+  const context = await loadAnswerSkillOptimizationContext(rebasedRun);
+  return toDetailDto(rebasedRun, context);
 }
 
 type AnswerOptimizationMutationAction =
@@ -3629,7 +3895,7 @@ async function refineAnswerSkillOptimization(
     );
   }
   const context = await loadAnswerSkillOptimizationContext(run);
-  assertAnswerOptimizationReplayAvailable(context.answerRun);
+  assertAnswerOptimizationReplayAvailable(context.answerRun, context.run.answerSide);
   validateStoredTestDraft(run, context);
   const source = requestedSource;
   const qualityEvidence = requireRefinementPreviewEvidence(run, source);
@@ -3730,7 +3996,7 @@ async function regenerateAnswerSkillOptimization(
   }
 
   const context = await loadAnswerSkillOptimizationContext(run);
-  assertAnswerOptimizationReplayAvailable(context.answerRun);
+  assertAnswerOptimizationReplayAvailable(context.answerRun, context.run.answerSide);
   const isMultiTarget = Boolean(targetSkillIds && targetSkillIds.length > 0);
   if (isMultiTarget) {
     validateSelectedTargets(run, context, targetSkillIds);
@@ -3883,24 +4149,31 @@ function compareArenaMessageOrder(
   return leftTime === rightTime ? left.id - right.id : leftTime - rightTime;
 }
 
-function isEnhancedReplayHistoryMessage(message: ArenaMessage): boolean {
+function isReplayHistoryMessage(
+  message: ArenaMessage,
+  side: "baseline" | "enhanced",
+): boolean {
   return (
     (message.side === "shared" && message.role === "user") ||
-    (message.side === "enhanced" && message.role === "assistant")
+    (message.side === side && message.role === "assistant")
   );
 }
 
 async function loadRecordedAnswerReplayContext(
   context: AnswerSkillOptimizationContext,
 ): Promise<AnswerSkillOptimizationReplayContext> {
-  const contextMessageIds = context.answerRun.contextMessageIds;
+  const sideProvenance = answerRunSideProvenance(
+    context.answerRun,
+    context.run.answerSide,
+  );
+  const contextMessageIds = sideProvenance.contextMessageIds;
   if (contextMessageIds === null) {
     throw new AnswerSkillOptimizationDraftError(
       "The original enhanced answer does not have recorded replay context",
       "replay_context_unavailable",
     );
   }
-  const enhancedModel = context.answerRun.enhancedModel;
+  const enhancedModel = sideProvenance.model;
   if (!enhancedModel?.trim()) {
     throw new AnswerSkillOptimizationDraftError(
       "The original enhanced answer does not have a recorded model",
@@ -3932,7 +4205,7 @@ async function loadRecordedAnswerReplayContext(
 
   for (let index = 0; index < historyMessages.length; index += 1) {
     const message = historyMessages[index];
-    if (!message || !isEnhancedReplayHistoryMessage(message)) {
+    if (!message || !isReplayHistoryMessage(message, context.run.answerSide)) {
       throw new AnswerSkillOptimizationDraftError(
         "Recorded Arena replay context contains an invalid message",
         "replay_context_unavailable",
@@ -3959,7 +4232,7 @@ async function loadRecordedAnswerReplayContext(
 
   const promptContext = buildArenaSidePromptContext(
     historyMessages,
-    "enhanced",
+    context.run.answerSide,
     context.question,
   );
   if (
@@ -4633,7 +4906,7 @@ export async function testAnswerSkillOptimization(
   }
 
   const context = await loadAnswerSkillOptimizationContext(run);
-  assertAnswerOptimizationReplayAvailable(context.answerRun);
+  assertAnswerOptimizationReplayAvailable(context.answerRun, context.run.answerSide);
   const replayContext = await loadRecordedAnswerReplayContext(context);
   const draft = validateStoredTestDraft(run, context);
   const testContext = buildAnswerOptimizationTestContext(context, draft);
@@ -4986,6 +5259,7 @@ function toConfirmDto(
     baseVersionId: result.baseVersionId,
     finalVersionId: result.finalVersionId,
     versionNumber: result.versionNumber,
+    skillVersionNumber: result.skillVersionNumber ?? result.versionNumber,
     source: result.source,
     completedAt: result.completedAt,
     ...(advanced ? { advancedToNextTarget: true } : {}),
@@ -5126,6 +5400,32 @@ async function confirmAnswerSkillOptimizationTransaction(
     insertedVersion.rows[0]?.id,
     "final Package version ID",
   );
+  const confirmedTargetSkillId = run.result.targetSkill?.skillId;
+  const syncedSkillVersions = await syncPackageVersionSkillsFromSnapshot(client, {
+    packageId: run.packageId,
+    packageVersionId: finalVersionId,
+    packageVersionNumber: versionNumber,
+    source: "interactive",
+    snapshot: finalSnapshot,
+    note: input.versionNote,
+    forcedSkillVersions: confirmedTargetSkillId
+      ? new Map([
+          [
+            confirmedTargetSkillId,
+            {
+              source: "interactive" as const,
+              ...(run.workingSkillVersionId === null
+                ? {}
+                : { basedOnVersionId: run.workingSkillVersionId }),
+              note: input.versionNote,
+            },
+          ],
+        ])
+      : undefined,
+  });
+  const skillVersionNumber = confirmedTargetSkillId
+    ? syncedSkillVersions?.get(confirmedTargetSkillId)?.versionNumber ?? versionNumber
+    : versionNumber;
   const packageUpdate = await client.query(
     `update agent_packages
      set current_version_id = $1, updated_at = $2
@@ -5188,6 +5488,7 @@ async function confirmAnswerSkillOptimizationTransaction(
       baseVersionId: run.baseVersionId,
       finalVersionId,
       versionNumber,
+      skillVersionNumber,
       source: "interactive",
       completedAt,
       advancedToNextTarget: true,
@@ -5233,6 +5534,7 @@ async function confirmAnswerSkillOptimizationTransaction(
     baseVersionId: run.baseVersionId,
     finalVersionId,
     versionNumber,
+    skillVersionNumber,
     source: "interactive",
     completedAt,
   };
@@ -5310,7 +5612,7 @@ export async function confirmAnswerSkillOptimization(
   const current = await getAnswerSkillOptimizationRun(userId, optimizationId);
   if (current.status !== "completed") {
     const answerRun = await getVerifiedArenaAnswerRun(current);
-    assertAnswerOptimizationReplayAvailable(answerRun);
+    assertAnswerOptimizationReplayAvailable(answerRun, current.answerSide);
   }
   return withTransaction((client) =>
     confirmAnswerSkillOptimizationTransaction(client, {

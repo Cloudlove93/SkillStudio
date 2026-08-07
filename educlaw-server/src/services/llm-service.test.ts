@@ -33,6 +33,21 @@ function mockChatResponse(content: string, init: ResponseInit = {}) {
   );
 }
 
+function mockTruncatedThinkingResponse() {
+  return new Response(
+    JSON.stringify({
+      choices: [{
+        finish_reason: "length",
+        message: { content: null, reasoning_content: "internal reasoning" },
+      }],
+    }),
+    {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    },
+  );
+}
+
 function mockStreamResponse(chunks: string[]) {
   const encoder = new TextEncoder();
   return new Response(
@@ -149,6 +164,18 @@ describe("llm-service", () => {
     expect(body.messages[1].content).toContain("Before sending the final answer");
   });
 
+  it("does not repeat a JSON request that exhausted its output limit", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockTruncatedThinkingResponse());
+    vi.stubGlobal("fetch", fetchMock);
+    const { generateJson } = await loadService();
+
+    await expect(generateJson({
+      systemPrompt: "Return JSON",
+      userPrompt: "Give me data",
+    })).rejects.toThrow("output token limit");
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
   it("throws before fetch when LLM_API_KEY is missing", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
@@ -202,7 +229,7 @@ describe("llm-service", () => {
       temperature: 0.2,
     });
     body = JSON.parse(fetchMock.mock.calls[1]![1].body as string);
-    expect(body.temperature).toBe(1);
-    expect(body.thinking).toBeUndefined();
+    expect(body.temperature).toBeUndefined();
+    expect(body.thinking).toEqual({ type: "disabled" });
   });
 });

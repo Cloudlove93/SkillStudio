@@ -5,9 +5,11 @@ import {
 } from './guided-creation-actions.js';
 
 describe('guided creation POST /api actions', () => {
-  it('recognizes only the six PascalCase actions', () => {
+  it('recognizes the guided creation PascalCase actions', () => {
     expect(isGuidedCreationAction('SkillGuidedCreationStart')).toBe(true);
     expect(isGuidedCreationAction('SkillGuidedCreationConfirm')).toBe(true);
+    expect(isGuidedCreationAction('SkillGuidedCreationRename')).toBe(true);
+    expect(isGuidedCreationAction('SkillGuidedCreationDelete')).toBe(true);
     expect(isGuidedCreationAction('skill.guided.creation.start')).toBe(false);
     expect(isGuidedCreationAction('SkillGuidedCreationUnknown')).toBe(false);
   });
@@ -65,6 +67,50 @@ describe('guided creation POST /api actions', () => {
       throw new Error('expected parser to reject the request');
     } catch (error) {
       expect(error).toMatchObject({ code: 'INVALID_GUIDED_REQUEST' });
+    }
+  });
+
+  it('parses rename and delete payloads with snake_case fields', () => {
+    expect(
+      parseGuidedCreationRequest({
+        action: 'SkillGuidedCreationRename',
+        payload: {
+          session_id: '12',
+          revision_no: 2,
+          display_name: '浮力实验指导',
+        },
+      }),
+    ).toEqual({
+      action: 'SkillGuidedCreationRename',
+      payload: {
+        session_id: '12',
+        revision_no: 2,
+        display_name: '浮力实验指导',
+      },
+    });
+    expect(
+      parseGuidedCreationRequest({
+        action: 'SkillGuidedCreationDelete',
+        payload: { session_id: '12', revision_no: 2 },
+      }),
+    ).toEqual({
+      action: 'SkillGuidedCreationDelete',
+      payload: { session_id: '12', revision_no: 2 },
+    });
+  });
+
+  it('rejects an empty rename and unknown delete fields', () => {
+    for (const request of [
+      {
+        action: 'SkillGuidedCreationRename',
+        payload: { session_id: '12', revision_no: 2, display_name: '  ' },
+      },
+      {
+        action: 'SkillGuidedCreationDelete',
+        payload: { session_id: '12', revision_no: 2, delete_skill: true },
+      },
+    ]) {
+      expect(() => parseGuidedCreationRequest(request)).toThrowError();
     }
   });
 });

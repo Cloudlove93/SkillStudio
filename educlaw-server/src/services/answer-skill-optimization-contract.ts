@@ -170,6 +170,7 @@ export interface AnswerOptimizationConfirmResult {
   baseVersionId: number;
   finalVersionId: number;
   versionNumber: number;
+  skillVersionNumber?: number;
   source: "interactive";
   completedAt: string;
   advancedToNextTarget?: boolean;
@@ -901,6 +902,7 @@ function parseConfirmResult(
       "baseVersionId",
       "finalVersionId",
       "versionNumber",
+      "skillVersionNumber",
       "source",
       "completedAt",
       "advancedToNextTarget",
@@ -932,6 +934,12 @@ function parseConfirmResult(
       100,
     ),
   };
+  if (object.skillVersionNumber !== undefined) {
+    result.skillVersionNumber = asPositiveInteger(
+      object.skillVersionNumber,
+      `${field}.skillVersionNumber`,
+    );
+  }
   if (object.advancedToNextTarget !== undefined) {
     if (typeof object.advancedToNextTarget !== "boolean") {
       throw new AnswerSkillOptimizationContractError(

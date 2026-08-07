@@ -20,10 +20,12 @@ vi.mock('./package-service.js', () => ({
 }));
 
 import {
-  GuidedCreationError,
   confirmGuidedCreation,
+  deleteGuidedCreation,
   getGuidedCreationDetail,
+  listGuidedCreations,
   processGuidedCreationMessage,
+  renameGuidedCreation,
   startGuidedCreation,
 } from './guided-creation-service.js';
 
@@ -55,6 +57,14 @@ function createMemoryDb() {
         documents_json: JSON.parse(String(params[2])),
         draft_json: {},
         field_states_json: {},
+        flow_version: sql.includes('$4, 3')
+          ? 3
+          : sql.includes('flow_version')
+            ? 2
+            : 1,
+        confirmed_stages_json: [],
+        display_name: null,
+        deleted_at: null,
         confirmation_json: null,
         generated_snapshot_json: null,
         validation_result_json: null,
@@ -77,9 +87,26 @@ function createMemoryDb() {
       );
       return result(row ? [{ id: row.id }] : []);
     }
+    if (
+      sql.startsWith('select * from skill_guided_creation_sessions') &&
+      sql.includes('order by updated_at desc')
+    ) {
+      return result(
+        sessions
+          .filter(
+            (item) => item.user_id === params[0] && item.deleted_at == null,
+          )
+          .sort((a, b) =>
+            String(b.updated_at).localeCompare(String(a.updated_at)),
+          ),
+      );
+    }
     if (sql.startsWith('select * from skill_guided_creation_sessions')) {
       const row = sessions.find(
-        (item) => String(item.id) === String(params[0]) && item.user_id === params[1],
+        (item) =>
+          String(item.id) === String(params[0]) &&
+          item.user_id === params[1] &&
+          (!sql.includes('deleted_at is null') || item.deleted_at == null),
       );
       return result(row ? [row] : []);
     }
@@ -132,6 +159,42 @@ function createMemoryDb() {
         created_at: now(),
       });
       return result([], 1);
+    }
+    if (
+      sql.startsWith('update skill_guided_creation_sessions') &&
+      sql.includes('set display_name = $4')
+    ) {
+      const row = sessions.find(
+        (item) =>
+          String(item.id) === String(params[0]) &&
+          item.user_id === params[1] &&
+          Number(item.revision_no) === Number(params[2]) &&
+          item.deleted_at == null &&
+          item.status !== 'finalizing',
+      );
+      if (!row) return result([], 0);
+      row.display_name = params[3];
+      row.revision_no = Number(row.revision_no) + 1;
+      row.updated_at = now();
+      return result([], 1);
+    }
+    if (
+      sql.startsWith('update skill_guided_creation_sessions') &&
+      sql.includes('set deleted_at = now()')
+    ) {
+      const row = sessions.find(
+        (item) =>
+          String(item.id) === String(params[0]) &&
+          item.user_id === params[1] &&
+          Number(item.revision_no) === Number(params[2]) &&
+          item.deleted_at == null &&
+          item.status !== 'finalizing',
+      );
+      if (!row) return result([], 0);
+      row.deleted_at = now();
+      row.revision_no = Number(row.revision_no) + 1;
+      row.updated_at = now();
+      return result([{ id: row.id, deleted_at: row.deleted_at }], 1);
     }
     if (sql.includes("set status = 'collecting'") && sql.includes('revision_no = revision_no + 1')) {
       const row = sessions.find(
@@ -226,13 +289,14 @@ function createMemoryDb() {
         (item) =>
           String(item.id) === String(params[0]) &&
           item.user_id === params[1] &&
-          Number(item.revision_no) === Number(params[6]),
+          Number(item.revision_no) === Number(params[7]),
       );
       if (!row) return result([], 0);
       row.status = params[2];
       row.draft_json = JSON.parse(String(params[3]));
       row.field_states_json = JSON.parse(String(params[4]));
-      row.confirmation_json = params[5] ? JSON.parse(String(params[5])) : null;
+      row.confirmed_stages_json = JSON.parse(String(params[5]));
+      row.confirmation_json = params[6] ? JSON.parse(String(params[6])) : null;
       row.error_json = null;
       row.updated_at = now();
       return result([], 1);
@@ -244,12 +308,15 @@ function createMemoryDb() {
 }
 
 const extraction = {
-  operations: [{ op: 'set', path: 'roles', value: '教师助手', state: 'explicit' }],
+  operations: [{
+    dimension: 'educational_goal',
+    content: '帮助教师设计课堂活动',
+    source: 'user_explicit',
+    quote: '设计课堂活动',
+  }],
+  step_complete: false,
   acknowledgement: '明白了。',
-};
-const phrasing = {
-  field: 'goal',
-  question: '最希望这个 Skill 帮你完成什么目标？',
+  question: '你希望学生通过这些课堂活动获得什么具体变化？',
   suggested_options: ['备课', '课堂活动'],
 };
 
@@ -260,7 +327,7 @@ describe('guided creation persistence and retry', () => {
 
   it('reuses the same session and completed turn when Start is replayed', async () => {
     const db = createMemoryDb();
-    mocks.generateJson.mockResolvedValueOnce(extraction).mockResolvedValueOnce(phrasing);
+    mocks.generateJson.mockResolvedValueOnce(extraction);
     const request = {
       auth_user_id: 'user-1',
       content: '帮教师设计课堂活动',
@@ -273,10 +340,11 @@ describe('guided creation persistence and retry', () => {
     expect(replay.id).toBe(first.id);
     expect(db.sessions).toHaveLength(1);
     expect(db.messages).toHaveLength(2);
-    expect(mocks.generateJson).toHaveBeenCalledTimes(2);
+    expect(mocks.generateJson).toHaveBeenCalledTimes(1);
+    expect(mocks.generateJson.mock.calls[0]?.[0]).toMatchObject({ maxTokens: 4096 });
   });
 
-  it('keeps the user message when the model fails and retries it in place', async () => {
+  it('keeps the conversation moving with a local question when the model fails', async () => {
     const db = createMemoryDb();
     mocks.generateJson.mockRejectedValueOnce(new Error('model offline'));
     const request = {
@@ -285,27 +353,151 @@ describe('guided creation persistence and retry', () => {
       client_message_id: 'message-0002',
     };
 
-    await expect(startGuidedCreation(request)).rejects.toMatchObject<Partial<GuidedCreationError>>({
-      code: 'GUIDED_ASSISTANT_FAILED',
-      retryable: true,
-    });
-    expect(db.sessions).toHaveLength(1);
-    expect(db.sessions[0].status).toBe('failed');
-    expect(db.messages).toHaveLength(1);
-    expect(db.messages[0].content).toBe(request.content);
+    const created = await startGuidedCreation(request);
 
-    mocks.generateJson.mockResolvedValueOnce(extraction).mockResolvedValueOnce(phrasing);
-    const recovered = await startGuidedCreation(request);
-
-    expect(recovered.id).toBe('1');
-    expect(recovered.status).toBe('collecting');
+    expect(created.status).toBe('collecting');
     expect(db.sessions).toHaveLength(1);
+    expect(db.sessions[0].status).toBe('collecting');
+    expect(db.sessions[0].error_json).toBeNull();
     expect(db.messages).toHaveLength(2);
+    expect(db.messages[0].content).toBe(request.content);
+    expect(db.messages[1].content).toContain('这个方向准确吗');
+    expect(mocks.generateJson).toHaveBeenCalledOnce();
+  });
+
+  it('requires user participation in each co-creation step before advancing', async () => {
+    createMemoryDb();
+    mocks.generateJson
+      .mockResolvedValueOnce({
+        operations: [
+          {
+            dimension: 'educational_goal',
+            content: '指导学生完成物理浮力实验',
+            source: 'user_explicit',
+            quote: '物理浮力实验指导',
+          },
+        ],
+        stage_complete: true,
+        acknowledgement: '我先了解一下你的教学想法。',
+      })
+      .mockResolvedValueOnce({
+        question: '你希望哪些学生在什么课堂情境中使用它？',
+        suggested_options: ['教师指导学生', '学生自主探究'],
+      });
+
+    const created = await startGuidedCreation({
+      auth_user_id: 'teacher-1',
+      content: '我想做一个初中物理浮力实验指导的 Skill',
+      client_message_id: 'buoyancy-start-0001',
+    });
+
+    expect(created.flow_version).toBe(3);
+    expect(created.confirmed_stages).toEqual([]);
+    expect(created.completed_steps).toEqual([]);
+    expect(created.current_step).toBe('intent_context');
+    expect(created.education_draft?.audience_context?.content).toContain('初中');
+    expect(created.messages.at(-1)?.content).toContain('这个方向准确吗');
+    expect(created.status).toBe('collecting');
+
+    mocks.generateJson.mockResolvedValueOnce({
+        operations: [
+          {
+            dimension: 'audience_context',
+            content: '初中教师在分组实验课中指导学生',
+            source: 'user_explicit',
+            quote: '帮助初中教师设计实验的助手',
+          },
+        ],
+        stage_complete: true,
+        acknowledgement: '明白了，会把教师的实验设计经验融入进去。',
+        question: '你实际带这个实验时，学生最容易卡在哪里？',
+        suggested_options: ['概念理解', '实验操作'],
+      });
+
+    const continued = await processGuidedCreationMessage({
+      auth_user_id: 'teacher-1',
+      session_id: created.id,
+      content: '我希望它是帮助初中教师设计实验的助手',
+      client_message_id: 'buoyancy-role-0002',
+      revision_no: created.revision_no,
+    });
+
+    expect(continued.status).toBe('collecting');
+    expect(continued.completed_steps).toEqual(['intent_context']);
+    expect(continued.current_step).toBe('teacher_experience');
+    expect(continued.confirmation).toBeNull();
+    expect(continued.messages.at(-1)?.metadata.focus_step).toBe(
+      'teacher_experience',
+    );
+  });
+
+  it('renames only an owned visible session', async () => {
+    createMemoryDb();
+    mocks.generateJson.mockResolvedValueOnce(extraction);
+    const created = await startGuidedCreation({
+      auth_user_id: 'owner-rename',
+      content: '创建一个课堂实验 Skill',
+      client_message_id: 'rename-session-0001',
+    });
+
+    const renamed = await renameGuidedCreation({
+      auth_user_id: 'owner-rename',
+      session_id: created.id,
+      revision_no: created.revision_no,
+      display_name: '浮力实验指导',
+    });
+
+    expect(renamed.display_name).toBe('浮力实验指导');
+    await expect(
+      renameGuidedCreation({
+        auth_user_id: 'other-user',
+        session_id: created.id,
+        revision_no: renamed.revision_no,
+        display_name: '不应成功',
+      }),
+    ).rejects.toMatchObject({ code: 'SESSION_REVISION_CONFLICT' });
+  });
+
+  it('soft deletes a completed session without deleting its generated Skill', async () => {
+    const db = createMemoryDb();
+    mocks.generateJson.mockResolvedValueOnce(extraction);
+    const created = await startGuidedCreation({
+      auth_user_id: 'owner-delete',
+      content: '创建一个浮力实验 Skill',
+      client_message_id: 'delete-session-0001',
+    });
+    Object.assign(db.sessions[0], {
+      status: 'completed',
+      package_id: '41',
+      skill_id: '42',
+      skill_version_id: '43',
+    });
+
+    const deleted = await deleteGuidedCreation({
+      auth_user_id: 'owner-delete',
+      session_id: created.id,
+      revision_no: created.revision_no,
+    });
+
+    expect(deleted.deleted_at).toBeTruthy();
+    expect(db.sessions[0]).toMatchObject({
+      package_id: '41',
+      skill_id: '42',
+      skill_version_id: '43',
+    });
+    await expect(
+      getGuidedCreationDetail({
+        auth_user_id: 'owner-delete',
+        session_id: created.id,
+      }),
+    ).rejects.toMatchObject({ code: 'GUIDED_SESSION_NOT_FOUND' });
+    const listed = await listGuidedCreations({ auth_user_id: 'owner-delete' });
+    expect(listed.items).toEqual([]);
   });
 
   it('reclaims a stale message after a process interruption', async () => {
     const db = createMemoryDb();
-    mocks.generateJson.mockResolvedValueOnce(extraction).mockResolvedValueOnce(phrasing);
+    mocks.generateJson.mockResolvedValueOnce(extraction);
     const request = {
       auth_user_id: 'user-1',
       content: 'Create a lesson activity Skill',
@@ -314,7 +506,7 @@ describe('guided creation persistence and retry', () => {
     const created = await startGuidedCreation(request);
     db.messages.splice(1, 1);
     db.sessions[0].updated_at = new Date(Date.now() - 3 * 60 * 1_000).toISOString();
-    mocks.generateJson.mockResolvedValueOnce(extraction).mockResolvedValueOnce(phrasing);
+    mocks.generateJson.mockResolvedValueOnce(extraction);
 
     const recovered = await processGuidedCreationMessage({
       auth_user_id: request.auth_user_id,
@@ -330,7 +522,7 @@ describe('guided creation persistence and retry', () => {
 
   it('does not expose a session to another authenticated user', async () => {
     createMemoryDb();
-    mocks.generateJson.mockResolvedValueOnce(extraction).mockResolvedValueOnce(phrasing);
+    mocks.generateJson.mockResolvedValueOnce(extraction);
     const created = await startGuidedCreation({
       auth_user_id: 'owner-1',
       content: '帮教师设计课堂活动',
@@ -344,7 +536,7 @@ describe('guided creation persistence and retry', () => {
 
   it('returns the existing Skill when a completed confirmation is replayed', async () => {
     const db = createMemoryDb();
-    mocks.generateJson.mockResolvedValueOnce(extraction).mockResolvedValueOnce(phrasing);
+    mocks.generateJson.mockResolvedValueOnce(extraction);
     const created = await startGuidedCreation({
       auth_user_id: 'owner-1',
       content: '帮教师设计课堂活动',
@@ -373,7 +565,7 @@ describe('guided creation persistence and retry', () => {
 
   it('marks the session failed without result IDs when the save transaction rolls back', async () => {
     const db = createMemoryDb();
-    mocks.generateJson.mockResolvedValueOnce(extraction).mockResolvedValueOnce(phrasing);
+    mocks.generateJson.mockResolvedValueOnce(extraction);
     const created = await startGuidedCreation({
       auth_user_id: 'owner-1',
       content: '帮教师设计课堂活动',

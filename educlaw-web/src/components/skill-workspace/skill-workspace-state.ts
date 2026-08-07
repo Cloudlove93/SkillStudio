@@ -9,7 +9,7 @@ export type SkillWorkspaceView =
   | 'versions'
   | 'report';
 
-export type SkillContextView = 'summary' | 'versions';
+export type SkillContextView = 'summary' | 'versions' | 'optimization';
 
 export interface SkillPinnedUpdate {
   id: string;

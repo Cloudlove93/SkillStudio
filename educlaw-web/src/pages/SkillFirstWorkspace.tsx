@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import type {
+  ArenaThread,
   GuidedCreationDocument,
   GuidedCreationSession,
   GuidedCreationSessionDetail,
@@ -16,11 +17,16 @@ import {
   isGuidedFinalizationStale,
   isGuidedRunVisible,
 } from '../components/skill-workspace/guided-creation-state';
+import {
+  createPendingGuidedMessage,
+  type PendingGuidedMessage,
+} from '../components/skill-workspace/guided-optimistic-message';
 import { SkillContextPanel } from '../components/skill-workspace/SkillContextPanel';
 import {
   SkillWorkspaceSidebar,
   type SkillCreateAction,
   type SkillCreateMode,
+  type SkillMenuAction,
 } from '../components/skill-workspace/SkillWorkspaceSidebar';
 import { SkillPinnedUpdate } from '../components/skill-workspace/SkillPinnedUpdate';
 import {
@@ -37,6 +43,11 @@ import {
   type SkillPinnedUpdate as SkillPinnedUpdateValue,
 } from '../components/skill-workspace/skill-workspace-state';
 import '../components/skill-workspace/skill-workspace.css';
+import type {
+  AnswerOptimizationRerunRequest,
+  AnswerOptimizationSelection,
+} from '../components/skill-workspace/answer-optimization-selection';
+import { isSkillConversationThread } from '../components/skill-workspace/skill-conversation-list';
 
 type StreamError = { code: string; message: string; retryable: boolean };
 
@@ -52,6 +63,8 @@ export default function SkillFirstWorkspace() {
   const [sessions, setSessions] = useState<GuidedCreationSession[]>([]);
   const [repositorySkills, setRepositorySkills] = useState<RepositorySkill[]>([]);
   const [session, setSession] = useState<GuidedCreationSessionDetail | null>(null);
+  const [pendingGuidedMessage, setPendingGuidedMessage] =
+    useState<PendingGuidedMessage | null>(null);
   const [selectedRepositorySkill, setSelectedRepositorySkill] = useState<RepositorySkill | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [documents, setDocuments] = useState<GuidedCreationDocument[]>([]);
@@ -72,6 +85,13 @@ export default function SkillFirstWorkspace() {
   const [versions, setVersions] = useState<SkillVersionDetail[]>([]);
   const [currentVersionId, setCurrentVersionId] = useState<string | null>(null);
   const [versionsLoading, setVersionsLoading] = useState(false);
+  const [answerOptimization, setAnswerOptimization] = useState<AnswerOptimizationSelection | null>(null);
+  const [answerRerunRequest, setAnswerRerunRequest] = useState<AnswerOptimizationRerunRequest | null>(null);
+  const [conversations, setConversations] = useState<ArenaThread[]>([]);
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+  const [conversationLoading, setConversationLoading] = useState(false);
+  const [runningConversationId, setRunningConversationId] = useState<string | null>(null);
+  const [completedConversationIds, setCompletedConversationIds] = useState<Set<string>>(new Set());
   const lastActionRef = useRef<(() => void) | null>(null);
   const selectedRef = useRef<string | null>(null);
   const activeRunRef = useRef<string | null>(null);
@@ -86,6 +106,8 @@ export default function SkillFirstWorkspace() {
         }
       : null
   );
+  const visiblePendingGuidedMessage =
+    pendingGuidedMessage?.sessionId === selectedSessionId ? pendingGuidedMessage : null;
 
   useEffect(() => {
     selectedRef.current = selectedSessionId;
@@ -124,9 +146,42 @@ export default function SkillFirstWorkspace() {
     }
   }, [activeSkill?.packageId, activeSkill?.skillId, token]);
 
+  const loadConversations = useCallback(async () => {
+    if (!activeSkill?.packageId || !activeSkill.skillId) {
+      setConversations([]);
+      setSelectedConversationId(null);
+      setRunningConversationId(null);
+      setCompletedConversationIds(new Set());
+      return;
+    }
+    setRunningConversationId(null);
+    setCompletedConversationIds(new Set());
+    setConversationLoading(true);
+    try {
+      const threads = await liteApi.listThreads(token, activeSkill.packageId);
+      const next = threads
+        .filter((thread) => isSkillConversationThread(thread, activeSkill.skillId))
+        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+      setConversations(next);
+      setSelectedConversationId((current) =>
+        current && next.some((thread) => String(thread.id) === current)
+          ? current
+          : next[0] ? String(next[0].id) : null,
+      );
+    } catch (loadError) {
+      toast.error(loadError instanceof Error ? loadError.message : '对话加载失败');
+    } finally {
+      setConversationLoading(false);
+    }
+  }, [activeSkill?.packageId, activeSkill?.skillId, token]);
+
   useEffect(() => {
     void loadVersions();
   }, [loadVersions]);
+
+  useEffect(() => {
+    void loadConversations();
+  }, [loadConversations]);
 
   const refreshRepository = useCallback(async () => {
     const packages = await liteApi.listPackages(token);
@@ -195,6 +250,7 @@ export default function SkillFirstWorkspace() {
     event: GuidedCreationSseEvent,
     runSessionId: string | null,
     runId: string,
+    clientMessageId?: string,
   ) => {
     const isVisibleRun = isGuidedRunVisible(
       selectedRef.current,
@@ -231,6 +287,11 @@ export default function SkillFirstWorkspace() {
     }
     if (event.event === 'done') {
       const next = event.data.session;
+      if (clientMessageId) {
+        setPendingGuidedMessage((current) =>
+          current?.clientMessageId === clientMessageId ? null : current,
+        );
+      }
       mergeSession(next);
       if (next.status === 'completed') void refreshRepository().catch(() => undefined);
       if (isVisibleRun) {
@@ -269,12 +330,13 @@ export default function SkillFirstWorkspace() {
   const runStream = async (
     run: (onEvent: (event: GuidedCreationSseEvent) => void) => Promise<void>,
     runSessionId: string | null,
+    clientMessageId?: string,
   ) => {
     const runId = createRequestId('run');
     activeRunRef.current = runId;
     resetStream();
     try {
-      await run((event) => handleStreamEvent(event, runSessionId, runId));
+      await run((event) => handleStreamEvent(event, runSessionId, runId, clientMessageId));
     } catch (streamError) {
       if (activeRunRef.current !== runId) return;
       setBusy(false);
@@ -290,6 +352,7 @@ export default function SkillFirstWorkspace() {
   const start = (content: string) => {
     dispatchWorkspace({ type: 'open-context', view: 'summary' });
     const clientMessageId = createRequestId('message');
+    setPendingGuidedMessage(createPendingGuidedMessage(content, clientMessageId, null));
     const action = () =>
       runStream(
         (onEvent) =>
@@ -303,6 +366,7 @@ export default function SkillFirstWorkspace() {
             onEvent,
           ),
         null,
+        clientMessageId,
       );
     lastActionRef.current = action;
     void action();
@@ -316,6 +380,7 @@ export default function SkillFirstWorkspace() {
     dispatchWorkspace({ type: 'open-context', view: 'summary' });
     const sessionId = session.id;
     const clientMessageId = createRequestId('message');
+    setPendingGuidedMessage(createPendingGuidedMessage(content, clientMessageId, sessionId));
     const revisionNo = session.revision_no;
     const action = () =>
       runStream(
@@ -331,6 +396,7 @@ export default function SkillFirstWorkspace() {
             onEvent,
           ),
         sessionId,
+        clientMessageId,
       );
     lastActionRef.current = action;
     void action();
@@ -366,6 +432,7 @@ export default function SkillFirstWorkspace() {
 
   const openSession = async (summary: GuidedCreationSession) => {
     activeRunRef.current = null;
+    setPendingGuidedMessage(null);
     setSelectedRepositorySkill(null);
     setSelectedSessionId(summary.id);
     selectedRef.current = summary.id;
@@ -463,6 +530,7 @@ export default function SkillFirstWorkspace() {
     }
     setImportOpen(false);
     activeRunRef.current = null;
+    setPendingGuidedMessage(null);
     setCreateMode(mode);
     setSession(null);
     setSelectedRepositorySkill(null);
@@ -486,8 +554,137 @@ export default function SkillFirstWorkspace() {
     dispatchWorkspace({ type: 'dismiss-update' });
   };
 
+  const renameSession = async (item: GuidedCreationSession, displayName: string) => {
+    try {
+      const renamed = await liteApi.renameGuidedCreation(token, {
+        session_id: item.id,
+        revision_no: item.revision_no,
+        display_name: displayName,
+      });
+      mergeSession(renamed);
+      if (selectedSessionId === item.id) setSession(renamed);
+      toast.success('会话名称已更新');
+    } catch (renameError) {
+      toast.error(renameError instanceof Error ? renameError.message : '重命名失败');
+      throw renameError;
+    }
+  };
+
+  const deleteSession = async (item: GuidedCreationSession) => {
+    try {
+      await liteApi.deleteGuidedCreation(token, {
+        session_id: item.id,
+        revision_no: item.revision_no,
+      });
+      setSessions((current) => current.filter((candidate) => candidate.id !== item.id));
+
+      if (selectedSessionId === item.id) {
+        activeRunRef.current = null;
+        setPendingGuidedMessage(null);
+        setSession(null);
+        setSelectedRepositorySkill(null);
+        setSelectedSessionId(null);
+        selectedRef.current = null;
+        setDocuments([]);
+        setBusy(false);
+        setPhase(null);
+        setPreviews([]);
+        setError(null);
+        setVersions([]);
+        setCurrentVersionId(null);
+        if (item.status === 'completed') openRepository();
+        else newSkill();
+      }
+
+      toast.success(item.status === 'completed'
+        ? '会话已从最近使用中移除'
+        : '草稿已删除');
+    } catch (deleteError) {
+      toast.error(deleteError instanceof Error ? deleteError.message : '删除失败');
+      throw deleteError;
+    }
+  };
+
+  const handleConversationCreated = (thread: ArenaThread) => {
+    setConversations((current) => [thread, ...current.filter((item) => item.id !== thread.id)]);
+    setSelectedConversationId(String(thread.id));
+    setCompletedConversationIds((current) => {
+      const next = new Set(current);
+      next.delete(String(thread.id));
+      return next;
+    });
+  };
+
+  const handleConversationUpdated = (thread: ArenaThread) => {
+    setConversations((current) => current.map((item) => item.id === thread.id ? thread : item));
+  };
+
+  const handleConversationSelect = (id: string) => {
+    setSelectedConversationId(id);
+    dispatchWorkspace({ type: 'navigate', view: 'run' });
+    dispatchWorkspace({ type: 'close-context' });
+  };
+
+  const handleConversationRunState = (running: boolean, threadId?: string | null) => {
+    if (running) {
+      const runId = threadId ?? selectedConversationId;
+      setRunningConversationId(runId);
+      if (runId) {
+        setCompletedConversationIds((current) => {
+          const next = new Set(current);
+          next.delete(runId);
+          return next;
+        });
+      }
+      return;
+    }
+    const completedId = threadId ?? runningConversationId;
+    setRunningConversationId((current) => {
+      if (!completedId || current === completedId) return null;
+      return current;
+    });
+    if (completedId) {
+      setCompletedConversationIds((current) => {
+        const next = new Set(current);
+        next.add(completedId);
+        return next;
+      });
+    }
+  };
+
+  const handleNewConversation = () => {
+    setSelectedConversationId(null);
+    dispatchWorkspace({ type: 'navigate', view: 'run' });
+    dispatchWorkspace({ type: 'close-context' });
+  };
+
+  const renameConversation = async (thread: ArenaThread, title: string) => {
+    if (!activeSkill) return;
+    const renamed = await liteApi.renameArenaThread(token, activeSkill.packageId, String(thread.id), title);
+    handleConversationUpdated(renamed);
+  };
+
+  const deleteConversation = async (thread: ArenaThread) => {
+    if (!activeSkill) return;
+    try {
+      await liteApi.deleteArenaThread(token, activeSkill.packageId, String(thread.id));
+      setConversations((current) => current.filter((item) => item.id !== thread.id));
+      setSelectedConversationId((current) => current === String(thread.id) ? null : current);
+      setCompletedConversationIds((current) => {
+        const next = new Set(current);
+        next.delete(String(thread.id));
+        return next;
+      });
+      setRunningConversationId((current) => current === String(thread.id) ? null : current);
+      toast.success('对话已删除');
+    } catch (deleteError) {
+      toast.error(deleteError instanceof Error ? deleteError.message : '对话删除失败');
+    }
+  };
+
   const openRepositorySkill = (skill: RepositorySkill) => {
     activeRunRef.current = null;
+    setPendingGuidedMessage(null);
     setSelectedRepositorySkill(skill);
     setSession(null);
     setSelectedSessionId(null);
@@ -498,6 +695,15 @@ export default function SkillFirstWorkspace() {
     dispatchWorkspace({ type: 'navigate', view: 'run' });
     dispatchWorkspace({ type: 'close-context' });
     dispatchWorkspace({ type: 'dismiss-update' });
+  };
+
+  const handleSkillMenuAction = (skill: RepositorySkill, action: SkillMenuAction) => {
+    openRepositorySkill(skill);
+    if (action === 'open') return;
+    dispatchWorkspace({
+      type: 'navigate',
+      view: action === 'overview' ? 'overview' : action,
+    });
   };
 
   const addFiles = async (files: FileList) => {
@@ -529,7 +735,10 @@ export default function SkillFirstWorkspace() {
     }
   };
 
-  const completed = Boolean(activeSkill);
+  const activeSkillKey = activeSkill ? `${activeSkill.packageId}:${activeSkill.skillId}` : null;
+  const activeSkillName = repositorySkills.find((skill) => skill.key === activeSkillKey)?.name
+    || activeSkill?.name
+    || null;
   const detailView = (
     ['overview', 'run', 'test', 'arena', 'optimize', 'versions'].includes(workspaceState.activeView)
       ? workspaceState.activeView
@@ -554,8 +763,6 @@ export default function SkillFirstWorkspace() {
         sessions={sessions}
         selectedSessionId={selectedSessionId}
         repositoryActive={workspaceState.activeView === 'repository'}
-        activeView={workspaceState.activeView}
-        selectedSessionCompleted={Boolean(completed)}
         selectedCreateMode={createMode}
         collapsed={leftCollapsed}
         search={search}
@@ -563,9 +770,24 @@ export default function SkillFirstWorkspace() {
         onSearch={setSearch}
         onToggle={() => setLeftCollapsed((value) => !value)}
         onRepository={openRepository}
-        onNavigate={(view) => dispatchWorkspace({ type: 'navigate', view })}
         onCreateMode={newSkill}
         onSelect={(item) => void openSession(item)}
+        skills={repositorySkills}
+        activeSkillKey={activeSkillKey}
+        activeSkillName={activeSkillName}
+        onSelectSkill={openRepositorySkill}
+        onSkillAction={handleSkillMenuAction}
+        onRename={renameSession}
+        onDelete={deleteSession}
+        conversations={conversations}
+        selectedConversationId={selectedConversationId}
+        conversationLoading={conversationLoading}
+        conversationRunningId={runningConversationId}
+        completedConversationIds={completedConversationIds}
+        onConversationSelect={handleConversationSelect}
+        onNewConversation={handleNewConversation}
+        onConversationRename={renameConversation}
+        onConversationDelete={deleteConversation}
         onLogout={logout}
       />
       <div className="skill-main-column">
@@ -593,12 +815,23 @@ export default function SkillFirstWorkspace() {
               versions={versions}
               currentVersionId={currentVersionId}
               versionsLoading={versionsLoading}
+              onRunStateChange={handleConversationRunState}
               onPublishUpdate={publishUpdate}
               onReloadVersions={loadVersions}
+              onOptimizeAnswer={(selection) => {
+                setAnswerOptimization(selection);
+                dispatchWorkspace({ type: 'open-context', view: 'optimization' });
+              }}
+              conversations={conversations}
+              selectedConversationId={selectedConversationId}
+              onConversationCreated={handleConversationCreated}
+              onConversationUpdated={handleConversationUpdated}
+              answerRerunRequest={answerRerunRequest}
             />
           ) : session ? (
             <GuidedSkillCreationPanel
               session={session}
+              pendingMessage={visiblePendingGuidedMessage}
               documents={documents}
               busy={busy}
               phase={phase}
@@ -633,6 +866,7 @@ export default function SkillFirstWorkspace() {
           ) : (
             <GuidedSkillCreationPanel
               session={null}
+              pendingMessage={visiblePendingGuidedMessage}
               documents={documents}
               busy={busy}
               phase={phase}
@@ -650,6 +884,7 @@ export default function SkillFirstWorkspace() {
         </div>
       </div>
       <SkillContextPanel
+        token={token}
         session={workspaceState.activeView === 'repository' ? null : session}
         hasSkill={Boolean(activeSkill)}
         open={workspaceState.contextOpen}
@@ -658,6 +893,15 @@ export default function SkillFirstWorkspace() {
         versions={versions}
         currentVersionId={currentVersionId}
         versionsLoading={versionsLoading}
+        answerOptimization={answerOptimization}
+        onAnswerOptimizationSaved={() => { void loadVersions(); }}
+        onAnswerOptimizationRerun={(versionNumber, selection) => {
+          void (async () => {
+            await loadVersions();
+            dispatchWorkspace({ type: 'navigate', view: selection.origin });
+            setAnswerRerunRequest({ requestId: createRequestId('rerun'), versionNumber, selection });
+          })();
+        }}
         onOpen={(view) => dispatchWorkspace({ type: 'open-context', view })}
         onClose={() => dispatchWorkspace({ type: 'close-context' })}
         onOpenVersionManager={() => {

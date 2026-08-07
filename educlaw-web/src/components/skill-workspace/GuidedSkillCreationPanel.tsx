@@ -2,22 +2,34 @@ import { useMemo, useRef, useState } from 'react';
 import type {
   GuidedCreationDocument,
   GuidedCreationSessionDetail,
+  GuidedCreationStep,
+  GuidedCreationStage,
 } from '@educlaw/shared';
 import {
   ArrowLeft,
   ArrowUp,
+  BookOpenCheck,
   Check,
   ChevronDown,
   FileText,
   Loader2,
+  Layers3,
   Paperclip,
   RotateCcw,
   Sparkles,
   X,
 } from 'lucide-react';
+import { educationScenarios } from './education-scenarios';
+import {
+  shouldDisplayPendingGuidedMessage,
+  type PendingGuidedMessage,
+} from './guided-optimistic-message';
+import { ConversationTurnNavigation } from './ConversationTurnNavigation';
+import { collectConversationTurns } from './conversation-turn-navigation';
 
 type Props = {
   session: GuidedCreationSessionDetail | null;
+  pendingMessage: PendingGuidedMessage | null;
   documents: GuidedCreationDocument[];
   busy: boolean;
   phase: string | null;
@@ -36,21 +48,82 @@ const phaseSteps = [
   { key: 'saving', label: '保存 Skill v1' },
 ];
 
-const educationTemplates = [
-  ['课堂活动设计', '为教师创建一个课堂活动设计 Skill，根据教学目标、年级、课时和班级情况生成可执行活动。'],
-  ['作业反馈', '创建一个作业反馈 Skill，根据学生作答给出具体、鼓励性且可行动的反馈。'],
-  ['练习题生成', '创建一个练习题生成 Skill，根据教学材料、知识点和难度生成带答案解析的练习。'],
-] as const;
+const guidedStageLabels: Record<GuidedCreationStage, string> = {
+  positioning: '明确对象与目标',
+  scenario_input: '还原使用场景',
+  expected_result: '说清理想结果',
+  working_method: '提炼你的做法',
+  evidence_scope: '确定参考依据',
+  boundaries_completion: '补充边界与完成标准',
+};
+
+const guidedStepLabels: Record<GuidedCreationStep, string> = {
+  intent_context: '教育意图',
+  teacher_experience: '教师经验',
+  strategy_co_creation: '教育策略',
+  action_adjustment: '行动调整',
+  evidence_review: '效果复核',
+};
+
+const guidedInterviewSteps: Array<{ key: GuidedCreationStep; label: string }> = [
+  { key: 'intent_context', label: '目标与对象' },
+  { key: 'teacher_experience', label: '经验与依据' },
+  { key: 'strategy_co_creation', label: '教学策略' },
+  { key: 'action_adjustment', label: '行动与边界' },
+  { key: 'evidence_review', label: '效果与证据' },
+];
 
 export function GuidedSkillCreationPanel(props: Props) {
   const [input, setInput] = useState('');
   const [showConversation, setShowConversation] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const messageListRef = useRef<HTMLDivElement>(null);
   const isConfirmation = props.session?.status === 'ready_for_confirmation';
   const documentsLocked = Boolean(props.session);
   const isFinalizing = Boolean(
     props.busy && ['generating', 'validating', 'saving'].includes(props.phase || ''),
   );
+  const showPendingMessage = shouldDisplayPendingGuidedMessage(
+    props.pendingMessage,
+    props.session?.id ?? null,
+    props.session?.messages ?? [],
+  );
+  const hasConversation = Boolean(props.session || showPendingMessage);
+  const conversationTurns = useMemo(() => collectConversationTurns([
+    ...(props.session?.messages ?? []),
+    ...(showPendingMessage && props.pendingMessage
+      ? [{
+          id: props.pendingMessage.clientMessageId,
+          role: 'user',
+          content: props.pendingMessage.content,
+        }]
+      : []),
+  ]), [props.pendingMessage, props.session?.messages, showPendingMessage]);
+  const guidedStage =
+    props.session &&
+    props.session.flow_version === 2 &&
+    props.session.status === 'collecting'
+      ? props.session.next_stage
+      : null;
+  const guidedStep =
+    props.session &&
+    props.session.flow_version >= 3 &&
+    props.session.status === 'collecting'
+      ? props.session.current_step
+      : null;
+  const guidedProgress = guidedStep && props.session
+    ? {
+        label: guidedStepLabels[guidedStep],
+        current: Math.min((props.session.completed_steps?.length ?? 0) + 1, 5),
+        total: 5,
+      }
+    : guidedStage && props.session
+      ? {
+          label: guidedStageLabels[guidedStage],
+          current: props.session.confirmed_stages.length + 1,
+          total: 6,
+        }
+      : null;
 
   const send = () => {
     const value = input.trim();
@@ -149,34 +222,96 @@ export function GuidedSkillCreationPanel(props: Props) {
           </div>
         )}
 
-        <div className={`skill-message-list ${props.session ? '' : 'is-empty'}`}>
-          {!props.session ? (
+        <div className="skill-message-scroll-region">
+          <ConversationTurnNavigation
+            containerRef={messageListRef}
+            turns={conversationTurns}
+          />
+          <div
+            ref={messageListRef}
+            className={`skill-message-list ${hasConversation ? '' : 'is-empty'}`}
+          >
+          {!hasConversation ? (
             <div className="skill-empty-conversation">
               <div className="skill-empty-icon"><Sparkles size={24} /></div>
-              <h2>一起创建一个教育 Skill</h2>
-              <p>先简单描述目标，我会通过对话帮你逐步补全。</p>
+              <h2>从一个教学目标开始</h2>
+              <p>描述你的教学目标，我会协助梳理需求并生成可运行的 Skill。</p>
               <div className="skill-starter-section">
-                <span>从常用场景开始</span>
+                <span>精选教学场景</span>
                 <div className="skill-starter-chips">
-                  {educationTemplates.map(([label, prompt]) => (
-                    <button key={label} onClick={() => setInput(prompt)}>{label}</button>
-                  ))}
+                  {educationScenarios.map((scenario) => {
+                    const ScenarioIcon = scenario.tone === 'codex-orange' ? BookOpenCheck : Layers3;
+                    return (
+                      <button
+                        key={scenario.id}
+                        className={`skill-starter-card is-${scenario.tone}`}
+                        onClick={() => setInput(scenario.prompt)}
+                      >
+                        <span className="skill-starter-card-icon"><ScenarioIcon size={20} /></span>
+                        <span className="skill-starter-card-copy">
+                          <strong>{scenario.label}</strong>
+                          <small>{scenario.description}</small>
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </div>
           ) : (
-            props.session.messages.map((message) => (
-              <MessageBubble key={message.id} message={message} onOption={(option) => setInput(option)} />
-            ))
+            <>
+              {props.session?.messages.map((message) => (
+                <MessageBubble
+                  key={message.id}
+                  message={message}
+                  turnId={message.role === 'user' ? `guided-turn-${message.id}` : undefined}
+                  onOption={(option) => setInput(option)}
+                />
+              ))}
+              {showPendingMessage && props.pendingMessage && (
+                <div
+                  id={`guided-turn-${props.pendingMessage.clientMessageId}`}
+                  className="skill-user-message is-pending"
+                >
+                  {props.pendingMessage.content}
+                </div>
+              )}
+            </>
           )}
           {props.busy && !isFinalizing && (
             <div className="skill-assistant-message is-thinking"><span /><span /><span /></div>
           )}
+          </div>
         </div>
 
         {props.error && <InlineError error={props.error} onRetry={props.onRetry} />}
 
         <div className="skill-composer-wrap">
+          {guidedProgress && (
+            <div className="skill-guided-progress" aria-label="共创进度">
+              <span>共创进度</span>
+              <strong>{guidedProgress.label}</strong>
+              <small>{guidedProgress.current} / {guidedProgress.total}</small>
+            </div>
+          )}
+          {guidedStep && props.session && (
+            <nav className="skill-interview-steps" aria-label="Skill 引导阶段">
+              {guidedInterviewSteps.map((step, index) => {
+                const completed = props.session?.completed_steps?.includes(step.key) ?? false;
+                const active = step.key === guidedStep;
+                return (
+                  <span
+                    key={step.key}
+                    className={`skill-interview-step ${completed ? 'is-complete' : ''} ${active ? 'is-active' : ''}`}
+                    aria-current={active ? 'step' : undefined}
+                  >
+                    <i>{completed ? <Check size={11} /> : index + 1}</i>
+                    <em>{step.label}</em>
+                  </span>
+                );
+              })}
+            </nav>
+          )}
           {props.documents.length > 0 && (
             <div className="skill-document-row">
               {props.documents.map((document, index) => (
@@ -240,16 +375,20 @@ export function GuidedSkillCreationPanel(props: Props) {
 
 function MessageBubble({
   message,
+  turnId,
   onOption,
 }: {
   message: GuidedCreationSessionDetail['messages'][number];
+  turnId?: string;
   onOption: (option: string) => void;
 }) {
   const options = useMemo(() => {
     const value = message.metadata.suggested_options;
     return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
   }, [message.metadata]);
-  if (message.role === 'user') return <div className="skill-user-message">{message.content}</div>;
+  if (message.role === 'user') {
+    return <div id={turnId} className="skill-user-message">{message.content}</div>;
+  }
   return (
     <div className="skill-assistant-block">
       <div className="skill-assistant-avatar"><Sparkles size={14} /></div>

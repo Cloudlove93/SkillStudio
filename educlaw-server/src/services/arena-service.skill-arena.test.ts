@@ -587,6 +587,9 @@ describe("skill arena runtime", () => {
           rowCount: 1,
         };
       }
+      if (sql.includes("insert into arena_answer_runs")) {
+        return { rows: [], rowCount: 1 };
+      }
       if (sql.startsWith("update arena_threads set updated_at = $1")) {
         return {
           rows: [],
@@ -610,6 +613,28 @@ describe("skill arena runtime", () => {
       "Current Skill",
     );
     expect(streamTextMock.mock.calls[1]?.[0]?.systemPrompt).toContain("[SKILL.md: Skill B]");
+    const answerRunInsert = queryMock.mock.calls.find((call) =>
+      String(call[0]).includes("insert into arena_answer_runs"),
+    );
+    expect(answerRunInsert).toBeDefined();
+    expect(answerRunInsert?.[1]).toEqual([
+      "user-1",
+      "91",
+      7,
+      33,
+      1,
+      1,
+      1,
+      JSON.stringify(["skill-b"]),
+      JSON.stringify([]),
+      "gpt-5",
+      JSON.stringify(["skill-a"]),
+      JSON.stringify([]),
+      "gpt-5",
+      101,
+      202,
+      expect.any(String),
+    ]);
   });
 
   it("generates reports with fixed skill labels from the bound versions", async () => {

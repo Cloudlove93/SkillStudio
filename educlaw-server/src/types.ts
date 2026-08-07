@@ -76,6 +76,11 @@ export interface DbRowArenaAnswerRun {
   used_skill_ids: unknown;
   context_message_ids: unknown | null;
   enhanced_model: string | null;
+  baseline_used_skill_ids: unknown | null;
+  baseline_context_message_ids: unknown | null;
+  baseline_model: string | null;
+  baseline_skill_version_id: number | null;
+  enhanced_skill_version_id: number | null;
   created_at: string;
 }
 
@@ -88,6 +93,11 @@ export interface DbRowAnswerSkillOptimizationRun {
   question_message_id: number;
   enhanced_answer_message_id: number;
   baseline_answer_message_id: number | null;
+  answer_side?: "baseline" | "enhanced" | null;
+  answer_message_id?: number | null;
+  evidence_version_id?: number | null;
+  answer_skill_version_id?: number | null;
+  working_skill_version_id?: number | null;
   user_feedback: string;
   target_skill_id: string | null;
   result_json: unknown;

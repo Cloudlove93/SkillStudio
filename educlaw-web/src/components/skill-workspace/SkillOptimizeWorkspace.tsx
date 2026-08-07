@@ -1,8 +1,10 @@
-import { useEffect, useReducer, useRef, useState } from 'react';
+import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import type { SkillVersionDetail } from '@educlaw/shared';
 import { ArrowUp, Check, Loader2, Save, Sparkles } from 'lucide-react';
 import { liteApi } from '../../api/lite-api';
 import { createSkillOptimizeState, skillOptimizeReducer } from './skill-optimize-state';
+import { ConversationTurnNavigation } from './ConversationTurnNavigation';
+import { collectConversationTurns } from './conversation-turn-navigation';
 
 type Props = {
   token: string;
@@ -20,6 +22,14 @@ export function SkillOptimizeWorkspace({ token, packageId, version, onSaved }: P
   const [state, dispatch] = useReducer(skillOptimizeReducer, undefined, createSkillOptimizeState);
   const [initializing, setInitializing] = useState(true);
   const sessionIdRef = useRef<string | undefined>(undefined);
+  const messageListRef = useRef<HTMLDivElement>(null);
+  const conversationTurns = useMemo(() => collectConversationTurns(
+    state.messages.map((message, index) => ({
+      id: `optimize-${index}`,
+      role: message.role,
+      content: message.content,
+    })),
+  ), [state.messages]);
 
   useEffect(() => {
     let cancelled = false;
@@ -128,13 +138,15 @@ export function SkillOptimizeWorkspace({ token, packageId, version, onSaved }: P
 
   return (
     <div className="skill-flat-conversation skill-optimize-workspace skill-view-enter">
-      <div className="skill-flat-messages">
+      <div className="skill-message-scroll-region">
+        <ConversationTurnNavigation containerRef={messageListRef} turns={conversationTurns} />
+        <div ref={messageListRef} className="skill-flat-messages">
         {initializing ? (
-          <div className="skill-flat-empty"><Loader2 size={23} className="spin" /><h2>正在分析当前 Skill</h2><p>分析完成后即可直接对话优化。</p></div>
+          <div className="skill-flat-empty"><Loader2 size={23} className="spin" /><h2>正在分析这个 Skill</h2><p>马上为你整理值得改进的地方。</p></div>
         ) : (
           state.messages.map((message, index) =>
             message.role === 'user' ? (
-              <div className="skill-user-message" key={`${message.role}-${index}`}>{message.content}</div>
+              <div id={`guided-turn-optimize-${index}`} className="skill-user-message" key={`${message.role}-${index}`}>{message.content}</div>
             ) : (
               <div className="skill-assistant-block" key={`${message.role}-${index}`}>
                 <div className="skill-assistant-avatar"><Sparkles size={14} /></div>
@@ -148,6 +160,7 @@ export function SkillOptimizeWorkspace({ token, packageId, version, onSaved }: P
         {state.savedVersionNumber && (
           <div className="skill-optimize-saved"><Check size={14} />已生成 v{state.savedVersionNumber}</div>
         )}
+        </div>
       </div>
 
       {state.changes.length > 0 && (

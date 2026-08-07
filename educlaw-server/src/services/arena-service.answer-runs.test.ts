@@ -546,6 +546,11 @@ describe("Arena answer run provenance", () => {
       usedSkillIds: ["skill-bullying"],
       contextMessageIds: [801, 802],
       enhancedModel: "resolved-enhanced-model",
+      baselineUsedSkillIds: [],
+      baselineContextMessageIds: null,
+      baselineModel: null,
+      baselineSkillVersionId: null,
+      enhancedSkillVersionId: null,
       createdAt: timestamp,
     });
     expect(queryMock).toHaveBeenNthCalledWith(1, expect.stringContaining("user_id = $1"), [
@@ -555,6 +560,64 @@ describe("Arena answer run provenance", () => {
     await expect(
       getArenaAnswerRunByEnhancedMessage("user-2", 2002),
     ).rejects.toThrow("Arena answer run not found");
+  });
+
+  it("finds the same answer provenance from either recorded side", async () => {
+    const {
+      getArenaAnswerRunByMessage,
+      getArenaAnswerRunSideProvenance,
+    } = await loadService();
+    queryMock.mockReset();
+    queryMock.mockResolvedValue({
+      rows: [
+        {
+          id: 9001,
+          user_id: "user-1",
+          thread_id: 101,
+          package_id: 301,
+          package_version_id: 501,
+          question_message_id: 1001,
+          enhanced_answer_message_id: 2002,
+          baseline_answer_message_id: 2001,
+          used_skill_ids: ["skill-b"],
+          context_message_ids: [801, 803],
+          enhanced_model: "model-b",
+          baseline_used_skill_ids: ["skill-a"],
+          baseline_context_message_ids: [801, 802],
+          baseline_model: "model-a",
+          baseline_skill_version_id: 101,
+          enhanced_skill_version_id: 202,
+          created_at: timestamp,
+        },
+      ],
+      rowCount: 1,
+    });
+
+    const baseline = await getArenaAnswerRunByMessage("user-1", 2001);
+    const enhanced = await getArenaAnswerRunByMessage("user-1", 2002);
+
+    expect(baseline.baselineSkillVersionId).toBe(101);
+    expect(baseline.baselineUsedSkillIds).toEqual(["skill-a"]);
+    expect(enhanced.enhancedSkillVersionId).toBe(202);
+    expect(getArenaAnswerRunSideProvenance(baseline, "baseline")).toEqual({
+      answerMessageId: 2001,
+      usedSkillIds: ["skill-a"],
+      contextMessageIds: [801, 802],
+      model: "model-a",
+      skillVersionId: 101,
+    });
+    expect(getArenaAnswerRunSideProvenance(enhanced, "enhanced")).toEqual({
+      answerMessageId: 2002,
+      usedSkillIds: ["skill-b"],
+      contextMessageIds: [801, 803],
+      model: "model-b",
+      skillVersionId: 202,
+    });
+    expect(queryMock).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining("baseline_answer_message_id = $2"),
+      ["user-1", 2001],
+    );
   });
 
   it("keeps legacy unknown context distinct from a recorded empty history", async () => {

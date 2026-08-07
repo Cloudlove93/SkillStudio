@@ -1,5 +1,6 @@
 import type {
   GuidedConfirmationCard,
+  GuidedCreationStage,
   GuidedDraftField,
   GuidedFieldState,
   GuidedSkillDraft,
@@ -28,6 +29,42 @@ export const GUIDED_REQUIRED_FIELDS = [
   'core_capabilities',
   'workflow',
 ] as const satisfies readonly GuidedDraftField[];
+
+export const GUIDED_STAGES = [
+  {
+    key: 'positioning',
+    fields: ['roles', 'goal'],
+  },
+  {
+    key: 'scenario_input',
+    fields: ['usage_scenario', 'input_contract'],
+  },
+  {
+    key: 'expected_result',
+    fields: ['output_contract'],
+  },
+  {
+    key: 'working_method',
+    fields: ['core_capabilities', 'workflow'],
+  },
+  {
+    key: 'evidence_scope',
+    fields: ['knowledge_evidence'],
+  },
+  {
+    key: 'boundaries_completion',
+    fields: [
+      'boundaries_permissions',
+      'exception_recovery',
+      'completion_evidence',
+    ],
+  },
+] as const satisfies readonly {
+  key: GuidedCreationStage;
+  fields: readonly GuidedDraftField[];
+}[];
+
+export const GUIDED_STAGE_KEYS = GUIDED_STAGES.map((stage) => stage.key);
 
 const FIELD_SET = new Set<string>(GUIDED_DRAFT_FIELDS);
 const REQUIRED_FIELD_SET = new Set<GuidedDraftField>(GUIDED_REQUIRED_FIELDS);
@@ -58,6 +95,7 @@ export interface DraftOperation {
   path: string;
   value?: unknown;
   state?: Extract<GuidedFieldState, 'explicit' | 'inferred' | 'conflicted'>;
+  evidence?: string;
 }
 
 export interface DraftEvaluation {
@@ -67,10 +105,90 @@ export interface DraftEvaluation {
   ready_for_confirmation: boolean;
 }
 
+export interface GuidedFlowEvaluation extends DraftEvaluation {
+  confirmed_stages: GuidedCreationStage[];
+  next_stage: GuidedCreationStage | null;
+}
+
 function assertDraftField(path: string): asserts path is GuidedDraftField {
   if (!FIELD_SET.has(path)) {
     throw new Error('INVALID_DRAFT_PATH');
   }
+}
+
+function normalizeEvidence(value: string): string {
+  return value.normalize('NFKC').toLocaleLowerCase().replace(/\s+/g, '');
+}
+
+export function validateExplicitEvidence(
+  userMessage: string,
+  evidence: string | undefined,
+): boolean {
+  if (!evidence?.trim()) return false;
+  const normalizedMessage = normalizeEvidence(userMessage);
+  const normalizedEvidence = normalizeEvidence(evidence);
+  return Boolean(
+    normalizedEvidence && normalizedMessage.includes(normalizedEvidence),
+  );
+}
+
+export function sanitizeDraftOperations(
+  currentDraft: GuidedSkillDraft,
+  currentStates: Partial<Record<GuidedDraftField, GuidedFieldState>>,
+  operations: readonly DraftOperation[],
+  userMessage: string,
+): DraftOperation[] {
+  const accepted: DraftOperation[] = [];
+  for (const operation of operations) {
+    assertDraftField(operation.path);
+    if (operation.op === 'remove') {
+      accepted.push(operation);
+      continue;
+    }
+
+    let state = operation.state ?? 'inferred';
+    if (
+      state === 'explicit' &&
+      !validateExplicitEvidence(userMessage, operation.evidence)
+    ) {
+      state = 'inferred';
+    }
+    if (
+      state === 'inferred' &&
+      currentStates[operation.path] === 'explicit' &&
+      currentDraft[operation.path]
+    ) {
+      continue;
+    }
+    let value = operation.value;
+    const currentValue = currentDraft[operation.path];
+    if (
+      state === 'explicit' &&
+      operation.op === 'set' &&
+      currentStates[operation.path] === 'explicit' &&
+      typeof currentValue === 'string' &&
+      currentValue.trim() &&
+      typeof value === 'string' &&
+      value.trim()
+    ) {
+      const existing = currentValue.trim();
+      const incoming = value.trim();
+      if (existing.includes(incoming)) {
+        value = existing;
+      } else if (!incoming.includes(existing)) {
+        value = `${existing}；${incoming}`;
+      }
+    }
+    accepted.push({ ...operation, value, state });
+  }
+  return accepted;
+}
+
+export function nextGuidedStage(
+  confirmedStages: readonly GuidedCreationStage[],
+): GuidedCreationStage | null {
+  const confirmed = new Set(confirmedStages);
+  return GUIDED_STAGE_KEYS.find((stage) => !confirmed.has(stage)) ?? null;
 }
 
 export function applyDraftOperations(
@@ -156,6 +274,25 @@ export function evaluateDraft(
     field_states,
     next_blocking_field,
     ready_for_confirmation: next_blocking_field === null,
+  };
+}
+
+export function evaluateGuidedFlow(
+  draft: GuidedSkillDraft,
+  knownStates: Partial<Record<GuidedDraftField, GuidedFieldState>>,
+  confirmedStages: readonly GuidedCreationStage[],
+): GuidedFlowEvaluation {
+  const evaluation = evaluateDraft(draft, knownStates);
+  const confirmed = GUIDED_STAGE_KEYS.filter((stage) =>
+    confirmedStages.includes(stage),
+  );
+  const next_stage = nextGuidedStage(confirmed);
+  return {
+    ...evaluation,
+    confirmed_stages: confirmed,
+    next_stage,
+    ready_for_confirmation:
+      next_stage === null && evaluation.ready_for_confirmation,
   };
 }
 

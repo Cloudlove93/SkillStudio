@@ -160,6 +160,11 @@ export interface AnswerSkillOptimizationDetail {
   packageId: number;
   threadId: number;
   baseVersionId: number;
+  evidenceVersionId: number;
+  answerSide: 'baseline' | 'enhanced';
+  answerMessageId: number;
+  answerSkillVersionId: number | null;
+  workingSkillVersionId: number | null;
   status: ArenaAnswerOptimizationStatus;
   revision: number;
   feedback: string;
@@ -194,6 +199,8 @@ export interface CreateAnswerOptimizationInput {
   questionMessageId: number;
   enhancedAnswerMessageId: number;
   baselineAnswerMessageId: number | null;
+  answerSide?: 'baseline' | 'enhanced';
+  answerMessageId?: number;
   feedback: string;
 }
 
@@ -205,6 +212,7 @@ export interface ConfirmAnswerOptimizationResult {
   baseVersionId: number;
   finalVersionId: number;
   versionNumber: number;
+  skillVersionNumber: number;
   source: 'interactive';
   completedAt: string;
   advancedToNextTarget?: boolean;
@@ -386,6 +394,24 @@ export const answerSkillOptimizationApi = {
       ),
       { expectedRevision },
       idempotencyKey,
+    );
+  },
+  rebase(
+    token: string,
+    optimizationId: number,
+    expectedRevision: number,
+  ) {
+    return request<AnswerSkillOptimizationDetail>(
+      token,
+      optimizationPath(
+        ANSWER_SKILL_OPTIMIZATION_ROUTES.REBASE,
+        optimizationId,
+      ),
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expectedRevision }),
+      },
     );
   },
   confirm(

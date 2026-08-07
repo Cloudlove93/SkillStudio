@@ -20,6 +20,7 @@ export const ANSWER_SKILL_OPTIMIZATION_ROUTES = {
   CREATE: "/arena/answer-optimizations",
   DETAIL: "/arena/answer-optimizations/:optimizationId",
   REVISE: "/arena/answer-optimizations/:optimizationId/revise",
+  REBASE: "/arena/answer-optimizations/:optimizationId/rebase",
   TEST: "/arena/answer-optimizations/:optimizationId/test",
   CONFIRM: "/arena/answer-optimizations/:optimizationId/confirm",
   CANCEL: "/arena/answer-optimizations/:optimizationId/cancel",
@@ -129,7 +130,9 @@ export type SkillAction =
   | "skill.version.discard"
   | "skill.version.undiscard"
   | "arena.thread.create"
-  | "arena.thread.detail";
+  | "arena.thread.detail"
+  | "arena.thread.rename"
+  | "arena.thread.delete";
 
 export type ArenaKind = "package_arena" | "skill_arena";
 
@@ -145,6 +148,8 @@ export interface ArenaThreadVariant {
 export interface SkillArenaConfig {
   mode: "skill_arena";
   compositionMode: "skill_only";
+  /** Ordinary single-Skill conversations use run; Arena comparisons use arena. */
+  surface?: "run" | "arena";
   basePackageVersionId: string;
   left: ArenaThreadVariant;
   right: ArenaThreadVariant;
@@ -187,6 +192,8 @@ export interface ArenaMessage {
   role: ArenaRole;
   content: string;
   createdAt: string;
+  skillVersionId?: string;
+  skillVersionNumber?: number;
 }
 
 export type ArenaAnswerOptimizationStatus =
@@ -348,7 +355,9 @@ export type GuidedCreationAction =
   | "SkillGuidedCreationDetail"
   | "SkillGuidedCreationMessage"
   | "SkillGuidedCreationConfirm"
-  | "SkillGuidedCreationCancel";
+  | "SkillGuidedCreationCancel"
+  | "SkillGuidedCreationRename"
+  | "SkillGuidedCreationDelete";
 
 export type GuidedCreationStatus =
   | "collecting"
@@ -357,6 +366,14 @@ export type GuidedCreationStatus =
   | "completed"
   | "failed"
   | "cancelled";
+
+export type GuidedCreationStage =
+  | "positioning"
+  | "scenario_input"
+  | "expected_result"
+  | "working_method"
+  | "evidence_scope"
+  | "boundaries_completion";
 
 export type GuidedDraftField =
   | "roles"
@@ -380,6 +397,52 @@ export type GuidedFieldState =
 
 export type GuidedSkillDraft = Partial<Record<GuidedDraftField, string>>;
 
+export type GuidedEducationDimension =
+  | "educational_goal"
+  | "audience_context"
+  | "input_evidence"
+  | "teaching_strategy"
+  | "action_adaptation"
+  | "boundaries_responsibility"
+  | "completion_evidence";
+
+export type GuidedCreationStep =
+  | "intent_context"
+  | "teacher_experience"
+  | "strategy_co_creation"
+  | "action_adjustment"
+  | "evidence_review";
+
+export type GuidedEducationEvidenceSource =
+  | "user_explicit"
+  | "user_adopted"
+  | "inferred"
+  | "platform_default"
+  | "conflicted";
+
+/**
+ * v3 教育版草稿操作类型。
+ * - set：补充新内容（默认）
+ * - replace：用户明确纠正或否定先前说法时覆盖 content 并清空旧 evidence
+ * - remove：用户撤回该维度内容时删除整个 section
+ */
+export type GuidedEducationDraftOp = "set" | "replace" | "remove";
+
+export interface GuidedEducationEvidence {
+  source: GuidedEducationEvidenceSource;
+  quote?: string;
+  experience_id?: string;
+}
+
+export interface GuidedEducationSection {
+  content: string;
+  evidence: GuidedEducationEvidence[];
+}
+
+export type GuidedEducationDraft = Partial<
+  Record<GuidedEducationDimension, GuidedEducationSection>
+>;
+
 export interface GuidedCreationDocument {
   name: string;
   content: string;
@@ -393,7 +456,8 @@ export interface GuidedConfirmationSection {
     | "input_output"
     | "capability_flow"
     | "knowledge_boundary"
-    | "recovery_completion";
+    | "recovery_completion"
+    | GuidedEducationDimension;
   title: string;
   content: string;
 }
@@ -416,11 +480,19 @@ export interface GuidedCreationMessage {
 
 export interface GuidedCreationSession {
   id: string;
+  display_name: string | null;
+  deleted_at: string | null;
   status: GuidedCreationStatus;
   model: string | null;
   documents: GuidedCreationDocument[];
   draft: GuidedSkillDraft;
   field_states: Record<GuidedDraftField, GuidedFieldState>;
+  education_draft?: GuidedEducationDraft;
+  flow_version: number;
+  confirmed_stages: GuidedCreationStage[];
+  next_stage: GuidedCreationStage | null;
+  completed_steps?: GuidedCreationStep[];
+  current_step?: GuidedCreationStep | null;
   confirmation: GuidedConfirmationCard | null;
   revision_no: number;
   package_id: string | null;
@@ -467,6 +539,17 @@ export interface GuidedCreationListPayload {
 }
 
 export interface GuidedCreationCancelPayload {
+  session_id: string;
+  revision_no: number;
+}
+
+export interface GuidedCreationRenamePayload {
+  session_id: string;
+  revision_no: number;
+  display_name: string;
+}
+
+export interface GuidedCreationDeletePayload {
   session_id: string;
   revision_no: number;
 }

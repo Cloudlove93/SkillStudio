@@ -23,6 +23,13 @@ export class LlmInvalidJsonError extends Error {
   }
 }
 
+export class LlmOutputTruncatedError extends Error {
+  constructor(message = "LLM output token limit was exhausted before usable content was returned") {
+    super(message);
+    this.name = "LlmOutputTruncatedError";
+  }
+}
+
 const STRICT_JSON_CONTRACT = [
   "Strict JSON output contract:",
   "1. Return exactly one JSON object and nothing else.",
@@ -209,13 +216,8 @@ function buildChatCompletionBody(
     ...(maxTokens ? { max_tokens: maxTokens } : {}),
   };
 
-  if (usesKimiK26(model)) {
+  if (usesKimiK25(model) || usesKimiK26(model)) {
     body.thinking = { type: "disabled" };
-    return body;
-  }
-
-  if (usesKimiK25(model)) {
-    body.temperature = 1;
     return body;
   }
 
@@ -298,7 +300,7 @@ async function readChatText(response: Response): Promise<string> {
   const choice = json.choices?.[0];
   const content = choice?.message?.content?.trim() || "";
   if (!content && choice?.finish_reason === "length") {
-    throw new Error("LLM output hit the length limit without returning usable content");
+    throw new LlmOutputTruncatedError();
   }
   return content;
 }
@@ -448,6 +450,9 @@ export async function generateJson<T>(
       }
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
+      if (lastError instanceof LlmOutputTruncatedError) {
+        throw lastError;
+      }
       if (attempt < retries) {
         await new Promise((resolve) => setTimeout(resolve, 500));
       }

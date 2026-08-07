@@ -434,8 +434,8 @@ async function findReusableSkillVersion(
   packageId: string,
   packageVersionNumber?: number,
 ) {
-  const result = await client.query<{ id: string }>(
-    `select sv.id
+  const result = await client.query<{ id: string; version_number: number }>(
+    `select sv.id, sv.version_number
      from agent_skill_versions sv
      join agent_package_versions pv
        on pv.id = sv.created_in_package_version_id
@@ -448,7 +448,7 @@ async function findReusableSkillVersion(
      limit 1`,
     [skillId, contentHash, packageId, packageVersionNumber ?? null],
   );
-  return result.rows[0]?.id;
+  return result.rows[0];
 }
 
 async function createSkillVersion(
@@ -511,13 +511,14 @@ export async function syncPackageVersionSkillsFromSnapshot(
     packageId,
     command.snapshot.skills,
   );
+  const syncedVersions = new Map<string, { id: string; versionNumber: number }>();
 
   for (let index = 0; index < normalizedSkills.length; index += 1) {
     const skill = normalizedSkills[index]!;
     const skillRow = await getOrCreateSkillRow(client, packageId, skill, now);
     const forced = command.forcedSkillVersions?.get(skill.id);
     const contentHash = hashSkill(skill);
-    let skillVersionId = !forced
+    const reusableVersion = !forced
       ? await findReusableSkillVersion(
           client,
           skillRow.id,
@@ -526,6 +527,8 @@ export async function syncPackageVersionSkillsFromSnapshot(
           command.packageVersionNumber,
         )
       : undefined;
+    let skillVersionId = reusableVersion?.id;
+    let skillVersionNumber = reusableVersion?.version_number;
 
     if (!skillVersionId) {
       const versionNumber = await allocateSkillVersionNumber(
@@ -544,7 +547,12 @@ export async function syncPackageVersionSkillsFromSnapshot(
         now,
         note: forced?.note || command.note,
       });
+      skillVersionNumber = versionNumber;
     }
+    syncedVersions.set(skill.id, {
+      id: String(skillVersionId),
+      versionNumber: Number(skillVersionNumber),
+    });
 
     await client.query(
       `insert into agent_package_version_skills
@@ -562,6 +570,7 @@ export async function syncPackageVersionSkillsFromSnapshot(
      where package_id = $1 and not (skill_uid = any($2::text[])) and status = 'active'`,
     [packageId, normalizedSkills.map((skill) => skill.id), now],
   );
+  return syncedVersions;
 }
 
 async function ensurePackageSkillHistory(client: Queryable, pkg: DbRowPackage) {

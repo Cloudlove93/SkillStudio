@@ -152,6 +152,12 @@ export const schemaStatements = [
       field_states_json jsonb not null default '{}'::jsonb check (
         jsonb_typeof(field_states_json) = 'object'
       ),
+      flow_version integer not null default 1 check (flow_version >= 1),
+      confirmed_stages_json jsonb not null default '[]'::jsonb check (
+        jsonb_typeof(confirmed_stages_json) = 'array'
+      ),
+      display_name varchar(200),
+      deleted_at timestamptz,
       confirmation_json jsonb,
       generated_snapshot_json jsonb,
       validation_result_json jsonb,
@@ -173,6 +179,22 @@ export const schemaStatements = [
     `
       alter table skill_guided_creation_sessions
         add column if not exists start_client_message_id text
+    `,
+    `
+      alter table skill_guided_creation_sessions
+        add column if not exists flow_version integer not null default 1
+    `,
+    `
+      alter table skill_guided_creation_sessions
+        add column if not exists confirmed_stages_json jsonb not null default '[]'::jsonb
+    `,
+    `
+      alter table skill_guided_creation_sessions
+        add column if not exists display_name varchar(200)
+    `,
+    `
+      alter table skill_guided_creation_sessions
+        add column if not exists deleted_at timestamptz
     `,
     `
       create unique index if not exists uq_guided_session_start_message
@@ -305,6 +327,11 @@ export const schemaStatements = [
       used_skill_ids jsonb not null,
       context_message_ids jsonb,
       enhanced_model text,
+      baseline_used_skill_ids jsonb,
+      baseline_context_message_ids jsonb,
+      baseline_model text,
+      baseline_skill_version_id bigint,
+      enhanced_skill_version_id bigint,
       created_at timestamptz not null default now(),
       constraint arena_answer_runs_used_skill_ids_string_array check (
         jsonb_typeof(used_skill_ids) = 'array'
@@ -346,6 +373,11 @@ export const schemaStatements = [
       question_message_id bigint not null,
       enhanced_answer_message_id bigint not null,
       baseline_answer_message_id bigint,
+      answer_side text not null default 'enhanced',
+      answer_message_id bigint not null,
+      evidence_version_id bigint not null,
+      answer_skill_version_id bigint,
+      working_skill_version_id bigint,
       user_feedback text not null,
       target_skill_id text,
       result_json jsonb not null default '{}'::jsonb,
@@ -376,12 +408,27 @@ export const schemaStatements = [
       constraint answer_skill_optimization_runs_feedback_check check (
         char_length(btrim(user_feedback)) between 1 and 2000
       ),
+      constraint answer_skill_optimization_runs_answer_side_check check (
+        answer_side in ('baseline', 'enhanced')
+      ),
       constraint answer_skill_optimization_runs_user_create_key_unique unique (
         user_id,
         create_request_key
       )
     )
   `,
+  // Version-aware per-answer optimization must migrate legacy tables before
+  // any index below references the new answer_message_id column.
+  `alter table answer_skill_optimization_runs add column if not exists answer_side text not null default 'enhanced'`,
+  `alter table answer_skill_optimization_runs add column if not exists answer_message_id bigint`,
+  `update answer_skill_optimization_runs set answer_message_id = enhanced_answer_message_id where answer_message_id is null`,
+  `alter table answer_skill_optimization_runs alter column answer_message_id set not null`,
+  `alter table answer_skill_optimization_runs add column if not exists evidence_version_id bigint`,
+  `update answer_skill_optimization_runs set evidence_version_id = base_version_id where evidence_version_id is null`,
+  `alter table answer_skill_optimization_runs alter column evidence_version_id set not null`,
+  `alter table answer_skill_optimization_runs add column if not exists answer_skill_version_id bigint`,
+  `alter table answer_skill_optimization_runs add column if not exists working_skill_version_id bigint`,
+  `drop index if exists uq_answer_skill_optimization_runs_non_cancelled_answer`,
   `
     create index if not exists idx_answer_skill_optimization_runs_user_status
       on answer_skill_optimization_runs (user_id, status)
@@ -392,7 +439,7 @@ export const schemaStatements = [
   `,
   `
     create unique index if not exists uq_answer_skill_optimization_runs_non_cancelled_answer
-      on answer_skill_optimization_runs (user_id, enhanced_answer_message_id)
+      on answer_skill_optimization_runs (user_id, answer_message_id)
       where status <> 'cancelled'
   `,
   `
@@ -720,6 +767,11 @@ export const migrationStatements = [
   // arena_answer_runs
   `alter table arena_answer_runs add column if not exists context_message_ids jsonb`,
   `alter table arena_answer_runs add column if not exists enhanced_model text`,
+  `alter table arena_answer_runs add column if not exists baseline_used_skill_ids jsonb`,
+  `alter table arena_answer_runs add column if not exists baseline_context_message_ids jsonb`,
+  `alter table arena_answer_runs add column if not exists baseline_model text`,
+  `alter table arena_answer_runs add column if not exists baseline_skill_version_id bigint`,
+  `alter table arena_answer_runs add column if not exists enhanced_skill_version_id bigint`,
   `
     do $$
     begin

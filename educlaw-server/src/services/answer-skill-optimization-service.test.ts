@@ -40,6 +40,11 @@ const defaultAnswerRun: ArenaAnswerRun = {
   usedSkillIds: ["skill-bullying"],
   contextMessageIds: [],
   enhancedModel: "resolved-enhanced-model",
+  baselineUsedSkillIds: ["skill-bullying"],
+  baselineContextMessageIds: [],
+  baselineModel: "resolved-enhanced-model",
+  baselineSkillVersionId: 101,
+  enhancedSkillVersionId: 202,
   createdAt,
 };
 
@@ -190,7 +195,7 @@ function configureQueryMock() {
           storedRows.some(
             (row) =>
               row.user_id === userId &&
-              row.enhanced_answer_message_id === Number(values[5]) &&
+              (row.answer_message_id ?? row.enhanced_answer_message_id) === Number(values[18]) &&
               row.status !== "cancelled",
           )
         ) {
@@ -220,6 +225,11 @@ function configureQueryMock() {
           final_version_id: null,
           created_at: String(values[15]),
           updated_at: String(values[16]),
+          answer_side: values[17] as "baseline" | "enhanced",
+          answer_message_id: Number(values[18]),
+          evidence_version_id: Number(values[19]),
+          answer_skill_version_id: nullableNumber(values[20]),
+          working_skill_version_id: nullableNumber(values[21]),
         };
         nextOptimizationId += 1;
         storedRows.push(row);
@@ -264,6 +274,7 @@ async function loadService() {
             ? { available: false, reason: "replay_model_unavailable" }
             : { available: true, reason: null },
     getArenaAnswerRunByEnhancedMessage: getArenaAnswerRunMock,
+    getArenaAnswerRunByMessage: getArenaAnswerRunMock,
     parseArenaAnswerContextMessageIds: (value: unknown) => value,
     parseArenaAnswerEnhancedModel: (value: unknown) => value,
   }));
@@ -289,6 +300,24 @@ afterEach(() => {
 });
 
 describe("createAnswerSkillOptimizationRun", () => {
+  it("creates an independent optimization for the baseline Arena answer", async () => {
+    const { createAnswerSkillOptimizationRun } = await loadService();
+
+    const run = await createAnswerSkillOptimizationRun(createInput({
+      answerSide: "baseline",
+      answerMessageId: 2001,
+    }));
+
+    expect(run).toMatchObject({
+      answerSide: "baseline",
+      answerMessageId: 2001,
+      answerSkillVersionId: 101,
+      workingSkillVersionId: 101,
+      enhancedAnswerMessageId: 2002,
+    });
+    expect(getArenaAnswerRunMock).toHaveBeenCalledWith("user-1", 2001);
+  });
+
   it("creates a processing run from trusted Arena provenance", async () => {
     const { createAnswerSkillOptimizationRun } = await loadService();
 
@@ -303,6 +332,11 @@ describe("createAnswerSkillOptimizationRun", () => {
       questionMessageId: 1001,
       enhancedAnswerMessageId: 2002,
       baselineAnswerMessageId: 2001,
+      answerSide: "enhanced",
+      answerMessageId: 2002,
+      evidenceVersionId: 501,
+      answerSkillVersionId: 202,
+      workingSkillVersionId: 202,
       userFeedback: "Please add concrete response steps.",
       targetSkillId: null,
       result: {},
@@ -713,6 +747,11 @@ describe("getAnswerSkillOptimizationRun", () => {
       questionMessageId: 1001,
       enhancedAnswerMessageId: 2002,
       baselineAnswerMessageId: 2001,
+      answerSide: "enhanced",
+      answerMessageId: 2002,
+      evidenceVersionId: 501,
+      answerSkillVersionId: null,
+      workingSkillVersionId: null,
       userFeedback: "Please add concrete response steps.",
       targetSkillId: null,
       result: {},

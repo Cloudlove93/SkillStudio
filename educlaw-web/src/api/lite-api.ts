@@ -9,10 +9,12 @@ import type {
   GuidedCreationAction,
   GuidedCreationCancelPayload,
   GuidedCreationConfirmPayload,
+  GuidedCreationDeletePayload,
   GuidedCreationDetailPayload,
   GuidedCreationListPayload,
   GuidedCreationMessage,
   GuidedCreationMessagePayload,
+  GuidedCreationRenamePayload,
   GuidedCreationSession,
   GuidedCreationSessionDetail,
   GuidedCreationStartPayload,
@@ -444,6 +446,24 @@ export const liteApi = {
       'SkillGuidedCreationCancel',
       payload as unknown as Record<string, unknown>,
     ),
+  renameGuidedCreation: (
+    token: string,
+    payload: GuidedCreationRenamePayload,
+  ) =>
+    guidedActionRequest<GuidedCreationSessionDetail>(
+      token,
+      'SkillGuidedCreationRename',
+      payload as unknown as Record<string, unknown>,
+    ),
+  deleteGuidedCreation: (
+    token: string,
+    payload: GuidedCreationDeletePayload,
+  ) =>
+    guidedActionRequest<{ id: string; deleted_at: string }>(
+      token,
+      'SkillGuidedCreationDelete',
+      payload as unknown as Record<string, unknown>,
+    ),
   startGuidedCreationStream: (
     token: string,
     payload: GuidedCreationStartPayload,
@@ -648,6 +668,7 @@ export const liteApi = {
       left: SkillArenaSelectionPayload;
       right: SkillArenaSelectionPayload;
       model?: string;
+      surface?: 'run' | 'arena';
     },
   ) =>
     actionRequest<ArenaThread>(token, 'arena.thread.create', packageId, {
@@ -657,6 +678,7 @@ export const liteApi = {
       left: payload.left,
       right: payload.right,
       model: payload.model,
+      surface: payload.surface,
     }),
   getThread: (token: string, threadId: string) =>
     request<ArenaThreadDetail>(
@@ -666,6 +688,15 @@ export const liteApi = {
     ),
   getArenaThreadDetail: (token: string, packageId: string, threadId: string) =>
     actionRequest<ArenaThreadDetail>(token, 'arena.thread.detail', packageId, {
+      threadId,
+    }),
+  renameArenaThread: (token: string, packageId: string, threadId: string, title: string) =>
+    actionRequest<ArenaThread>(token, 'arena.thread.rename', packageId, {
+      threadId,
+      title,
+    }),
+  deleteArenaThread: (token: string, packageId: string, threadId: string) =>
+    actionRequest<{ ok: boolean }>(token, 'arena.thread.delete', packageId, {
       threadId,
     }),
   sendMessageStream: (

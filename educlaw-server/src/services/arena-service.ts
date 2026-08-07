@@ -48,6 +48,11 @@ export interface ArenaAnswerRun {
   usedSkillIds: string[];
   contextMessageIds: number[] | null;
   enhancedModel: string | null;
+  baselineUsedSkillIds: string[];
+  baselineContextMessageIds: number[] | null;
+  baselineModel: string | null;
+  baselineSkillVersionId: number | null;
+  enhancedSkillVersionId: number | null;
   createdAt: string;
 }
 
@@ -97,6 +102,7 @@ interface CreateArenaThreadInput {
   right?: SkillArenaVariantSelection;
   model?: string;
   idempotencyKey?: string;
+  surface?: "run" | "arena";
 }
 
 interface GetArenaThreadDetailInput {
@@ -130,6 +136,43 @@ interface ArenaRuntimeContext {
     baseline: string;
     enhanced: string;
   };
+  skillVersions: {
+    baseline: { id: number; versionNumber: number; skillUid: string };
+    enhanced: { id: number; versionNumber: number; skillUid: string };
+  } | null;
+}
+
+export interface ArenaAnswerRunSideProvenance {
+  answerMessageId: number;
+  usedSkillIds: string[];
+  contextMessageIds: number[] | null;
+  model: string | null;
+  skillVersionId: number | null;
+}
+
+export function getArenaAnswerRunSideProvenance(
+  answerRun: ArenaAnswerRun,
+  side: ArenaStreamSide,
+): ArenaAnswerRunSideProvenance {
+  return side === "baseline"
+    ? {
+        answerMessageId: answerRun.baselineAnswerMessageId ?? 0,
+        usedSkillIds: [...answerRun.baselineUsedSkillIds],
+        contextMessageIds: answerRun.baselineContextMessageIds === null
+          ? null
+          : [...answerRun.baselineContextMessageIds],
+        model: answerRun.baselineModel,
+        skillVersionId: answerRun.baselineSkillVersionId,
+      }
+    : {
+        answerMessageId: answerRun.enhancedAnswerMessageId,
+        usedSkillIds: [...answerRun.usedSkillIds],
+        contextMessageIds: answerRun.contextMessageIds === null
+          ? null
+          : [...answerRun.contextMessageIds],
+        model: answerRun.enhancedModel,
+        skillVersionId: answerRun.enhancedSkillVersionId,
+      };
 }
 
 export class ArenaServiceError extends Error {
@@ -355,6 +398,26 @@ function toAnswerRun(row: DbRowArenaAnswerRun): ArenaAnswerRun {
       row.context_message_ids,
     ),
     enhancedModel: parseArenaAnswerEnhancedModel(row.enhanced_model),
+    baselineUsedSkillIds:
+      row.baseline_used_skill_ids == null
+        ? []
+        : parseUsedSkillIds(row.baseline_used_skill_ids),
+    baselineContextMessageIds:
+      row.baseline_context_message_ids === undefined
+        ? null
+        : parseArenaAnswerContextMessageIds(row.baseline_context_message_ids),
+    baselineModel:
+      row.baseline_model === undefined
+        ? null
+        : parseArenaAnswerEnhancedModel(row.baseline_model),
+    baselineSkillVersionId:
+      row.baseline_skill_version_id == null
+        ? null
+        : Number(row.baseline_skill_version_id),
+    enhancedSkillVersionId:
+      row.enhanced_skill_version_id == null
+        ? null
+        : Number(row.enhanced_skill_version_id),
     createdAt: row.created_at,
   };
 }
@@ -716,6 +779,7 @@ function buildSkillArenaConfig(input: {
   basePackageVersionId: string;
   left: DbSkillArenaVariantRow;
   right: DbSkillArenaVariantRow;
+  surface?: "run" | "arena";
 }) {
   const toVariant = (
     side: "left" | "right",
@@ -744,6 +808,7 @@ function buildSkillArenaConfig(input: {
   return {
     mode: "skill_arena" as const,
     compositionMode: "skill_only" as const,
+    ...(input.surface ? { surface: input.surface } : {}),
     basePackageVersionId: input.basePackageVersionId,
     left: toVariant("left", input.left),
     right: toVariant("right", input.right),
@@ -858,6 +923,7 @@ async function resolveThreadRuntime(
         baseline: "Baseline",
         enhanced: pkg.snapshot.name || "Enhanced",
       },
+      skillVersions: null,
     };
   }
 
@@ -916,6 +982,18 @@ async function resolveThreadRuntime(
       baseline: `${leftSkill.name || left.skill_uid} v${left.version_number}`,
       enhanced: `${rightSkill.name || right.skill_uid} v${right.version_number}`,
     },
+    skillVersions: {
+      baseline: {
+        id: Number(left.skill_version_id),
+        versionNumber: Number(left.version_number),
+        skillUid: left.skill_uid,
+      },
+      enhanced: {
+        id: Number(right.skill_version_id),
+        versionNumber: Number(right.version_number),
+        skillUid: right.skill_uid,
+      },
+    },
   };
 }
 
@@ -925,6 +1003,56 @@ export async function listThreads(userId: string, packageId: string | number) {
     [userId, packageId],
   );
   return result.rows.map(toThread);
+}
+
+export async function renameArenaThread(input: {
+  authUserId: string;
+  packageId: string;
+  threadId: string;
+  title: string;
+}) {
+  const title = input.title.trim().replace(/\s+/g, " ").slice(0, 120);
+  if (!title) {
+    throw new ArenaServiceError("Thread title is required", 422, "INVALID_ARGUMENT");
+  }
+  const result = await query<DbRowThread>(
+    "update arena_threads set title = $1, updated_at = now() where id = $2 and user_id = $3 and package_id = $4 returning *",
+    [title, input.threadId, input.authUserId, input.packageId],
+  );
+  const row = result.rows[0];
+  if (!row) throw new ArenaServiceError("Arena thread not found", 404, "THREAD_NOT_FOUND");
+  return toThread(row);
+}
+
+export async function deleteArenaThread(input: {
+  authUserId: string;
+  packageId: string;
+  threadId: string;
+}) {
+  return withTransaction(async (client) => {
+    // These legacy tables do not all have a thread foreign key, so clean the
+    // dependent records explicitly before removing the conversation itself.
+    await client.query(
+      "delete from answer_skill_optimization_runs where thread_id = $1 and user_id = $2 and package_id = $3",
+      [input.threadId, input.authUserId, input.packageId],
+    );
+    await client.query(
+      "delete from arena_answer_runs where thread_id = $1 and user_id = $2 and package_id = $3",
+      [input.threadId, input.authUserId, input.packageId],
+    );
+    await client.query(
+      "delete from arena_messages where thread_id = $1 and user_id = $2",
+      [input.threadId, input.authUserId],
+    );
+    const result = await client.query<{ id: number }>(
+      "delete from arena_threads where id = $1 and user_id = $2 and package_id = $3 returning id",
+      [input.threadId, input.authUserId, input.packageId],
+    );
+    if (result.rows.length === 0) {
+      throw new ArenaServiceError("Arena thread not found", 404, "THREAD_NOT_FOUND");
+    }
+    return { ok: true };
+  });
 }
 
 export async function createThread(userId: string, packageId: string | number, model?: string) {
@@ -1037,6 +1165,7 @@ export async function createArenaThread(
       basePackageVersionId,
       left,
       right,
+      surface: input.surface,
     });
     const warning =
       leftSkillId === rightSkillId && leftSkillVersionId === rightSkillVersionId
@@ -1119,6 +1248,7 @@ export async function createArenaThread(
 export async function getThreadDetail(
   userId: string,
   threadId: string | number,
+  includeAnswerVersions = false,
 ): Promise<Omit<ArenaThreadDetail, "answerOptimizations">> {
   const threadResult = await query<DbRowThread>(
     "select * from arena_threads where id = $1 and user_id = $2",
@@ -1137,7 +1267,52 @@ export async function getThreadDetail(
     messages: messages.rows.map(toMessage),
   };
   // Skill Arena 线程：附带绑定版本号与最新 active 版本号，供前端显示过期提示
-  if (detail.thread.arenaKind === "skill_arena") {
+  if (detail.thread.arenaKind === "skill_arena" && includeAnswerVersions) {
+    const answerRuns = await query<
+      DbRowArenaAnswerRun & {
+        baseline_version_number: number | null;
+        enhanced_version_number: number | null;
+      }
+    >(
+      `select ar.*,
+              bsv.version_number as baseline_version_number,
+              esv.version_number as enhanced_version_number
+         from arena_answer_runs ar
+         left join agent_skill_versions bsv
+           on bsv.id = ar.baseline_skill_version_id
+         left join agent_skill_versions esv
+           on esv.id = ar.enhanced_skill_version_id
+        where ar.user_id = $1 and ar.thread_id = $2`,
+      [userId, threadId],
+    );
+    const versionByMessageId = new Map<
+      number,
+      { id: number; versionNumber: number }
+    >();
+    for (const row of answerRuns.rows) {
+      if (row.baseline_answer_message_id && row.baseline_skill_version_id) {
+        versionByMessageId.set(Number(row.baseline_answer_message_id), {
+          id: Number(row.baseline_skill_version_id),
+          versionNumber: Number(row.baseline_version_number),
+        });
+      }
+      if (row.enhanced_skill_version_id) {
+        versionByMessageId.set(Number(row.enhanced_answer_message_id), {
+          id: Number(row.enhanced_skill_version_id),
+          versionNumber: Number(row.enhanced_version_number),
+        });
+      }
+    }
+    detail.messages = detail.messages.map((message) => {
+      const version = versionByMessageId.get(message.id);
+      return version && Number.isSafeInteger(version.versionNumber)
+        ? {
+            ...message,
+            skillVersionId: String(version.id),
+            skillVersionNumber: version.versionNumber,
+          }
+        : message;
+    });
     detail.skillVersionInfo = await getSkillArenaVersionInfo(
       threadId,
       thread.package_id,
@@ -1160,12 +1335,30 @@ export async function getArenaAnswerRunByEnhancedMessage(
   return toAnswerRun(row);
 }
 
+export async function getArenaAnswerRunByMessage(
+  userId: string,
+  answerMessageId: string | number,
+): Promise<ArenaAnswerRun> {
+  const result = await query<DbRowArenaAnswerRun>(
+    `select * from arena_answer_runs
+     where user_id = $1
+       and (
+         enhanced_answer_message_id = $2
+         or baseline_answer_message_id = $2
+       )`,
+    [userId, answerMessageId],
+  );
+  const row = result.rows[0];
+  if (!row) throw new ArenaAnswerRunNotFoundError();
+  return toAnswerRun(row);
+}
+
 export async function getArenaThreadDetail(
   input: GetArenaThreadDetailInput,
 ): Promise<Omit<ArenaThreadDetail, "answerOptimizations">> {
   const packageId = positiveId(input.packageId, "packageId");
   const threadId = positiveId(input.threadId, "threadId");
-  const detail = await getThreadDetail(input.authUserId, threadId);
+  const detail = await getThreadDetail(input.authUserId, threadId, true);
   if (String(detail.thread.packageId) !== packageId) {
     throw new ArenaServiceError(
       "Arena thread not found",
@@ -1229,6 +1422,15 @@ export async function* streamMessage(
   const enhancedModel = packageArenaEnhanced
     ? resolveEnhancedModel(model || detail.thread.model || undefined)
     : null;
+  const skillArenaPromptContexts = runtime.arenaKind === "skill_arena"
+    ? {
+        baseline: buildArenaSidePromptContext(detail.messages, "baseline", shared),
+        enhanced: buildArenaSidePromptContext(detail.messages, "enhanced", shared),
+      }
+    : null;
+  const skillArenaModel = runtime.arenaKind === "skill_arena"
+    ? model || detail.thread.model || resolveEnhancedModel(undefined)
+    : null;
   const queue: Array<Exclude<ArenaChatStreamEvent, { event: "done" }>> = [];
   let pending = sides.length;
   let wake: (() => void) | null = null;
@@ -1280,9 +1482,10 @@ export async function* streamMessage(
             runtime.baselineSnapshot || runtime.packageSnapshot,
           )
         : BASELINE_SYSTEM_PROMPT,
-      buildHistory(fullHistory, "baseline"),
+       skillArenaPromptContexts?.baseline.userPrompt
+         || buildHistory(fullHistory, "baseline"),
       runtime.arenaKind === "skill_arena"
-        ? model || detail.thread.model || undefined
+         ? skillArenaModel || undefined
         : resolveBaselineModel(model || detail.thread.model || undefined),
     );
   }
@@ -1293,8 +1496,9 @@ export async function* streamMessage(
         buildSkillArenaPrompt(
           runtime.enhancedSnapshot || runtime.packageSnapshot,
         ),
-        buildHistory(fullHistory, "enhanced"),
-        model || detail.thread.model || undefined,
+         skillArenaPromptContexts?.enhanced.userPrompt
+           || buildHistory(fullHistory, "enhanced"),
+         skillArenaModel || undefined,
       );
     } else {
       void runSide(
@@ -1341,23 +1545,43 @@ export async function* streamMessage(
         role: "assistant",
         content: sideContents[side],
         createdAt: savedAt,
+        ...(runtime.skillVersions
+          ? {
+              skillVersionId: String(runtime.skillVersions[side].id),
+              skillVersionNumber: runtime.skillVersions[side].versionNumber,
+            }
+          : {}),
       });
     }
 
-    if (packageArenaEnhanced) {
+    if (packageArenaEnhanced || runtime.arenaKind === "skill_arena") {
       if (enhancedAnswerMessageId === null) {
         throw new Error("Enhanced answer was not saved");
       }
-      if (!enhancedPromptContext || !enhancedModel) {
+      const recordedEnhancedContext = enhancedPromptContext
+        || skillArenaPromptContexts?.enhanced;
+      const recordedEnhancedModel = enhancedModel || skillArenaModel;
+      if (!recordedEnhancedContext || !recordedEnhancedModel) {
         throw new Error("Enhanced answer provenance is unavailable");
       }
+      const baselineContext = skillArenaPromptContexts?.baseline ?? null;
+      const enhancedUsedSkillIds = runtime.skillVersions
+        ? [runtime.skillVersions.enhanced.skillUid]
+        : usedSkillIds;
+      const baselineUsedSkillIds = runtime.skillVersions
+        ? [runtime.skillVersions.baseline.skillUid]
+        : [];
       await client.query(
         `insert into arena_answer_runs
            (user_id, thread_id, package_id, package_version_id,
             question_message_id, enhanced_answer_message_id,
             baseline_answer_message_id, used_skill_ids,
-            context_message_ids, enhanced_model, created_at)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+            context_message_ids, enhanced_model,
+            baseline_used_skill_ids, baseline_context_message_ids,
+            baseline_model, baseline_skill_version_id,
+            enhanced_skill_version_id, created_at)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+                 $11, $12, $13, $14, $15, $16)`,
         [
           userId,
           threadId,
@@ -1366,9 +1590,16 @@ export async function* streamMessage(
           shared.id,
           enhancedAnswerMessageId,
           baselineAnswerMessageId,
-          JSON.stringify(usedSkillIds),
-          JSON.stringify(enhancedPromptContext.contextMessageIds),
-          enhancedModel,
+          JSON.stringify(enhancedUsedSkillIds),
+          JSON.stringify(recordedEnhancedContext.contextMessageIds),
+          recordedEnhancedModel,
+          JSON.stringify(baselineUsedSkillIds),
+          baselineContext
+            ? JSON.stringify(baselineContext.contextMessageIds)
+            : null,
+          baselineContext ? skillArenaModel : null,
+          runtime.skillVersions?.baseline.id ?? null,
+          runtime.skillVersions?.enhanced.id ?? null,
           savedAt,
         ],
       );

@@ -1,9 +1,11 @@
-import type { SkillVersionDetail } from '@educlaw/shared';
+import { useEffect, useState } from 'react';
+import type { ArenaThread, SkillVersionDetail } from '@educlaw/shared';
 import type { SkillPinnedUpdate, SkillWorkspaceView } from './skill-workspace-state';
 import { SkillArenaWorkspace } from './SkillArenaWorkspace';
 import { SkillOptimizeWorkspace } from './SkillOptimizeWorkspace';
 import { SkillRunWorkspace } from './SkillRunWorkspace';
 import { SkillVersionWorkspace } from './SkillVersionWorkspace';
+import type { AnswerOptimizationRerunRequest, AnswerOptimizationSelection } from './answer-optimization-selection';
 
 type DetailView = Extract<SkillWorkspaceView, 'overview' | 'run' | 'test' | 'arena' | 'optimize' | 'versions'>;
 
@@ -24,6 +26,13 @@ type Props = {
   versionsLoading: boolean;
   onPublishUpdate: (update: SkillPinnedUpdate, autoOpen?: boolean) => void;
   onReloadVersions: () => Promise<void>;
+  onRunStateChange?: (running: boolean, threadId?: string | null) => void;
+  onOptimizeAnswer: (selection: AnswerOptimizationSelection) => void;
+  conversations: ArenaThread[];
+  selectedConversationId: string | null;
+  onConversationCreated: (thread: ArenaThread) => void;
+  onConversationUpdated: (thread: ArenaThread) => void;
+  answerRerunRequest?: AnswerOptimizationRerunRequest | null;
 };
 
 const viewLabels: Record<DetailView, string> = {
@@ -31,18 +40,38 @@ const viewLabels: Record<DetailView, string> = {
   run: '运行 Skill',
   test: '测试',
   arena: 'Arena 对比',
-  optimize: '交互式优化',
+  optimize: '整体优化',
   versions: '版本',
 };
 
 export function SkillDetailWorkspace(props: Props) {
   const currentVersion = props.versions.find((version) => version.id === props.currentVersionId);
+  const [selectedRunVersionId, setSelectedRunVersionId] = useState(props.currentVersionId ?? '');
+  useEffect(() => {
+    if (!props.versions.some((version) => version.id === selectedRunVersionId)) {
+      setSelectedRunVersionId(props.currentVersionId ?? props.versions[0]?.id ?? '');
+    }
+  }, [props.currentVersionId, props.versions, selectedRunVersionId]);
+  const selectedRunVersion = props.versions.find((version) => version.id === selectedRunVersionId) ?? currentVersion;
+  useEffect(() => {
+    const request = props.answerRerunRequest;
+    if (!request || request.selection.origin === 'arena') return;
+    const next = props.versions.find((version) => version.versionNumber === request.versionNumber);
+    if (next && selectedRunVersionId !== next.id) setSelectedRunVersionId(next.id);
+  }, [props.answerRerunRequest, props.versions, selectedRunVersionId]);
 
   return (
     <main className="skill-center skill-detail-workspace">
       <header className="skill-workspace-topbar">
         <strong className="skill-current-view">{viewLabels[props.view]}</strong>
-        {(props.view === 'run' || props.view === 'test') && <span className="skill-active-version">固定使用 v{currentVersion?.versionNumber ?? '-'}</span>}
+        {(props.view === 'run' || props.view === 'test') && (
+          <label className="skill-active-version skill-version-picker">
+            <span>当前版本</span>
+            <select value={selectedRunVersion?.id ?? ''} onChange={(event) => setSelectedRunVersionId(event.target.value)}>
+              {props.versions.filter((version) => version.status !== 'discarded').map((version) => <option value={version.id} key={version.id}>v{version.versionNumber}</option>)}
+            </select>
+          </label>
+        )}
       </header>
 
       <div className="skill-detail-content">
@@ -51,27 +80,29 @@ export function SkillDetailWorkspace(props: Props) {
           <SkillRunWorkspace
             token={props.token}
             packageId={props.skill.packageId}
-            version={currentVersion}
-            onCompleted={() => props.onPublishUpdate({
-              id: 'skill-run-completed',
-              title: 'Skill 运行完成',
-              message: `本次任务由 v${currentVersion?.versionNumber ?? '-'} 完成，运行记录已保存在服务端。`,
-              actionLabel: '查看运行信息',
-            }, false)}
+            version={selectedRunVersion}
+            currentPackageVersionId={currentVersion?.createdInPackageVersionId}
+            onRunStateChange={props.onRunStateChange}
+            onOptimizeAnswer={props.onOptimizeAnswer}
+            selectedThreadId={props.selectedConversationId}
+            onThreadCreated={props.onConversationCreated}
+            onThreadUpdated={props.onConversationUpdated}
+            rerunRequest={props.answerRerunRequest}
           />
         )}
         {props.view === 'test' && (
           <SkillRunWorkspace
             token={props.token}
             packageId={props.skill.packageId}
-            version={currentVersion}
+            version={selectedRunVersion}
+            currentPackageVersionId={currentVersion?.createdInPackageVersionId}
             purpose="test"
-            onCompleted={() => props.onPublishUpdate({
-              id: 'test-recorded',
-              title: '测试完成',
-              message: `v${currentVersion?.versionNumber ?? '-'} 的测试记录已保存在服务端。`,
-              actionLabel: '查看测试信息',
-            }, false)}
+            onRunStateChange={props.onRunStateChange}
+            onOptimizeAnswer={props.onOptimizeAnswer}
+            selectedThreadId={props.selectedConversationId}
+            onThreadCreated={props.onConversationCreated}
+            onThreadUpdated={props.onConversationUpdated}
+            rerunRequest={props.answerRerunRequest}
           />
         )}
         {props.view === 'arena' && (
@@ -80,12 +111,9 @@ export function SkillDetailWorkspace(props: Props) {
             packageId={props.skill.packageId}
             versions={props.versions}
             currentVersionId={props.currentVersionId}
-            onCompleted={() => props.onPublishUpdate({
-              id: 'arena-completed',
-              title: 'Arena 对比完成',
-              message: '两个固定 Skill 版本的运行结果已生成并保存在服务端。',
-              actionLabel: '查看对比信息',
-            }, false)}
+            onOptimizeAnswer={props.onOptimizeAnswer}
+            onCompleted={() => undefined}
+            rerunRequest={props.answerRerunRequest}
           />
         )}
         {props.view === 'optimize' && (

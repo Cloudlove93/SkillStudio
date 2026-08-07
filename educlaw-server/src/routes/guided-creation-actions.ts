@@ -7,10 +7,12 @@ import type {
 import {
   cancelGuidedCreation,
   confirmGuidedCreation,
+  deleteGuidedCreation,
   getGuidedCreationDetail,
   GuidedCreationError,
   listGuidedCreations,
   processGuidedCreationMessage,
+  renameGuidedCreation,
   startGuidedCreation,
 } from '../services/guided-creation-service.js';
 import {
@@ -27,6 +29,8 @@ const ACTIONS = new Set<GuidedCreationAction>([
   'SkillGuidedCreationMessage',
   'SkillGuidedCreationConfirm',
   'SkillGuidedCreationCancel',
+  'SkillGuidedCreationRename',
+  'SkillGuidedCreationDelete',
 ]);
 const STREAM_ACTIONS = new Set<GuidedCreationAction>([
   'SkillGuidedCreationStart',
@@ -223,6 +227,31 @@ export function parseGuidedCreationRequest(
         },
       };
     }
+    case 'SkillGuidedCreationRename': {
+      exactKeys(
+        payload,
+        ['session_id', 'revision_no', 'display_name'],
+        'payload',
+      );
+      return {
+        action: body.action,
+        payload: {
+          session_id: positiveId(payload.session_id, 'session_id'),
+          revision_no: revision(payload.revision_no),
+          display_name: requiredText(payload.display_name, 'display_name', 200),
+        },
+      };
+    }
+    case 'SkillGuidedCreationDelete': {
+      exactKeys(payload, ['session_id', 'revision_no'], 'payload');
+      return {
+        action: body.action,
+        payload: {
+          session_id: positiveId(payload.session_id, 'session_id'),
+          revision_no: revision(payload.revision_no),
+        },
+      };
+    }
     case 'SkillGuidedCreationList': {
       exactKeys(payload, ['status', 'limit', 'cursor'], 'payload');
       let status: GuidedCreationStatus[] | undefined;
@@ -281,6 +310,19 @@ export async function handleGuidedCreationJsonAction(input: {
       });
     case 'SkillGuidedCreationCancel':
       return cancelGuidedCreation({
+        auth_user_id: input.auth_user_id,
+        session_id: payload.session_id as string,
+        revision_no: payload.revision_no as number,
+      });
+    case 'SkillGuidedCreationRename':
+      return renameGuidedCreation({
+        auth_user_id: input.auth_user_id,
+        session_id: payload.session_id as string,
+        revision_no: payload.revision_no as number,
+        display_name: payload.display_name as string,
+      });
+    case 'SkillGuidedCreationDelete':
+      return deleteGuidedCreation({
         auth_user_id: input.auth_user_id,
         session_id: payload.session_id as string,
         revision_no: payload.revision_no as number,

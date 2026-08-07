@@ -5,6 +5,8 @@ import {
   ArenaServiceError,
   createArenaThread,
   getArenaThreadDetail,
+  renameArenaThread,
+  deleteArenaThread,
 } from '../services/arena-service.js';
 import {
   discardSkillVersion,
@@ -127,6 +129,19 @@ function optionalLimit(value: unknown): number | undefined {
   return value;
 }
 
+function optionalArenaSurface(value: unknown): 'run' | 'arena' | undefined {
+  const surface = optionalString(value, 'surface', 20);
+  if (surface === undefined) return undefined;
+  if (surface !== 'run' && surface !== 'arena') {
+    throw new SkillVersionError(
+      'INVALID_ARGUMENT',
+      'surface must be run or arena',
+      422,
+    );
+  }
+  return surface;
+}
+
 function parseBase(body: unknown, payloadKeys: string[]) {
   if (!isPlainObject(body)) {
     throw new SkillVersionError(
@@ -183,6 +198,7 @@ const actionMap = new Map<string, ApiHandler>([
         'left',
         'right',
         'model',
+        'surface',
       ]);
       const arenaKind = optionalString(
         parsed.payload.arenaKind,
@@ -212,6 +228,7 @@ const actionMap = new Map<string, ApiHandler>([
         left: parseVariantSelection(parsed.payload.left, 'left'),
         right: parseVariantSelection(parsed.payload.right, 'right'),
         model: optionalString(parsed.payload.model, 'model', 120),
+        surface: optionalArenaSurface(parsed.payload.surface),
       });
     },
   ],
@@ -220,6 +237,29 @@ const actionMap = new Map<string, ApiHandler>([
     async ({ body, authUserId }) => {
       const parsed = parseBase(body, ['threadId']);
       return getArenaThreadDetail({
+        authUserId,
+        packageId: parsed.packageId,
+        threadId: asPositiveId(parsed.payload.threadId, 'threadId'),
+      });
+    },
+  ],
+  [
+    'arena.thread.rename',
+    async ({ body, authUserId }) => {
+      const parsed = parseBase(body, ['threadId', 'title']);
+      return renameArenaThread({
+        authUserId,
+        packageId: parsed.packageId,
+        threadId: asPositiveId(parsed.payload.threadId, 'threadId'),
+        title: requiredString(parsed.payload.title, 'title', 120),
+      });
+    },
+  ],
+  [
+    'arena.thread.delete',
+    async ({ body, authUserId }) => {
+      const parsed = parseBase(body, ['threadId']);
+      return deleteArenaThread({
         authUserId,
         packageId: parsed.packageId,
         threadId: asPositiveId(parsed.payload.threadId, 'threadId'),

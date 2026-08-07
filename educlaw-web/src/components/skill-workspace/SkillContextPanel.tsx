@@ -12,6 +12,8 @@ import {
   Sparkles,
 } from 'lucide-react';
 import type { SkillContextView, SkillWorkspaceView } from './skill-workspace-state';
+import type { AnswerOptimizationSelection } from './answer-optimization-selection';
+import { SkillAnswerOptimizationPanel } from './SkillAnswerOptimizationPanel';
 
 type Props = {
   session: GuidedCreationSessionDetail | null;
@@ -25,6 +27,10 @@ type Props = {
   onOpen: (view: SkillContextView) => void;
   onClose: () => void;
   onOpenVersionManager: () => void;
+  token: string;
+  answerOptimization: AnswerOptimizationSelection | null;
+  onAnswerOptimizationSaved: (versionNumber: number) => void;
+  onAnswerOptimizationRerun: (versionNumber: number, selection: AnswerOptimizationSelection) => void;
 };
 
 const fallbackTopics = [
@@ -46,66 +52,71 @@ function summaryTitle(activeView: SkillWorkspaceView) {
 
 export function SkillContextPanel(props: Props) {
   const [fullscreen, setFullscreen] = useState(false);
-  if (!props.open) {
-    return (
-      <aside className="skill-context is-collapsed">
-        <nav className="skill-context-rail" aria-label="右侧快捷工具">
-          <button
-            className="skill-icon-button"
-            onClick={() => props.onOpen('summary')}
-            aria-label="当前信息"
-            title="当前信息"
-          >
-            <Info size={17} />
-          </button>
-          <button
-            className="skill-icon-button"
-            onClick={() => props.onOpen('versions')}
-            aria-label="版本管理"
-            title="版本管理"
-            disabled={!props.hasSkill}
-          >
-            <GitBranch size={17} />
-          </button>
-        </nav>
-      </aside>
-    );
-  }
-
   const [eyebrow, title] = props.view === 'versions'
     ? ['版本管理', '最近版本']
-    : summaryTitle(props.activeView);
+    : props.view === 'optimization'
+      ? ['回答优化', '改进这条回答']
+      : summaryTitle(props.activeView);
 
   return (
-    <aside className={`skill-context is-open ${fullscreen ? 'is-fullscreen' : ''}`}>
-      <header className="skill-context-header">
-        <div>
-          <span className="skill-eyebrow">{eyebrow}</span>
-          <h2>{title}</h2>
-        </div>
-        <div className="skill-context-header-actions">
-          {props.view === 'versions' && (
-            <button className="skill-icon-button" onClick={props.onOpenVersionManager} title="在主区域打开">
-              <ExternalLink size={16} />
+    <aside className={`skill-context ${props.open ? 'is-open' : 'is-collapsed'} ${props.open && fullscreen ? 'is-fullscreen' : ''}`}>
+      <nav className="skill-context-rail" aria-label="右侧快捷工具" aria-hidden={props.open}>
+        <button
+          className="skill-icon-button"
+          onClick={() => props.onOpen('summary')}
+          aria-label="当前信息"
+          title="当前信息"
+        >
+          <Info size={17} />
+        </button>
+        <button
+          className="skill-icon-button"
+          onClick={() => props.onOpen('versions')}
+          aria-label="版本管理"
+          title="版本管理"
+          disabled={!props.hasSkill}
+        >
+          <GitBranch size={17} />
+        </button>
+      </nav>
+      <div className="skill-context-panel-body" aria-hidden={!props.open}>
+        <header className="skill-context-header">
+          <div>
+            <span className="skill-eyebrow">{eyebrow}</span>
+            <h2>{title}</h2>
+          </div>
+          <div className="skill-context-header-actions">
+            {props.view === 'versions' && (
+              <button className="skill-icon-button" onClick={props.onOpenVersionManager} title="在主区域打开">
+                <ExternalLink size={16} />
+              </button>
+            )}
+            <button
+              className="skill-icon-button"
+              onClick={() => setFullscreen((value) => !value)}
+              title={fullscreen ? '退出展开' : '展开工作区'}
+              aria-label={fullscreen ? '退出展开' : '展开工作区'}
+            >
+              {fullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
             </button>
-          )}
-          <button
-            className="skill-icon-button"
-            onClick={() => setFullscreen((value) => !value)}
-            title={fullscreen ? '退出全屏右侧栏' : '全屏显示右侧栏'}
-          >
-            {fullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-          </button>
-          <button className="skill-icon-button" onClick={props.onClose} title="收起右侧栏">
-            <PanelRightClose size={17} />
-          </button>
-        </div>
-      </header>
-      {props.view === 'versions' ? (
-        <VersionSummary {...props} />
-      ) : (
-        <ContextSummary session={props.session} activeView={props.activeView} currentVersionId={props.currentVersionId} versions={props.versions} />
-      )}
+            <button className="skill-icon-button" onClick={props.onClose} title="收起右侧栏">
+              <PanelRightClose size={17} />
+            </button>
+          </div>
+        </header>
+        {props.view === 'versions' ? (
+          <VersionSummary {...props} />
+        ) : props.view === 'optimization' && props.answerOptimization ? (
+          <SkillAnswerOptimizationPanel
+            token={props.token}
+            selection={props.answerOptimization}
+            onSaved={props.onAnswerOptimizationSaved}
+            onRerun={props.onAnswerOptimizationRerun}
+          />
+        ) : (
+          <ContextSummary session={props.session} activeView={props.activeView} currentVersionId={props.currentVersionId} versions={props.versions} />
+        )}
+      </div>
     </aside>
   );
 }
@@ -123,7 +134,6 @@ function ContextSummary({
         <section><span>使用版本</span><strong>{current ? `v${current.versionNumber}` : '当前版本'}</strong></section>
         <section><span>工作方式</span><strong>{activeView === 'arena' ? '双版本对比' : activeView === 'test' ? '固定版本测试' : '固定版本运行'}</strong></section>
         <section><span>记录</span><strong>服务端自动保存</strong></section>
-        <p>中间区域用于任务和结果，右侧只保留当前运行信息，不挤占主要交互空间。</p>
       </div>
     );
   }

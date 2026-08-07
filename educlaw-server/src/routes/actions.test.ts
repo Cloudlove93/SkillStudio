@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 const listPackageSkillsMock = vi.fn();
 const createArenaThreadMock = vi.fn();
 const getArenaThreadDetailMock = vi.fn();
+const deleteArenaThreadMock = vi.fn();
 
 async function createApp() {
   vi.resetModules();
@@ -37,6 +38,7 @@ async function createApp() {
     },
     createArenaThread: createArenaThreadMock,
     getArenaThreadDetail: getArenaThreadDetailMock,
+    deleteArenaThread: deleteArenaThreadMock,
   }));
 
   const routes = (await import('./index.js')).default;
@@ -76,6 +78,7 @@ afterEach(() => {
   listPackageSkillsMock.mockReset();
   createArenaThreadMock.mockReset();
   getArenaThreadDetailMock.mockReset();
+  deleteArenaThreadMock.mockReset();
 });
 
 describe('POST /api action dispatcher', () => {
@@ -296,6 +299,36 @@ describe('POST /api action dispatcher', () => {
 
       expect(response.status).toBe(200);
       expect(getArenaThreadDetailMock).toHaveBeenCalledWith({
+        authUserId: 'real-user',
+        packageId: '7',
+        threadId: '91',
+      });
+    } finally {
+      await close(server);
+    }
+  });
+
+  it('deletes an arena conversation through POST /api with the authenticated identity', async () => {
+    deleteArenaThreadMock.mockResolvedValueOnce({ ok: true });
+    const { server, url } = await listen(await createApp());
+
+    try {
+      const response = await fetch(`${url}/api`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Id': 'real-user',
+        },
+        body: JSON.stringify({
+          action: 'arena.thread.delete',
+          pkgId: '7',
+          payload: { threadId: '91' },
+        }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ success: true, data: { ok: true } });
+      expect(deleteArenaThreadMock).toHaveBeenCalledWith({
         authUserId: 'real-user',
         packageId: '7',
         threadId: '91',

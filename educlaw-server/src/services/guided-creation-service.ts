@@ -5,9 +5,15 @@ import type {
   GuidedCreationMessage,
   GuidedCreationSession,
   GuidedCreationSessionDetail,
+  GuidedCreationStep,
+  GuidedCreationStage,
   GuidedCreationStatus,
   GuidedDraftField,
   GuidedFieldState,
+  GuidedEducationDimension,
+  GuidedEducationDraft,
+  GuidedEducationDraftOp,
+  GuidedEducationEvidenceSource,
   GuidedSkillDraft,
 } from '@educlaw/shared';
 import { query, withTransaction } from './db.js';
@@ -21,17 +27,50 @@ import {
   applyFieldStateOperations,
   buildConfirmationCard,
   evaluateDraft,
+  evaluateGuidedFlow,
   GUIDED_DRAFT_FIELDS,
+  GUIDED_FIELD_LABELS,
+  GUIDED_STAGE_KEYS,
+  GUIDED_STAGES,
+  nextGuidedStage,
+  sanitizeDraftOperations,
   type DraftOperation,
 } from './guided-creation-policy.js';
+import {
+  applyEducationOperations,
+  buildEducationConfirmationCard,
+  educationDraftToGenerationBrief,
+  evaluateEducationFlow,
+  GUIDED_CREATION_STEPS,
+  GUIDED_EDUCATION_DIMENSIONS,
+  GUIDED_EDUCATION_LABELS,
+  sanitizeEducationOperations,
+  type EducationDraftOperation,
+} from './guided-education-policy.js';
+import {
+  GUIDED_SKILL_CONVERSION_RULES,
+  matchTeachingExperiences,
+} from './guided-experience-library.js';
 
 export interface GuidedExtractionResult {
   operations: DraftOperation[];
+  stage_complete: boolean;
   acknowledgement: string;
+}
+
+export interface GuidedEducationExtractionResult {
+  operations: EducationDraftOperation[];
+  step_complete: boolean;
+  acknowledgement: string;
+  question?: string;
+  suggested_options?: string[];
 }
 
 export interface GuidedQuestionPhrasing {
   field?: string;
+  stage?: string;
+  step?: string;
+  mode?: 'collect_field' | 'confirm_stage';
   question: string;
   suggested_options: string[];
 }
@@ -48,11 +87,31 @@ export interface GuidedAssistantTurn {
   content: string;
   suggested_options: string[];
   confirmation: GuidedConfirmationCard | null;
+  confirmed_stages: GuidedCreationStage[];
+  next_stage: GuidedCreationStage | null;
+  focus_stage: GuidedCreationStage | null;
+  education_draft?: GuidedEducationDraft;
+  completed_steps?: GuidedCreationStep[];
+  current_step?: GuidedCreationStep | null;
+  focus_step?: GuidedCreationStep | null;
 }
 
 const DRAFT_FIELD_SET = new Set<string>(GUIDED_DRAFT_FIELDS);
 const OPERATION_SET = new Set(['set', 'replace', 'remove']);
 const EXTRACTION_STATE_SET = new Set(['explicit', 'inferred', 'conflicted']);
+const GUIDED_STAGE_SET = new Set<string>(GUIDED_STAGE_KEYS);
+const GUIDED_EDUCATION_DIMENSION_SET = new Set<string>(
+  GUIDED_EDUCATION_DIMENSIONS,
+);
+const GUIDED_EDUCATION_SOURCE_SET = new Set<string>([
+  'user_explicit',
+  'user_adopted',
+  'inferred',
+  'platform_default',
+  'conflicted',
+]);
+const GUIDED_EDUCATION_OP_SET = new Set<string>(['set', 'replace', 'remove']);
+const GUIDED_CREATION_STEP_SET = new Set<string>(GUIDED_CREATION_STEPS);
 
 const FALLBACK_QUESTIONS: Record<GuidedDraftField, string> = {
   roles: '这个 Skill 主要给谁使用，并希望它扮演什么角色？',
@@ -77,6 +136,8 @@ const FALLBACK_OPTIONS: Partial<Record<GuidedDraftField, string[]>> = {
   core_capabilities: ['提炼关键信息', '生成内容', '检查质量'],
   workflow: ['分析输入后生成', '分步骤与用户确认', '生成后自动检查'],
 };
+
+const STAGE_CONFIRMATION_OPTIONS = ['准确，继续', '我想补充', '需要调整'];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -126,12 +187,90 @@ export function parseExtractionResult(value: unknown): GuidedExtractionResult {
       path: operation.path,
       value: operation.value,
       state: operation.state as DraftOperation['state'],
+      evidence:
+        typeof operation.evidence === 'string'
+          ? operation.evidence.trim().slice(0, 500)
+          : undefined,
     };
   });
 
   return {
     operations,
+    stage_complete: value.stage_complete === true,
     acknowledgement: cleanAcknowledgement(value.acknowledgement),
+  };
+}
+
+export function parseEducationExtractionResult(
+  value: unknown,
+): GuidedEducationExtractionResult {
+  if (!isRecord(value) || !Array.isArray(value.operations)) {
+    throw new Error('INVALID_EDUCATION_EXTRACTION');
+  }
+  if (
+    typeof value.acknowledgement !== 'string' ||
+    !value.acknowledgement.trim() ||
+    value.operations.length > GUIDED_EDUCATION_DIMENSIONS.length * 2
+  ) {
+    throw new Error('INVALID_EDUCATION_EXTRACTION');
+  }
+
+  const operations = value.operations.map((operation) => {
+    if (
+      !isRecord(operation) ||
+      typeof operation.dimension !== 'string' ||
+      !GUIDED_EDUCATION_DIMENSION_SET.has(operation.dimension) ||
+      typeof operation.source !== 'string' ||
+      !GUIDED_EDUCATION_SOURCE_SET.has(operation.source)
+    ) {
+      throw new Error('INVALID_EDUCATION_EXTRACTION');
+    }
+    const op =
+      typeof operation.op === 'string' &&
+      GUIDED_EDUCATION_OP_SET.has(operation.op)
+        ? (operation.op as GuidedEducationDraftOp)
+        : undefined;
+    // remove 不要求 content；其他 op 必须有非空 content。
+    if (op !== 'remove') {
+      if (
+        typeof operation.content !== 'string' ||
+        !operation.content.trim()
+      ) {
+        throw new Error('INVALID_EDUCATION_EXTRACTION');
+      }
+    }
+    return {
+      dimension: operation.dimension as GuidedEducationDimension,
+      op,
+      content:
+        typeof operation.content === 'string'
+          ? operation.content.trim().slice(0, MAX_MESSAGE_CHARS)
+          : '',
+      source: operation.source as GuidedEducationEvidenceSource,
+      quote:
+        typeof operation.quote === 'string'
+          ? operation.quote.trim().slice(0, 500)
+          : undefined,
+      experience_id:
+        typeof operation.experience_id === 'string'
+          ? operation.experience_id.trim().slice(0, 120)
+          : undefined,
+    };
+  });
+
+  return {
+    operations,
+    step_complete: value.step_complete === true,
+    acknowledgement: cleanAcknowledgement(value.acknowledgement),
+    question:
+      typeof value.question === 'string' ? value.question.trim() : undefined,
+    suggested_options: Array.isArray(value.suggested_options)
+      ? value.suggested_options
+          .filter((item): item is string => typeof item === 'string')
+          .map((item) => item.trim())
+          .filter(Boolean)
+          .slice(0, 4)
+      : undefined,
   };
 }
 
@@ -190,6 +329,9 @@ export function buildGuidedAssistantTurn(input: {
       content: `${acknowledgement}\n\n信息已经完整，请检查确认内容。确认后我会生成这个 Skill。`,
       suggested_options: [],
       confirmation: buildConfirmationCard(evaluation.normalized_draft),
+      confirmed_stages: [],
+      next_stage: null,
+      focus_stage: null,
     };
   }
 
@@ -207,6 +349,422 @@ export function buildGuidedAssistantTurn(input: {
     content: `${acknowledgement}\n\n${question}`,
     suggested_options,
     confirmation: null,
+    confirmed_stages: [],
+    next_stage: null,
+    focus_stage: null,
+  };
+}
+
+function parseStagePhrasing(
+  phrasing: GuidedQuestionPhrasing | null,
+  stage: GuidedCreationStage,
+  field: GuidedDraftField | null,
+  draft: GuidedSkillDraft,
+): { question: string; suggested_options: string[] } {
+  const candidate = phrasing?.question?.replace(/\s+/g, ' ').trim() ?? '';
+  const firstQuestion = candidate.match(/^.*?[？?]/)?.[0]?.trim() ?? '';
+  const usesExpectedStage = !phrasing?.stage || phrasing.stage === stage;
+  const expectedMode = field ? 'collect_field' : 'confirm_stage';
+  const usesExpectedMode = phrasing?.mode
+    ? phrasing.mode === expectedMode
+    : field !== null;
+  const usesExpectedField = field
+    ? phrasing?.field === field
+    : !phrasing?.field;
+  const candidateIsUsable =
+    usesExpectedStage &&
+    usesExpectedMode &&
+    usesExpectedField &&
+    firstQuestion.length <= 160;
+  const confirmationSummary = GUIDED_STAGES.find(
+    (candidateStage) => candidateStage.key === stage,
+  )!
+    .fields.map((stageField) => {
+      const value = draft[stageField]?.trim();
+      if (!value) return null;
+      const conciseValue = value.length > 48 ? `${value.slice(0, 48)}…` : value;
+      return `${GUIDED_FIELD_LABELS[stageField]}为“${conciseValue}”`;
+    })
+    .filter((value): value is string => Boolean(value))
+    .join('，');
+  const fallbackQuestion = field
+    ? FALLBACK_QUESTIONS[field]
+    : `我已经记下${confirmationSummary ? `：${confirmationSummary}` : '这些信息'}。这个理解准确吗？`;
+  const question =
+    candidateIsUsable
+      ? firstQuestion.replace(/\?$/, '？')
+      : fallbackQuestion;
+  const candidateOptions = Array.isArray(phrasing?.suggested_options)
+    ? phrasing.suggested_options
+        .filter((option): option is string => typeof option === 'string')
+        .map((option) => option.trim())
+        .filter(Boolean)
+        .slice(0, 4)
+    : [];
+  return {
+    question,
+    suggested_options:
+      candidateIsUsable && candidateOptions.length >= 2
+        ? candidateOptions
+        : field
+          ? (FALLBACK_OPTIONS[field] ?? []).slice(0, 4)
+          : STAGE_CONFIRMATION_OPTIONS,
+  };
+}
+
+function isClearStageConfirmation(value: string): boolean {
+  const normalized = value.normalize('NFKC').replace(/\s+/g, '');
+  return /^(?:嗯+[，,]?)?(?:准确|正确|是的|对(?:的)?|没错|没问题|可以(?:的)?|好的|确认|就是这样|就这样|按这个来|就按这个来)(?:[，,。.!！]*(?:继续|下一步)(?:吧)?)?[。.!！]?$/.test(
+    normalized,
+  );
+}
+
+function isDelegatedStageAnswer(value: string): boolean {
+  const normalized = value.normalize('NFKC').replace(/\s+/g, '');
+  return /^(?:你决定|你来决定|都可以|都行|随便|随你|你看着办|无所谓|不知道|不清楚|不确定|暂时不知道|按默认)(?:就行|即可|吧)?[。.!！]?$/.test(
+    normalized,
+  );
+}
+
+export function buildGuidedAssistantTurnV2(input: {
+  current_draft: GuidedSkillDraft;
+  current_field_states: Partial<Record<GuidedDraftField, GuidedFieldState>>;
+  confirmed_stages: GuidedCreationStage[];
+  current_stage: GuidedCreationStage | null;
+  user_message: string;
+  extraction: GuidedExtractionResult;
+  phrasing: GuidedQuestionPhrasing | null;
+}): GuidedAssistantTurn {
+  const operations = sanitizeDraftOperations(
+    input.current_draft,
+    input.current_field_states,
+    input.extraction.operations,
+    input.user_message,
+  );
+  const draft = applyDraftOperations(input.current_draft, operations);
+  const stateOverrides = applyFieldStateOperations(
+    input.current_field_states,
+    operations,
+  );
+  const confirmedStages = [...input.confirmed_stages];
+  if (input.current_stage) {
+    const stage = GUIDED_STAGES.find(
+      (candidate) => candidate.key === input.current_stage,
+    );
+    const hasExplicitStageEvidence = operations.some(
+      (operation) =>
+        operation.state === 'explicit' &&
+        stage?.fields.some((field) => field === operation.path),
+    );
+    const hasCompleteExplicitStage = stage?.fields.every(
+      (field) =>
+        stateOverrides[field] === 'explicit' && Boolean(draft[field]?.trim()),
+    );
+    const hasReliableUserConfirmation =
+      !isDelegatedStageAnswer(input.user_message) &&
+      (input.extraction.stage_complete ||
+        isClearStageConfirmation(input.user_message));
+    if (
+      hasCompleteExplicitStage &&
+      (hasExplicitStageEvidence || hasReliableUserConfirmation) &&
+      !confirmedStages.includes(input.current_stage)
+    ) {
+      confirmedStages.push(input.current_stage);
+    }
+  }
+
+  const evaluation = evaluateGuidedFlow(
+    draft,
+    stateOverrides,
+    confirmedStages,
+  );
+  const acknowledgement = cleanAcknowledgement(input.extraction.acknowledgement);
+  if (evaluation.ready_for_confirmation) {
+    return {
+      draft: evaluation.normalized_draft,
+      field_states: evaluation.field_states,
+      status: 'ready_for_confirmation',
+      next_blocking_field: null,
+      acknowledgement,
+      content: `${acknowledgement}\n\n你的想法已经梳理完整，请检查确认内容。确认后我会生成这个 Skill。`,
+      suggested_options: [],
+      confirmation: buildConfirmationCard(evaluation.normalized_draft),
+      confirmed_stages: evaluation.confirmed_stages,
+      next_stage: null,
+      focus_stage: null,
+    };
+  }
+
+  const focusStage = evaluation.next_stage!;
+  const stageDefinition = GUIDED_STAGES.find(
+    (stage) => stage.key === focusStage,
+  )!;
+  const nextBlockingField =
+    stageDefinition.fields.find(
+      (field) => evaluation.field_states[field] !== 'explicit',
+    ) ?? null;
+  const { question, suggested_options } = parseStagePhrasing(
+    input.phrasing,
+    focusStage,
+    nextBlockingField,
+    evaluation.normalized_draft,
+  );
+  return {
+    draft: evaluation.normalized_draft,
+    field_states: evaluation.field_states,
+    status: 'collecting',
+    next_blocking_field: nextBlockingField,
+    acknowledgement,
+    content: `${acknowledgement}\n\n${question}`,
+    suggested_options,
+    confirmation: null,
+    confirmed_stages: evaluation.confirmed_stages,
+    next_stage: focusStage,
+    focus_stage: focusStage,
+  };
+}
+
+const STEP_DIMENSIONS: Record<
+  GuidedCreationStep,
+  readonly GuidedEducationDimension[]
+> = {
+  intent_context: ['educational_goal', 'audience_context'],
+  teacher_experience: ['input_evidence', 'teaching_strategy', 'action_adaptation'],
+  strategy_co_creation: ['teaching_strategy'],
+  action_adjustment: ['action_adaptation', 'boundaries_responsibility'],
+  evidence_review: ['completion_evidence'],
+};
+
+const STEP_FALLBACK_QUESTIONS: Record<GuidedCreationStep, string> = {
+  intent_context:
+    '完成这个 Skill 后，你最希望学生发生什么变化，它会在怎样的真实教学情境中使用？',
+  teacher_experience:
+    '你实际带这个实验时，学生最容易卡在哪里，你通常会怎样判断并处理？',
+  strategy_co_creation:
+    '结合你的经验，你希望这个 Skill 采用怎样的教学方式来推动学生真正理解？',
+  action_adjustment:
+    '使用过程中要观察哪些表现，出现什么情况时应该调整做法或交给教师确认？',
+  evidence_review:
+    '看到哪些具体表现或作品时，你会认为这个 Skill 在教育上真正有效？',
+};
+
+const STEP_FALLBACK_OPTIONS: Record<GuidedCreationStep, string[]> = {
+  intent_context: ['理解关键概念', '能够独立实践', '能解释并迁移应用'],
+  teacher_experience: ['说说常见困难', '分享一次有效做法', '说明你会关注什么'],
+  strategy_co_creation: ['先诊断再引导', '通过探究形成理解', '用反馈推动修正'],
+  action_adjustment: ['根据错误类型调整', '逐步增减学习支架', '关键节点由教师确认'],
+  evidence_review: ['用作品或表现判断', '用真实任务验证', '结合过程与结果判断'],
+};
+
+const STEP_CONFIRMATION_QUESTIONS: Record<GuidedCreationStep, string> = {
+  intent_context: '我先确认一下：目标和使用对象这样理解准确吗？',
+  teacher_experience: '我先确认一下：这些材料和已有做法，确实是你希望保留的经验吗？',
+  strategy_co_creation: '我先确认一下：这就是你希望采用的教学策略吗？',
+  action_adjustment: '我先确认一下：观察、调整和教师负责的边界这样安排合适吗？',
+  evidence_review: '我先确认一下：这些表现可以作为有效完成的依据吗？',
+};
+
+function hasUserOwnedEvidence(
+  draft: GuidedEducationDraft,
+  dimension: GuidedEducationDimension,
+): boolean {
+  return Boolean(
+    draft[dimension]?.evidence.some(
+      (evidence) =>
+        evidence.source === 'user_explicit' ||
+        evidence.source === 'user_adopted',
+    ),
+  );
+}
+
+function parseEducationPhrasing(
+  phrasing: GuidedQuestionPhrasing | null,
+  step: GuidedCreationStep,
+  draft: GuidedEducationDraft,
+): { question: string; suggested_options: string[] } {
+  const candidate = phrasing?.question?.replace(/\s+/g, ' ').trim() ?? '';
+  const firstQuestion = candidate.match(/^.*?[？?]/)?.[0]?.trim() ?? '';
+  const usesExpectedStep = !phrasing?.step || phrasing.step === step;
+  const intentFallback =
+    step === 'intent_context' &&
+    draft.educational_goal?.content &&
+    draft.audience_context?.content
+      ? `我理解你希望“${draft.educational_goal.content.slice(0, 48)}”，主要用于“${draft.audience_context.content.slice(0, 48)}”。这个方向准确吗？`
+      : STEP_FALLBACK_QUESTIONS[step];
+  const stepHasContent = STEP_DIMENSIONS[step].every((dimension) =>
+    Boolean(draft[dimension]?.content?.trim()),
+  );
+  const question =
+    step === 'intent_context'
+      ? '我先确认一下：你的目标和使用对象，这个方向准确吗？'
+      : stepHasContent
+      ? STEP_CONFIRMATION_QUESTIONS[step]
+      : usesExpectedStep && firstQuestion.length > 0 && firstQuestion.length <= 180
+      ? firstQuestion.replace(/\?$/, '？')
+      : intentFallback;
+  const candidateOptions = Array.isArray(phrasing?.suggested_options)
+    ? phrasing.suggested_options
+        .filter((option): option is string => typeof option === 'string')
+        .map((option) => option.trim())
+        .filter(Boolean)
+        .slice(0, 4)
+    : [];
+  return {
+    question,
+    suggested_options:
+      candidateOptions.length >= 2
+        ? candidateOptions
+        : STEP_FALLBACK_OPTIONS[step],
+  };
+}
+
+function addUserAdoption(
+  draft: GuidedEducationDraft,
+  step: GuidedCreationStep,
+  quote: string,
+): GuidedEducationDraft {
+  const next = structuredClone(draft);
+  for (const dimension of STEP_DIMENSIONS[step]) {
+    const section = next[dimension];
+    if (!section?.content || hasUserOwnedEvidence(next, dimension)) continue;
+    // 用户采纳后清除该维度的冲突标记，避免 conflicted 残留导致会话卡死。
+    section.evidence = section.evidence.filter(
+      (item) => item.source !== 'conflicted',
+    );
+    section.evidence.push({ source: 'user_adopted', quote });
+  }
+  return next;
+}
+
+export function buildGuidedAssistantTurnV3(input: {
+  current_draft: GuidedEducationDraft;
+  completed_steps: GuidedCreationStep[];
+  current_step: GuidedCreationStep | null;
+  user_message: string;
+  extraction: GuidedEducationExtractionResult;
+  phrasing: GuidedQuestionPhrasing | null;
+}): GuidedAssistantTurn {
+  const operations = sanitizeEducationOperations(
+    input.current_draft,
+    input.extraction.operations,
+    input.user_message,
+  );
+  let draft = applyEducationOperations(input.current_draft, operations);
+  const completedSteps = [...input.completed_steps];
+
+  if (input.current_step) {
+    const relevantDimensions = STEP_DIMENSIONS[input.current_step];
+    const participated = operations.some(
+      (operation) =>
+        relevantDimensions.includes(operation.dimension) &&
+        (operation.source === 'user_explicit' ||
+          operation.source === 'user_adopted'),
+    );
+    if (isClearStageConfirmation(input.user_message)) {
+      draft = addUserAdoption(draft, input.current_step, input.user_message);
+    }
+    const requiredDimensions = STEP_DIMENSIONS[input.current_step];
+    const hasRequiredEvidence = requiredDimensions.every((dimension) =>
+      hasUserOwnedEvidence(draft, dimension),
+    );
+    const confirmedExisting =
+      isClearStageConfirmation(input.user_message) &&
+      STEP_DIMENSIONS[input.current_step].some(
+        (dimension) => Boolean(draft[dimension]?.content),
+      );
+    // 若该步骤任一维度存在 conflicted evidence，不应标记完成，否则 current_step
+    // 不会再指向它，用户失去解决冲突的入口。
+    const hasConflictedInStep = requiredDimensions.some(
+      (dimension) =>
+        Boolean(draft[dimension]?.evidence.some(
+          (item) => item.source === 'conflicted',
+        )),
+    );
+    if (
+      !isDelegatedStageAnswer(input.user_message) &&
+      (participated || confirmedExisting) &&
+      hasRequiredEvidence &&
+      !hasConflictedInStep &&
+      !completedSteps.includes(input.current_step)
+    ) {
+      completedSteps.push(input.current_step);
+    }
+  }
+
+  // Do not silently fill education dimensions with platform defaults. The
+  // teacher must express or explicitly adopt materials and responsibility.
+  const platformDefaultsEnabled = false;
+  if (platformDefaultsEnabled) {
+    const defaults: EducationDraftOperation[] = [];
+    if (!draft.input_evidence?.content) {
+      defaults.push({
+        dimension: 'input_evidence',
+        content:
+          '优先依据教师提供的课程标准、教材、学情、任务材料和本次使用中的真实记录；信息不足时先向教师确认。',
+        source: 'platform_default',
+      });
+    }
+    if (!draft.boundaries_responsibility?.content) {
+      defaults.push({
+        dimension: 'boundaries_responsibility',
+        content:
+          '不编造学生表现和教学事实；涉及安全、专业判断、评价结论或影响学生的重要决定时，由教师确认。',
+        source: 'platform_default',
+      });
+    }
+    draft = applyEducationOperations(draft, defaults);
+  }
+
+  const evaluation = evaluateEducationFlow(draft, completedSteps);
+  const acknowledgement = cleanAcknowledgement(input.extraction.acknowledgement);
+  const legacyStates = Object.fromEntries(
+    GUIDED_DRAFT_FIELDS.map((field) => [field, 'missing']),
+  ) as Record<GuidedDraftField, GuidedFieldState>;
+
+  if (evaluation.ready_for_confirmation) {
+    return {
+      draft: {},
+      field_states: legacyStates,
+      education_draft: evaluation.normalized_draft,
+      completed_steps: evaluation.completed_steps,
+      current_step: null,
+      focus_step: null,
+      status: 'ready_for_confirmation',
+      next_blocking_field: null,
+      acknowledgement,
+      content: `${acknowledgement}\n\n你的教学想法已经整理成完整方案，请检查确认。确认后我会生成这个 Skill。`,
+      suggested_options: [],
+      confirmation: buildEducationConfirmationCard(
+        evaluation.normalized_draft,
+      ),
+      confirmed_stages: [],
+      next_stage: null,
+      focus_stage: null,
+    };
+  }
+
+  const focusStep = evaluation.current_step ?? 'evidence_review';
+  const { question, suggested_options } = parseEducationPhrasing(
+    input.phrasing,
+    focusStep,
+    evaluation.normalized_draft,
+  );
+  return {
+    draft: {},
+    field_states: legacyStates,
+    education_draft: evaluation.normalized_draft,
+    completed_steps: evaluation.completed_steps,
+    current_step: focusStep,
+    focus_step: focusStep,
+    status: 'collecting',
+    next_blocking_field: null,
+    acknowledgement,
+    content: `${acknowledgement}\n\n${question}`,
+    suggested_options,
+    confirmation: null,
+    confirmed_stages: [],
+    next_stage: null,
+    focus_stage: null,
   };
 }
 
@@ -252,18 +810,58 @@ function asIso(value: unknown): string {
 }
 
 function mapSession(row: Record<string, unknown>): GuidedCreationSession {
-  const draft = parseJson<GuidedSkillDraft>(row.draft_json, {});
+  const storedDraft = parseJson<Record<string, unknown>>(row.draft_json, {});
   const storedStates = parseJson<
     Partial<Record<GuidedDraftField, GuidedFieldState>>
   >(row.field_states_json, {});
-  const evaluation = evaluateDraft(draft, storedStates);
+  const flowVersion = Math.max(1, Number(row.flow_version ?? 1));
+  const storedProgress = parseJson<unknown[]>(
+    row.confirmed_stages_json,
+    [],
+  );
+  const confirmedStages = storedProgress.filter(
+    (stage): stage is GuidedCreationStage =>
+      typeof stage === 'string' && GUIDED_STAGE_SET.has(stage),
+  );
+  const completedSteps = storedProgress.filter(
+    (step): step is GuidedCreationStep =>
+      typeof step === 'string' && GUIDED_CREATION_STEP_SET.has(step),
+  );
+  const educationEvaluation =
+    flowVersion >= 3
+      ? evaluateEducationFlow(
+          storedDraft as GuidedEducationDraft,
+          completedSteps,
+        )
+      : null;
+  const legacyEvaluation =
+    flowVersion >= 3
+      ? evaluateDraft({}, {})
+      : flowVersion >= 2
+        ? evaluateGuidedFlow(
+            storedDraft as GuidedSkillDraft,
+            storedStates,
+            confirmedStages,
+          )
+        : evaluateDraft(storedDraft as GuidedSkillDraft, storedStates);
   return {
     id: String(row.id),
+    display_name:
+      typeof row.display_name === 'string' ? row.display_name : null,
+    deleted_at: row.deleted_at ? asIso(row.deleted_at) : null,
     status: row.status as GuidedCreationStatus,
     model: typeof row.model === 'string' ? row.model : null,
     documents: parseJson<GuidedCreationDocument[]>(row.documents_json, []),
-    draft: evaluation.normalized_draft,
-    field_states: evaluation.field_states,
+    draft: flowVersion >= 3 ? {} : legacyEvaluation.normalized_draft,
+    field_states: legacyEvaluation.field_states,
+    education_draft: educationEvaluation?.normalized_draft,
+    flow_version: flowVersion,
+    confirmed_stages: flowVersion === 2 ? confirmedStages : [],
+    next_stage:
+      flowVersion === 2 ? nextGuidedStage(confirmedStages) : null,
+    completed_steps: flowVersion >= 3 ? completedSteps : undefined,
+    current_step:
+      flowVersion >= 3 ? educationEvaluation?.current_step ?? null : undefined,
     confirmation: parseJson<GuidedConfirmationCard | null>(
       row.confirmation_json,
       null,
@@ -362,7 +960,7 @@ export async function getGuidedCreationDetail(input: {
   const sessionResult = await query<Record<string, unknown>>(
     `select *
        from skill_guided_creation_sessions
-      where id = $1 and user_id = $2`,
+      where id = $1 and user_id = $2 and deleted_at is null`,
     [input.session_id, input.auth_user_id],
   );
   const row = sessionResult.rows[0];
@@ -378,6 +976,7 @@ export async function getGuidedCreationDetail(input: {
        from skill_guided_creation_messages m
        join skill_guided_creation_sessions s on s.id = m.session_id
       where m.session_id = $1 and s.user_id = $2
+        and s.deleted_at is null
       order by m.message_no asc`,
     [input.session_id, input.auth_user_id],
   );
@@ -395,7 +994,7 @@ export async function listGuidedCreations(input: {
     Math.max(1, Math.trunc(input.limit ?? DEFAULT_LIST_LIMIT)),
   );
   const values: unknown[] = [input.auth_user_id];
-  const where = ['user_id = $1'];
+  const where = ['user_id = $1', 'deleted_at is null'];
   if (input.status?.length) {
     values.push(input.status);
     where.push(`status = any($${values.length}::text[])`);
@@ -421,6 +1020,85 @@ export async function listGuidedCreations(input: {
   };
 }
 
+function normalizeDisplayName(value: string): string {
+  if (typeof value !== 'string' || !value.trim() || value.trim().length > 200) {
+    throw new GuidedCreationError(
+      'INVALID_DISPLAY_NAME',
+      '名称需要填写 1 到 200 个字符',
+      400,
+    );
+  }
+  return value.trim();
+}
+
+export async function renameGuidedCreation(input: {
+  auth_user_id: string;
+  session_id: string;
+  revision_no: number;
+  display_name: string;
+}): Promise<GuidedCreationSessionDetail> {
+  const displayName = normalizeDisplayName(input.display_name);
+  const result = await query(
+    `update skill_guided_creation_sessions
+        set display_name = $4,
+            revision_no = revision_no + 1,
+            updated_at = now()
+      where id = $1
+        and user_id = $2
+        and revision_no = $3
+        and deleted_at is null
+        and status <> 'finalizing'`,
+    [
+      input.session_id,
+      input.auth_user_id,
+      input.revision_no,
+      displayName,
+    ],
+  );
+  if (result.rowCount !== 1) {
+    throw new GuidedCreationError(
+      'SESSION_REVISION_CONFLICT',
+      '会话已更新，请刷新后重试',
+      409,
+      true,
+    );
+  }
+  return getGuidedCreationDetail({
+    auth_user_id: input.auth_user_id,
+    session_id: input.session_id,
+  });
+}
+
+export async function deleteGuidedCreation(input: {
+  auth_user_id: string;
+  session_id: string;
+  revision_no: number;
+}): Promise<{ id: string; deleted_at: string }> {
+  const result = await query<Record<string, unknown>>(
+    `update skill_guided_creation_sessions
+        set deleted_at = now(),
+            revision_no = revision_no + 1,
+            updated_at = now()
+      where id = $1
+        and user_id = $2
+        and revision_no = $3
+        and deleted_at is null
+        and status <> 'finalizing'
+      returning id, deleted_at`,
+    [input.session_id, input.auth_user_id, input.revision_no],
+  );
+  const row = result.rows[0];
+  if (!row) {
+    throw new GuidedCreationError(
+      'SESSION_REVISION_CONFLICT',
+      '会话已更新，请刷新后重试',
+      409,
+      true,
+    );
+  }
+  return { id: String(row.id), deleted_at: asIso(row.deleted_at) };
+}
+
 function extractionPrompt(input: {
   draft: GuidedSkillDraft;
   messages: GuidedCreationMessage[];
@@ -439,7 +1117,69 @@ function extractionPrompt(input: {
     systemPrompt:
       '你负责从教育 Skill 对话中提取结构化信息。只返回 JSON。operations 只能使用 set、replace、remove，path 只能来自给定字段；不要自行决定是否完成，也不要提出问题。state 只能是 explicit、inferred、conflicted。',
     userPrompt: `字段：${GUIDED_DRAFT_FIELDS.join(', ')}\n当前草案：${JSON.stringify(input.draft)}\n对话：\n${history}\n参考材料：\n${documentSummary || '无'}\n返回：{"operations":[],"acknowledgement":"一句简短确认"}`,
-    maxTokens: 1_200,
+    maxTokens: 4_096,
+  };
+}
+
+function extractionPromptV2(input: {
+  draft: GuidedSkillDraft;
+  messages: GuidedCreationMessage[];
+  content: string;
+  documents: GuidedCreationDocument[];
+  currentStage: GuidedCreationStage | null;
+}): { systemPrompt: string; userPrompt: string; maxTokens: number } {
+  const history = [...input.messages, { role: 'user', content: input.content }]
+    .slice(-12)
+    .map((message) => `${message.role}: ${message.content}`)
+    .join('\n');
+  const documentSummary = input.documents
+    .map((document) => `# ${document.name}\n${document.content}`)
+    .join('\n\n')
+    .slice(0, MAX_DOCUMENT_CHARS);
+  const stage = GUIDED_STAGES.find(
+    (candidate) => candidate.key === input.currentStage,
+  );
+  return {
+    systemPrompt:
+      '你负责从教育 Skill 共创对话中提取用户真正表达的经验和要求，只返回 JSON。不得替用户补全想法。operations 的 path 只能来自给定字段；明确来自本轮用户原话时 state 才能为 explicit，并必须在 evidence 中逐字复制能够在本轮用户消息中找到的短语；合理推测只能标记 inferred。已有 explicit 内容必须保留：补充信息用 set，只有用户明确否定或纠正先前说法时才用 replace。stage_complete 只有在本轮用户确实回答了当前阶段问题且信息足以进入下一阶段时才为 true。“你决定”“都可以”等放弃表达不算完成。当前阶段为空时必须返回 false。不要提出问题。',
+    userPrompt: `字段：${GUIDED_DRAFT_FIELDS.join(', ')}\n当前阶段：${input.currentStage ?? '尚未开始，先记录初始目标'}\n本阶段字段：${stage?.fields.join(', ') ?? '无'}\n当前草案：${JSON.stringify(input.draft)}\n对话：\n${history}\n本轮用户消息：${input.content}\n参考材料：\n${documentSummary || '无'}\n返回：{"operations":[{"op":"set","path":"goal","value":"提取值","state":"explicit","evidence":"本轮用户原话"}],"stage_complete":false,"acknowledgement":"一句简短确认"}`,
+    maxTokens: 4_096,
+  };
+}
+
+function extractionPromptV3(input: {
+  draft: GuidedEducationDraft;
+  messages: GuidedCreationMessage[];
+  content: string;
+  documents: GuidedCreationDocument[];
+  currentStep: GuidedCreationStep | null;
+}): { systemPrompt: string; userPrompt: string; maxTokens: number } {
+  const history = [...input.messages, { role: 'user', content: input.content }]
+    .slice(-14)
+    .map((message) => `${message.role}: ${message.content}`)
+    .join('\n');
+  const documentSummary = input.documents
+    .map((document) => `# ${document.name}\n${document.content}`)
+    .join('\n\n')
+    .slice(0, MAX_DOCUMENT_CHARS);
+  const step = input.currentStep ?? 'intent_context';
+  const candidates = matchTeachingExperiences({ draft: input.draft, step });
+  const candidateContext = candidates.map((item) => ({
+    experience_id: item.experience_id,
+    applicable_when: item.applicable_when,
+    educational_intent: item.educational_intent,
+    suggested_strategy: item.suggested_strategy,
+    observation_signals: item.observation_signals,
+    adjustment_guidance: item.adjustment_guidance,
+    teacher_responsibility: item.teacher_responsibility,
+    effectiveness_evidence: item.effectiveness_evidence,
+  }));
+
+  return {
+    systemPrompt:
+      '你负责通过自然对话帮助教师把真实教育经验提炼为可执行的 Skill。只返回 JSON。一次回答可以更新多个教育维度，但不得把 AI 推测冒充成用户意见。source=user_explicit 或 user_adopted 时，quote 必须逐字来自本轮用户消息；用户没有表达或采纳的候选经验只能帮助你提出更好的问题，绝不能写入 operations。不要重复询问草案中已经明确的内容。如果本轮已经回答当前步骤，question 应自然进入下一个步骤；信息含糊或冲突时才针对当前步骤补问一次。每轮只提出一个最有价值的问题，question 只能有一个问号，suggested_options 提供 2 到 4 个贴合当前情境的方向并允许用户自由表达。step_complete 只是辅助判断，后端会依据证据独立决定是否推进。\noperations 每项可带 op 字段：补充新信息用 set（默认，追加合并）；用户明确纠正或否定先前说法时用 replace（覆盖该维度 content 与证据，必须配 source=user_explicit/user_adopted）；用户撤回某个维度内容时用 remove（不需要 content/source）。不要用 replace 覆盖你推测出来的内容。\n当本轮用户说法与草案已有内容明显冲突（例如对象从「小学生」改成「中学生」）且用户未明确表示纠正时，用 source=conflicted 标记该维度，content 留空，并在 question 中向用户确认真实意图；不要直接合并矛盾内容。',
+    userPrompt: `七个维度：${GUIDED_EDUCATION_DIMENSIONS.map((dimension) => `${dimension}（${GUIDED_EDUCATION_LABELS[dimension]}）`).join('，')}\n当前共创步骤：${input.currentStep ?? '尚未开始；先吸收初始需求，再从教育意图开始'}\n当前草案：${JSON.stringify(input.draft)}\n对话：\n${history}\n本轮用户消息：${input.content}\n参考材料：\n${documentSummary || '无'}\n最多两条内部候选经验（只用于启发追问）：${JSON.stringify(candidateContext)}\nSkill 转化提醒：${GUIDED_SKILL_CONVERSION_RULES.join('；')}\n返回：{"operations":[{"dimension":"educational_goal","op":"set","content":"提炼后的结论","source":"user_explicit","quote":"本轮用户原话"}],"step_complete":false,"acknowledgement":"一句具体承接，不要重复用户整句话","question":"下一步唯一的问题？","suggested_options":["方向1","方向2"]}`,
+    maxTokens: 4_096,
   };
 }
 
@@ -451,7 +1191,136 @@ function phrasingPrompt(input: {
     systemPrompt:
       '你负责把一个确定的追问写得自然、简短。只能问一个问题，不得追问其他字段。给出 2 到 4 个可选短答案，同时允许用户自由输入。只返回 JSON。',
     userPrompt: `必须询问字段：${input.field}\n当前草案：${JSON.stringify(input.draft)}\n返回：{"field":"${input.field}","question":"一个问题？","suggested_options":["选项1","选项2"]}`,
-    maxTokens: 400,
+    maxTokens: 1_024,
+  };
+}
+
+function phrasingPromptV2(input: {
+  stage: GuidedCreationStage;
+  field: GuidedDraftField | null;
+  draft: GuidedSkillDraft;
+  recentQuestions: string[];
+}): { systemPrompt: string; userPrompt: string; maxTokens: number } {
+  const stageDefinition = GUIDED_STAGES.find(
+    (candidate) => candidate.key === input.stage,
+  )!;
+  const mode = input.field ? 'collect_field' : 'confirm_stage';
+  const task = input.field
+    ? `只询问尚未明确的字段 ${input.field}（${GUIDED_FIELD_LABELS[input.field]}），不得再次询问本阶段其他已知字段。`
+    : '本阶段字段已经明确。请简短复述当前理解并询问是否准确，不得重新要求用户描述这些字段。';
+  return {
+    systemPrompt:
+      '你负责用自然对话帮助教师说出自己的做法和经验。每轮只能有一个问号、一个主要问题，不要替用户作答。问题和选项必须紧扣已知草案中的学科与目标，不得引入用户没有提到的其他课题、学科或实验。不要重复最近已经问过的问题。只返回 JSON。',
+    userPrompt: `当前阶段：${input.stage}\n本阶段字段：${stageDefinition.fields.join(', ')}\n问题模式：${mode}\n当前任务：${task}\n已知草案：${JSON.stringify(input.draft)}\n最近问题：${input.recentQuestions.join(' | ') || '无'}\n返回：{"stage":"${input.stage}","field":${input.field ? `"${input.field}"` : 'null'},"mode":"${mode}","question":"一个自然的问题？","suggested_options":["方向1","方向2"]}`,
+    maxTokens: 1_024,
+  };
+}
+
+function parseQuestionPhrasing(value: unknown): GuidedQuestionPhrasing | null {
+  if (!isRecord(value)) return null;
+  return {
+    field: typeof value.field === 'string' ? value.field : undefined,
+    stage: typeof value.stage === 'string' ? value.stage : undefined,
+    step: typeof value.step === 'string' ? value.step : undefined,
+    mode:
+      value.mode === 'collect_field' || value.mode === 'confirm_stage'
+        ? value.mode
+        : undefined,
+    question: typeof value.question === 'string' ? value.question : '',
+    suggested_options: Array.isArray(value.suggested_options)
+      ? value.suggested_options.filter(
+          (option): option is string => typeof option === 'string',
+        )
+      : [],
+  };
+}
+
+function currentFocusStage(
+  session: GuidedCreationSessionDetail,
+): GuidedCreationStage | null {
+  const focusStage = [...session.messages]
+    .reverse()
+    .find((message) => message.role === 'assistant')?.metadata.focus_stage;
+  return typeof focusStage === 'string' && GUIDED_STAGE_SET.has(focusStage)
+    ? (focusStage as GuidedCreationStage)
+    : null;
+}
+
+function currentFocusStep(
+  session: GuidedCreationSessionDetail,
+): GuidedCreationStep | null {
+  const focusStep = [...session.messages]
+    .reverse()
+    .find((message) => message.role === 'assistant')?.metadata.focus_step;
+  return typeof focusStep === 'string' && GUIDED_CREATION_STEP_SET.has(focusStep)
+    ? (focusStep as GuidedCreationStep)
+    : null;
+}
+
+function fallbackEducationExtraction(input: {
+  content: string;
+  currentStep: GuidedCreationStep | null;
+}): GuidedEducationExtractionResult {
+  const quote = input.content.slice(0, 500);
+  const operations: EducationDraftOperation[] = [];
+  if (!isDelegatedStageAnswer(input.content)) {
+    if (!input.currentStep || input.currentStep === 'intent_context') {
+      operations.push({
+        dimension: 'educational_goal',
+        content: input.content,
+        source: 'user_explicit',
+        quote,
+      });
+      const audience = input.content.match(
+        /小学|初中|高中|大学|职校|[一二三四五六七八九十0-9]{1,3}年级|教师|老师|学生|家长|教研员|分组实验|演示实验|实验课|课堂|课前|课后/g,
+      );
+      if (audience?.length) {
+        operations.push({
+          dimension: 'audience_context',
+          content: `使用对象与情境：${[...new Set(audience)].join('、')}`,
+          source: 'user_explicit',
+          quote: audience[0],
+        });
+      }
+    } else {
+      const dimension: Record<GuidedCreationStep, GuidedEducationDimension> = {
+        intent_context: 'educational_goal',
+        teacher_experience: 'teaching_strategy',
+        strategy_co_creation: 'teaching_strategy',
+        action_adjustment: 'action_adaptation',
+        evidence_review: 'completion_evidence',
+      };
+      operations.push({
+        dimension: dimension[input.currentStep],
+        content: input.content,
+        source: 'user_explicit',
+        quote,
+      });
+    }
+  }
+  return {
+    operations,
+    step_complete: false,
+    acknowledgement: '我已经记下你的想法，我们继续把它梳理得更具体。',
+  };
+}
+
+function enrichInitialEducationExtraction(
+  extraction: GuidedEducationExtractionResult,
+  content: string,
+): GuidedEducationExtractionResult {
+  const dimensions = new Set(
+    extraction.operations.map((operation) => operation.dimension),
+  );
+  const local = fallbackEducationExtraction({ content, currentStep: null });
+  return {
+    ...extraction,
+    operations: [
+      ...extraction.operations,
+      ...local.operations.filter(
+        (operation) => !dimensions.has(operation.dimension),
+      ),
+    ],
   };
 }
 
@@ -459,15 +1328,141 @@ async function generateAssistantTurn(input: {
   session: GuidedCreationSessionDetail;
   content: string;
 }): Promise<GuidedAssistantTurn> {
-  const rawExtraction = await generateJson<unknown>(
-    extractionPrompt({
-      draft: input.session.draft,
-      messages: input.session.messages,
-      content: input.content,
-      documents: input.session.documents,
-    }),
-  );
-  const extraction = parseExtractionResult(rawExtraction);
+  if (input.session.flow_version >= 3) {
+    const currentStep = currentFocusStep(input.session);
+    let extraction: GuidedEducationExtractionResult;
+    try {
+      extraction = parseEducationExtractionResult(
+        await generateJson<unknown>(
+          extractionPromptV3({
+            draft: input.session.education_draft ?? {},
+            messages: input.session.messages,
+            content: input.content,
+            documents: input.session.documents,
+            currentStep,
+          }),
+        ),
+      );
+      if (!currentStep) {
+        extraction = enrichInitialEducationExtraction(
+          extraction,
+          input.content,
+        );
+      }
+    } catch {
+      extraction = fallbackEducationExtraction({
+        content: input.content,
+        currentStep,
+      });
+    }
+    const baseInput = {
+      current_draft: input.session.education_draft ?? {},
+      completed_steps: input.session.completed_steps ?? [],
+      current_step: currentStep,
+      user_message: input.content,
+      extraction,
+    };
+    const preview = buildGuidedAssistantTurnV3({
+      ...baseInput,
+      phrasing: null,
+    });
+    if (preview.status === 'ready_for_confirmation') return preview;
+    return buildGuidedAssistantTurnV3({
+      ...baseInput,
+      phrasing:
+        currentStep && extraction.question && extraction.suggested_options
+          ? {
+              step: preview.current_step ?? undefined,
+              question: extraction.question,
+              suggested_options: extraction.suggested_options,
+            }
+          : null,
+    });
+  }
+
+  const usesStageFlow = input.session.flow_version === 2;
+  const currentStage = usesStageFlow ? currentFocusStage(input.session) : null;
+  let extraction: GuidedExtractionResult;
+  try {
+    const rawExtraction = await generateJson<unknown>(
+      usesStageFlow
+        ? extractionPromptV2({
+            draft: input.session.draft,
+            messages: input.session.messages,
+            content: input.content,
+            documents: input.session.documents,
+            currentStage,
+          })
+        : extractionPrompt({
+            draft: input.session.draft,
+            messages: input.session.messages,
+            content: input.content,
+            documents: input.session.documents,
+          }),
+    );
+    extraction = parseExtractionResult(rawExtraction);
+  } catch {
+    const fallbackExtraction: GuidedExtractionResult = {
+      operations: [],
+      stage_complete: false,
+      acknowledgement: '我们继续把你的想法梳理清楚。',
+    };
+    return usesStageFlow
+      ? buildGuidedAssistantTurnV2({
+          current_draft: input.session.draft,
+          current_field_states: input.session.field_states,
+          confirmed_stages: input.session.confirmed_stages,
+          current_stage: currentStage,
+          user_message: input.content,
+          extraction: fallbackExtraction,
+          phrasing: null,
+        })
+      : buildGuidedAssistantTurn({
+          current_draft: input.session.draft,
+          current_field_states: input.session.field_states,
+          extraction: fallbackExtraction,
+          phrasing: null,
+        });
+  }
+  if (usesStageFlow) {
+    const previewTurn = buildGuidedAssistantTurnV2({
+      current_draft: input.session.draft,
+      current_field_states: input.session.field_states,
+      confirmed_stages: input.session.confirmed_stages,
+      current_stage: currentStage,
+      user_message: input.content,
+      extraction,
+      phrasing: null,
+    });
+    if (previewTurn.status === 'ready_for_confirmation') return previewTurn;
+    let phrasing: GuidedQuestionPhrasing | null;
+    try {
+      phrasing = parseQuestionPhrasing(
+        await generateJson<unknown>(
+          phrasingPromptV2({
+            stage: previewTurn.focus_stage!,
+            field: previewTurn.next_blocking_field,
+            draft: previewTurn.draft,
+            recentQuestions: input.session.messages
+              .filter((message) => message.role === 'assistant')
+              .slice(-4)
+              .map((message) => message.content),
+          }),
+        ),
+      );
+    } catch {
+      phrasing = null;
+    }
+    return buildGuidedAssistantTurnV2({
+      current_draft: input.session.draft,
+      current_field_states: input.session.field_states,
+      confirmed_stages: input.session.confirmed_stages,
+      current_stage: currentStage,
+      user_message: input.content,
+      extraction,
+      phrasing,
+    });
+  }
   const previewDraft = applyDraftOperations(
     input.session.draft,
     extraction.operations,
@@ -479,28 +1474,16 @@ async function generateAssistantTurn(input: {
   const previewEvaluation = evaluateDraft(previewDraft, previewStates);
   let phrasing: GuidedQuestionPhrasing | null = null;
   if (previewEvaluation.next_blocking_field) {
-    const rawPhrasing = await generateJson<unknown>(
-      phrasingPrompt({
-        field: previewEvaluation.next_blocking_field,
-        draft: previewEvaluation.normalized_draft,
-      }),
-    );
-    if (isRecord(rawPhrasing)) {
-      phrasing = {
-        field:
-          typeof rawPhrasing.field === 'string'
-            ? rawPhrasing.field
-            : undefined,
-        question:
-          typeof rawPhrasing.question === 'string'
-            ? rawPhrasing.question
-            : '',
-        suggested_options: Array.isArray(rawPhrasing.suggested_options)
-          ? rawPhrasing.suggested_options.filter(
-              (option): option is string => typeof option === 'string',
-            )
-          : [],
-      };
+    try {
+      const rawPhrasing = await generateJson<unknown>(
+        phrasingPrompt({
+          field: previewEvaluation.next_blocking_field,
+          draft: previewEvaluation.normalized_draft,
+        }),
+      );
+      phrasing = parseQuestionPhrasing(rawPhrasing);
+    } catch {
+      phrasing = null;
     }
   }
   return buildGuidedAssistantTurn({
@@ -754,6 +1737,10 @@ export async function processGuidedCreationMessage(input: {
         JSON.stringify({
           reply_to_client_message_id: clientMessageId,
           next_blocking_field: turn.next_blocking_field,
+          focus_stage: turn.focus_stage,
+          focus_step: turn.focus_step,
+          confirmed_stages: turn.confirmed_stages,
+          completed_steps: turn.completed_steps,
           suggested_options: turn.suggested_options,
           confirmation: turn.confirmation,
         }),
@@ -764,16 +1751,18 @@ export async function processGuidedCreationMessage(input: {
           set status = $3,
               draft_json = $4::jsonb,
               field_states_json = $5::jsonb,
-              confirmation_json = $6::jsonb,
+              confirmed_stages_json = $6::jsonb,
+              confirmation_json = $7::jsonb,
               error_json = null,
               updated_at = now()
-        where id = $1 and user_id = $2 and revision_no = $7`,
+        where id = $1 and user_id = $2 and revision_no = $8`,
       [
         input.session_id,
         input.auth_user_id,
         turn.status,
-        JSON.stringify(turn.draft),
-        JSON.stringify(turn.field_states),
+        JSON.stringify(turn.education_draft ?? turn.draft),
+        JSON.stringify(turn.education_draft ? {} : turn.field_states),
+        JSON.stringify(turn.completed_steps ?? turn.confirmed_stages),
         turn.confirmation ? JSON.stringify(turn.confirmation) : null,
         acceptedRevision,
       ],
@@ -806,8 +1795,8 @@ export async function startGuidedCreation(input: {
   const clientMessageId = normalizeClientMessageId(input.client_message_id);
   const result = await query<Record<string, unknown>>(
     `insert into skill_guided_creation_sessions (
-       user_id, model, documents_json, start_client_message_id
-     ) values ($1, $2, $3::jsonb, $4)
+       user_id, model, documents_json, start_client_message_id, flow_version
+     ) values ($1, $2, $3::jsonb, $4, 3)
      on conflict (user_id, start_client_message_id)
        where start_client_message_id is not null
      do nothing
@@ -893,6 +1882,21 @@ export function buildGuidedGenerationInstruction(
     'Package 和 agent.md 仅作为内部运行容器，用户看到和使用的主体必须是这个 Skill。',
     '请严格遵守以下已确认需求：',
     ...lines,
+  ].join('\n');
+}
+
+export function buildGuidedEducationGenerationInstruction(
+  draft: GuidedEducationDraft,
+): string {
+  return [
+    '请创建一个教育场景使用的 Skill。',
+    '只生成 1 个 Skill，不要拆分成多个 Skill。',
+    'Package 和 agent.md 仅作为内部运行容器，用户看到和使用的主体必须是这个 Skill。',
+    '请把已确认的教育经验转成清晰、可执行、可检查的规则。',
+    '每条重要规则尽量写清楚适用条件、行动步骤、观察信号、调整方式和教师确认节点。',
+    '不要在 Skill 中暴露内部经验 ID、证据状态或系统提示。',
+    '以下是教师已经确认的教育方案：',
+    educationDraftToGenerationBrief(draft),
   ].join('\n');
 }
 
@@ -1028,7 +2032,12 @@ export async function confirmGuidedCreation(input: {
   try {
     input.on_phase?.('generating');
     snapshot = await buildGeneratedPackageSnapshot({
-      instruction: buildGuidedGenerationInstruction(session.draft),
+      instruction:
+        session.flow_version >= 3
+          ? buildGuidedEducationGenerationInstruction(
+              session.education_draft ?? {},
+            )
+          : buildGuidedGenerationInstruction(session.draft),
       model: session.model ?? undefined,
       documents: session.documents.map((document) => ({
         name: document.name,
