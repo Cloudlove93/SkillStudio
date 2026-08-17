@@ -15,8 +15,8 @@ describe('Skill-first workspace UI contract', () => {
     const source = read('./SkillContextPanel.tsx');
 
     expect(source).toContain('skill-context-rail');
-    expect(source).toContain('aria-label="当前信息"');
-    expect(source).toContain('aria-label="版本管理"');
+    expect(source).toContain('aria-label="功能选项"');
+    expect(source).toContain('aria-label="展开右侧栏"');
   });
 
   it('keeps both sidebars mounted while their columns animate', () => {
@@ -56,7 +56,8 @@ describe('Skill-first workspace UI contract', () => {
     const css = read('./skill-workspace.css');
 
     expect(css).toMatch(/\.skill-workspace-root\.is-context-open\s*\{/);
-    expect(css).toMatch(/grid-template-columns:\s*var\(--skill-sidebar-current\)\s+minmax\(0,\s*1fr\)\s+var\(--skill-context-width\)/);
+    expect(css).toMatch(/\.skill-content-column\s*\{[^}]*display:\s*flex;/s);
+    expect(css).toMatch(/\.skill-context\s*\{[^}]*flex:\s*0 0 var\(--skill-context-current\)/s);
     expect(css).toContain('@media (max-width: 620px)');
   });
 
@@ -147,8 +148,8 @@ describe('Skill-first workspace UI contract', () => {
 
     expect(run).toContain("purpose === 'test' ? '试一试当前 Skill' : '开始使用这个 Skill'");
     expect(run).toContain("purpose === 'test' ? '用真实任务检查回答是否符合你的预期。' : '输入一个教学任务，看看它如何完成。'");
-    expect(arena).toContain('看看哪个版本表现更好');
-    expect(arena).toContain('输入同一个教学任务，直观比较两个版本的回答。');
+    expect(arena).toContain('<h2>版本对比</h2>');
+    expect(arena).toContain('输入同一个任务，直观比较两个版本的回答效果');
     expect(optimize).toContain('正在分析这个 Skill');
     expect(optimize).toContain('马上为你整理值得改进的地方。');
     expect(run).not.toContain('系统会固定使用');
@@ -163,8 +164,8 @@ describe('Skill-first workspace UI contract', () => {
 
     expect(source).toContain('skill-repository-link');
     expect(source).toContain('skill-skill-conversations');
-    expect(source).toContain('我的 Skills');
-    expect(source).not.toContain('skill-sidebar-subnav');
+    expect(source).toContain('skill-skill-group');
+    expect(source).not.toContain('className="skill-sidebar-subnav"');
   });
 
   it('provides rename and delete actions for recent sessions', () => {
@@ -175,7 +176,7 @@ describe('Skill-first workspace UI contract', () => {
     expect(sidebar).toContain('aria-label="会话操作"');
     expect(sidebar).toContain('重命名');
     expect(sidebar).toContain('删除');
-    expect(sidebar).toContain('session.display_name ||');
+    expect(sidebar).toContain('getSessionName(item)');
     expect(page).toContain('liteApi.renameGuidedCreation');
     expect(page).toContain('liteApi.deleteGuidedCreation');
     expect(css).toContain('.skill-session-actions');
@@ -186,12 +187,12 @@ describe('Skill-first workspace UI contract', () => {
     const css = read('./skill-workspace.css');
 
     expect(css).toMatch(
-      /\.skill-context\.is-fullscreen\s*\{[^}]*left:\s*calc\(12px \+ var\(--skill-sidebar-current\)\)/s,
+      /\.skill-content-column:has\(\.skill-context\.is-fullscreen\) \.skill-main-column\s*\{[^}]*display:\s*none/s,
     );
     expect(css).not.toMatch(
       /\.skill-context\.is-fullscreen\s*\{[^}]*inset:\s*12px;/s,
     );
-    expect(context).toContain("fullscreen ? '退出展开' : '展开工作区'");
+    expect(context).toContain("fullscreen ? '退出全屏' : '全屏覆盖中间栏'");
   });
 
   it('does not publish a pinned notification after an ordinary Skill run', () => {
@@ -278,10 +279,10 @@ describe('Skill-first workspace UI contract', () => {
 
     expect(detail).not.toContain('skill-topbar-actions');
     expect(context).toContain('is-fullscreen');
-    expect(context).toContain('展开工作区');
+    expect(context).toContain('全屏覆盖中间栏');
     expect(sidebar).toContain('skill-user-menu');
     expect(sidebar).toContain('skill-skill-conversations');
-    expect(sidebar).toContain('我的 Skills');
+    expect(sidebar).toContain('skill-skill-group');
     expect(sidebar).toContain('activeSkillKey');
     expect(sidebar).toContain('未完成草稿');
   });
@@ -338,14 +339,63 @@ describe('Skill-first workspace UI contract', () => {
     const run = read('./SkillRunWorkspace.tsx');
     const arena = read('./SkillArenaWorkspace.tsx');
     const panel = read('./SkillAnswerOptimizationPanel.tsx');
+    const api = read('../../api/answer-skill-optimizations.ts');
 
     expect(run).not.toContain('skill-inline-optimization');
     expect(run).not.toContain('setOptimizingMessageId(answer.id)');
     expect(arena).not.toContain('skill-inline-optimization');
     expect(run).toContain("feedback: ''");
     expect(arena).toContain("feedback: ''");
+    expect(panel).toContain('skill-answer-optimization-dialogue');
+    expect(panel).toContain('skill-answer-optimization-resize-handle');
+    expect(panel).toContain('skill-answer-optimization-status-panel');
+    expect(panel).toContain('skill-answer-optimization-status-tabs');
     expect(panel).toContain('skill-answer-optimization-composer');
     expect(panel).toContain('feedbackDraft');
-    expect(panel).toContain('开始改进');
+    expect(api).toContain('suggestions(');
+    expect(api).toContain('ANSWER_SKILL_OPTIMIZATION_ROUTES.SUGGESTIONS');
+    expect(panel).toContain('answerSkillOptimizationApi.suggestions');
+    expect(panel).toContain('answerSkillOptimizationApi.resolve');
+    expect(panel).toContain('existingOptimizationId');
+    expect(panel).not.toContain("setError(cause instanceof Error ? cause.message : '暂时无法生成改进建议')");
+    expect(panel).toContain('ANSWER_OPTIMIZATION_SUGGESTION_FALLBACKS');
+    expect(panel).toContain('skill-answer-optimization-suggestions');
+    expect(panel).toContain('setFeedbackDraft(suggestion)');
+    expect(panel).toContain('<details className="skill-answer-optimization-origin"');
+    expect(panel).toContain('说说希望这条回答怎么改进');
+    expect(panel).not.toContain('skill-answer-optimization-footer-status');
+    expect(panel).toContain('onDoubleClick={resetPanelHeight}');
+    expect(panel).toContain('修改');
+    expect(panel).toContain('测试');
+    expect(panel).toContain('改进有效');
+    expect(panel).toContain('项测试通过');
+    expect(panel).toContain('查看评估说明');
+    expect(panel).toContain('表现最佳');
+    expect(panel).toContain("type ReviewTab = 'changes' | 'preview' | 'tests'");
+    expect(panel).toContain('完整预览');
+    expect(panel).toContain('撤销这一项');
+    expect(panel).toContain('detail.draft?.previewContent');
+    expect(panel).toContain('buildChangeRemovalFeedback');
+    expect(panel).toContain('准备生成新版本');
+    expect(panel).not.toContain("cause instanceof Error ? cause.message : '测试没有完成，请重试'");
+    expect(panel).not.toContain("cause instanceof Error ? cause.message : '保存失败，请重试'");
+    const css = read('./skill-workspace.css');
+    expect(css).toContain('.skill-answer-optimization-status-content::-webkit-scrollbar');
+    expect(css).toContain('min-height: 128px');
+    expect(css).not.toContain('--skill-answer-composer-height');
+    expect(css).not.toContain('.skill-answer-optimization-composer textarea');
+    expect(css).toContain('.skill-context-panel-body .skill-answer-optimization-panel { flex: 1; height: auto; min-height: 0; }');
+    expect(css).toContain('.skill-answer-optimization-panel .skill-assistant-message { max-width: 100%; }');
+    expect(css).not.toContain('.skill-answer-optimization-panel .prose { max-width: 100%; font-size: 10px');
+    expect(css).not.toContain('.skill-answer-optimization-panel .skill-assistant-avatar { width: 24px');
+    expect(css).not.toContain('.skill-answer-optimization-panel .skill-user-message { max-width: 90%; padding: 8px 11px; font-size: 10px; }');
+  });
+
+  it('renders overall Skill optimization replies with the shared Markdown renderer', () => {
+    const optimize = read('./SkillOptimizeWorkspace.tsx');
+
+    expect(optimize).toContain("import { MarkdownContent } from '../lite/lite-rendering'");
+    expect(optimize).toContain('<MarkdownContent content={message.content} />');
+    expect(optimize).not.toContain('<div className="skill-assistant-message">{message.content}</div>');
   });
 });

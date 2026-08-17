@@ -8,6 +8,8 @@ const reviseMock = vi.fn();
 const testMock = vi.fn();
 const confirmMock = vi.fn();
 const cancelMock = vi.fn();
+const suggestionsMock = vi.fn();
+const resolveMock = vi.fn();
 
 class MockValidationError extends Error {}
 class MockNotFoundError extends Error {}
@@ -85,6 +87,7 @@ class MockBadGatewayError extends MockUpstreamError {
     super(message, 502);
   }
 }
+class MockSuggestionNotFoundError extends Error {}
 
 const detail = {
   optimizationId: 789,
@@ -138,11 +141,16 @@ async function createApp() {
     AnswerSkillRefinementTechnicalError: MockRefinementTechnicalError,
     AnswerSkillOptimizationUpstreamError: MockUpstreamError,
     createAnswerSkillOptimization: createMock,
+    resolveAnswerSkillOptimizationReference: resolveMock,
     getAnswerSkillOptimizationDetail: getMock,
     reviseAnswerSkillOptimization: reviseMock,
     testAnswerSkillOptimization: testMock,
     confirmAnswerSkillOptimization: confirmMock,
     cancelAnswerSkillOptimization: cancelMock,
+  }));
+  vi.doMock("../services/answer-optimization-suggestion-service.js", () => ({
+    AnswerOptimizationSuggestionNotFoundError: MockSuggestionNotFoundError,
+    suggestAnswerOptimizationFeedback: suggestionsMock,
   }));
   const { withRequestContext } = await import("../middleware/request-context.js");
   const router = (await import("./answer-skill-optimizations.js")).default;
@@ -192,6 +200,11 @@ function createBody(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   createMock.mockReset().mockResolvedValue(detail);
+  resolveMock.mockReset().mockResolvedValue({
+    optimizationId: 789,
+    status: "draft_ready",
+    versionNumber: null,
+  });
   getMock.mockReset().mockResolvedValue(detail);
   reviseMock.mockReset().mockResolvedValue({
     ...detail,
@@ -227,14 +240,133 @@ beforeEach(() => {
     reason: "user_cancelled",
     cancelledAt: detail.updatedAt,
   });
+  suggestionsMock.mockReset().mockResolvedValue({
+    suggestions: [
+      "先让学生表达预测和依据",
+      "增加关键实验安全提醒",
+      "明确观察记录与完成标准",
+    ],
+    source: "ai",
+  });
 });
 
 afterEach(() => {
   vi.resetModules();
   vi.doUnmock("../services/answer-skill-optimization-service.js");
+  vi.doUnmock("../services/answer-optimization-suggestion-service.js");
 });
 
 describe("answer Skill optimization routes", () => {
+  it("restores an existing optimization from trusted answer provenance", async () => {
+    const { server, url } = await listen(await createApp());
+    try {
+      const response = await fetch(
+        `${url}/api/arena/answer-optimizations/resolve`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-User-Id": "user-1",
+          },
+          body: JSON.stringify({
+            packageId: 123,
+            threadId: 456,
+            questionMessageId: 1001,
+            answerMessageId: 1002,
+            answerSide: "enhanced",
+          }),
+        },
+      );
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        data: { detail: { optimizationId: 789 }, versionNumber: null },
+      });
+      expect(resolveMock).toHaveBeenCalledWith({
+        userId: "user-1",
+        packageId: 123,
+        threadId: 456,
+        questionMessageId: 1001,
+        answerMessageId: 1002,
+        answerSide: "enhanced",
+      });
+    } finally {
+      await close(server);
+    }
+  });
+
+  it("returns answer-specific improvement suggestions from trusted IDs", async () => {
+    const { server, url } = await listen(await createApp());
+    try {
+      const response = await fetch(
+        `${url}/api/arena/answer-optimizations/suggestions`,
+        {
+          method: "POST",
+          headers: postHeaders(),
+          body: JSON.stringify({
+            packageId: 123,
+            threadId: 456,
+            questionMessageId: 1001,
+            answerMessageId: 1002,
+            answerSide: "enhanced",
+            answerVersionNumber: 2,
+          }),
+        },
+      );
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({
+        data: {
+          suggestions: [
+            "先让学生表达预测和依据",
+            "增加关键实验安全提醒",
+            "明确观察记录与完成标准",
+          ],
+          source: "ai",
+        },
+        requestId: "request-123",
+      });
+      expect(suggestionsMock).toHaveBeenCalledWith({
+        userId: "user-1",
+        packageId: 123,
+        threadId: 456,
+        questionMessageId: 1001,
+        answerMessageId: 1002,
+        answerSide: "enhanced",
+        answerVersionNumber: 2,
+      });
+    } finally {
+      await close(server);
+    }
+  });
+
+  it("rejects invalid suggestion fields before calling the service", async () => {
+    const { server, url } = await listen(await createApp());
+    try {
+      const response = await fetch(
+        `${url}/api/arena/answer-optimizations/suggestions`,
+        {
+          method: "POST",
+          headers: postHeaders(),
+          body: JSON.stringify({
+            packageId: 123,
+            threadId: 456,
+            questionMessageId: 1001,
+            answerMessageId: 1002,
+            answerSide: "unknown",
+            answerVersionNumber: 2,
+            answer: "client supplied text",
+          }),
+        },
+      );
+
+      expect(response.status).toBe(400);
+      expect(suggestionsMock).not.toHaveBeenCalled();
+    } finally {
+      await close(server);
+    }
+  });
+
   it("creates from IDs and trusted Kong identity with the success envelope", async () => {
     const { server, url } = await listen(await createApp());
     try {
@@ -829,7 +961,7 @@ describe("answer Skill optimization routes", () => {
 
       expect(response.status).toBe(status);
       expect(payload.requestId).toBe("request-123");
-      if (status >= 500) {
+      if (status === 422 || status >= 500) {
         expect(payload.error).not.toContain("private internal detail");
       }
     } finally {
@@ -859,7 +991,7 @@ describe("answer Skill optimization routes", () => {
       const payload = (await response.json()) as { error: string };
 
       expect(response.status).toBe(status);
-      if (status >= 500) {
+      if (status === 422 || status >= 500) {
         expect(payload.error).not.toContain("private test detail");
       }
     } finally {

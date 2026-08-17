@@ -34,7 +34,7 @@ describe('Skill workspace layout state', () => {
     expect(closed.contextView).toBe('versions');
   });
 
-  it('automatically opens supporting information for optimization', () => {
+  it('automatically opens supporting information for optimization without a layout-shifting banner', () => {
     const state = skillWorkspaceReducer(createSkillWorkspaceState(), {
       type: 'navigate',
       view: 'optimize',
@@ -43,7 +43,7 @@ describe('Skill workspace layout state', () => {
     expect(state.activeView).toBe('optimize');
     expect(state.contextOpen).toBe(true);
     expect(state.contextView).toBe('summary');
-    expect(state.pinnedUpdate?.title).toBe('优化草案有新修改');
+    expect(state.pinnedUpdate).toBeNull();
   });
 
   it('pins new information and opens its supporting sidebar', () => {

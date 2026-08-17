@@ -62,6 +62,14 @@ export default function SkillFirstWorkspace() {
   const logout = useAuthStore((state) => state.logout);
   const [sessions, setSessions] = useState<GuidedCreationSession[]>([]);
   const [repositorySkills, setRepositorySkills] = useState<RepositorySkill[]>([]);
+  const [workspaceSkillKeys, setWorkspaceSkillKeys] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem('educlaw:workspace-skills');
+      return stored ? JSON.parse(stored) as string[] : [];
+    } catch {
+      return [];
+    }
+  });
   const [session, setSession] = useState<GuidedCreationSessionDetail | null>(null);
   const [pendingGuidedMessage, setPendingGuidedMessage] =
     useState<PendingGuidedMessage | null>(null);
@@ -87,6 +95,10 @@ export default function SkillFirstWorkspace() {
   const [versionsLoading, setVersionsLoading] = useState(false);
   const [answerOptimization, setAnswerOptimization] = useState<AnswerOptimizationSelection | null>(null);
   const [answerRerunRequest, setAnswerRerunRequest] = useState<AnswerOptimizationRerunRequest | null>(null);
+  const [contextWidth, setContextWidth] = useState<number | null>(null);
+  const isResizingRef = useRef(false);
+  const resizeStartXRef = useRef(0);
+  const resizeStartWidthRef = useRef(0);
   const [conversations, setConversations] = useState<ArenaThread[]>([]);
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [conversationLoading, setConversationLoading] = useState(false);
@@ -100,8 +112,12 @@ export default function SkillFirstWorkspace() {
       ? {
           packageId: session.package_id,
           skillId: session.skill_id,
-          name: session.draft.goal || '教育 Skill',
-          description: session.draft.roles || '通过结构化流程完成教育场景任务',
+          name: session.education_draft?.educational_goal?.content?.trim()
+            || session.draft.goal
+            || '教育 Skill',
+          description: session.education_draft?.audience_context?.content?.trim()
+            || session.draft.roles
+            || '通过结构化流程完成教育场景任务',
           sections: session.confirmation?.sections,
         }
       : null
@@ -112,6 +128,54 @@ export default function SkillFirstWorkspace() {
   useEffect(() => {
     selectedRef.current = selectedSessionId;
   }, [selectedSessionId]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('educlaw:workspace-skills', JSON.stringify(workspaceSkillKeys));
+    } catch {
+      // ignore persistence errors
+    }
+  }, [workspaceSkillKeys]);
+
+  useEffect(() => {
+    if (workspaceState.contextOpen && workspaceState.contextView === 'optimization') {
+      setContextWidth(Math.max(500, Math.floor(window.innerWidth * 0.45)));
+    } else if (!workspaceState.contextOpen) {
+      setContextWidth(null);
+    }
+  }, [workspaceState.contextOpen, workspaceState.contextView]);
+
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isResizingRef.current = true;
+    resizeStartXRef.current = e.clientX;
+    const contextEl = document.querySelector('.skill-context') as HTMLElement | null;
+    resizeStartWidthRef.current = contextEl ? contextEl.getBoundingClientRect().width : contextWidth || 276;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, [contextWidth]);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizingRef.current) return;
+      const delta = resizeStartXRef.current - e.clientX;
+      const newWidth = Math.max(320, Math.min(700, resizeStartWidthRef.current + delta));
+      setContextWidth(newWidth);
+    };
+    const handleMouseUp = () => {
+      if (isResizingRef.current) {
+        isResizingRef.current = false;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      }
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
 
   const publishUpdate = useCallback(
     (update: SkillPinnedUpdateValue, autoOpen = true) => {
@@ -259,6 +323,20 @@ export default function SkillFirstWorkspace() {
       runId,
     );
     if (event.event === 'phase' && isVisibleRun) setPhase(event.data.phase);
+    if (event.event === 'confirmation' && isVisibleRun) {
+      // 实时同步右侧栏：LLM 完成维度提取后立即更新 session 草案
+      mergeSession(event.data.session);
+      setSession(event.data.session);
+    }
+    if (event.event === 'message' && isVisibleRun) {
+      // 实时展示助手回复（在 done 之前先入列，避免消息闪断）
+      setSession((current) => {
+        if (!current) return current;
+        const exists = current.messages?.some((m) => m.id === event.data.message.id);
+        if (exists) return current;
+        return { ...current, messages: [...(current.messages ?? []), event.data.message] };
+      });
+    }
     if (event.event === 'preview' && isVisibleRun) {
       setPreviews((current) => {
         const next = [...current];
@@ -692,12 +770,25 @@ export default function SkillFirstWorkspace() {
     setDocuments([]);
     setBusy(false);
     setError(null);
+    setWorkspaceSkillKeys((keys) => keys.includes(skill.key) ? keys : [...keys, skill.key]);
     dispatchWorkspace({ type: 'navigate', view: 'run' });
     dispatchWorkspace({ type: 'close-context' });
     dispatchWorkspace({ type: 'dismiss-update' });
   };
 
+  const removeFromWorkspace = (skill: RepositorySkill) => {
+    setWorkspaceSkillKeys((keys) => keys.filter((k) => k !== skill.key));
+    if (selectedRepositorySkill?.key === skill.key) {
+      setSelectedRepositorySkill(null);
+      dispatchWorkspace({ type: 'navigate', view: 'overview' });
+    }
+  };
+
   const handleSkillMenuAction = (skill: RepositorySkill, action: SkillMenuAction) => {
+    if (action === 'remove') {
+      removeFromWorkspace(skill);
+      return;
+    }
     openRepositorySkill(skill);
     if (action === 'open') return;
     dispatchWorkspace({
@@ -739,6 +830,8 @@ export default function SkillFirstWorkspace() {
   const activeSkillName = repositorySkills.find((skill) => skill.key === activeSkillKey)?.name
     || activeSkill?.name
     || null;
+  const workspaceSkills = repositorySkills.filter((skill) => workspaceSkillKeys.includes(skill.key));
+
   const detailView = (
     ['overview', 'run', 'test', 'arena', 'optimize', 'versions'].includes(workspaceState.activeView)
       ? workspaceState.activeView
@@ -758,7 +851,8 @@ export default function SkillFirstWorkspace() {
   };
 
   return (
-    <div className={`skill-workspace-root ${leftCollapsed ? 'is-left-collapsed' : ''} ${workspaceState.contextOpen ? 'is-context-open' : ''}`}>
+    <div className={`skill-workspace-root ${leftCollapsed ? 'is-left-collapsed' : ''} ${workspaceState.contextOpen ? 'is-context-open' : ''}`}
+        style={{ '--skill-context-current': contextWidth != null ? `${contextWidth}px` : (workspaceState.contextOpen ? '276px' : '46px') } as React.CSSProperties}>
       <SkillWorkspaceSidebar
         sessions={sessions}
         selectedSessionId={selectedSessionId}
@@ -772,7 +866,8 @@ export default function SkillFirstWorkspace() {
         onRepository={openRepository}
         onCreateMode={newSkill}
         onSelect={(item) => void openSession(item)}
-        skills={repositorySkills}
+        skills={workspaceSkills}
+        allRepositorySkills={repositorySkills}
         activeSkillKey={activeSkillKey}
         activeSkillName={activeSkillName}
         onSelectSkill={openRepositorySkill}
@@ -790,6 +885,7 @@ export default function SkillFirstWorkspace() {
         onConversationDelete={deleteConversation}
         onLogout={logout}
       />
+      <div className="skill-content-column">
       <div className="skill-main-column">
         <SkillPinnedUpdate
           update={workspaceState.pinnedUpdate}
@@ -815,6 +911,7 @@ export default function SkillFirstWorkspace() {
               versions={versions}
               currentVersionId={currentVersionId}
               versionsLoading={versionsLoading}
+              onNavigate={(view) => dispatchWorkspace({ type: 'navigate', view })}
               onRunStateChange={handleConversationRunState}
               onPublishUpdate={publishUpdate}
               onReloadVersions={loadVersions}
@@ -883,6 +980,11 @@ export default function SkillFirstWorkspace() {
           )}
         </div>
       </div>
+      {workspaceState.contextOpen && (
+        <div className="skill-content-resize-handle" onMouseDown={handleResizeStart}>
+          <div className="skill-content-resize-grip" />
+        </div>
+      )}
       <SkillContextPanel
         token={token}
         session={workspaceState.activeView === 'repository' ? null : session}
@@ -904,11 +1006,13 @@ export default function SkillFirstWorkspace() {
         }}
         onOpen={(view) => dispatchWorkspace({ type: 'open-context', view })}
         onClose={() => dispatchWorkspace({ type: 'close-context' })}
+        onNavigate={(view) => dispatchWorkspace({ type: 'navigate', view })}
         onOpenVersionManager={() => {
           dispatchWorkspace({ type: 'navigate', view: 'versions' });
           dispatchWorkspace({ type: 'close-context' });
         }}
       />
+      </div>
       <SkillImportDialog
         open={importOpen}
         busy={importBusy}

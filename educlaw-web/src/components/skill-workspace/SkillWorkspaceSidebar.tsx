@@ -20,6 +20,7 @@ import {
   Sparkles,
   Trash2,
   ChevronRight,
+  X,
 } from 'lucide-react';
 import { ThemeToggle } from '../theme-toggle';
 import { SkillConversationList } from './SkillConversationList';
@@ -29,7 +30,7 @@ import type { RepositorySkill } from './SkillRepositoryWorkspace';
 
 export type SkillCreateMode = 'conversation' | 'document' | 'manual';
 export type SkillCreateAction = SkillCreateMode | 'import';
-export type SkillMenuAction = 'open' | 'overview' | 'test' | 'versions';
+export type SkillMenuAction = 'open' | 'overview' | 'test' | 'versions' | 'remove';
 
 type Props = {
   sessions: GuidedCreationSession[];
@@ -45,6 +46,7 @@ type Props = {
   onCreateMode: (mode: SkillCreateAction) => void;
   onSelect: (session: GuidedCreationSession) => void;
   skills?: RepositorySkill[];
+  allRepositorySkills?: RepositorySkill[];
   activeSkillKey?: string | null;
   activeSkillName?: string | null;
   onSelectSkill?: (skill: RepositorySkill) => void;
@@ -98,7 +100,16 @@ const statusLabel: Record<string, string> = {
 };
 
 export function getSessionName(session: GuidedCreationSession) {
-  return session.display_name || session.draft.goal || session.draft.roles || '未命名 Skill';
+  if (session.display_name?.trim()) return session.display_name;
+  // v3 教育版流程：优先从 education_draft 提取标题
+  const eduDraft = session.education_draft;
+  if (eduDraft) {
+    const goal = eduDraft.educational_goal?.content?.trim();
+    if (goal) return goal;
+    const audience = eduDraft.audience_context?.content?.trim();
+    if (audience) return audience;
+  }
+  return session.draft.goal || session.draft.roles || '未命名 Skill';
 }
 
 export function SkillWorkspaceSidebar({
@@ -115,6 +126,7 @@ export function SkillWorkspaceSidebar({
   onCreateMode,
   onSelect,
   skills = [],
+  allRepositorySkills = [],
   activeSkillKey = null,
   activeSkillName = null,
   onSelectSkill,
@@ -139,22 +151,23 @@ export function SkillWorkspaceSidebar({
   } | null>(null);
   const [displayName, setDisplayName] = useState('');
   const [actionBusy, setActionBusy] = useState(false);
-  const [expandedSkillKey, setExpandedSkillKey] = useState<string | null>(activeSkillKey);
   const [skillMenu, setSkillMenu] = useState<{
     skill: RepositorySkill;
     x: number;
     y: number;
   } | null>(null);
-  const query = search.trim().toLowerCase();
-  const visible = sessions.filter((session) =>
-    getSessionName(session).toLowerCase().includes(query),
-  );
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [addDialogQuery, setAddDialogQuery] = useState('');
+  const [expandedSkillKey, setExpandedSkillKey] = useState<string | null>(activeSkillKey);
   const skillEntries = activeSkillKey && activeSkillName && !skills.some((skill) => skill.key === activeSkillKey)
     ? [{ key: activeSkillKey, packageId: '', skillId: '', name: activeSkillName, description: '', updatedAt: '' }, ...skills]
     : skills;
-  const visibleSkills = skillEntries.filter((skill) =>
-    `${skill.name} ${skill.description}`.toLowerCase().includes(query),
-  );
+  const visibleDrafts = sessions.filter((item) => {
+    if (item.status === 'completed') return false;
+    const keyword = search.trim().toLowerCase();
+    if (!keyword) return true;
+    return getSessionName(item).toLowerCase().includes(keyword);
+  });
   const showSkillConversations = Boolean(
     activeSkillKey
       && !repositoryActive
@@ -163,12 +176,12 @@ export function SkillWorkspaceSidebar({
       && onConversationRename
       && onConversationDelete,
   );
-  const visibleDrafts = visible.filter((item) => item.status !== 'completed' && item.status !== 'cancelled');
   const skillMenuItems = [
     { id: 'open', label: '打开 Skill', icon: Play },
     { id: 'overview', label: '查看详情', icon: Info },
     { id: 'test', label: '测试 Skill', icon: FlaskConical },
     { id: 'versions', label: '版本管理', icon: History },
+    { id: 'remove', label: '从工作区移除', icon: LogOut },
   ];
 
   const openSkillMenu = (event: MouseEvent, skill: RepositorySkill) => {
@@ -178,17 +191,15 @@ export function SkillWorkspaceSidebar({
   };
 
   useEffect(() => {
-    setExpandedSkillKey(activeSkillKey);
-  }, [activeSkillKey]);
-
-  useEffect(() => {
     const closeOnOutsideClick = (event: PointerEvent) => {
       if (!createMenuRef.current?.contains(event.target as Node)) {
         createMenuRef.current?.removeAttribute('open');
       }
     };
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') createMenuRef.current?.removeAttribute('open');
+      if (event.key === 'Escape') {
+        createMenuRef.current?.removeAttribute('open');
+      }
     };
     document.addEventListener('pointerdown', closeOnOutsideClick);
     document.addEventListener('keydown', closeOnEscape);
@@ -197,6 +208,10 @@ export function SkillWorkspaceSidebar({
       document.removeEventListener('keydown', closeOnEscape);
     };
   }, []);
+
+  useEffect(() => {
+    if (activeSkillKey) setExpandedSkillKey(activeSkillKey);
+  }, [activeSkillKey]);
 
   return (
     <aside className={`skill-sidebar ${collapsed ? 'is-collapsed' : ''}`}>
@@ -221,7 +236,7 @@ export function SkillWorkspaceSidebar({
           <Plus size={16} /><span>新建 Skill</span>
         </summary>
         <div className="skill-create-popover" role="menu" aria-label="新建 Skill 的方式">
-          <strong>新建 Skill</strong>
+          <span className="skill-create-popover-title">创建方式</span>
           {creationModes.map(({ mode, label, description, icon: Icon }) => (
             <button
               key={mode}
@@ -243,6 +258,9 @@ export function SkillWorkspaceSidebar({
           ))}
         </div>
       </details>
+      <button type="button" className="skill-repository-link" onClick={() => setAddDialogOpen(true)}>
+        <Layers2 size={14} /><span>加入工作区</span>
+      </button>
       <button type="button" className="skill-repository-link" onClick={onRepository}>
         <Library size={14} /><span>Skill 仓库</span>
       </button>
@@ -257,24 +275,26 @@ export function SkillWorkspaceSidebar({
       </label>
 
       <div className="skill-sidebar-scroll">
-        <div className="skill-sidebar-heading"><span>我的 Skills</span></div>
-        {visibleSkills.length === 0 ? (
-          <div className="skill-sidebar-empty">暂无 Skill</div>
-        ) : visibleSkills.map((skill, index) => (
+        {skillEntries.length === 0 ? (
+          <div className="skill-sidebar-empty">工作区为空，前往「Skill 仓库」选择要使用的 Skill</div>
+        ) : skillEntries.map((skill, index) => (
           <div key={skill.key} className={`skill-skill-group ${activeSkillKey === skill.key ? 'is-active' : ''}`}>
             <div
               className="skill-session-row skill-skill-row"
               onContextMenu={(event) => openSkillMenu(event, skill)}
             >
-              <button
-                type="button"
-                className="skill-skill-main"
-                onClick={() => {
-                  const isActive = activeSkillKey === skill.key;
-                  setExpandedSkillKey(isActive && expandedSkillKey === skill.key ? null : skill.key);
-                  if (!isActive || repositoryActive) onSelectSkill?.(skill);
-                }}
-                title={skill.description}
+               <button
+                 type="button"
+                 className="skill-skill-main"
+                 onClick={() => {
+                   if (activeSkillKey === skill.key && expandedSkillKey === skill.key) {
+                     setExpandedSkillKey(null);
+                     return;
+                   }
+                   setExpandedSkillKey(skill.key);
+                   onSelectSkill?.(skill);
+                 }}
+                 title={skill.description}
               >
                 <Layers2
                   size={15}
@@ -296,7 +316,7 @@ export function SkillWorkspaceSidebar({
                 <MoreHorizontal size={14} />
               </button>
             </div>
-            {activeSkillKey === skill.key && expandedSkillKey === skill.key && showSkillConversations ? (
+             {activeSkillKey === skill.key && expandedSkillKey === skill.key && showSkillConversations ? (
               <div className="skill-skill-conversations">
                 <SkillConversationList
                   conversations={conversations}
@@ -327,7 +347,7 @@ export function SkillWorkspaceSidebar({
                 >
                   <span className={`skill-status-dot status-${item.status}`} />
                   <span className="skill-session-copy">
-                    <strong>{getSessionName(item)}</strong>
+                    <span>{getSessionName(item)}</span>
                     <small>{statusLabel[item.status] || '草稿'}</small>
                   </span>
                 </button>
@@ -384,6 +404,24 @@ export function SkillWorkspaceSidebar({
               return;
             }
             onSkillAction?.(skillMenu.skill, selectedAction);
+          }}
+        />
+      ) : null}
+
+      {addDialogOpen ? (
+        <SkillAddDialog
+          skills={allRepositorySkills}
+          workspaceKeys={new Set(skills.map((s) => s.key))}
+          query={addDialogQuery}
+          onQueryChange={setAddDialogQuery}
+          onClose={() => {
+            setAddDialogOpen(false);
+            setAddDialogQuery('');
+          }}
+          onSelect={(skill) => {
+            setAddDialogOpen(false);
+            setAddDialogQuery('');
+            onSelectSkill?.(skill);
           }}
         />
       ) : null}
@@ -462,5 +500,78 @@ export function SkillWorkspaceSidebar({
         </div>
       )}
     </aside>
+  );
+}
+
+type SkillAddDialogProps = {
+  skills: RepositorySkill[];
+  workspaceKeys: Set<string>;
+  query: string;
+  onQueryChange: (value: string) => void;
+  onClose: () => void;
+  onSelect: (skill: RepositorySkill) => void;
+};
+
+function SkillAddDialog({
+  skills,
+  workspaceKeys,
+  query,
+  onQueryChange,
+  onClose,
+  onSelect,
+}: SkillAddDialogProps) {
+  const q = query.trim().toLowerCase();
+  const addable = skills.filter((s) => {
+    if (workspaceKeys.has(s.key)) return false;
+    if (!q) return true;
+    return `${s.name} ${s.description}`.toLowerCase().includes(q);
+  });
+
+  return (
+    <div className="skill-add-dialog-backdrop" onClick={onClose}>
+      <div className="skill-add-dialog" onClick={(e) => e.stopPropagation()}>
+        <header className="skill-add-dialog-header">
+          <div>
+            <h2>加入工作区</h2>
+            <p>从仓库选择 Skill 加入左侧工作区</p>
+          </div>
+          <button type="button" className="skill-icon-button" onClick={onClose} aria-label="关闭">
+            <X size={16} />
+          </button>
+        </header>
+        <label className="skill-add-dialog-search">
+          <Search size={15} />
+          <input
+            autoFocus
+            value={query}
+            onChange={(e) => onQueryChange(e.target.value)}
+            placeholder="搜索 Skill 名称或描述"
+          />
+        </label>
+        <div className="skill-add-dialog-list">
+          {addable.length === 0 ? (
+            <div className="skill-add-dialog-empty">
+              {skills.length === 0 ? '仓库中暂无 Skill' : '没有匹配的 Skill'}
+            </div>
+          ) : addable.map((skill) => (
+            <button
+              key={skill.key}
+              type="button"
+              className="skill-add-dialog-item"
+              onClick={() => onSelect(skill)}
+            >
+              <span className="skill-add-dialog-item-icon">
+                <Sparkles size={15} />
+              </span>
+              <span className="skill-add-dialog-item-copy">
+                <strong>{skill.name}</strong>
+                <small>{skill.description || '无描述'}</small>
+              </span>
+              <Plus size={15} />
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }

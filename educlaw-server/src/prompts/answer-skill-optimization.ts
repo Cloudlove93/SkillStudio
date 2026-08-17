@@ -118,6 +118,9 @@ export function buildAnswerSkillOptimizationPrompt(
       'Return strict JSON matching the supplied output shape, with no extra fields and no Markdown code fence.',
       'Keep JSON keys, enum values, Skill IDs, section values, and operation values exactly as specified in English.',
       'Write every user-facing natural-language string in diagnosis.summary, diagnosis.riskNotes, candidateSkills.reason, and patch.reason in Simplified Chinese.',
+      'Keep diagnosis.summary conversational and concise: state the main problem and intended improvement in at most three short paragraphs.',
+      'Do not use report headings, horizontal separators, or a generic opening such as “好的，我来分析”.',
+      'Do not ask for confirmation unless a material ambiguity prevents a safe patch; place detailed rule changes in patch fields instead of repeating them in diagnosis.summary.',
       'Only structured enum fields may contain the English enum tokens. In user-facing natural-language strings, refer to sections and operations with Simplified Chinese labels instead of Instructions, Workflow, Output Format, Examples, Common Issues, replace, append, or add_section.',
       'Preserve the original question and answer as input evidence; do not translate or rewrite them.',
       "When the target Skill is mainly Chinese, write patch.proposedContent in Simplified Chinese. Otherwise preserve the target Skill's primary language.",
@@ -181,6 +184,7 @@ export function buildAnswerSkillOptimizationLocalizationPrompt(
       'You localize one already validated answer optimization result.',
       'Return strict JSON with exactly the same object shape and no Markdown code fence.',
       'Translate only diagnosis.summary, diagnosis.riskNotes items, candidateSkills.reason, and patch.reason into Simplified Chinese.',
+      'Preserve the concise conversational style of user-facing summaries; do not introduce report headings, horizontal separators, generic openings, or unnecessary confirmation questions.',
       input.translateProposedContent
         ? 'The target Skill is mainly Chinese, so also translate patch.proposedContent into Simplified Chinese while preserving its Markdown structure.'
         : 'Do not change patch.proposedContent because the target Skill is not mainly Chinese.',
@@ -258,6 +262,10 @@ export function buildAnswerSkillRefinementPrompt(
       'patch.proposedContent must contain only the target section body. Do not include the target section heading, YAML frontmatter, or another top-level section.',
       'Avoid unrelated expansion. Produce concrete, executable, unambiguous rules.',
       'For an applicable edit, return kind=applied with one complete patch and a concise Simplified Chinese assistantSummary.',
+      'Keep assistantSummary conversational and concise: tell the user what was improved in at most three short paragraphs.',
+      'Put detailed changes in the patch instead of repeating them in assistantSummary.',
+      'Do not use report headings, horizontal separators, or a generic opening such as “好的，我来逐一分析”.',
+      'Do not ask for confirmation when the requested edit has already been applied safely; ask only when a material ambiguity requires clarification.',
       'For needs_clarification, return one focused question and 1-3 Simplified Chinese suggestions that can be submitted directly.',
       'For not_suitable_for_shared_rule, explain why it only suits this answer and suggest a reusable rewrite when possible.',
       'Keep JSON keys and enum values in English. Write patch.reason in Simplified Chinese.',
@@ -362,6 +370,7 @@ export function buildAnswerSkillRefinementLocalizationPrompt(
       'You localize one already validated Skill refinement result.',
       'Return strict JSON with exactly the same object shape and no Markdown code fence.',
       'Translate every user-facing natural-language string into Simplified Chinese: assistantSummary, patch.reason, message, clarificationQuestion, suggestedFeedback items, and suggestedReusableFeedback.',
+      'Preserve the concise conversational style of user-facing summaries; do not introduce report headings, horizontal separators, generic openings, or unnecessary confirmation questions.',
       input.translateProposedContent
         ? 'The target Skill is mainly Chinese, so also translate patch.proposedContent into Simplified Chinese while preserving Markdown structure.'
         : 'Do not change patch.proposedContent because the target Skill is not mainly Chinese.',

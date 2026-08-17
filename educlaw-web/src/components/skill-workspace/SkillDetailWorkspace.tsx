@@ -26,6 +26,7 @@ type Props = {
   versionsLoading: boolean;
   onPublishUpdate: (update: SkillPinnedUpdate, autoOpen?: boolean) => void;
   onReloadVersions: () => Promise<void>;
+  onNavigate: (view: DetailView) => void;
   onRunStateChange?: (running: boolean, threadId?: string | null) => void;
   onOptimizeAnswer: (selection: AnswerOptimizationSelection) => void;
   conversations: ArenaThread[];
@@ -33,15 +34,6 @@ type Props = {
   onConversationCreated: (thread: ArenaThread) => void;
   onConversationUpdated: (thread: ArenaThread) => void;
   answerRerunRequest?: AnswerOptimizationRerunRequest | null;
-};
-
-const viewLabels: Record<DetailView, string> = {
-  overview: '概览',
-  run: '运行 Skill',
-  test: '测试',
-  arena: 'Arena 对比',
-  optimize: '整体优化',
-  versions: '版本',
 };
 
 export function SkillDetailWorkspace(props: Props) {
@@ -62,17 +54,16 @@ export function SkillDetailWorkspace(props: Props) {
 
   return (
     <main className="skill-center skill-detail-workspace">
-      <header className="skill-workspace-topbar">
-        <strong className="skill-current-view">{viewLabels[props.view]}</strong>
-        {(props.view === 'run' || props.view === 'test') && (
+      {(props.view === 'run' || props.view === 'test') && (
+        <header className="skill-workspace-topbar">
           <label className="skill-active-version skill-version-picker">
             <span>当前版本</span>
             <select value={selectedRunVersion?.id ?? ''} onChange={(event) => setSelectedRunVersionId(event.target.value)}>
               {props.versions.filter((version) => version.status !== 'discarded').map((version) => <option value={version.id} key={version.id}>v{version.versionNumber}</option>)}
             </select>
           </label>
-        )}
-      </header>
+        </header>
+      )}
 
       <div className="skill-detail-content">
         {props.view === 'overview' && <Overview skill={props.skill} />}

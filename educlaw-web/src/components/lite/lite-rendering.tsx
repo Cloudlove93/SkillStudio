@@ -1,4 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import type {
   AgentPackageSnapshot,
   ArenaAnswerOptimizationSummary,
@@ -7,7 +12,7 @@ import type {
 } from '@educlaw/shared';
 import type { VersionCompareResult, LineDiff } from '../../api/lite-api';
 import { computeLineDiff } from '../../api/lite-api';
-import { Loader2, Wrench } from 'lucide-react';
+import { Loader2, Wrench, ChevronDown } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import type { Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -105,13 +110,24 @@ const markdownComponents: Components = {
   },
 };
 
-export function MarkdownContent({ content }: { content: string }) {
+export function MarkdownContent({
+  content,
+}: {
+  content: string;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const components = useMemo<Components>(() => markdownComponents, []);
+
   return (
-    <div className="prose prose-sm max-w-none min-w-0 break-words [overflow-wrap:anywhere] dark:prose-invert">
+    <div
+      ref={containerRef}
+      className="prose prose-sm max-w-none min-w-0 break-words [overflow-wrap:anywhere] dark:prose-invert"
+    >
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeKatex]}
-        components={markdownComponents}
+        components={components}
       >
         {content}
       </ReactMarkdown>
@@ -221,11 +237,11 @@ function InlineDiffText({
 }) {
   const tone =
     type === 'removed'
-      ? 'bg-red-500/15 text-red-600'
-      : 'bg-emerald-500/15 text-emerald-600';
+      ? 'bg-rose-100/80 dark:bg-rose-900/25 text-rose-700 dark:text-rose-300'
+      : 'bg-emerald-100/80 dark:bg-emerald-900/25 text-emerald-700 dark:text-emerald-300';
 
   if (counterpart === undefined) {
-    return <span className={tone}>{text}</span>;
+    return <span className={`rounded-[2px] px-0.5 ${tone}`}>{text}</span>;
   }
 
   const parts = splitChangedText(text, counterpart);
@@ -233,7 +249,7 @@ function InlineDiffText({
     <>
       {parts.prefix}
       {parts.changed && (
-        <span className={`rounded px-0.5 ${tone}`}>{parts.changed}</span>
+        <span className={`rounded-[2px] px-0.5 ${tone}`}>{parts.changed}</span>
       )}
       {parts.suffix}
     </>
@@ -251,30 +267,44 @@ function DiffLineView({
 }) {
   if (line.type === 'same' && line.text.startsWith('...')) {
     return (
-      <div key={index} className="px-2 py-0.5 text-muted-foreground/40 italic">
-        {line.text}
+      <div key={index} className="flex items-center gap-2 py-2 px-3">
+        <div className="h-px flex-1 bg-border/60" />
+        <span className="text-[10px] text-muted-foreground/40 select-none">省略</span>
+        <div className="h-px flex-1 bg-border/60" />
       </div>
     );
   }
 
-  if (line.type === 'removed' || line.type === 'added') {
+  if (line.type === 'removed') {
     return (
       <div
         key={index}
-        className="px-2 py-0.5 whitespace-pre-wrap break-all text-foreground"
+        className="border-l-2 border-l-rose-300/60 dark:border-l-rose-700/40 bg-rose-50/50 dark:bg-rose-950/10 px-3 py-1.5"
       >
-        <span
-          className={
-            line.type === 'removed' ? 'text-red-500' : 'text-emerald-500'
-          }
-        >
-          {line.type === 'removed' ? '- ' : '+ '}
+        <span className="whitespace-pre-wrap break-all text-[13px] leading-[1.65] text-foreground/55">
+          <InlineDiffText
+            text={line.text}
+            counterpart={counterpart}
+            type="removed"
+          />
         </span>
-        <InlineDiffText
-          text={line.text}
-          counterpart={counterpart}
-          type={line.type}
-        />
+      </div>
+    );
+  }
+
+  if (line.type === 'added') {
+    return (
+      <div
+        key={index}
+        className="border-l-2 border-l-emerald-300/60 dark:border-l-emerald-700/40 bg-emerald-50/50 dark:bg-emerald-950/10 px-3 py-1.5"
+      >
+        <span className="whitespace-pre-wrap break-all text-[13px] leading-[1.65] text-foreground">
+          <InlineDiffText
+            text={line.text}
+            counterpart={counterpart}
+            type="added"
+          />
+        </span>
       </div>
     );
   }
@@ -282,9 +312,8 @@ function DiffLineView({
   return (
     <div
       key={index}
-      className="px-2 py-0.5 whitespace-pre-wrap break-all text-foreground/45"
+      className="px-3 py-1 whitespace-pre-wrap break-all text-[13px] leading-[1.65] text-muted-foreground/60"
     >
-      <span className="text-muted-foreground/50"> </span>
       {line.text}
     </div>
   );
@@ -347,22 +376,30 @@ function DiffBlock({ title, diffs }: { title: string; diffs: LineDiff[] }) {
   const added = diffs.filter((d) => d.type === 'added').length;
   const removed = diffs.filter((d) => d.type === 'removed').length;
   return (
-    <div className="rounded-[20px] border border-border/70 bg-card/80 px-4 py-3">
+    <div className="rounded-xl border border-border/80 bg-card overflow-hidden">
       <button
         onClick={() => setExpanded((v) => !v)}
-        className="flex items-center justify-between w-full text-left"
+        className="flex items-center justify-between w-full text-left px-4 py-3 hover:bg-muted/30 transition-colors"
       >
-        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-          {title}
-        </div>
-        <div className="flex items-center gap-2 text-[10px]">
-          {removed > 0 && <span className="text-red-500">-{removed}</span>}
-          {added > 0 && <span className="text-emerald-500">+{added}</span>}
-          <span className="text-muted-foreground">{expanded ? '▲' : '▼'}</span>
+        <span className="text-sm font-medium text-foreground">{title}</span>
+        <div className="flex items-center gap-2">
+          {removed > 0 && (
+            <span className="rounded-full bg-rose-50 dark:bg-rose-950/30 px-2 py-0.5 text-[11px] font-medium text-rose-600 dark:text-rose-400">
+              删除 {removed}
+            </span>
+          )}
+          {added > 0 && (
+            <span className="rounded-full bg-emerald-50 dark:bg-emerald-950/30 px-2 py-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+              新增 {added}
+            </span>
+          )}
+          <ChevronDown
+            className={`size-4 text-muted-foreground transition-transform ${expanded ? 'rotate-180' : ''}`}
+          />
         </div>
       </button>
       {expanded && (
-        <div className="mt-2 space-y-0 font-mono leading-5 text-xs border-t border-border/50 pt-2">
+        <div className="border-t border-border/60 py-2">
           <DiffLinesView diffs={diffs} />
         </div>
       )}
@@ -372,7 +409,7 @@ function DiffBlock({ title, diffs }: { title: string; diffs: LineDiff[] }) {
 
 export function VersionDiffView({ result }: { result: VersionCompareResult }) {
   return (
-    <div className="space-y-3 text-xs">
+    <div className="space-y-3">
       <DiffBlock
         title={`agent.md (v${result.baseVersion.versionNumber} → v${result.targetVersion.versionNumber})`}
         diffs={result.diffs.agentMd}
@@ -610,20 +647,20 @@ export function OptimizationDiffView({
   );
 
   return (
-    <div className="space-y-3 text-xs">
-      <div className="rounded-[20px] border border-border/70 bg-card/80 px-4 py-3">
-        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground mb-2">
-          agent.md 变更
+    <div className="space-y-3">
+      <div className="rounded-xl border border-border/80 bg-card overflow-hidden">
+        <div className="px-4 py-2.5 border-b border-border/60">
+          <span className="text-sm font-medium text-foreground">agent.md 变更</span>
         </div>
-        <div className="space-y-0.5 font-mono leading-5">
+        <div className="py-2">
           <DiffLinesView diffs={agentDiff} />
         </div>
       </div>
-      <div className="rounded-[20px] border border-border/70 bg-card/80 px-4 py-3">
-        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground mb-2">
-          rubric.md 变更
+      <div className="rounded-xl border border-border/80 bg-card overflow-hidden">
+        <div className="px-4 py-2.5 border-b border-border/60">
+          <span className="text-sm font-medium text-foreground">rubric.md 变更</span>
         </div>
-        <div className="space-y-0.5 font-mono leading-5">
+        <div className="py-2">
           <DiffLinesView diffs={rubricDiff} />
         </div>
       </div>

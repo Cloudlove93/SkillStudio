@@ -665,8 +665,8 @@ export const liteApi = {
     payload: {
       idempotencyKey: string;
       basePackageVersionId: string;
-      left: SkillArenaSelectionPayload;
-      right: SkillArenaSelectionPayload;
+      left: SkillArenaSelectionPayload | null;
+      right: SkillArenaSelectionPayload | null;
       model?: string;
       surface?: 'run' | 'test' | 'arena' | 'optimize';
     },

@@ -351,7 +351,7 @@ export interface AnswerSkillOptimizationDetailDto {
   targetSkill: AnswerOptimizationTargetSkill | null;
   candidateSkills: AnswerOptimizationCandidateSkill[];
   patch: AnswerSkillPatch | null;
-  draft: Pick<AnswerOptimizationDraft, "skillId" | "validation"> | null;
+  draft: PublicAnswerOptimizationDraft | null;
   diff: AnswerOptimizationDiff | null;
   testResult: PublicAnswerOptimizationTestResult | null;
   refinementHistory: AnswerSkillRefinementTurn[];
@@ -395,7 +395,7 @@ export interface ReviseAnswerSkillOptimizationDto {
   targetSkill: AnswerOptimizationTargetSkill | null;
   candidateSkills: AnswerOptimizationCandidateSkill[];
   patch: AnswerSkillPatch | null;
-  draft: Pick<AnswerOptimizationDraft, "skillId" | "validation"> | null;
+  draft: PublicAnswerOptimizationDraft | null;
   diff: AnswerOptimizationDiff | null;
   testResult: null;
   refinementHistory: AnswerSkillRefinementTurn[];
@@ -702,6 +702,21 @@ function answerRunSideProvenance(
       };
 }
 
+export interface ResolveAnswerSkillOptimizationInput {
+  userId: string;
+  packageId: number;
+  threadId: number;
+  questionMessageId: number;
+  answerMessageId: number;
+  answerSide: "baseline" | "enhanced";
+}
+
+export interface AnswerSkillOptimizationReference {
+  optimizationId: number;
+  status: AnswerSkillOptimizationStatus;
+  versionNumber: number | null;
+}
+
 export interface RebaseAnswerSkillOptimizationInput {
   userId: string;
   optimizationId: number;
@@ -905,9 +920,13 @@ async function findNonCancelledByAnswer(
   answerMessageId: number,
 ): Promise<DbRowExistingAnswerOptimization | null> {
   const result = await query<DbRowExistingAnswerOptimization>(
-    `select r.*, v.version_number as final_version_number
+    `select r.*, sv.version_number as final_version_number
        from answer_skill_optimization_runs r
-       left join agent_package_versions v on v.id = r.final_version_id
+       left join agent_package_skills ps
+         on ps.package_id = r.package_id and ps.skill_uid = r.target_skill_id
+       left join agent_package_version_skills pvs
+         on pvs.package_version_id = r.final_version_id and pvs.skill_id = ps.id
+       left join agent_skill_versions sv on sv.id = pvs.skill_version_id
       where r.user_id = $1
         and (
           r.answer_message_id = $2
@@ -1681,26 +1700,56 @@ async function loadAnswerSkillOptimizationContext(
   };
 }
 
-function publicDraft(
+interface PublicAnswerOptimizationDraft
+  extends Pick<AnswerOptimizationDraft, "skillId" | "validation"> {
+  previewContent: string;
+}
+
+export function publicDraft(
   draft: AnswerOptimizationDraft | null | undefined,
-): Pick<AnswerOptimizationDraft, "skillId" | "validation"> | null {
+): PublicAnswerOptimizationDraft | null {
   return draft
-    ? { skillId: draft.skillId, validation: draft.validation }
+    ? {
+        skillId: draft.skillId,
+        validation: draft.validation,
+        previewContent: draft.skillMd,
+      }
     : null;
 }
 
 function publicTestResult(
+  run: Pick<AnswerSkillOptimizationRun, "answerSkillVersionId">,
   result: AnswerOptimizationTestResult | null | undefined,
 ): PublicAnswerOptimizationTestResult | null {
   if (!result) return null;
+  const hasRecordedFixedSkill =
+    run.answerSkillVersionId !== null &&
+    result.usedSkillIds.includes(result.runtimeSelectionCheck.targetSkillId);
+  const runtimeSelectionCheck = hasRecordedFixedSkill
+    ? {
+        targetSkillId: result.runtimeSelectionCheck.targetSkillId,
+        selectedSkillIds: [...result.usedSkillIds],
+        targetSkillSelected: true,
+      }
+    : result.runtimeSelectionCheck;
+  const passedCount = result.samples.filter((sample) => sample.passed).length;
+  const qualityGate = hasRecordedFixedSkill
+    ? {
+        ...result.qualityGate,
+        passed:
+          passedCount >= 2 &&
+          !result.samples.some((sample) => sample.criticalRisk),
+        passedCount,
+      }
+    : result.qualityGate;
   return {
     testedRevision: result.testedRevision,
     question: result.question,
     beforeAnswer: result.beforeAnswer,
     afterAnswer: result.afterAnswer,
     samples: result.samples,
-    qualityGate: result.qualityGate,
-    runtimeSelectionCheck: result.runtimeSelectionCheck,
+    qualityGate,
+    runtimeSelectionCheck,
     createdAt: result.createdAt,
   };
 }
@@ -1762,7 +1811,7 @@ function toDetailDto(
     patch: run.result.patch ?? null,
     draft: publicDraft(run.result.draft),
     diff: run.result.diff ?? null,
-    testResult: publicTestResult(run.result.testResult),
+    testResult: publicTestResult(run, run.result.testResult),
     refinementHistory: run.result.refinementHistory ?? [],
     failureCode: run.result.failure?.code ?? null,
     finalVersionId: run.finalVersionId,
@@ -2448,6 +2497,71 @@ export async function getAnswerSkillOptimizationDetail(
   const run = await recoverStaleAnswerSkillOptimizationRun(storedRun);
   const context = await loadAnswerSkillOptimizationContext(run);
   return toDetailDto(run, context);
+}
+
+export async function resolveAnswerSkillOptimizationReference(
+  input: ResolveAnswerSkillOptimizationInput,
+): Promise<AnswerSkillOptimizationReference | null> {
+  const userId = normalizeUserId(input.userId);
+  const packageId = toPositiveSafeInteger(input.packageId, "packageId");
+  const threadId = toPositiveSafeInteger(input.threadId, "threadId");
+  const questionMessageId = toPositiveSafeInteger(
+    input.questionMessageId,
+    "questionMessageId",
+  );
+  const answerMessageId = toPositiveSafeInteger(
+    input.answerMessageId,
+    "answerMessageId",
+  );
+  if (input.answerSide !== "baseline" && input.answerSide !== "enhanced") {
+    throw new AnswerSkillOptimizationValidationError(
+      "answerSide must be baseline or enhanced",
+    );
+  }
+
+  let answerRun: ArenaAnswerRun;
+  try {
+    answerRun = await getArenaAnswerRunByMessage(userId, answerMessageId);
+  } catch (error) {
+    if (error instanceof ArenaAnswerRunNotFoundError) {
+      throw new AnswerSkillOptimizationNotFoundError("Answer context not found");
+    }
+    throw error;
+  }
+  const recordedAnswerId = input.answerSide === "baseline"
+    ? answerRun.baselineAnswerMessageId
+    : answerRun.enhancedAnswerMessageId;
+  if (
+    answerRun.packageId !== packageId ||
+    answerRun.threadId !== threadId ||
+    answerRun.questionMessageId !== questionMessageId ||
+    recordedAnswerId !== answerMessageId
+  ) {
+    throw new AnswerSkillOptimizationNotFoundError("Answer context not found");
+  }
+
+  const row = await findNonCancelledByAnswer(userId, answerMessageId);
+  if (!row) return null;
+  const run = await recoverStaleAnswerSkillOptimizationRun(
+    toAnswerSkillOptimizationRun(row),
+  );
+  if (
+    run.packageId !== packageId ||
+    run.threadId !== threadId ||
+    run.questionMessageId !== questionMessageId ||
+    run.answerMessageId !== answerMessageId ||
+    run.answerSide !== input.answerSide
+  ) {
+    throw new AnswerSkillOptimizationNotFoundError("Answer context not found");
+  }
+  return {
+    optimizationId: run.id,
+    status: run.status,
+    versionNumber: toNullablePositiveSafeInteger(
+      row.final_version_number,
+      "final_version_number",
+    ),
+  };
 }
 
 export async function rebaseAnswerSkillOptimization(
@@ -4363,15 +4477,17 @@ async function generateAnswerOptimizationTestSamples(
 function buildRuntimeSelectionCheck(
   testContext: AnswerSkillOptimizationTestContext,
   question: string,
+  fixedSkillVersionId: number | null,
 ): {
   targetSkillId: string;
   selectedSkillIds: string[];
   targetSkillSelected: boolean;
 } {
-  const selectedSkillIds = selectRelevantSkills(
-    testContext.snapshot,
-    question,
-  ).map((skill) => skill.id);
+  const selectedSkillIds = fixedSkillVersionId !== null
+    ? [...testContext.usedSkillIds]
+    : selectRelevantSkills(testContext.snapshot, question).map(
+        (skill) => skill.id,
+      );
   return {
     targetSkillId: testContext.targetSkillId,
     selectedSkillIds,
@@ -4562,10 +4678,13 @@ function buildQualityGatedTestResult(input: {
 }
 
 function toTestDtoFromResult(
-  run: Pick<AnswerSkillOptimizationRun, "id" | "revision" | "updatedAt">,
+  run: Pick<
+    AnswerSkillOptimizationRun,
+    "id" | "revision" | "updatedAt" | "answerSkillVersionId"
+  >,
   testResult: AnswerOptimizationTestResult,
 ): TestAnswerSkillOptimizationDto {
-  const publicResult = publicTestResult(testResult);
+  const publicResult = publicTestResult(run, testResult);
   if (!publicResult) {
     throw new AnswerSkillOptimizationConflictError(
       "Draft test result is unavailable",
@@ -4615,6 +4734,7 @@ function testReplayDto(
       id: run.id,
       revision: record.resultingRevision,
       updatedAt: testResult.createdAt,
+      answerSkillVersionId: run.answerSkillVersionId,
     },
     testResult,
   );
@@ -4922,6 +5042,8 @@ export async function testAnswerSkillOptimization(
   const runtimeSelectionCheck = buildRuntimeSelectionCheck(
     testContext,
     context.question.content,
+    answerRunSideProvenance(context.answerRun, context.run.answerSide)
+      .skillVersionId,
   );
   const claimResult = await claimAnswerSkillOptimizationTest({
     run,

@@ -55,6 +55,15 @@ describe('answer Skill optimization prompts', () => {
     expect(prompt.systemPrompt).toContain(
       'Preserve the original question and answer',
     );
+    expect(prompt.systemPrompt).toContain(
+      'Keep diagnosis.summary conversational and concise',
+    );
+    expect(prompt.systemPrompt).toContain(
+      'Do not use report headings, horizontal separators, or a generic opening',
+    );
+    expect(prompt.systemPrompt).toContain(
+      'Do not ask for confirmation unless a material ambiguity prevents a safe patch',
+    );
     expect(prompt.systemPrompt).toContain('reusable');
     expect(prompt.systemPrompt).toContain('Instructions');
     expect(prompt.systemPrompt).toContain('append');
@@ -113,6 +122,9 @@ describe('answer Skill optimization prompts', () => {
     );
     expect(prompt.systemPrompt).toContain(
       'Do not change reusability, targetSkillId, candidate Skill IDs',
+    );
+    expect(prompt.systemPrompt).toContain(
+      'Preserve the concise conversational style of user-facing summaries',
     );
     expect(prompt.systemPrompt).toContain(
       'Keep JSON keys and every enum value in English',
@@ -187,6 +199,18 @@ describe('answer Skill optimization prompts', () => {
     );
     expect(prompt.systemPrompt).toContain('short contextual requests');
     expect(prompt.systemPrompt).toContain('consolidated patch');
+    expect(prompt.systemPrompt).toContain(
+      'Keep assistantSummary conversational and concise',
+    );
+    expect(prompt.systemPrompt).toContain(
+      'Put detailed changes in the patch instead of repeating them in assistantSummary',
+    );
+    expect(prompt.systemPrompt).toContain(
+      'Do not use report headings, horizontal separators, or a generic opening',
+    );
+    expect(prompt.systemPrompt).toContain(
+      'Do not ask for confirmation when the requested edit has already been applied safely',
+    );
     expect(prompt.userPrompt).toContain('保留五步结构');
     expect(prompt.userPrompt).toContain('把家长沟通写得更中性');
     expect(prompt.userPrompt).toContain('currentDraftSkillMd');

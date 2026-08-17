@@ -2,6 +2,7 @@ import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import type { ArenaThread, SkillVersionDetail } from '@educlaw/shared';
 import { ArrowUp, Check, Loader2, Save, Sparkles } from 'lucide-react';
 import { liteApi } from '../../api/lite-api';
+import { MarkdownContent } from '../lite/lite-rendering';
 import { createSkillOptimizeState, skillOptimizeReducer } from './skill-optimize-state';
 import { ConversationTurnNavigation } from './ConversationTurnNavigation';
 import { collectConversationTurns } from './conversation-turn-navigation';
@@ -171,7 +172,7 @@ export function SkillOptimizeWorkspace({ token, packageId, version, onSaved, onT
             ) : (
               <div className="skill-assistant-block" key={`${message.role}-${index}`}>
                 <div className="skill-assistant-avatar"><Sparkles size={14} /></div>
-                <div className="skill-assistant-message">{message.content}</div>
+                <div className="skill-assistant-message"><MarkdownContent content={message.content} /></div>
               </div>
             ),
           )

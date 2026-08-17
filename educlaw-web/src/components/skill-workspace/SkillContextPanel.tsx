@@ -1,19 +1,36 @@
-import { useState } from 'react';
-import type { GuidedCreationSessionDetail, SkillVersionDetail } from '@educlaw/shared';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import type { GuidedCreationSessionDetail, GuidedEducationDimension, SkillVersionDetail } from '@educlaw/shared';
 import {
   Check,
   ChevronRight,
   ExternalLink,
+  FileText,
+  FlaskConical,
   GitBranch,
-  Info,
+  LayoutGrid,
   Maximize2,
   Minimize2,
   PanelRightClose,
+  PanelRightOpen,
+  Play,
+  Scale,
   Sparkles,
+  WandSparkles,
 } from 'lucide-react';
 import type { SkillContextView, SkillWorkspaceView } from './skill-workspace-state';
 import type { AnswerOptimizationSelection } from './answer-optimization-selection';
 import { SkillAnswerOptimizationPanel } from './SkillAnswerOptimizationPanel';
+
+const EDUCATION_DIMENSIONS: { key: GuidedEducationDimension; title: string }[] = [
+  { key: 'educational_goal', title: '教育目标' },
+  { key: 'audience_context', title: '对象与情境' },
+  { key: 'input_evidence', title: '输入与依据' },
+  { key: 'teaching_strategy', title: '教育策略' },
+  { key: 'action_adaptation', title: '行动与调整' },
+  { key: 'boundaries_responsibility', title: '边界与责任' },
+  { key: 'completion_evidence', title: '完成与证据' },
+];
 
 type Props = {
   session: GuidedCreationSessionDetail | null;
@@ -27,6 +44,7 @@ type Props = {
   onOpen: (view: SkillContextView) => void;
   onClose: () => void;
   onOpenVersionManager: () => void;
+  onNavigate: (view: SkillWorkspaceView) => void;
   token: string;
   answerOptimization: AnswerOptimizationSelection | null;
   onAnswerOptimizationSaved: (versionNumber: number) => void;
@@ -42,6 +60,20 @@ const fallbackTopics = [
   { key: 'recovery_completion', title: '异常与完成标准', fields: ['exception_recovery', 'completion_evidence'] },
 ] as const;
 
+const CONTEXT_OPTIONS: { view: SkillContextView; label: string; icon: typeof FileText; desc: string }[] = [
+  { view: 'summary', label: '摘要', icon: FileText, desc: '查看当前信息' },
+  { view: 'versions', label: '版本', icon: GitBranch, desc: '浏览版本列表' },
+  { view: 'optimization', label: '优化', icon: WandSparkles, desc: '回答优化面板' },
+];
+
+const VIEW_OPTIONS = [
+  { view: 'run' as const, label: '使用', icon: Play, desc: '运行当前版本' },
+  { view: 'test' as const, label: '测试', icon: FlaskConical, desc: '固定版本测试' },
+  { view: 'arena' as const, label: 'Arena', icon: Scale, desc: '双版本对比' },
+  { view: 'optimize' as const, label: '优化', icon: WandSparkles, desc: '改进回答' },
+  { view: 'versions' as const, label: '版本', icon: GitBranch, desc: '版本管理' },
+];
+
 function summaryTitle(activeView: SkillWorkspaceView) {
   if (activeView === 'run') return ['运行信息', '当前运行'];
   if (activeView === 'test') return ['测试信息', '当前测试'];
@@ -51,7 +83,43 @@ function summaryTitle(activeView: SkillWorkspaceView) {
 }
 
 export function SkillContextPanel(props: Props) {
+  const [menuOpen, setMenuOpen] = useState(true);
   const [fullscreen, setFullscreen] = useState(false);
+  const menuBtnRef = useRef<HTMLButtonElement>(null);
+  const [popoverPos, setPopoverPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+
+  const railRef = useRef<HTMLDivElement>(null);
+
+  const toggleMenu = useCallback(() => {
+    setMenuOpen((prev) => {
+      if (!prev && railRef.current) {
+        const rect = railRef.current.getBoundingClientRect();
+        setPopoverPos({ top: rect.bottom + 6, left: rect.right - 8 });
+      }
+      return !prev;
+    });
+  }, []);
+  const closeMenu = useCallback(() => setMenuOpen(false), []);
+
+  useEffect(() => {
+    if (railRef.current) {
+      const rect = railRef.current.getBoundingClientRect();
+      setPopoverPos({ top: rect.bottom + 6, left: rect.right - 8 });
+    }
+  }, []);
+
+  const wasMenuOpenRef = useRef(true);
+
+  useEffect(() => {
+    if (props.open) {
+      wasMenuOpenRef.current = menuOpen;
+      closeMenu();
+    } else {
+      setMenuOpen(wasMenuOpenRef.current);
+      setFullscreen(false);
+    }
+  }, [props.open, closeMenu]);
+
   const [eyebrow, title] = props.view === 'versions'
     ? ['版本管理', '最近版本']
     : props.view === 'optimization'
@@ -59,26 +127,54 @@ export function SkillContextPanel(props: Props) {
       : summaryTitle(props.activeView);
 
   return (
-    <aside className={`skill-context ${props.open ? 'is-open' : 'is-collapsed'} ${props.open && fullscreen ? 'is-fullscreen' : ''}`}>
-      <nav className="skill-context-rail" aria-label="右侧快捷工具" aria-hidden={props.open}>
+    <aside className={`skill-context ${props.open ? 'is-open' : 'is-collapsed'} ${fullscreen && props.open ? 'is-fullscreen' : ''}`}>
+      <nav ref={railRef} className="skill-context-rail" aria-label="右侧栏操作" aria-hidden={props.open}>
+        <button
+          ref={menuBtnRef}
+          className={`skill-icon-button ${menuOpen ? 'is-active' : ''}`}
+          onClick={toggleMenu}
+          aria-label="功能选项"
+          title="功能选项"
+        >
+          <LayoutGrid size={17} />
+        </button>
         <button
           className="skill-icon-button"
           onClick={() => props.onOpen('summary')}
-          aria-label="当前信息"
-          title="当前信息"
+          aria-label="展开右侧栏"
+          title="展开右侧栏"
         >
-          <Info size={17} />
-        </button>
-        <button
-          className="skill-icon-button"
-          onClick={() => props.onOpen('versions')}
-          aria-label="版本管理"
-          title="版本管理"
-          disabled={!props.hasSkill}
-        >
-          <GitBranch size={17} />
+          <PanelRightOpen size={17} />
         </button>
       </nav>
+      {menuOpen && createPortal(
+        <div className="skill-context-popover" style={{ top: popoverPos.top, left: popoverPos.left }}>
+          <div className="skill-context-popover-section">
+            <span className="skill-context-popover-label">视图切换</span>
+            {VIEW_OPTIONS.map((opt) => {
+              const Icon = opt.icon;
+              const isActive = props.activeView === opt.view;
+              return (
+                <button
+                  key={opt.view}
+                  className={`skill-context-popover-item ${isActive ? 'is-current' : ''}`}
+                  onClick={() => { props.onNavigate(opt.view); closeMenu(); }}
+                >
+                  <span className="skill-context-popover-icon">
+                    <Icon size={14} />
+                  </span>
+                  <div className="skill-context-popover-copy">
+                    <strong>{opt.label}</strong>
+                    <small>{opt.desc}</small>
+                  </div>
+                  {isActive && <span className="skill-context-popover-dot" />}
+                </button>
+              );
+            })}
+          </div>
+        </div>,
+        document.body,
+      )}
       <div className="skill-context-panel-body" aria-hidden={!props.open}>
         <header className="skill-context-header">
           <div>
@@ -91,12 +187,7 @@ export function SkillContextPanel(props: Props) {
                 <ExternalLink size={16} />
               </button>
             )}
-            <button
-              className="skill-icon-button"
-              onClick={() => setFullscreen((value) => !value)}
-              title={fullscreen ? '退出展开' : '展开工作区'}
-              aria-label={fullscreen ? '退出展开' : '展开工作区'}
-            >
+            <button className="skill-icon-button" onClick={() => setFullscreen((v) => !v)} title={fullscreen ? '退出全屏' : '全屏覆盖中间栏'}>
               {fullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
             </button>
             <button className="skill-icon-button" onClick={props.onClose} title="收起右侧栏">
@@ -167,18 +258,6 @@ function ContextSummary({
 }
 
 function RequirementSummary({ session }: { session: GuidedCreationSessionDetail | null }) {
-  const sections = session?.confirmation?.sections ?? fallbackTopics.map((topic) => ({
-    key: topic.key,
-    title: topic.title,
-    content: topic.fields
-      .map((field) => session?.draft[field] || '')
-      .filter(Boolean)
-      .join('\n'),
-  }));
-  const completedCount = session
-    ? Object.values(session.field_states).filter((state) => state !== 'missing' && state !== 'conflicted').length
-    : 0;
-
   if (!session) {
     return (
       <div className="skill-context-placeholder">
@@ -188,12 +267,34 @@ function RequirementSummary({ session }: { session: GuidedCreationSessionDetail 
     );
   }
 
+  const isEducationFlow = session.flow_version === 3 || Boolean(session.education_draft);
+
+  const sections = isEducationFlow
+    ? EDUCATION_DIMENSIONS.map((dim) => ({
+        key: dim.key,
+        title: dim.title,
+        content: session.education_draft?.[dim.key]?.content?.trim() || '',
+      }))
+    : session?.confirmation?.sections ?? fallbackTopics.map((topic) => ({
+        key: topic.key,
+        title: topic.title,
+        content: topic.fields
+          .map((field) => session?.draft[field] || '')
+          .filter(Boolean)
+          .join('\n'),
+      }));
+
+  const completedCount = isEducationFlow
+    ? EDUCATION_DIMENSIONS.filter((dim) => session.education_draft?.[dim.key]?.content?.trim()).length
+    : Object.values(session.field_states).filter((state) => state !== 'missing' && state !== 'conflicted').length;
+  const totalCount = isEducationFlow ? EDUCATION_DIMENSIONS.length : 11;
+
   return (
     <div className="skill-context-scroll">
       <div className="skill-context-progress">
-        <div><span>需求完整度</span><strong>{completedCount}/11</strong></div>
+        <div><span>需求完整度</span><strong>{completedCount}/{totalCount}</strong></div>
         <div className="skill-context-progress-track">
-          <span style={{ width: `${Math.round((completedCount / 11) * 100)}%` }} />
+          <span style={{ width: `${Math.round((completedCount / totalCount) * 100)}%` }} />
         </div>
       </div>
       <div className="skill-context-sections">

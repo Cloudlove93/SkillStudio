@@ -156,7 +156,7 @@ function configureQueryMock() {
           .filter(
             (candidate) =>
               candidate.user_id === values[0] &&
-              candidate.enhanced_answer_message_id === values[1] &&
+              ((candidate.answer_message_id ?? candidate.enhanced_answer_message_id) === values[1]) &&
               candidate.status !== "cancelled",
           )
           .sort((left, right) => Number(right.id) - Number(left.id))[0];
@@ -297,6 +297,22 @@ afterEach(() => {
   vi.resetModules();
   vi.doUnmock("./db.js");
   vi.doUnmock("./arena-service.js");
+});
+
+describe("publicDraft", () => {
+  it("returns the complete Skill preview with validation metadata", async () => {
+    const { publicDraft } = await loadService();
+
+    expect(publicDraft({
+      skillId: "skill-bullying",
+      skillMd: "# Skill\n\n## Instructions\nUse the revised workflow.",
+      validation: { valid: true, errors: [] },
+    })).toEqual({
+      skillId: "skill-bullying",
+      previewContent: "# Skill\n\n## Instructions\nUse the revised workflow.",
+      validation: { valid: true, errors: [] },
+    });
+  });
 });
 
 describe("createAnswerSkillOptimizationRun", () => {
@@ -663,6 +679,34 @@ describe("createAnswerSkillOptimizationRun", () => {
     expect(storedRows).toHaveLength(1);
   });
 
+  it("does not substitute a package version number when the final Skill version cannot be resolved", async () => {
+    storedRows.push(
+      createStoredRow({
+        status: "completed",
+        final_version_id: 8001,
+        target_skill_id: null,
+      }),
+    );
+    queryMock.mockImplementationOnce(async (sql: string) => {
+      expect(sql).toContain("sv.version_number as final_version_number");
+      expect(sql).not.toContain("coalesce(sv.version_number, v.version_number)");
+      return {
+        rows: [{ ...storedRows[0], final_version_number: null }],
+        rowCount: 1,
+      };
+    });
+    const { createAnswerSkillOptimizationRun } = await loadService();
+
+    const failure = await createAnswerSkillOptimizationRun(
+      createInput({ idempotencyKey: secondCreateKey }),
+    ).catch((error: unknown) => error);
+
+    expect(failure).toMatchObject({
+      code: "answer_already_optimized",
+      versionNumber: null,
+    });
+  });
+
   it("allows a cancelled answer optimization to restart with a new key", async () => {
     storedRows.push(createStoredRow({ status: "cancelled" }));
     nextOptimizationId = 7002;
@@ -723,6 +767,90 @@ describe("createAnswerSkillOptimizationRun", () => {
     expect(storedRows).toHaveLength(1);
     expect(storedRows[0]?.status).toBe("failed");
     expect(recoveryWriteCount).toBe(1);
+  });
+});
+
+describe("resolveAnswerSkillOptimizationReference", () => {
+  it("returns the existing task for the exact answer identity", async () => {
+    storedRows.push(createStoredRow({ status: "draft_ready" }));
+    const { resolveAnswerSkillOptimizationReference } = await loadService();
+
+    const existing = await resolveAnswerSkillOptimizationReference({
+      userId: "user-1",
+      packageId: 301,
+      threadId: 101,
+      questionMessageId: 1001,
+      answerMessageId: 2002,
+      answerSide: "enhanced",
+    });
+
+    expect(existing).toEqual({
+      optimizationId: 7001,
+      status: "draft_ready",
+      versionNumber: null,
+    });
+    expect(getArenaAnswerRunMock).toHaveBeenCalledWith("user-1", 2002);
+  });
+
+  it("rejects answer identity fields that do not match recorded provenance", async () => {
+    storedRows.push(createStoredRow({ status: "draft_ready" }));
+    const {
+      resolveAnswerSkillOptimizationReference,
+      AnswerSkillOptimizationNotFoundError,
+    } = await loadService();
+
+    await expect(resolveAnswerSkillOptimizationReference({
+      userId: "user-1",
+      packageId: 999,
+      threadId: 101,
+      questionMessageId: 1001,
+      answerMessageId: 2002,
+      answerSide: "enhanced",
+    })).rejects.toBeInstanceOf(AnswerSkillOptimizationNotFoundError);
+  });
+
+  it("restores a baseline Arena optimization independently from the enhanced side", async () => {
+    storedRows.push(createStoredRow({
+      answer_side: "baseline",
+      answer_message_id: 2001,
+      answer_skill_version_id: 101,
+      working_skill_version_id: 101,
+      status: "test_ready",
+    }));
+    const { resolveAnswerSkillOptimizationReference } = await loadService();
+
+    await expect(resolveAnswerSkillOptimizationReference({
+      userId: "user-1",
+      packageId: 301,
+      threadId: 101,
+      questionMessageId: 1001,
+      answerMessageId: 2001,
+      answerSide: "baseline",
+    })).resolves.toEqual({
+      optimizationId: 7001,
+      status: "test_ready",
+      versionNumber: null,
+    });
+  });
+
+  it("does not restore an optimization row whose stored answer provenance is inconsistent", async () => {
+    storedRows.push(createStoredRow({
+      package_id: 999,
+      status: "draft_ready",
+    }));
+    const {
+      resolveAnswerSkillOptimizationReference,
+      AnswerSkillOptimizationNotFoundError,
+    } = await loadService();
+
+    await expect(resolveAnswerSkillOptimizationReference({
+      userId: "user-1",
+      packageId: 301,
+      threadId: 101,
+      questionMessageId: 1001,
+      answerMessageId: 2002,
+      answerSide: "enhanced",
+    })).rejects.toBeInstanceOf(AnswerSkillOptimizationNotFoundError);
   });
 });
 

@@ -91,6 +91,7 @@ it("treats an advisory preview with concerns as confirmable", () => {
     getAnswerSkillConfirmIssue({
       status: "test_ready",
       finalVersionId: null,
+      answerSkillVersionId: null,
       targetSkillId: "skill-one",
       revision: 2,
       result: result(testResult({ passed: false })),
@@ -103,6 +104,7 @@ it("still blocks confirmation when the runtime selector misses the target", () =
     getAnswerSkillConfirmIssue({
       status: "test_ready",
       finalVersionId: null,
+      answerSkillVersionId: null,
       targetSkillId: "skill-one",
       revision: 2,
       result: result(testResult({ passed: false, targetSkillSelected: false })),
@@ -113,6 +115,19 @@ it("still blocks confirmation when the runtime selector misses the target", () =
   });
 });
 
+it("accepts a recorded fixed Skill run even when an old preview stored an auto-route miss", () => {
+  expect(
+    getAnswerSkillConfirmIssue({
+      status: "test_ready",
+      finalVersionId: null,
+      answerSkillVersionId: 20,
+      targetSkillId: "skill-one",
+      revision: 2,
+      result: result(testResult({ passed: false, targetSkillSelected: false })),
+    }),
+  ).toBeNull();
+});
+
 it("still requires a faithful preview of the current revision", () => {
   const missingPreview = result();
   missingPreview.testResult = null;
@@ -120,6 +135,7 @@ it("still requires a faithful preview of the current revision", () => {
     getAnswerSkillConfirmIssue({
       status: "test_ready",
       finalVersionId: null,
+      answerSkillVersionId: null,
       targetSkillId: "skill-one",
       revision: 2,
       result: missingPreview,
@@ -133,6 +149,7 @@ it("still requires a faithful preview of the current revision", () => {
     getAnswerSkillConfirmIssue({
       status: "test_ready",
       finalVersionId: null,
+      answerSkillVersionId: null,
       targetSkillId: "skill-one",
       revision: 3,
       result: result(testResult({ testedRevision: 2, passed: false })),

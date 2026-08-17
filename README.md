@@ -1,6 +1,8 @@
 # EduSkill
 
-EduSkill is a workspace for managing skills, agents, chats, and learning assets.
+EduSkill is an education-focused Skill lifecycle platform for creating, running, testing, optimizing, and versioning reusable Skills.
+
+For a current product definition, feature map, core workflows, architecture, and implementation-status boundaries, see [EduSkill 平台说明与功能地图](docs/EDUSKILL_PLATFORM_OVERVIEW.md).
 
 ## Start
 

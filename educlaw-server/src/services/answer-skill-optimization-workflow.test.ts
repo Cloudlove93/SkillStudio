@@ -16,6 +16,7 @@ const getVersionMock = vi.fn();
 const generateJsonMock = vi.fn();
 const generateTextMock = vi.fn();
 const validateSkillMock = vi.fn();
+const getSkillVersionDetailMock = vi.fn();
 
 class MockArenaAnswerRunNotFoundError extends Error {}
 class MockLlmInvalidJsonError extends Error {}
@@ -468,6 +469,13 @@ function configureQueryMock() {
           final_version_id: null,
           created_at: String(values[15]),
           updated_at: String(values[16]),
+          answer_side: values[17] as "baseline" | "enhanced",
+          answer_message_id: Number(values[18]),
+          evidence_version_id: Number(values[19]),
+          answer_skill_version_id:
+            values[20] === null ? null : Number(values[20]),
+          working_skill_version_id:
+            values[21] === null ? null : Number(values[21]),
         };
         nextOptimizationId += 1;
         optimizationRows.push(row);
@@ -827,6 +835,10 @@ async function loadService() {
     getVersion: getVersionMock,
     validateSkillMdStandard: validateSkillMock,
   }));
+  vi.doMock("./skill-version-service.js", async (importOriginal) => ({
+    ...await importOriginal<typeof import("./skill-version-service.js")>(),
+    getSkillVersionDetail: getSkillVersionDetailMock,
+  }));
   vi.doMock("./llm-service.js", () => ({
     generateJson: generateJsonMock,
     generateText: generateTextMock,
@@ -885,6 +897,9 @@ beforeEach(() => {
   generateJsonMock.mockReset();
   generateTextMock.mockReset();
   validateSkillMock.mockReset();
+  getSkillVersionDetailMock.mockReset().mockResolvedValue({
+    skill: version.snapshot.skills[0],
+  });
   configureQueryMock();
   getArenaAnswerRunMock.mockResolvedValue({ ...answerRun });
   getVersionMock.mockResolvedValue(version);
@@ -1342,7 +1357,7 @@ describe("answer optimization create workflow", () => {
     expect(stored.result.draft).toBeNull();
   });
 
-  it("restores owner-scoped message content without exposing the full draft", async () => {
+  it("restores the owner-scoped Skill preview without exposing package internals", async () => {
     const {
       AnswerSkillOptimizationNotFoundError,
       createAnswerSkillOptimization,
@@ -1360,7 +1375,11 @@ describe("answer optimization create workflow", () => {
     expect(detail.draft).toEqual({
       skillId: "skill-one",
       validation: { valid: true, errors: [] },
+      previewContent: expect.stringContaining("## Instructions"),
     });
+    expect(detail).not.toHaveProperty("snapshot");
+    expect(detail).not.toHaveProperty("agentMd");
+    expect(detail).not.toHaveProperty("rubricMd");
     expect(detail.replayAvailability).toEqual({
       available: true,
       reason: null,
@@ -2693,6 +2712,31 @@ describe("answer optimization draft test workflow", () => {
       targetSkillSelected: false,
     });
     expect(tested.testResult.qualityGate.passed).toBe(false);
+  });
+
+  it("uses the recorded Skill binding instead of auto-routing a fixed Skill answer", async () => {
+    getArenaAnswerRunMock.mockResolvedValue({
+      ...answerRun,
+      enhancedSkillVersionId: 20,
+    });
+    selectRelevantSkillsMock.mockReturnValue([version.snapshot.skills[1]!]);
+    const {
+      createAnswerSkillOptimization,
+      testAnswerSkillOptimization,
+    } = await loadService();
+    const created = await createAnswerSkillOptimization(createInput());
+
+    const tested = await testAnswerSkillOptimization(
+      testInput(created.optimizationId),
+    );
+
+    expect(tested.testResult.runtimeSelectionCheck).toEqual({
+      targetSkillId: "skill-one",
+      selectedSkillIds: ["skill-one"],
+      targetSkillSelected: true,
+    });
+    expect(tested.testResult.qualityGate.passed).toBe(true);
+    expect(selectRelevantSkillsMock).not.toHaveBeenCalled();
   });
 
   it("rejects an invalid Judge result and restores the stable draft state", async () => {

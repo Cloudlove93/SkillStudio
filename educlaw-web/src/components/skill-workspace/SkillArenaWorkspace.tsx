@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import type { SkillVersionDetail } from '@educlaw/shared';
-import { ArrowUp, Columns3, Loader2, WandSparkles } from 'lucide-react';
+import { ArrowUp, Ban, Columns3, Loader2, WandSparkles } from 'lucide-react';
 import { liteApi } from '../../api/lite-api';
 import { createSkillArenaState, skillArenaReducer } from './skill-arena-state';
 import type { AnswerOptimizationRerunRequest, AnswerOptimizationSelection } from './answer-optimization-selection';
@@ -21,6 +21,8 @@ function requestId() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
   return `skill-arena-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
+
+const NONE = '__none__';
 
 export function SkillArenaWorkspace({ token, packageId, versions, currentVersionId, onCompleted, onOptimizeAnswer, rerunRequest }: Props) {
   const available = useMemo(() => versions.filter((version) => version.status !== 'discarded'), [versions]);
@@ -50,21 +52,23 @@ export function SkillArenaWorkspace({ token, packageId, versions, currentVersion
     setProvenance(null);
   }, [leftVersionId, rightVersionId]);
 
-  const leftVersion = available.find((version) => version.id === leftVersionId);
-  const rightVersion = available.find((version) => version.id === rightVersionId);
+  const leftVersion = leftVersionId === NONE ? null : available.find((version) => version.id === leftVersionId);
+  const rightVersion = rightVersionId === NONE ? null : available.find((version) => version.id === rightVersionId);
 
   const sendContent = useCallback(async (rawContent: string) => {
     const content = rawContent.trim();
-    if (!content || state.busy || !leftVersion || !rightVersion) return;
+    if (!content || state.busy || (!leftVersion && !rightVersion)) return;
+    const baseVersion = leftVersion ?? rightVersion;
+    if (!baseVersion) return;
     dispatch({ type: 'submit', content });
     try {
       if (!threadIdRef.current) {
         const thread = await liteApi.createArenaThread(token, packageId, {
           idempotencyKey: requestId(),
-          basePackageVersionId: rightVersion.createdInPackageVersionId,
-          left: { skillId: leftVersion.skillId, skillVersionId: leftVersion.id },
-            right: { skillId: rightVersion.skillId, skillVersionId: rightVersion.id },
-            surface: 'arena',
+          basePackageVersionId: baseVersion.createdInPackageVersionId,
+          left: leftVersion ? { skillId: leftVersion.skillId, skillVersionId: leftVersion.id } : null,
+          right: rightVersion ? { skillId: rightVersion.skillId, skillVersionId: rightVersion.id } : null,
+          surface: 'arena',
         });
         threadIdRef.current = String(thread.id);
       }
@@ -128,31 +132,92 @@ export function SkillArenaWorkspace({ token, packageId, versions, currentVersion
 
   return (
     <div className="skill-arena-workspace skill-view-enter">
-      <div className="skill-arena-selectors">
-        <label><span>左侧版本</span><select value={leftVersionId} onChange={(event) => setLeftVersionId(event.target.value)}>{available.map((version) => <option key={version.id} value={version.id}>v{version.versionNumber}</option>)}</select></label>
-        <Columns3 size={16} />
-        <label><span>右侧版本</span><select value={rightVersionId} onChange={(event) => setRightVersionId(event.target.value)}>{available.map((version) => <option key={version.id} value={version.id}>v{version.versionNumber}</option>)}</select></label>
+      <div className="arena-control-bar">
+        <div className="arena-side-picker">
+          <span className="arena-side-label">A</span>
+          {leftVersionId === NONE ? (
+            <button className="arena-none-btn" onClick={() => setLeftVersionId(fallbackLeft)}>
+              <Ban size={13} /> 不使用 Skill
+            </button>
+          ) : (
+            <>
+              <select value={leftVersionId} onChange={(event) => setLeftVersionId(event.target.value)}>
+                {available.map((version) => <option key={version.id} value={version.id}>v{version.versionNumber}</option>)}
+              </select>
+              <button className="arena-remove-btn" onClick={() => setLeftVersionId(NONE)} title="移除 Skill">
+                <Ban size={13} />
+              </button>
+            </>
+          )}
+        </div>
+        <div className="arena-side-picker">
+          <span className="arena-side-label">B</span>
+          {rightVersionId === NONE ? (
+            <button className="arena-none-btn" onClick={() => setRightVersionId(fallbackRight)}>
+              <Ban size={13} /> 不使用 Skill
+            </button>
+          ) : (
+            <>
+              <select value={rightVersionId} onChange={(event) => setRightVersionId(event.target.value)}>
+                {available.map((version) => <option key={version.id} value={version.id}>v{version.versionNumber}</option>)}
+              </select>
+              <button className="arena-remove-btn" onClick={() => setRightVersionId(NONE)} title="移除 Skill">
+                <Ban size={13} />
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       <div className="skill-message-scroll-region">
         <ConversationTurnNavigation containerRef={resultListRef} turns={conversationTurns} />
         <div ref={resultListRef} className="skill-arena-results">
         {!state.question ? (
-          <div className="skill-flat-empty"><Columns3 size={24} /><h2>看看哪个版本表现更好</h2><p>输入同一个教学任务，直观比较两个版本的回答。</p></div>
+          <div className="arena-empty-state">
+            <Columns3 size={28} strokeWidth={1.5} />
+            <h2>版本对比</h2>
+            <p>输入同一个任务，直观比较两个版本的回答效果</p>
+          </div>
         ) : (
-          <><div id="guided-turn-arena-current" className="skill-user-message">{state.question}</div><div className="skill-arena-grid">
-            <ArenaSide version={leftVersion} answer={state.baseline} busy={state.busy} onBegin={() => openOptimization('baseline')} ready={Boolean(provenance)} />
-            <ArenaSide version={rightVersion} answer={state.enhanced} busy={state.busy} onBegin={() => openOptimization('enhanced')} ready={Boolean(provenance)} />
-          </div></>
+          <>
+            <div id="guided-turn-arena-current" className="skill-user-message">{state.question}</div>
+            <div className="arena-grid">
+              <ArenaSide side="A" version={leftVersion} answer={state.baseline} busy={state.busy} onBegin={() => openOptimization('baseline')} ready={Boolean(provenance)} />
+              <ArenaSide side="B" version={rightVersion} answer={state.enhanced} busy={state.busy} onBegin={() => openOptimization('enhanced')} ready={Boolean(provenance)} />
+            </div>
+          </>
         )}
         {state.error && <div className="skill-run-error">{state.error}</div>}
         </div>
       </div>
-      <div className="skill-test-composer"><textarea value={state.draft} onChange={(event) => dispatch({ type: 'draft', value: event.target.value })} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void send(); } }} placeholder="输入用于对比的真实任务…" /><button onClick={() => void send()} disabled={!state.draft.trim() || state.busy || !leftVersion || !rightVersion}>{state.busy ? <Loader2 size={15} className="spin" /> : <ArrowUp size={15} />}</button></div>
+      <div className="skill-test-composer">
+        <textarea value={state.draft} onChange={(event) => dispatch({ type: 'draft', value: event.target.value })} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void send(); } }} placeholder="输入用于对比的真实任务…" />
+        <button onClick={() => void send()} disabled={!state.draft.trim() || state.busy || (!leftVersion && !rightVersion)}>{state.busy ? <Loader2 size={15} className="spin" /> : <ArrowUp size={15} />}</button>
+      </div>
     </div>
   );
 }
 
-function ArenaSide({ version, answer, busy, onBegin, ready }: { version?: SkillVersionDetail; answer: string; busy: boolean; onBegin: () => void; ready: boolean }) {
-  return <section><strong>v{version?.versionNumber ?? '-'}</strong><div>{answer || (busy ? '正在生成…' : '暂无结果')}</div>{ready && answer && <button className="skill-arena-optimize" onClick={onBegin}><WandSparkles size={13} />改进这个版本</button>}</section>;
+function ArenaSide({ side, version, answer, busy, onBegin, ready }: { side: 'A' | 'B'; version?: SkillVersionDetail | null; answer: string; busy: boolean; onBegin: () => void; ready: boolean }) {
+  const isNone = !version;
+  return (
+    <section className={isNone ? 'arena-side arena-side-none' : 'arena-side'}>
+      <div className="arena-side-label-row">
+        <span className={`arena-side-badge arena-side-badge-${side}`}>{side}</span>
+        <span className="arena-side-version">{version ? `v${version.versionNumber}` : '不使用 Skill'}</span>
+      </div>
+      <div className="arena-side-body">
+        {answer || (busy ? (
+          <span className="arena-side-loading"><Loader2 size={14} className="spin" /> 正在生成…</span>
+        ) : (
+          <span className="arena-side-placeholder">暂无结果</span>
+        ))}
+      </div>
+      {ready && answer && version && (
+        <button className="arena-side-optimize" onClick={onBegin}>
+          <WandSparkles size={13} /> 改进这个版本
+        </button>
+      )}
+    </section>
+  );
 }

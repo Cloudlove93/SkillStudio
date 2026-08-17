@@ -169,7 +169,10 @@ function parseBase(body: unknown, payloadKeys: string[]) {
 function parseVariantSelection(
   value: unknown,
   fieldName: string,
-): { skillId: string; skillVersionId: string } {
+): { skillId: string; skillVersionId: string } | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
   if (!isPlainObject(value)) {
     throw new SkillVersionError(
       'INVALID_ARGUMENT',

@@ -98,8 +98,8 @@ interface CreateArenaThreadInput {
   packageId: string;
   arenaKind?: ArenaKind;
   basePackageVersionId?: string;
-  left?: SkillArenaVariantSelection;
-  right?: SkillArenaVariantSelection;
+  left?: SkillArenaVariantSelection | null;
+  right?: SkillArenaVariantSelection | null;
   model?: string;
   idempotencyKey?: string;
   surface?: "run" | "test" | "arena" | "optimize";
@@ -137,8 +137,8 @@ interface ArenaRuntimeContext {
     enhanced: string;
   };
   skillVersions: {
-    baseline: { id: number; versionNumber: number; skillUid: string };
-    enhanced: { id: number; versionNumber: number; skillUid: string };
+    baseline: { id: number; versionNumber: number; skillUid: string } | null;
+    enhanced: { id: number; versionNumber: number; skillUid: string } | null;
   } | null;
 }
 
@@ -789,7 +789,7 @@ function buildArenaThreadTitle(input: {
 }): string {
   switch (input.surface) {
     case "run":
-      return `Skill 运行：${input.leftSkillName}`;
+      return `Skill 使用：${input.leftSkillName}`;
     case "test":
       return `Skill 测试：${input.leftSkillName}`;
     case "optimize":
@@ -807,14 +807,15 @@ function buildArenaThreadTitle(input: {
 
 function buildSkillArenaConfig(input: {
   basePackageVersionId: string;
-  left: DbSkillArenaVariantRow;
-  right: DbSkillArenaVariantRow;
+  left: DbSkillArenaVariantRow | null;
+  right: DbSkillArenaVariantRow | null;
   surface?: "run" | "test" | "arena" | "optimize";
 }) {
   const toVariant = (
     side: "left" | "right",
-    row: DbSkillArenaVariantRow,
+    row: DbSkillArenaVariantRow | null,
   ): SkillArenaConfig["left"] => {
+    if (!row) return null;
     const skill = parseDbJson<AgentPackageSnapshot["skills"][number]>(
       row.skill_snapshot_json,
       {
@@ -874,9 +875,9 @@ async function getResolvedSkillArenaVariants(
      order by atv.side asc`,
     [threadId, packageId],
   );
-  const left = result.rows.find((row) => row.side === "left");
-  const right = result.rows.find((row) => row.side === "right");
-  if (!left || !right) {
+  const left = result.rows.find((row) => row.side === "left") ?? null;
+  const right = result.rows.find((row) => row.side === "right") ?? null;
+  if (!left && !right) {
     throw new ArenaServiceError(
       "Skill arena thread is missing bound skill variants",
       500,
@@ -892,8 +893,8 @@ async function getSkillArenaVersionInfo(
   threadId: string | number,
   packageId: string | number,
 ): Promise<{
-  left: { boundSkillVersionNumber: number; latestSkillVersionNumber: number };
-  right: { boundSkillVersionNumber: number; latestSkillVersionNumber: number };
+  left: { boundSkillVersionNumber: number; latestSkillVersionNumber: number } | null;
+  right: { boundSkillVersionNumber: number; latestSkillVersionNumber: number } | null;
 } | null> {
   const result = await query<{
     side: string;
@@ -920,16 +921,16 @@ async function getSkillArenaVersionInfo(
   );
   const left = result.rows.find((row) => row.side === "left");
   const right = result.rows.find((row) => row.side === "right");
-  if (!left || !right) return null;
+  if (!left && !right) return null;
   return {
-    left: {
+    left: left ? {
       boundSkillVersionNumber: left.bound_version_number,
       latestSkillVersionNumber: left.latest_version_number,
-    },
-    right: {
+    } : null,
+    right: right ? {
       boundSkillVersionNumber: right.bound_version_number,
       latestSkillVersionNumber: right.latest_version_number,
-    },
+    } : null,
   };
 }
 
@@ -981,7 +982,7 @@ async function resolveThreadRuntime(
     thread.id,
     thread.packageId,
   );
-  const leftSkill = parseDbJson<AgentPackageSnapshot["skills"][number]>(
+  const leftSkill = left ? parseDbJson<AgentPackageSnapshot["skills"][number]>(
     left.skill_snapshot_json,
     {
       id: left.skill_uid,
@@ -990,8 +991,8 @@ async function resolveThreadRuntime(
       description: "",
       skillMd: "",
     },
-  );
-  const rightSkill = parseDbJson<AgentPackageSnapshot["skills"][number]>(
+  ) : null;
+  const rightSkill = right ? parseDbJson<AgentPackageSnapshot["skills"][number]>(
     right.skill_snapshot_json,
     {
       id: right.skill_uid,
@@ -1000,29 +1001,29 @@ async function resolveThreadRuntime(
       description: "",
       skillMd: "",
     },
-  );
+  ) : null;
 
   return {
     arenaKind: "skill_arena",
     packageSnapshot: baseSnapshot,
     packageVersionId: Number(basePackageVersionId),
-    baselineSnapshot: cloneSnapshotWithSkill(baseSnapshot, leftSkill),
-    enhancedSnapshot: cloneSnapshotWithSkill(baseSnapshot, rightSkill),
+    baselineSnapshot: leftSkill ? cloneSnapshotWithSkill(baseSnapshot, leftSkill) : baseSnapshot,
+    enhancedSnapshot: rightSkill ? cloneSnapshotWithSkill(baseSnapshot, rightSkill) : baseSnapshot,
     labels: {
-      baseline: `${leftSkill.name || left.skill_uid} v${left.version_number}`,
-      enhanced: `${rightSkill.name || right.skill_uid} v${right.version_number}`,
+      baseline: leftSkill ? `${leftSkill.name || left!.skill_uid} v${left!.version_number}` : "不使用 Skill",
+      enhanced: rightSkill ? `${rightSkill.name || right!.skill_uid} v${right!.version_number}` : "不使用 Skill",
     },
     skillVersions: {
-      baseline: {
+      baseline: left ? {
         id: Number(left.skill_version_id),
         versionNumber: Number(left.version_number),
         skillUid: left.skill_uid,
-      },
-      enhanced: {
+      } : null,
+      enhanced: right ? {
         id: Number(right.skill_version_id),
         versionNumber: Number(right.version_number),
         skillUid: right.skill_uid,
-      },
+      } : null,
     },
   };
 }
@@ -1122,23 +1123,23 @@ export async function createArenaThread(
   );
   const leftSelection = input.left;
   const rightSelection = input.right;
-  if (!leftSelection || !rightSelection) {
+  if (!leftSelection && !rightSelection) {
     throw new ArenaServiceError(
-      "Both left and right skill selections are required",
+      "At least one of left or right skill selection is required",
       422,
       "INVALID_ARGUMENT",
     );
   }
-  const leftSkillId = positiveId(leftSelection.skillId, "left.skillId");
-  const leftSkillVersionId = positiveId(
+  const leftSkillId = leftSelection ? positiveId(leftSelection.skillId, "left.skillId") : null;
+  const leftSkillVersionId = leftSelection ? positiveId(
     leftSelection.skillVersionId,
     "left.skillVersionId",
-  );
-  const rightSkillId = positiveId(rightSelection.skillId, "right.skillId");
-  const rightSkillVersionId = positiveId(
+  ) : null;
+  const rightSkillId = rightSelection ? positiveId(rightSelection.skillId, "right.skillId") : null;
+  const rightSkillVersionId = rightSelection ? positiveId(
     rightSelection.skillVersionId,
     "right.skillVersionId",
-  );
+  ) : null;
   const idempotencyKey = String(input.idempotencyKey || "").trim();
   if (!idempotencyKey || idempotencyKey.length > 120) {
     throw new ArenaServiceError(
@@ -1178,18 +1179,22 @@ export async function createArenaThread(
     await getOwnedPackageRow(client, input.authUserId, packageId);
     await getOwnedPackageVersionRow(client, packageId, basePackageVersionId);
     const [left, right] = await Promise.all([
-      getOwnedSkillArenaVariant(client, {
-        authUserId: input.authUserId,
-        packageId,
-        skillId: leftSkillId,
-        skillVersionId: leftSkillVersionId,
-      }),
-      getOwnedSkillArenaVariant(client, {
-        authUserId: input.authUserId,
-        packageId,
-        skillId: rightSkillId,
-        skillVersionId: rightSkillVersionId,
-      }),
+      leftSkillId && leftSkillVersionId
+        ? getOwnedSkillArenaVariant(client, {
+            authUserId: input.authUserId,
+            packageId,
+            skillId: leftSkillId,
+            skillVersionId: leftSkillVersionId,
+          })
+        : null,
+      rightSkillId && rightSkillVersionId
+        ? getOwnedSkillArenaVariant(client, {
+            authUserId: input.authUserId,
+            packageId,
+            skillId: rightSkillId,
+            skillVersionId: rightSkillVersionId,
+          })
+        : null,
     ]);
 
     const skillArenaConfig = buildSkillArenaConfig({
@@ -1199,14 +1204,18 @@ export async function createArenaThread(
       surface: input.surface,
     });
     const warning =
-      leftSkillId === rightSkillId && leftSkillVersionId === rightSkillVersionId
+      leftSkillId && rightSkillId &&
+      leftSkillId === rightSkillId &&
+      leftSkillVersionId === rightSkillVersionId
         ? "Selected versions are identical"
         : null;
     const now = new Date().toISOString();
+    const leftSkillName = skillArenaConfig.left?.skillName ?? "不使用 Skill";
+    const rightSkillName = skillArenaConfig.right?.skillName ?? "不使用 Skill";
     const title = buildArenaThreadTitle({
       surface: input.surface,
-      leftSkillName: skillArenaConfig.left.skillName,
-      rightSkillName: skillArenaConfig.right.skillName,
+      leftSkillName,
+      rightSkillName,
       warning,
     });
     const threadResult = await client.query<{ id: number }>(
@@ -1234,10 +1243,9 @@ export async function createArenaThread(
       );
     }
 
-    const variants: Array<["left" | "right", DbSkillArenaVariantRow]> = [
-      ["left", left],
-      ["right", right],
-    ];
+    const variants: Array<["left" | "right", DbSkillArenaVariantRow]> = [];
+    if (left) variants.push(["left", left]);
+    if (right) variants.push(["right", right]);
     for (const [side, variant] of variants) {
       await client.query(
         `insert into arena_thread_variants
@@ -1578,10 +1586,10 @@ export async function* streamMessage(
         role: "assistant",
         content: sideContents[side],
         createdAt: savedAt,
-        ...(runtime.skillVersions
+        ...(runtime.skillVersions && runtime.skillVersions[side]
           ? {
-              skillVersionId: String(runtime.skillVersions[side].id),
-              skillVersionNumber: runtime.skillVersions[side].versionNumber,
+              skillVersionId: String(runtime.skillVersions[side]!.id),
+              skillVersionNumber: runtime.skillVersions[side]!.versionNumber,
             }
           : {}),
       });
@@ -1598,10 +1606,10 @@ export async function* streamMessage(
         throw new Error("Enhanced answer provenance is unavailable");
       }
       const baselineContext = skillArenaPromptContexts?.baseline ?? null;
-      const enhancedUsedSkillIds = runtime.skillVersions
+      const enhancedUsedSkillIds = runtime.skillVersions?.enhanced
         ? [runtime.skillVersions.enhanced.skillUid]
         : usedSkillIds;
-      const baselineUsedSkillIds = runtime.skillVersions
+      const baselineUsedSkillIds = runtime.skillVersions?.baseline
         ? [runtime.skillVersions.baseline.skillUid]
         : [];
       await client.query(
@@ -1631,8 +1639,8 @@ export async function* streamMessage(
             ? JSON.stringify(baselineContext.contextMessageIds)
             : null,
           baselineContext ? skillArenaModel : null,
-          runtime.skillVersions?.baseline.id ?? null,
-          runtime.skillVersions?.enhanced.id ?? null,
+          runtime.skillVersions?.baseline?.id ?? null,
+          runtime.skillVersions?.enhanced?.id ?? null,
           savedAt,
         ],
       );

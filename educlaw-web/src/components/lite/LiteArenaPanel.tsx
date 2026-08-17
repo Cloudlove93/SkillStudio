@@ -355,7 +355,7 @@ export default function LiteArenaPanel() {
   const [nowMs, setNowMs] = useState(0);
   const [isWideLayout, setIsWideLayout] = useState(prefersWideLayout);
   const [sidebarOpen, setSidebarOpen] = useState(prefersWideLayout);
-  const [rightSidebarOpen, setRightSidebarOpen] = useState(prefersWideLayout);
+  const [rightSidebarOpen, setRightSidebarOpen] = useState(true);
   const [leftWidth, setLeftWidth] = useState(400);
   const [rightWidth, setRightWidth] = useState(450);
   const [rightExpanded, setRightExpanded] = useState(false);
@@ -552,7 +552,6 @@ export default function LiteArenaPanel() {
       setIsWideLayout(wide);
       if (!wide) {
         setSidebarOpen(false);
-        setRightSidebarOpen(false);
         setRightExpanded(false);
       }
     };
@@ -2419,67 +2418,56 @@ export default function LiteArenaPanel() {
     const rows = getFocusedDiffRows(preview.diffs);
 
     return (
-      <div className="space-y-4">
-        <div className="rounded-[14px] border border-primary/20 bg-primary/5 px-4 py-3">
+      <div className="space-y-3">
+        <div className="rounded-xl border border-primary/15 bg-primary/5 px-4 py-3">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              <div className="text-[11px] font-medium text-muted-foreground">
                 修改位置
               </div>
-              <div className="mt-1 text-base font-semibold">
+              <div className="mt-0.5 text-sm font-semibold text-foreground">
                 {formatAdoptedTarget(preview.change)}
               </div>
-              <div className="mt-1 text-sm text-muted-foreground">
+              <div className="mt-1 text-xs text-muted-foreground leading-relaxed">
                 {preview.change.reason}
               </div>
             </div>
-            <div className="flex shrink-0 gap-2 text-xs">
-              <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-emerald-700 dark:text-emerald-300">
-                新增 {addedCount} 行
+            <div className="flex shrink-0 gap-1.5">
+              <span className="rounded-full bg-emerald-50 dark:bg-emerald-950/30 px-2 py-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                新增 {addedCount}
               </span>
-              <span className="rounded-full border border-destructive/20 bg-destructive/10 px-2.5 py-1 text-destructive">
-                删除 {removedCount} 行
+              <span className="rounded-full bg-rose-50 dark:bg-rose-950/30 px-2 py-0.5 text-[11px] font-medium text-rose-600 dark:text-rose-400">
+                删除 {removedCount}
               </span>
             </div>
           </div>
         </div>
-        <div className="overflow-hidden rounded-[14px] border border-border/70 bg-card/80">
-          <div className="border-b border-border/70 bg-muted/40 px-4 py-2 text-xs text-muted-foreground">
-            修改痕迹
+        <div className="rounded-xl border border-border/80 bg-card overflow-hidden">
+          <div className="border-b border-border/60 px-4 py-2.5">
+            <span className="text-sm font-medium text-foreground">修改痕迹</span>
           </div>
-          <div className="overflow-auto text-xs font-mono leading-5">
+          <div className="py-2">
             {rows.map((row, index) => {
               if (row.type === 'gap') {
                 return (
-                  <div
-                    key={`gap-${index}`}
-                    className="select-none border-y border-border/50 bg-muted/30 px-4 py-1 text-center text-muted-foreground"
-                  >
-                    ...
+                  <div key={`gap-${index}`} className="flex items-center gap-2 py-2 px-3">
+                    <div className="h-px flex-1 bg-border/60" />
+                    <span className="text-[10px] text-muted-foreground/40 select-none">省略</span>
+                    <div className="h-px flex-1 bg-border/60" />
                   </div>
                 );
               }
-              const prefix =
-                row.diff.type === 'added'
-                  ? '+'
-                  : row.diff.type === 'removed'
-                    ? '-'
-                    : ' ';
               const lineClass =
                 row.diff.type === 'added'
-                  ? 'bg-emerald-500/10 text-emerald-800 dark:text-emerald-200'
+                  ? 'border-l-2 border-l-emerald-300/60 dark:border-l-emerald-700/40 bg-emerald-50/50 dark:bg-emerald-950/10 text-foreground'
                   : row.diff.type === 'removed'
-                    ? 'bg-destructive/10 text-destructive'
-                    : 'text-muted-foreground';
+                    ? 'border-l-2 border-l-rose-300/60 dark:border-l-rose-700/40 bg-rose-50/50 dark:bg-rose-950/10 text-foreground/55'
+                    : 'text-muted-foreground/60';
               return (
                 <div
                   key={`${row.index}-${index}`}
-                  className={`flex min-w-max gap-3 px-4 py-0.5 ${lineClass}`}
+                  className={`px-3 py-1.5 text-[13px] leading-[1.65] ${lineClass}`}
                 >
-                  <span className="w-8 shrink-0 select-none text-right opacity-60">
-                    {row.index + 1}
-                  </span>
-                  <span className="w-4 shrink-0 select-none">{prefix}</span>
                   <span className="whitespace-pre-wrap break-words">
                     {row.diff.text || ' '}
                   </span>
@@ -3742,11 +3730,13 @@ export default function LiteArenaPanel() {
                   </button>
                 )}
                 {/* Skill Arena 线程：显示绑定的 Skill 版本号 */}
-                {isSkillArenaThread && skillVersionInfo && (
+                {isSkillArenaThread && skillVersionInfo && (skillVersionInfo.left || skillVersionInfo.right) && (
                   <div className="flex flex-wrap items-center gap-1.5 pl-1 text-xs text-muted-foreground">
                     <span>
-                      绑定版本：v{skillVersionInfo.left.boundSkillVersionNumber}{' '}
-                      / v{skillVersionInfo.right.boundSkillVersionNumber}
+                      绑定版本：
+                      {skillVersionInfo.left ? `v${skillVersionInfo.left.boundSkillVersionNumber}` : '不使用 Skill'}
+                      {' / '}
+                      {skillVersionInfo.right ? `v${skillVersionInfo.right.boundSkillVersionNumber}` : '不使用 Skill'}
                     </span>
                   </div>
                 )}

@@ -1,4 +1,6 @@
 import type {
+  AnswerOptimizationSuggestionsRequest,
+  AnswerOptimizationSuggestionsResult,
   ArenaAnswerOptimizationStatus,
   ArenaAnswerOptimizationUnavailableReason,
 } from '@educlaw/shared';
@@ -178,6 +180,7 @@ export interface AnswerSkillOptimizationDetail {
   draft: {
     skillId: string;
     validation: { valid: boolean; errors: string[] };
+    previewContent: string;
   } | null;
   diff: { before: string; after: string } | null;
   testResult: AnswerOptimizationTestResult | null;
@@ -202,6 +205,19 @@ export interface CreateAnswerOptimizationInput {
   answerSide?: 'baseline' | 'enhanced';
   answerMessageId?: number;
   feedback: string;
+}
+
+export interface ResolveAnswerOptimizationInput {
+  packageId: number;
+  threadId: number;
+  questionMessageId: number;
+  answerMessageId: number;
+  answerSide: 'baseline' | 'enhanced';
+}
+
+export interface ResolveAnswerOptimizationResult {
+  detail: AnswerSkillOptimizationDetail | null;
+  versionNumber: number | null;
 }
 
 export type ReviseAnswerOptimizationResult = AnswerSkillOptimizationDetail;
@@ -317,6 +333,31 @@ function post<T>(
 }
 
 export const answerSkillOptimizationApi = {
+  resolve(token: string, input: ResolveAnswerOptimizationInput) {
+    return request<ResolveAnswerOptimizationResult>(
+      token,
+      ANSWER_SKILL_OPTIMIZATION_ROUTES.RESOLVE,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      },
+    );
+  },
+  suggestions(
+    token: string,
+    input: AnswerOptimizationSuggestionsRequest,
+  ) {
+    return request<AnswerOptimizationSuggestionsResult>(
+      token,
+      ANSWER_SKILL_OPTIMIZATION_ROUTES.SUGGESTIONS,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      },
+    );
+  },
   create(
     token: string,
     input: CreateAnswerOptimizationInput,

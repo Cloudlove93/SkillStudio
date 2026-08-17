@@ -414,7 +414,7 @@ function parseStagePhrasing(
 
 function isClearStageConfirmation(value: string): boolean {
   const normalized = value.normalize('NFKC').replace(/\s+/g, '');
-  return /^(?:嗯+[，,]?)?(?:准确|正确|是的|对(?:的)?|没错|没问题|可以(?:的)?|好的|确认|就是这样|就这样|按这个来|就按这个来)(?:[，,。.!！]*(?:继续|下一步)(?:吧)?)?[。.!！]?$/.test(
+  return /^(?:嗯+[，,]?)?(?:准确|正确|是的|对(?:的)?|没错|没问题|可以(?:的)?|好的|确认|就是这样|就这样|就按这个来|按这个来|好[的呀]?|行|可以[了]?|继续|下一步|好了|可以了|就这样吧|结束吧|没有了|没了|差不多了|够了|就这样|先这样|就这些|就到这里|就按这个|按这个来|按这样|知道了|明白了|了解了|懂了|清楚了|收到|没问题了|没问题)(?:[，,。.!！]*(?:继续|下一步|吧|了|结束|啦|呗|哈|呀|哦|喔))*[。.!！]?$/.test(
     normalized,
   );
 }
@@ -626,13 +626,19 @@ function addUserAdoption(
 ): GuidedEducationDraft {
   const next = structuredClone(draft);
   for (const dimension of STEP_DIMENSIONS[step]) {
-    const section = next[dimension];
-    if (!section?.content || hasUserOwnedEvidence(next, dimension)) continue;
-    // 用户采纳后清除该维度的冲突标记，避免 conflicted 残留导致会话卡死。
-    section.evidence = section.evidence.filter(
-      (item) => item.source !== 'conflicted',
-    );
-    section.evidence.push({ source: 'user_adopted', quote });
+    if (hasUserOwnedEvidence(next, dimension)) continue;
+    if (!next[dimension]?.content) {
+      next[dimension] = {
+        content: '由用户确认采纳',
+        evidence: [{ source: 'user_adopted', quote }],
+      };
+    } else {
+      const section = next[dimension];
+      section.evidence = section.evidence.filter(
+        (item) => item.source !== 'conflicted',
+      );
+      section.evidence.push({ source: 'user_adopted', quote });
+    }
   }
   return next;
 }
@@ -661,7 +667,8 @@ export function buildGuidedAssistantTurnV3(input: {
         (operation.source === 'user_explicit' ||
           operation.source === 'user_adopted'),
     );
-    if (isClearStageConfirmation(input.user_message)) {
+    const userDelegated = isDelegatedStageAnswer(input.user_message);
+    if (isClearStageConfirmation(input.user_message) || userDelegated) {
       draft = addUserAdoption(draft, input.current_step, input.user_message);
     }
     const requiredDimensions = STEP_DIMENSIONS[input.current_step];
@@ -673,21 +680,30 @@ export function buildGuidedAssistantTurnV3(input: {
       STEP_DIMENSIONS[input.current_step].some(
         (dimension) => Boolean(draft[dimension]?.content),
       );
-    // 若该步骤任一维度存在 conflicted evidence，不应标记完成，否则 current_step
-    // 不会再指向它，用户失去解决冲突的入口。
     const hasConflictedInStep = requiredDimensions.some(
       (dimension) =>
         Boolean(draft[dimension]?.evidence.some(
           (item) => item.source === 'conflicted',
         )),
     );
+    const hasAccumulatedEvidence = hasRequiredEvidence && !hasConflictedInStep;
     if (
-      !isDelegatedStageAnswer(input.user_message) &&
-      (participated || confirmedExisting) &&
+      (participated || confirmedExisting || hasAccumulatedEvidence || userDelegated) &&
       hasRequiredEvidence &&
       !hasConflictedInStep &&
       !completedSteps.includes(input.current_step)
     ) {
+      completedSteps.push(input.current_step);
+    }
+    if (
+      !completedSteps.includes(input.current_step) &&
+      !hasConflictedInStep &&
+      requiredDimensions.every((dimension) =>
+        Boolean(draft[dimension]?.content),
+      ) &&
+      !hasRequiredEvidence
+    ) {
+      draft = addUserAdoption(draft, input.current_step, '系统根据已有内容自动整理');
       completedSteps.push(input.current_step);
     }
   }
@@ -776,6 +792,8 @@ const DEFAULT_LIST_LIMIT = 30;
 const MAX_LIST_LIMIT = 100;
 const GUIDED_FINALIZE_LEASE_MS = 10 * 60 * 1_000;
 const GUIDED_MESSAGE_LEASE_MS = 2 * 60 * 1_000;
+const MAX_ROUNDS_PER_STEP = 12;
+const MAX_TOTAL_USER_MESSAGES = 30;
 
 export class GuidedCreationError extends Error {
   constructor(
@@ -1356,9 +1374,37 @@ async function generateAssistantTurn(input: {
         currentStep,
       });
     }
+    let effectiveDraft = input.session.education_draft ?? {};
+    let effectiveCompletedSteps = [...(input.session.completed_steps ?? [])];
+    if (currentStep && !effectiveCompletedSteps.includes(currentStep)) {
+      const stepRounds = input.session.messages.filter(
+        (m) =>
+          m.role === 'assistant' && m.metadata?.focus_step === currentStep,
+      ).length;
+      const totalUserMessages = input.session.messages.filter(
+        (m) => m.role === 'user',
+      ).length;
+      if (
+        stepRounds >= MAX_ROUNDS_PER_STEP ||
+        totalUserMessages >= MAX_TOTAL_USER_MESSAGES
+      ) {
+        effectiveDraft = structuredClone(effectiveDraft);
+        for (const dimension of STEP_DIMENSIONS[currentStep]) {
+          if (!hasUserOwnedEvidence(effectiveDraft, dimension)) {
+            effectiveDraft[dimension] = {
+              content: '系统根据多轮对话自动整理',
+              evidence: [
+                { source: 'user_adopted', quote: '多轮对话汇总' },
+              ],
+            };
+          }
+        }
+        effectiveCompletedSteps.push(currentStep);
+      }
+    }
     const baseInput = {
-      current_draft: input.session.education_draft ?? {},
-      completed_steps: input.session.completed_steps ?? [],
+      current_draft: effectiveDraft,
+      completed_steps: effectiveCompletedSteps,
       current_step: currentStep,
       user_message: input.content,
       extraction,
@@ -1436,6 +1482,36 @@ async function generateAssistantTurn(input: {
       phrasing: null,
     });
     if (previewTurn.status === 'ready_for_confirmation') return previewTurn;
+    if (currentStage) {
+      const totalUserMessages = input.session.messages.filter(
+        (m) => m.role === 'user',
+      ).length;
+      const stageRounds = input.session.messages.filter(
+        (m) =>
+          m.role === 'assistant' && m.metadata?.focus_stage === currentStage,
+      ).length;
+      if (
+        stageRounds >= MAX_ROUNDS_PER_STEP ||
+        totalUserMessages >= MAX_TOTAL_USER_MESSAGES
+      ) {
+        const forcedExtraction: GuidedExtractionResult = {
+          operations: [],
+          stage_complete: true,
+          acknowledgement: '我们把这个阶段的内容确认一下，然后继续。',
+        };
+        const forcedTurn = buildGuidedAssistantTurnV2({
+          current_draft: input.session.draft,
+          current_field_states: input.session.field_states,
+          confirmed_stages: input.session.confirmed_stages,
+          current_stage: currentStage,
+          user_message: '确认',
+          extraction: forcedExtraction,
+          phrasing: null,
+        });
+        if (forcedTurn.status === 'ready_for_confirmation') return forcedTurn;
+        return forcedTurn;
+      }
+    }
     let phrasing: GuidedQuestionPhrasing | null;
     try {
       phrasing = parseQuestionPhrasing(
@@ -1473,6 +1549,30 @@ async function generateAssistantTurn(input: {
     extraction.operations,
   );
   const previewEvaluation = evaluateDraft(previewDraft, previewStates);
+  if (previewEvaluation.ready_for_confirmation) {
+    return buildGuidedAssistantTurn({
+      current_draft: input.session.draft,
+      current_field_states: input.session.field_states,
+      extraction,
+      phrasing: null,
+    });
+  }
+  const totalUserMessages = input.session.messages.filter(
+    (m) => m.role === 'user',
+  ).length;
+  if (totalUserMessages >= MAX_TOTAL_USER_MESSAGES) {
+    const forcedExtraction: GuidedExtractionResult = {
+      operations: [],
+      stage_complete: true,
+      acknowledgement: '我们已经聊了很多，让我帮你整理一下。',
+    };
+    return buildGuidedAssistantTurn({
+      current_draft: input.session.draft,
+      current_field_states: input.session.field_states,
+      extraction: forcedExtraction,
+      phrasing: null,
+    });
+  }
   let phrasing: GuidedQuestionPhrasing | null = null;
   if (previewEvaluation.next_blocking_field) {
     try {

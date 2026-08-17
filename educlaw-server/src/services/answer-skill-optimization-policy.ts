@@ -20,6 +20,7 @@ export type AnswerSkillConfirmIssue =
 export interface AnswerSkillConfirmPolicyInput {
   status: AnswerSkillOptimizationStatus;
   finalVersionId: number | null;
+  answerSkillVersionId: number | null;
   targetSkillId: string | null;
   revision: number;
   result: AnswerSkillOptimizationResult;
@@ -78,9 +79,13 @@ export function getAnswerSkillConfirmIssue(
       message: "Current optimization revision has not completed a faithful draft preview",
     };
   }
+  const fixedSkillBindingMatches =
+    input.answerSkillVersionId !== null &&
+    testResult.usedSkillIds.includes(targetSkill.skillId);
   if (
-    !testResult.runtimeSelectionCheck.targetSkillSelected ||
-    testResult.runtimeSelectionCheck.targetSkillId !== targetSkill.skillId
+    testResult.runtimeSelectionCheck.targetSkillId !== targetSkill.skillId ||
+    (!testResult.runtimeSelectionCheck.targetSkillSelected &&
+      !fixedSkillBindingMatches)
   ) {
     return {
       kind: "draft",

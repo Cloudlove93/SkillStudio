@@ -26,6 +26,7 @@ import {
 } from './guided-optimistic-message';
 import { ConversationTurnNavigation } from './ConversationTurnNavigation';
 import { collectConversationTurns } from './conversation-turn-navigation';
+import { MarkdownContent } from '../lite/lite-rendering';
 
 type Props = {
   session: GuidedCreationSessionDetail | null;
@@ -393,7 +394,7 @@ function MessageBubble({
     <div className="skill-assistant-block">
       <div className="skill-assistant-avatar"><Sparkles size={14} /></div>
       <div>
-        <div className="skill-assistant-message">{message.content}</div>
+        <div className="skill-assistant-message"><MarkdownContent content={message.content} /></div>
         {options.length > 0 && (
           <div className="skill-option-row">
             {options.map((option) => <button key={option} onClick={() => onOption(option)}>{option}</button>)}

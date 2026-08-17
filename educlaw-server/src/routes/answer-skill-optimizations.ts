@@ -18,6 +18,7 @@ import {
   createAnswerSkillOptimization,
   getAnswerSkillOptimizationDetail,
   rebaseAnswerSkillOptimization,
+  resolveAnswerSkillOptimizationReference,
   reviseAnswerSkillOptimization,
   testAnswerSkillOptimization,
   type CancelAnswerSkillOptimizationInput,
@@ -27,6 +28,10 @@ import {
   type TestAnswerSkillOptimizationInput,
 } from "../services/answer-skill-optimization-service.js";
 import type { AuthedRequest } from "../types.js";
+import {
+  AnswerOptimizationSuggestionNotFoundError,
+  suggestAnswerOptimizationFeedback,
+} from "../services/answer-optimization-suggestion-service.js";
 
 const router: import("express").Router = Router();
 const UUID_PATTERN =
@@ -122,6 +127,58 @@ function parseCreateBody(
         : positiveInteger(body.answerMessageId, "answerMessageId"),
     feedback: requiredString(body.feedback, "feedback"),
     idempotencyKey,
+  };
+}
+
+function parseSuggestionsBody(value: unknown, userId: string) {
+  const body = asObject(value);
+  assertOnlyKeys(body, [
+    "packageId",
+    "threadId",
+    "questionMessageId",
+    "answerMessageId",
+    "answerSide",
+    "answerVersionNumber",
+  ]);
+  if (body.answerSide !== "baseline" && body.answerSide !== "enhanced") {
+    throw new AnswerSkillOptimizationValidationError(
+      "answerSide must be baseline or enhanced",
+    );
+  }
+  const answerSide: "baseline" | "enhanced" = body.answerSide;
+  return {
+    userId,
+    packageId: positiveInteger(body.packageId, "packageId"),
+    threadId: positiveInteger(body.threadId, "threadId"),
+    questionMessageId: positiveInteger(body.questionMessageId, "questionMessageId"),
+    answerMessageId: positiveInteger(body.answerMessageId, "answerMessageId"),
+    answerSide,
+    answerVersionNumber: positiveInteger(body.answerVersionNumber, "answerVersionNumber"),
+  };
+}
+
+function parseResolveBody(value: unknown, userId: string) {
+  const body = asObject(value);
+  assertOnlyKeys(body, [
+    "packageId",
+    "threadId",
+    "questionMessageId",
+    "answerMessageId",
+    "answerSide",
+  ]);
+  if (body.answerSide !== "baseline" && body.answerSide !== "enhanced") {
+    throw new AnswerSkillOptimizationValidationError(
+      "answerSide must be baseline or enhanced",
+    );
+  }
+  const answerSide: "baseline" | "enhanced" = body.answerSide;
+  return {
+    userId,
+    packageId: positiveInteger(body.packageId, "packageId"),
+    threadId: positiveInteger(body.threadId, "threadId"),
+    questionMessageId: positiveInteger(body.questionMessageId, "questionMessageId"),
+    answerMessageId: positiveInteger(body.answerMessageId, "answerMessageId"),
+    answerSide,
   };
 }
 
@@ -424,12 +481,15 @@ function sendError(res: Response, error: unknown): void {
   } else if (error instanceof AnswerSkillOptimizationNotFoundError) {
     status = 404;
     message = error.message;
+  } else if (error instanceof AnswerOptimizationSuggestionNotFoundError) {
+    status = 404;
+    message = error.message;
   } else if (error instanceof AnswerSkillOptimizationConflictError) {
     status = 409;
     message = error.message;
   } else if (error instanceof AnswerSkillOptimizationDraftError) {
     status = 422;
-    message = error.message;
+    message = "optimization_not_ready";
   } else if (error instanceof AnswerSkillOptimizationUpstreamError) {
     status = error.statusCode;
     message = "Optimization model is temporarily unavailable";
@@ -441,6 +501,50 @@ function sendError(res: Response, error: unknown): void {
   }
   res.status(status).json({ error: message, requestId: requestId() });
 }
+
+router.post(
+  ANSWER_SKILL_OPTIMIZATION_ROUTES.SUGGESTIONS,
+  requireAuth,
+  async (req, res) => {
+    try {
+      assertJsonRequest(req);
+      const data = await suggestAnswerOptimizationFeedback(
+        parseSuggestionsBody(req.body as unknown, authenticatedUserId(req)),
+      );
+      res.json({ data, requestId: requestId() });
+    } catch (error) {
+      sendError(res, error);
+    }
+  },
+);
+
+router.post(
+  ANSWER_SKILL_OPTIMIZATION_ROUTES.RESOLVE,
+  requireAuth,
+  async (req, res) => {
+    try {
+      assertJsonRequest(req);
+      const reference = await resolveAnswerSkillOptimizationReference(
+        parseResolveBody(req.body as unknown, authenticatedUserId(req)),
+      );
+      const detail = reference
+        ? await getAnswerSkillOptimizationDetail(
+            authenticatedUserId(req),
+            reference.optimizationId,
+          )
+        : null;
+      res.json({
+        data: {
+          detail,
+          versionNumber: reference?.versionNumber ?? null,
+        },
+        requestId: requestId(),
+      });
+    } catch (error) {
+      sendError(res, error);
+    }
+  },
+);
 
 router.post(
   ANSWER_SKILL_OPTIMIZATION_ROUTES.CREATE,

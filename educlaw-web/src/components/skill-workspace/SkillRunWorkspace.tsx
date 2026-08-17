@@ -7,6 +7,7 @@ import type { AnswerOptimizationRerunRequest, AnswerOptimizationSelection } from
 import { ConversationTurnNavigation } from './ConversationTurnNavigation';
 import { collectConversationTurns } from './conversation-turn-navigation';
 import { getConversationTitle } from './skill-conversation-list';
+import { MarkdownContent } from '../lite/lite-rendering';
 
 type Props = {
   token: string;
@@ -45,9 +46,13 @@ export function SkillRunWorkspace({ token, packageId, version, currentPackageVer
   useEffect(() => {
     const requestNo = hydrateRequestRef.current + 1;
     hydrateRequestRef.current = requestNo;
+    const previousThreadId = threadIdRef.current;
     threadIdRef.current = selectedThreadId;
     if (!selectedThreadId) {
       dispatch({ type: 'reset' });
+      return;
+    }
+    if (previousThreadId === selectedThreadId) {
       return;
     }
     void liteApi.getArenaThreadDetail(token, packageId, selectedThreadId).then((detail) => {
@@ -202,7 +207,7 @@ export function SkillRunWorkspace({ token, packageId, version, currentPackageVer
               <div className="skill-assistant-block" key={`${message.role}-${index}`}>
                 <div className="skill-assistant-avatar"><Sparkles size={14} /></div>
                 <div className="skill-assistant-response">
-                  <div className="skill-assistant-message">{message.content}</div>
+                  <div className="skill-assistant-message"><MarkdownContent content={message.content} /></div>
                   {message.messageId && (
                     <div className="skill-answer-tools">
                       <span>由 v{message.skillVersionNumber ?? version?.versionNumber ?? '-'} 生成</span>
@@ -235,7 +240,7 @@ export function SkillRunWorkspace({ token, packageId, version, currentPackageVer
         {state.streaming && (
           <div className="skill-assistant-block">
             <div className="skill-assistant-avatar"><Sparkles size={14} /></div>
-            <div className="skill-assistant-message">{state.streaming}</div>
+            <div className="skill-assistant-message"><MarkdownContent content={state.streaming} /></div>
           </div>
         )}
         {state.error && <div className="skill-run-error">{state.error}</div>}

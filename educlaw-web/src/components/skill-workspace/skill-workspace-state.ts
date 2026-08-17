@@ -37,13 +37,6 @@ export type SkillWorkspaceEvent =
     }
   | { type: 'dismiss-update' };
 
-const optimizationUpdate: SkillPinnedUpdate = {
-  id: 'optimization-draft',
-  title: '优化草案有新修改',
-  message: '新的修改会先暂存，保存后再生成 Skill 新版本。',
-  actionLabel: '查看右侧修改',
-};
-
 export function createSkillWorkspaceState(): SkillWorkspaceState {
   return {
     activeView: 'create',
@@ -64,7 +57,7 @@ export function skillWorkspaceReducer(
         activeView: event.view,
         contextOpen: true,
         contextView: 'summary',
-        pinnedUpdate: optimizationUpdate,
+        pinnedUpdate: null,
       };
     }
     if (event.view === 'run' || event.view === 'test' || event.view === 'arena' || event.view === 'versions') {

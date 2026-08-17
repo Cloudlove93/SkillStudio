@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>优化面板样式预览</title>
+<style>
+:root {
+  --background: #f7f8ff;
+  --foreground: rgba(10, 10, 40, 1);
+  --card: #ffffff;
+  --card-foreground: rgba(10, 10, 40, 1);
+  --primary: #555aff;
+  --primary-foreground: #ffffff;
+  --secondary: #eeeeff;
+  --secondary-foreground: #4146b8;
+  --muted: #f5f7fc;
+  --muted-foreground: rgba(10, 10, 40, 0.55);
+  --border: rgba(10, 10, 40, 0.1);
+  --input: rgba(10, 10, 40, 0.1);
+  --ring: rgba(85, 90, 255, 0.2);
+  --primary-hover: #4e53eb;
+  --primary-active: #474cd6;
+  --primary-soft: #eeeeff;
+  --shadow-sm: 0 4px 12px rgba(10, 10, 40, 0.06);
+  --shadow-md: 0 8px 24px rgba(10, 10, 40, 0.08);
+  --destructive: #f02d2d;
+  --destructive-soft: #fef0f0;
+  --skill-panel: #fafbff;
+  --skill-panel-soft: #f3f4ff;
+  --skill-hover: rgba(85, 90, 255, 0.06);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: var(--background);
+  color: var(--foreground);
+  min-height: 100vh;
+  padding: 32px;
+}
+
+.page-title {
+  font-size: 20px;
+  font-weight: 620;
+  margin-bottom: 6px;
+  letter-spacing: -.02em;
+}
+.page-subtitle {
+  color: var(--muted-foreground);
+  font-size: 13px;
+  margin-bottom: 28px;
+}
+.preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 24px;
+  align-items: start;
+}
+.preview-card {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--background);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+.preview-card-header {
+  padding: 10px 14px;
+  font-size: 11px;
+  font-weight: 560;
+  color: var(--muted-foreground);
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.preview-card-header .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--primary);
+}
+.preview-card-body {
+  height: 520px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---- optimization panel CSS (copied from skill-workspace.css) ---- */
+.skill-answer-optimization-panel {
+  height: 100%;
+  overflow: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.skill-answer-optimization-origin {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.skill-answer-optimization-origin-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--primary) 8%, var(--card));
+  color: var(--primary);
+  font-size: 11px;
+}
+.skill-answer-optimization-origin-bubble {
+  width: 100%;
+  max-width: 100%;
+  border-radius: 16px 16px 16px 4px;
+  background: var(--primary-soft);
+  padding: 10px 14px;
+}
+.skill-answer-optimization-origin-bubble p {
+  margin: 0;
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--secondary-foreground);
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+.skill-answer-optimization-intro {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.skill-answer-optimization-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.skill-answer-optimization-suggestions button {
+  min-height: 30px;
+  padding: 0 11px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--muted-foreground);
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease, color 140ms ease;
+}
+.skill-answer-optimization-suggestions button:hover {
+  border-color: color-mix(in srgb, var(--primary) 30%, var(--border));
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+.skill-answer-optimization-composer {
+  margin-top: auto;
+  border: 1px solid var(--input);
+  border-radius: 12px;
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.skill-answer-optimization-composer:focus-within {
+  border-color: color-mix(in srgb, var(--primary) 34%, var(--border));
+  box-shadow: 0 0 0 3px var(--ring), var(--shadow-sm);
+}
+.skill-answer-optimization-composer textarea {
+  display: block;
+  width: 100%;
+  min-height: 64px;
+  max-height: 160px;
+  padding: 11px 12px 6px;
+  border: 0;
+  outline: 0;
+  resize: vertical;
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.55;
+}
+.skill-answer-optimization-composer-bar {
+  display: flex;
+  height: 36px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 8px;
+}
+.skill-answer-optimization-composer-bar > span {
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+.skill-answer-optimization-composer-bar button {
+  display: inline-flex;
+  height: 28px;
+  align-items: center;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--primary-active);
+  color: var(--primary-foreground);
+  font-size: 12px;
+  font-weight: 560;
+  cursor: pointer;
+}
+.skill-answer-optimization-composer-bar button:hover { background: var(--primary-hover); }
+.skill-answer-optimization-composer-bar button:disabled { opacity: .42; cursor: default; }
+
+.skill-answer-optimization-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+
+.skill-answer-optimization-result {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+}
+.skill-answer-optimization-rebase-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.skill-answer-optimization-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  padding: 12px;
+  box-shadow: var(--shadow-sm);
+}
+.skill-answer-optimization-card-label {
+  display: block;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  margin-bottom: 8px;
+}
+.skill-answer-optimization-card p {
+  margin: 0;
+  color: var(--foreground);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.skill-answer-optimization-diff {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.skill-answer-optimization-diff-before,
+.skill-answer-optimization-diff-after {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.skill-answer-optimization-diff-before::before {
+  content: '修改前';
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+.skill-answer-optimization-diff-after::before {
+  content: '修改后';
+  color: var(--primary);
+  font-size: 11px;
+}
+.skill-answer-optimization-diff-bubble {
+  border-radius: 10px;
+  background: var(--muted);
+  padding: 9px 12px;
+}
+.skill-answer-optimization-diff-bubble.is-after {
+  background: color-mix(in srgb, var(--primary) 6%, var(--card));
+}
+.skill-answer-optimization-diff-bubble p {
+  margin: 0;
+  color: var(--foreground);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.skill-answer-optimization-test-result {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--muted);
+}
+.skill-answer-optimization-test-result .is-pass,
+.skill-answer-optimization-test-result .is-fail {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+.skill-answer-optimization-test-result .is-pass { color: #16835b; }
+.skill-answer-optimization-test-result .is-fail { color: #b45309; }
+.skill-answer-optimization-test-result p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted-foreground);
+}
+.skill-answer-optimization-actions {
+  margin-top: auto;
+  display: flex;
+  gap: 8px;
+  padding-top: 8px;
+}
+.skill-primary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border-radius: 9px;
+  padding: 9px 14px;
+  font-size: 12px;
+  font-weight: 560;
+  cursor: pointer;
+  border: 1px solid var(--primary);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--primary) 20%, transparent);
+}
+.skill-primary-button:hover { background: var(--primary-hover); }
+.skill-primary-button:disabled { opacity: .55; cursor: default; }
+.skill-secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border-radius: 9px;
+  padding: 9px 14px;
+  font-size: 12px;
+  font-weight: 560;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--foreground);
+}
+.skill-secondary-button:hover { background: var(--primary-soft); color: var(--primary); }
+.skill-secondary-button:disabled { opacity: .55; cursor: default; }
+.skill-answer-optimization-actions .skill-primary-button,
+.skill-answer-optimization-actions .skill-secondary-button {
+  flex: 1;
+  gap: 6px;
+  font-size: 12px;
+  padding: 8px 12px;
+}
+.skill-answer-optimization-saved {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-top: auto;
+  padding: 10px 0;
+}
+.skill-answer-optimization-saved-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #16835b;
+  font-size: 14px;
+}
+.skill-answer-optimization-saved .skill-primary-button {
+  width: 100%;
+  justify-content: center;
+  gap: 7px;
+}
+.skill-run-error {
+  align-self: center;
+  border-radius: 8px;
+  background: var(--destructive-soft);
+  color: var(--destructive);
+  padding: 8px 11px;
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+/* spinner */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin 1s linear infinite; }
+.skill-answer-optimization-loading svg { width: 15px; height: 15px; opacity: .7; }
+
+/* dark toggle */
+.dark-toggle {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 100;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--foreground);
+  font-size: 12px;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+}
+</style>
+</head>
+<body>
+
+<button class="dark-toggle" onclick="document.documentElement.classList.toggle('dark')">切换深色模式</button>
+
+<h1 class="page-title">优化面板样式预览</h1>
+<p class="page-subtitle">SkillAnswerOptimizationPanel — 所有状态一览</p>
+
+<div class="preview-grid">
+
+  <!-- 1. 初始状态（空） -->
+  <div class="preview-card">
+    <div class="preview-card-header"><span class="dot"></span> 初始状态 · 空反馈</div>
+    <div class="preview-card-body">
+      <div class="skill-answer-optimization-panel">
+        <div class="skill-answer-optimization-origin">
+          <span class="skill-answer-optimization-origin-badge">v3 的回答</span>
+          <div class="skill-answer-optimization-origin-bubble">
+            <p>根据《民法典》第1165条规定，行为人因过错侵害他人民事权益造成损害的，应当承担侵权责任。本案中，被告的行为确实构成了侵权，应当承担相应的赔偿责任。</p>
+          </div>
+        </div>
+        <p class="skill-answer-optimization-intro">说说希望这条回答发生什么变化，我会结合原问题和当前 Skill 给出改进方案。</p>
+        <div class="skill-answer-optimization-suggestions">
+          <button type="button">步骤更清楚</button>
+          <button type="button">增加安全提醒</button>
+          <button type="button">更有启发性</button>
+        </div>
+        <div class="skill-answer-optimization-composer">
+          <textarea placeholder="例如：不要直接给答案，多用问题引导学生自查…"></textarea>
+          <div class="skill-answer-optimization-composer-bar">
+            <span>先生成改进方案，再测试效果</span>
+            <button type="button" disabled>开始改进</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. 初始状态（有文字） -->
+  <div class="preview-card">
+    <div class="preview-card-header"><span class="dot"></span> 初始状态 · 已输入反馈</div>
+    <div class="preview-card-body">
+      <div class="skill-answer-optimization-panel">
+        <div class="skill-answer-optimization-origin">
+          <span class="skill-answer-optimization-origin-badge">v3 的回答</span>
+          <div class="skill-answer-optimization-origin-bubble">
+            <p>根据《民法典》第1165条规定，行为人因过错侵害他人民事权益造成损害的，应当承担侵权责任。本案中，被告的行为确实构成了侵权，应当承担相应的赔偿责任。</p>
+          </div>
+        </div>
+        <p class="skill-answer-optimization-intro">说说希望这条回答发生什么变化，我会结合原问题和当前 Skill 给出改进方案。</p>
+        <div class="skill-answer-optimization-suggestions">
+          <button type="button">步骤更清楚</button>
+          <button type="button">增加安全提醒</button>
+          <button type="button">更有启发性</button>
+        </div>
+        <div class="skill-answer-optimization-composer">
+          <textarea>希望增加具体的法条引用和解释，让学生理解为什么适用这条法律，而不仅仅是结论。</textarea>
+          <div class="skill-answer-optimization-composer-bar">
+            <span>先生成改进方案，再测试效果</span>
+            <button type="button">开始改进</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. 加载中 -->
+  <div class="preview-card">
+    <div class="preview-card-header"><span class="dot"></span> 加载中</div>
+    <div class="preview-card-body">
+      <div class="skill-answer-optimization-panel">
+        <div class="skill-answer-optimization-origin">
+          <span class="skill-answer-optimization-origin-badge">v3 的回答</span>
+          <div class="skill-answer-optimization-origin-bubble">
+            <p>根据《民法典》第1165条规定，行为人因过错侵害他人民事权益造成损害的，应当承担侵权责任。本案中，被告的行为确实构成了侵权，应当承担相应的赔偿责任。</p>
+          </div>
+        </div>
+        <div class="skill-answer-optimization-loading">
+          <svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+          <span>正在分析这条回答…</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. 结果状态（诊断 + diff + 测试通过） -->
+  <div class="preview-card">
+    <div class="preview-card-header"><span class="dot"></span> 结果 · 测试通过</div>
+    <div class="preview-card-body">
+      <div class="skill-answer-optimization-panel">
+        <div class="skill-answer-optimization-origin">
+          <span class="skill-answer-optimization-origin-badge">v3 的回答</span>
+          <div class="skill-answer-optimization-origin-bubble">
+            <p>根据《民法典》第1165条规定，行为人因过错侵害他人民事权益造成损害的，应当承担侵权责任。本案中，被告的行为确实构成了侵权，应当承担相应的赔偿责任。</p>
+          </div>
+        </div>
+        <div class="skill-answer-optimization-result">
+          <div class="skill-answer-optimization-card">
+            <span class="skill-answer-optimization-card-label">问题判断</span>
+            <p>回答直接给出了结论，但没有解释为什么适用第1165条，缺乏对"过错"要件的分析过程，学生难以理解法律适用的逻辑。</p>
+          </div>
+          <div class="skill-answer-optimization-card">
+            <span class="skill-answer-optimization-card-label">修改对比</span>
+            <div class="skill-answer-optimization-diff">
+              <div class="skill-answer-optimization-diff-before">
+                <div class="skill-answer-optimization-diff-bubble">
+                  <p>根据《民法典》第1165条规定，应当承担侵权责任。</p>
+                </div>
+              </div>
+              <div class="skill-answer-optimization-diff-after">
+                <div class="skill-answer-optimization-diff-bubble is-after">
+                  <p>根据《民法典》第1165条规定，行为人因过错侵害他人民事权益造成损害的，应当承担侵权责任。这里需要注意的是，需要同时满足"过错行为"和"损害后果"两个要件。</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="skill-answer-optimization-card">
+            <span class="skill-answer-optimization-card-label">测试效果</span>
+            <div class="skill-answer-optimization-test-result">
+              <span class="is-pass">符合预期</span>
+              <p>改进后的回答增加了法条适用要件的分析，学生能更好地理解法律逻辑。</p>
+            </div>
+          </div>
+        </div>
+        <div class="skill-answer-optimization-actions">
+          <button class="skill-secondary-button">测试改进</button>
+          <button class="skill-primary-button">保存为新版本</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. 结果状态（诊断 + diff + 测试失败） -->
+  <div class="preview-card">
+    <div class="preview-card-header"><span class="dot"></span> 结果 · 测试失败</div>
+    <div class="preview-card-body">
+      <div class="skill-answer-optimization-panel">
+        <div class="skill-answer-optimization-origin">
+          <span class="skill-answer-optimization-origin-badge">v3 的回答</span>
+          <div class="skill-answer-optimization-origin-bubble">
+            <p>根据《民法典》第1165条规定，行为人因过错侵害他人民事权益造成损害的，应当承担侵权责任。</p>
+          </div>
+        </div>
+        <div class="skill-answer-optimization-result">
+          <div class="skill-answer-optimization-rebase-note">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;margin-top:1px"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+            <span>问题来自较早版本，改进已应用到当前版本；已有修改会继续保留。</span>
+          </div>
+          <div class="skill-answer-optimization-card">
+            <span class="skill-answer-optimization-card-label">问题判断</span>
+            <p>回答中缺少对"损害后果"的界定，建议补充因果关系分析。</p>
+          </div>
+          <div class="skill-answer-optimization-card">
+            <span class="skill-answer-optimization-card-label">修改对比</span>
+            <div class="skill-answer-optimization-diff">
+              <div class="skill-answer-optimization-diff-before">
+                <div class="skill-answer-optimization-diff-bubble">
+                  <p>应当承担侵权责任。</p>
+                </div>
+              </div>
+              <div class="skill-answer-optimization-diff-after">
+                <div class="skill-answer-optimization-diff-bubble is-after">
+                  <p>应当承担侵权责任，赔偿范围包括直接损失和合理的间接损失。</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="skill-answer-optimization-card">
+            <span class="skill-answer-optimization-card-label">测试效果</span>
+            <div class="skill-answer-optimization-test-result">
+              <span class="is-fail">仍需调整</span>
+              <p>改进后的表述仍不够完整，建议补充"过错"要件的具体判断标准。</p>
+            </div>
+          </div>
+        </div>
+        <div class="skill-answer-optimization-actions">
+          <button class="skill-secondary-button">测试改进</button>
+          <button class="skill-primary-button" disabled>保存为新版本</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. 已保存 -->
+  <div class="preview-card">
+    <div class="preview-card-header"><span class="dot"></span> 已保存</div>
+    <div class="preview-card-body">
+      <div class="skill-answer-optimization-panel">
+        <div class="skill-answer-optimization-origin">
+          <span class="skill-answer-optimization-origin-badge">v3 的回答</span>
+          <div class="skill-answer-optimization-origin-bubble">
+            <p>根据《民法典》第1165条规定，行为人因过错侵害他人民事权益造成损害的，应当承担侵权责任。</p>
+          </div>
+        </div>
+        <div class="skill-answer-optimization-result">
+          <div class="skill-answer-optimization-card">
+            <span class="skill-answer-optimization-card-label">问题判断</span>
+            <p>回答直接给出了结论，但缺乏对"过错"要件的分析过程。</p>
+          </div>
+          <div class="skill-answer-optimization-card">
+            <span class="skill-answer-optimization-card-label">修改对比</span>
+            <div class="skill-answer-optimization-diff">
+              <div class="skill-answer-optimization-diff-before">
+                <div class="skill-answer-optimization-diff-bubble">
+                  <p>应当承担侵权责任。</p>
+                </div>
+              </div>
+              <div class="skill-answer-optimization-diff-after">
+                <div class="skill-answer-optimization-diff-bubble is-after">
+                  <p>应当承担侵权责任。需要同时满足"过错行为"和"损害后果"两个要件。</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="skill-answer-optimization-card">
+            <span class="skill-answer-optimization-card-label">测试效果</span>
+            <div class="skill-answer-optimization-test-result">
+              <strong class="is-pass">符合预期</strong>
+              <p>改进后的回答增加了法条适用要件的分析。</p>
+            </div>
+          </div>
+        </div>
+        <div class="skill-answer-optimization-saved">
+          <div class="skill-answer-optimization-saved-badge">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>
+            已保存为 v4
+          </div>
+          <button class="skill-primary-button">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            用 v4 重新运行原任务
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 7. 错误状态 -->
+  <div class="preview-card">
+    <div class="preview-card-header"><span class="dot"></span> 错误状态</div>
+    <div class="preview-card-body">
+      <div class="skill-answer-optimization-panel">
+        <div class="skill-answer-optimization-origin">
+          <span class="skill-answer-optimization-origin-badge">v3 的回答</span>
+          <div class="skill-answer-optimization-origin-bubble">
+            <p>根据《民法典》第1165条规定，行为人因过错侵害他人民事权益造成损害的，应当承担侵权责任。</p>
+          </div>
+        </div>
+        <div class="skill-answer-optimization-result">
+          <div class="skill-answer-optimization-card">
+            <span class="skill-answer-optimization-card-label">修改对比</span>
+            <div class="skill-answer-optimization-diff">
+              <div class="skill-answer-optimization-diff-before">
+                <div class="skill-answer-optimization-diff-bubble">
+                  <p>应当承担侵权责任。</p>
+                </div>
+              </div>
+              <div class="skill-answer-optimization-diff-after">
+                <div class="skill-answer-optimization-diff-bubble is-after">
+                  <p>应当承担侵权责任。需要同时满足"过错行为"和"损害后果"两个要件。</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="skill-run-error">当前版本刚刚发生了变化，改进已重新应用，请再次测试后保存。</div>
+        <div class="skill-answer-optimization-actions">
+          <button class="skill-secondary-button">测试改进</button>
+          <button class="skill-primary-button">保存为新版本</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

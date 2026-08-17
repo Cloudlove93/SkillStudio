@@ -4,7 +4,7 @@ import { Loader2, MoreHorizontal, PencilLine, Plus, Trash2 } from 'lucide-react'
 import { getConversationSurface, getConversationTitle, getSurfaceLabel } from './skill-conversation-list';
 import { SkillContextMenu } from './SkillContextMenu';
 
-const DEFAULT_TITLE_PREFIXES = ['Skill Arena:', 'Skill 运行：', 'Skill 测试：', 'Skill 优化：'];
+const DEFAULT_TITLE_PREFIXES = ['Skill Arena:', 'Skill 使用：', 'Skill 测试：', 'Skill 优化：'];
 
 type Props = {
   conversations: ArenaThread[];
@@ -100,11 +100,11 @@ export function SkillConversationList({
                     aria-hidden={status ? undefined : true}
                   >
                     {status === 'running' ? (
-                      <span className="skill-conversation-status is-running">
+                      <span className="skill-conversation-status-icon is-running">
                         <Loader2 size={12} aria-hidden="true" />
                       </span>
                     ) : status === 'complete' ? (
-                      <span className="skill-conversation-status is-complete">
+                      <span className="skill-conversation-status-icon is-complete">
                         <span aria-hidden="true" />
                       </span>
                     ) : null}

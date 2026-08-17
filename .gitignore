@@ -36,4 +36,10 @@ npm-debug.log*
 CLAUDE.md
 
 # Local planning artifacts
-docs/superpowers/
+docs/superpowers/*
+!docs/superpowers/specs/
+docs/superpowers/specs/*
+!docs/superpowers/specs/2026-08-14-multimodal-skill-pack-design.md
+!docs/superpowers/plans/
+docs/superpowers/plans/*
+!docs/superpowers/plans/2026-08-14-multimodal-skill-pack.md

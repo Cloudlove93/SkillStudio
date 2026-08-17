@@ -18,6 +18,8 @@ export const ARENA_ROUTES = {
 
 export const ANSWER_SKILL_OPTIMIZATION_ROUTES = {
   CREATE: "/arena/answer-optimizations",
+  RESOLVE: "/arena/answer-optimizations/resolve",
+  SUGGESTIONS: "/arena/answer-optimizations/suggestions",
   DETAIL: "/arena/answer-optimizations/:optimizationId",
   REVISE: "/arena/answer-optimizations/:optimizationId/revise",
   REBASE: "/arena/answer-optimizations/:optimizationId/rebase",
@@ -25,6 +27,26 @@ export const ANSWER_SKILL_OPTIMIZATION_ROUTES = {
   CONFIRM: "/arena/answer-optimizations/:optimizationId/confirm",
   CANCEL: "/arena/answer-optimizations/:optimizationId/cancel",
 } as const;
+
+export interface AnswerOptimizationSuggestionsRequest {
+  packageId: number;
+  threadId: number;
+  questionMessageId: number;
+  answerMessageId: number;
+  answerSide: "baseline" | "enhanced";
+  answerVersionNumber: number;
+}
+
+export interface AnswerOptimizationSuggestionsResult {
+  suggestions: [string, string, string];
+  source: "ai" | "fallback";
+}
+
+export const ANSWER_OPTIMIZATION_SUGGESTION_FALLBACKS: [string, string, string] = [
+  "让回答更贴合具体教学目标和学生情况",
+  "增加引导学生思考、判断和调整的过程",
+  "补充关键边界、安全提醒和完成标准",
+];
 
 export interface LoginRequest {
   username: string;
@@ -151,8 +173,8 @@ export interface SkillArenaConfig {
   /** run: 单版本运行；test: 固定版本测试；arena: 双版本对比；optimize: 交互式优化 */
   surface?: "run" | "test" | "arena" | "optimize";
   basePackageVersionId: string;
-  left: ArenaThreadVariant;
-  right: ArenaThreadVariant;
+  left: ArenaThreadVariant | null;
+  right: ArenaThreadVariant | null;
 }
 
 export interface RollbackSkillVersionPayload {
@@ -239,8 +261,8 @@ export interface ArenaThreadDetail {
   answerOptimizations: ArenaAnswerOptimizationSummary[];
   // Skill Arena 线程的版本绑定信息（仅 skill_arena 模式有值；package_arena 为 null）
   skillVersionInfo?: {
-    left: ArenaThreadSideVersionInfo;
-    right: ArenaThreadSideVersionInfo;
+    left: ArenaThreadSideVersionInfo | null;
+    right: ArenaThreadSideVersionInfo | null;
   } | null;
 }
 

@@ -19,7 +19,7 @@ export function getConversationSurface(thread: ArenaThread): SkillConversationSu
 export function getSurfaceLabel(surface: SkillConversationSurface | null): string {
   switch (surface) {
     case 'run':
-      return '运行';
+      return '使用';
     case 'test':
       return '测试';
     case 'optimize':
