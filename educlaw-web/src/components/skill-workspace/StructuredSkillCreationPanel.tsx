@@ -1,12 +1,15 @@
 import { useRef, useState, type FormEvent } from 'react';
 import type { GuidedCreationDocument } from '@educlaw/shared';
-import { ArrowRight, FileText, Loader2, Paperclip, X } from 'lucide-react';
+import { ArrowRight, Loader2, Paperclip } from 'lucide-react';
 import {
   emptyStructuredSkillDraft,
   formatStructuredSkillRequest,
   hasStructuredSkillInput,
   type StructuredSkillDraft,
 } from './structured-skill-creation-state';
+import { InspectorPortal } from './InspectorPortal';
+import { StructuredInspectorContent } from './StructuredInspectorContent';
+import { useWorkspaceInspector } from './WorkspaceInspectorProvider';
 
 type Props = {
   documents: GuidedCreationDocument[];
@@ -25,11 +28,25 @@ export function StructuredSkillCreationPanel({
   onFiles,
   onRemoveDocument,
 }: Props) {
+  const { openInspector } = useWorkspaceInspector();
   const [draft, setDraft] = useState<StructuredSkillDraft>(emptyStructuredSkillDraft);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const inspectorOpenedRef = useRef(false);
+
+  const ensureInspector = () => {
+    if (inspectorOpenedRef.current) return;
+    inspectorOpenedRef.current = true;
+    openInspector({
+      owner: 'structured',
+      view: 'structured-summary',
+      title: '填写摘要',
+      description: '随表单更新，不会改变当前输入焦点。',
+    });
+  };
 
   const update = (key: keyof StructuredSkillDraft, value: string) => {
     setDraft((current) => ({ ...current, [key]: value }));
+    if (value.trim()) ensureInspector();
   };
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
@@ -82,17 +99,6 @@ export function StructuredSkillCreationPanel({
           </label>
         </div>
 
-        {documents.length > 0 && (
-          <div className="skill-document-row">
-            {documents.map((document, index) => (
-              <span key={`${document.name}-${index}`}>
-                <FileText size={13} />{document.name}
-                <button type="button" onClick={() => onRemoveDocument(index)}><X size={12} /></button>
-              </span>
-            ))}
-          </div>
-        )}
-
         <footer className="skill-structured-actions">
           <input
             ref={fileInputRef}
@@ -101,7 +107,10 @@ export function StructuredSkillCreationPanel({
             multiple
             accept={materialTypes}
             onChange={(event) => {
-              if (event.target.files?.length) onFiles(event.target.files);
+              if (event.target.files?.length) {
+                ensureInspector();
+                onFiles(event.target.files);
+              }
               event.target.value = '';
             }}
           />
@@ -115,6 +124,13 @@ export function StructuredSkillCreationPanel({
           </button>
         </footer>
       </form>
+      <InspectorPortal owner="structured">
+        <StructuredInspectorContent
+          draft={draft}
+          documents={documents}
+          onRemoveDocument={onRemoveDocument}
+        />
+      </InspectorPortal>
     </main>
   );
 }

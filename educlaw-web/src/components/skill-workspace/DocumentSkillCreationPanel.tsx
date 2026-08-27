@@ -1,13 +1,8 @@
 import { useRef, useState } from 'react';
 import {
-  CheckCircle2,
-  Clock3,
-  FileText,
   FileUp,
   Loader2,
   Sparkles,
-  X,
-  XCircle,
 } from 'lucide-react';
 import { liteApi } from '../../api/lite-api';
 import {
@@ -15,6 +10,9 @@ import {
   type DocumentBatchRun,
   type DocumentSource,
 } from './document-skill-creation-state';
+import { DocumentInspectorContent } from './DocumentInspectorContent';
+import { InspectorPortal } from './InspectorPortal';
+import { useWorkspaceInspector } from './WorkspaceInspectorProvider';
 
 type Props = {
   token: string;
@@ -28,8 +26,10 @@ const DOCX_MIME_TYPE =
 const BATCH_CONCURRENCY = 2;
 
 export function DocumentSkillCreationPanel({ token, onGenerated }: Props) {
+  const { openInspector } = useWorkspaceInspector();
   const inputRef = useRef<HTMLInputElement>(null);
   const [documents, setDocuments] = useState<DocumentSource[]>([]);
+  const documentsRef = useRef<DocumentSource[]>([]);
   const [instruction, setInstruction] = useState('');
   const [runs, setRuns] = useState<DocumentBatchRun[]>([]);
   const [busy, setBusy] = useState(false);
@@ -55,8 +55,17 @@ export function DocumentSkillCreationPanel({ token, onGenerated }: Props) {
       }
     }
     if (next.length > 0) {
-      setDocuments((current) => [...current, ...next].slice(0, 20));
+      const merged = [...documentsRef.current, ...next].slice(0, 20);
+      documentsRef.current = merged;
+      setDocuments(merged);
       setRuns([]);
+      openInspector({
+        owner: 'document',
+        view: 'document-materials',
+        title: '文档与生成状态',
+        description: `${merged.length} 份文档`,
+        preferredWidth: 400,
+      });
     }
     setNotice(
       failures.length > 0
@@ -75,6 +84,13 @@ export function DocumentSkillCreationPanel({ token, onGenerated }: Props) {
     let failureCount = 0;
     setRuns(plan);
     setBusy(true);
+    openInspector({
+      owner: 'document',
+      view: 'document-materials',
+      title: '文档与生成状态',
+      description: `${documents.length} 份文档正在分别生成`,
+      preferredWidth: 400,
+    });
     setNotice(
       documents.length > 1
         ? `正在分别生成 ${documents.length} 个 Skill`
@@ -175,41 +191,6 @@ export function DocumentSkillCreationPanel({ token, onGenerated }: Props) {
           <b>选择文档</b>
         </button>
 
-        {documents.length > 0 && (
-          <div className="skill-document-create-files">
-            {documents.map((document, index) => {
-              const run = runs[index];
-              return (
-                <div key={`${document.name}-${index}`}>
-                  <span className="skill-document-create-file-icon"><FileText size={14} /></span>
-                  <span>
-                    <strong>{document.name}</strong>
-                    <small>{run ? runStatus(run) : '将生成 1 个独立 Skill'}</small>
-                  </span>
-                  {run ? (
-                    <RunIcon run={run} />
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setDocuments((current) =>
-                          current.filter((_, itemIndex) => itemIndex !== index),
-                        )
-                      }
-                      aria-label={`移除 ${document.name}`}
-                    >
-                      <X size={13} />
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-            {documents.length > 1 && !busy && runs.length === 0 && (
-              <p>已选择 {documents.length} 份文档，将分别创建 {documents.length} 个 Skill。</p>
-            )}
-          </div>
-        )}
-
         <label className="skill-document-create-instruction">
           <span>补充要求（可选）</span>
           <textarea
@@ -233,24 +214,24 @@ export function DocumentSkillCreationPanel({ token, onGenerated }: Props) {
           </button>
         </footer>
       </div>
+      <InspectorPortal owner="document">
+        <DocumentInspectorContent
+          documents={documents}
+          runs={runs}
+          busy={busy}
+          notice={notice}
+          onRemoveDocument={(index) => {
+            setDocuments((current) => {
+              const next = current.filter((_, itemIndex) => itemIndex !== index);
+              documentsRef.current = next;
+              return next;
+            });
+            setRuns([]);
+          }}
+        />
+      </InspectorPortal>
     </main>
   );
-}
-
-function RunIcon({ run }: { run: DocumentBatchRun }) {
-  if (run.status === 'running') return <Loader2 size={15} className="spin" />;
-  if (run.status === 'done') return <CheckCircle2 size={15} className="is-success" />;
-  if (run.status === 'error') return <XCircle size={15} className="is-error" />;
-  return <Clock3 size={15} />;
-}
-
-function runStatus(run: DocumentBatchRun) {
-  if (run.status === 'waiting') return '等待生成';
-  if (run.status === 'running') return '正在生成';
-  if (run.status === 'done') return run.packageName
-    ? `已生成：${run.packageName}`
-    : '生成完成';
-  return run.error || '生成失败';
 }
 
 async function readDocument(file: File): Promise<DocumentSource> {

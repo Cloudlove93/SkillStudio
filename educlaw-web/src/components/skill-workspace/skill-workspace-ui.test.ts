@@ -257,6 +257,19 @@ describe('Skill-first workspace UI contract', () => {
     expect(page).toContain('StructuredSkillCreationPanel');
   });
 
+  it('uses the shared inspector for document, structured and repository context', () => {
+    const document = read('./DocumentSkillCreationPanel.tsx');
+    const structured = read('./StructuredSkillCreationPanel.tsx');
+    const repository = read('./SkillRepositoryWorkspace.tsx');
+
+    expect(document).toContain('<DocumentInspectorContent');
+    expect(document).toContain('<InspectorPortal owner="document">');
+    expect(structured).toContain('<StructuredInspectorContent');
+    expect(structured).toContain('<InspectorPortal owner="structured">');
+    expect(repository).toContain('<RepositoryInspectorContent');
+    expect(repository).toContain('<InspectorPortal owner="repository">');
+  });
+
   it('opens Skill ZIP import in a focused dialog', () => {
     const page = read('../../pages/SkillFirstWorkspace.tsx');
     const dialog = read('./SkillImportDialog.tsx');

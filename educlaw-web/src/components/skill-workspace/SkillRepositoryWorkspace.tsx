@@ -15,6 +15,9 @@ import {
 } from 'lucide-react';
 import { getSessionName } from './SkillWorkspaceSidebar';
 import { SkillDeleteConfirmDialog } from './SkillDeleteConfirmDialog';
+import { InspectorPortal } from './InspectorPortal';
+import { RepositoryInspectorContent } from './RepositoryInspectorContent';
+import { useWorkspaceInspector } from './WorkspaceInspectorProvider';
 import {
   clampRepositoryPage,
   filterRepositorySkills,
@@ -56,6 +59,7 @@ export function SkillRepositoryWorkspace({
   onDeleteSkills,
   onNew,
 }: Props) {
+  const { state: inspectorState, openInspector, closeInspector } = useWorkspaceInspector();
   const [activeTab, setActiveTab] = useState<RepositoryTab>('created');
   const [page, setPage] = useState(1);
   const [managing, setManaging] = useState(false);
@@ -65,6 +69,7 @@ export function SkillRepositoryWorkspace({
   const [deleteReturnFocusSkillId, setDeleteReturnFocusSkillId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const [previewSkill, setPreviewSkill] = useState<RepositorySkill | null>(null);
 
   const created = useMemo(
     () => filterRepositorySkills(skills, search),
@@ -90,10 +95,44 @@ export function SkillRepositoryWorkspace({
     setSelectedSkillIds((current) => intersectSkillSelection(current, created));
   }, [created]);
 
+  useEffect(() => {
+    if (inspectorState.descriptor?.owner !== 'repository') return;
+    const itemId = inspectorState.descriptor.itemId;
+    if (!itemId) return;
+    const selected = skills.find((skill) => skill.skillId === itemId);
+    if (selected) {
+      setPreviewSkill((current) => current?.skillId === itemId ? current : selected);
+    }
+  }, [inspectorState.descriptor, skills]);
+
   const stopManaging = () => {
     setManaging(false);
     setSelectedSkillIds(new Set());
     setMenuSkillId(null);
+    setPreviewSkill(null);
+    closeInspector({ force: true });
+  };
+
+  const previewRepositorySkill = (skill: RepositorySkill) => {
+    setPreviewSkill(skill);
+    openInspector({
+      owner: 'repository',
+      view: 'repository-selection',
+      title: skill.name,
+      description: '快速预览',
+      itemId: skill.skillId,
+    });
+  };
+
+  const startManaging = () => {
+    setManaging(true);
+    setPreviewSkill(null);
+    openInspector({
+      owner: 'repository',
+      view: 'repository-selection',
+      title: '批量选择',
+      description: '删除前仍会进行确认。',
+    });
   };
 
   const toggleSelection = (skillId: string) => {
@@ -162,7 +201,7 @@ export function SkillRepositoryWorkspace({
           <input value={search} onChange={(event) => { onSearch(event.target.value); setPage(1); }} placeholder="搜索 Skill" />
         </label>
         {activeTab === 'created' && !managing ? (
-          <button type="button" className="skill-repository-manage" onClick={() => setManaging(true)}>
+          <button type="button" className="skill-repository-manage" onClick={startManaging}>
             <CheckSquare2 size={15} />批量管理
           </button>
         ) : null}
@@ -216,6 +255,9 @@ export function SkillRepositoryWorkspace({
                   <button
                     type="button"
                     className="skill-repository-row-main"
+                    onFocus={() => {
+                      if (!managing) previewRepositorySkill(skill);
+                    }}
                     onClick={() => managing ? toggleSelection(skill.skillId) : onSelectSkill(skill)}
                   >
                     <span className="skill-repository-item-icon"><Sparkles size={15} /></span>
@@ -233,7 +275,10 @@ export function SkillRepositoryWorkspace({
                         aria-label="Skill 操作"
                         aria-expanded={menuSkillId === skill.skillId}
                         data-skill-delete-return={skill.skillId}
-                        onClick={() => setMenuSkillId((current) => current === skill.skillId ? null : skill.skillId)}
+                        onClick={() => {
+                          previewRepositorySkill(skill);
+                          setMenuSkillId((current) => current === skill.skillId ? null : skill.skillId);
+                        }}
                       >
                         <MoreHorizontal size={16} />
                       </button>
@@ -305,6 +350,14 @@ export function SkillRepositoryWorkspace({
           onConfirm={() => void confirmDeletion()}
         />
       ) : null}
+      <InspectorPortal owner="repository">
+        <RepositoryInspectorContent
+          previewSkill={previewSkill}
+          selectedSkills={selectedSkills}
+          filteredCount={created.length}
+          managing={managing}
+        />
+      </InspectorPortal>
     </main>
   );
 }

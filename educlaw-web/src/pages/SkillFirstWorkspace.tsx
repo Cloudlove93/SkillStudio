@@ -1031,6 +1031,7 @@ function SkillFirstWorkspaceContent() {
               onGenerated={async () => {
                 await refreshRepository();
                 dispatchWorkspace({ type: 'navigate', view: 'repository' });
+                closeInspector({ force: true });
               }}
             />
           ) : createMode === 'manual' ? (
@@ -1112,13 +1113,32 @@ function SkillFirstWorkspaceContent() {
         />
       </InspectorPortal>
       <WorkspaceInspector
-        defaultDescriptor={createMode === 'multimodal' && !session && !activeSkill
+        defaultDescriptor={workspaceState.activeView === 'repository'
+          ? {
+              owner: 'repository',
+              view: 'repository-selection',
+              title: '仓库摘要',
+              description: '聚焦 Skill 或进入批量管理后查看详情。',
+            }
+          : createMode === 'multimodal' && !session && !activeSkill
           ? {
               owner: 'multimodal',
               view: 'multimodal-progress',
               title: '处理状态',
               description: '查看素材处理阶段和已经形成的证据。',
             }
+          : createMode === 'document' && !session && !activeSkill
+            ? {
+                owner: 'document',
+                view: 'document-materials',
+                title: '文档与生成状态',
+              }
+            : createMode === 'manual' && !session && !activeSkill
+              ? {
+                  owner: 'structured',
+                  view: 'structured-summary',
+                  title: '填写摘要',
+                }
           : {
               owner: activeSkill ? 'skill' : 'guided',
               view: 'summary',
