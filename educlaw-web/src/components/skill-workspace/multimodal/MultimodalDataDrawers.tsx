@@ -10,18 +10,17 @@ import type {
 } from '@educlaw/shared';
 import { CANDIDATE_PASS_KEYS } from '@educlaw/shared';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import type { MediaSessionDetail } from '../../../api/lite-api';
+import type { MediaSessionDetail, MediaSessionProgress } from '../../../api/lite-api';
 import type { MultimodalWorkbenchError } from '../multimodal-guided-creation-state';
 import {
-  ADLER_LAYER_LABELS,
   aggregateMultimodalDegradations,
   CLAIM_TYPE_LABELS,
   degradationPresentation,
   EVIDENCE_KIND_LABELS,
 } from './multimodal-wizard-model';
-import { MultimodalDrawer } from './MultimodalDrawer';
 
-export type MultimodalDrawerKind =
+export type MultimodalInspectorKind =
+  | 'progress'
   | 'transcript'
   | 'evidence'
   | 'diagnostics'
@@ -36,7 +35,9 @@ type CandidateSkill =
 type Props = {
   detail: MediaSessionDetail | null;
   error: MultimodalWorkbenchError | null;
-  open: MultimodalDrawerKind;
+  progress: MediaSessionProgress | null;
+  statusText: string;
+  view: MultimodalInspectorKind;
   selectedLayer: AdlerLayerKey | null;
   selectedCandidate: {
     passKey: CandidatePassKey;
@@ -44,7 +45,6 @@ type Props = {
   } | null;
   selectedSkill: CandidateSkill | null;
   framePreview: { evidenceId: string; url: string } | null;
-  onOpenChange: (open: boolean) => void;
   onSeek: (timeMs: number) => void;
   onUpdateTranscript: (
     index: number,
@@ -250,7 +250,7 @@ function VirtualEvidenceList(props: {
   );
 }
 
-export function MultimodalDataDrawers(props: Props) {
+export function MultimodalInspectorContent(props: Props) {
   const [query, setQuery] = useState('');
   const [lowConfidenceOnly, setLowConfidenceOnly] = useState(false);
   const [editedOnly, setEditedOnly] = useState(false);
@@ -326,33 +326,37 @@ export function MultimodalDataDrawers(props: Props) {
       ? props.detail.mediaState.adlerOverview.overview[props.selectedLayer]
       : [];
 
-  const title =
-    props.open === 'transcript'
-      ? '完整转录'
-      : props.open === 'evidence'
-        ? '证据库'
-        : props.open === 'diagnostics'
-          ? '处理诊断'
-          : props.open === 'overview'
-            ? props.selectedLayer
-              ? ADLER_LAYER_LABELS[props.selectedLayer]
-              : '内容概览'
-            : props.open === 'candidate'
-              ? (props.selectedCandidate?.candidate.title ?? '编辑候选')
-              : (props.selectedSkill?.name ?? 'Skill 内容');
-
   return (
-    <MultimodalDrawer
-      open={props.open !== null}
-      onOpenChange={props.onOpenChange}
-      title={title}
-      description={
-        props.open === 'transcript' || props.open === 'evidence'
-          ? '搜索结果只渲染当前可见范围，不改变原始证据。'
-          : undefined
-      }
-    >
-      {props.open === 'transcript' && (
+    <div className="skill-mm-inspector-content">
+      {props.view === 'progress' && (
+        <div className="skill-mm-inspector-progress">
+          <section>
+            <span>当前状态</span>
+            <strong>{props.statusText}</strong>
+          </section>
+          {props.progress?.currentJob && (
+            <section>
+              <span>正在处理</span>
+              <strong>{props.progress.currentJob.hint ?? props.progress.currentJob.jobType}</strong>
+              {props.progress.currentJob.percent != null && (
+                <div className="skill-context-progress-track">
+                  <span style={{ width: `${props.progress.currentJob.percent}%` }} />
+                </div>
+              )}
+            </section>
+          )}
+          <section>
+            <span>已形成内容</span>
+            <strong>
+              {props.detail?.mediaState.transcript.segments.length ?? 0} 段转录 ·{' '}
+              {props.detail?.mediaState.evidenceTimeline.evidenceItems.length ?? 0} 条证据
+            </strong>
+          </section>
+          <p>状态保存在服务端，可以安全离开后再回来继续。</p>
+        </div>
+      )}
+
+      {props.view === 'transcript' && (
         <div className="skill-mm-drawer-dataset">
           <div className="skill-mm-drawer-filters">
             <input
@@ -389,7 +393,7 @@ export function MultimodalDataDrawers(props: Props) {
         </div>
       )}
 
-      {props.open === 'evidence' && (
+      {props.view === 'evidence' && (
         <div className="skill-mm-drawer-dataset">
           <div className="skill-mm-drawer-filters">
             <input
@@ -448,7 +452,7 @@ export function MultimodalDataDrawers(props: Props) {
         </div>
       )}
 
-      {props.open === 'diagnostics' && (
+      {props.view === 'diagnostics' && (
         <div className="skill-mm-diagnostics">
           {props.error && (
             <article className="skill-mm-diagnostic-item" role="alert">
@@ -488,7 +492,7 @@ export function MultimodalDataDrawers(props: Props) {
         </div>
       )}
 
-      {props.open === 'overview' && (
+      {props.view === 'overview' && (
         <div className="skill-mm-overview-expanded">
           {selectedLayerStatements.map((statement, index) => (
             <button
@@ -509,7 +513,7 @@ export function MultimodalDataDrawers(props: Props) {
         </div>
       )}
 
-      {props.open === 'candidate' && props.selectedCandidate && (
+      {props.view === 'candidate' && props.selectedCandidate && (
         <div className="skill-mm-candidate-editor">
           <label>
             候选标题
@@ -612,12 +616,12 @@ export function MultimodalDataDrawers(props: Props) {
         </div>
       )}
 
-      {props.open === 'skill' && props.selectedSkill && (
+      {props.view === 'skill' && props.selectedSkill && (
         <div className="skill-mm-skill-document">
           <p>{props.selectedSkill.description}</p>
           <pre>{props.selectedSkill.skillMd}</pre>
         </div>
       )}
-    </MultimodalDrawer>
+    </div>
   );
 }

@@ -96,9 +96,10 @@ export function WorkspaceInspectorProvider({ children }: { children: ReactNode }
   }, []);
 
   const openInspector = useCallback((descriptor: InspectorDescriptor) => {
+    if (descriptor.preferredWidth) setWidth(descriptor.preferredWidth);
     dispatch({ type: 'open', descriptor });
     replaceInspectorSearch(descriptor);
-  }, [replaceInspectorSearch]);
+  }, [replaceInspectorSearch, setWidth]);
 
   const closeInspector = useCallback((options?: CloseInspectorOptions) => {
     if (!options?.force && requiresInspectorCloseConfirmation(state)) return false;

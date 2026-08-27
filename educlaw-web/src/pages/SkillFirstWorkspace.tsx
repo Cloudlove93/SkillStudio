@@ -1112,11 +1112,18 @@ function SkillFirstWorkspaceContent() {
         />
       </InspectorPortal>
       <WorkspaceInspector
-        defaultDescriptor={{
-          owner: activeSkill ? 'skill' : 'guided',
-          view: 'summary',
-          title: activeSkill ? '当前 Skill' : '需求摘要',
-        }}
+        defaultDescriptor={createMode === 'multimodal' && !session && !activeSkill
+          ? {
+              owner: 'multimodal',
+              view: 'multimodal-progress',
+              title: '处理状态',
+              description: '查看素材处理阶段和已经形成的证据。',
+            }
+          : {
+              owner: activeSkill ? 'skill' : 'guided',
+              view: 'summary',
+              title: activeSkill ? '当前 Skill' : '需求摘要',
+            }}
       />
       </div>
       <SkillImportDialog

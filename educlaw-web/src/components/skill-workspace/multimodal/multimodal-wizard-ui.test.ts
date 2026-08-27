@@ -86,18 +86,30 @@ describe('multimodal wizard UI contract', () => {
     expect(source).not.toContain('<pre>');
   });
 
-  it('uses Radix Dialog and virtualizes complete data lists', () => {
-    const drawer = read('./MultimodalDrawer.tsx');
+  it('uses the shared non-modal inspector and virtualizes complete data lists', () => {
+    const panel = read('../MultimodalSkillCreationPanel.tsx');
     const data = read('./MultimodalDataDrawers.tsx');
 
-    expect(drawer).toContain('Dialog.Root');
-    expect(drawer).toContain('Dialog.Title');
-    expect(drawer).toContain('Dialog.Close');
+    expect(panel).toContain('<InspectorPortal owner="multimodal">');
+    expect(panel).toContain('openMultimodalInspector');
+    expect(panel).toContain('setInspectorDirty');
+    expect(data).toContain('MultimodalInspectorContent');
+    expect(data).not.toContain('MultimodalDrawer');
+    expect(data).not.toContain('Dialog.');
     expect(data).toContain('useVirtualizer');
     expect(data).toContain('getVirtualItems()');
     expect(data).toContain('measureElement');
     expect(data).toContain('低置信度');
     expect(data).toContain('证据类型');
+  });
+
+  it('restores the selected multimodal item from an inspector deep link', () => {
+    const panel = read('../MultimodalSkillCreationPanel.tsx');
+
+    expect(panel).toContain('inspectorState.descriptor?.itemId');
+    expect(panel).toContain('ADLER_LAYER_KEYS.includes');
+    expect(panel).toContain('candidate.candidateId === itemId');
+    expect(panel).toContain('skill.id === itemId');
   });
 
   it('does not render a complete transcript or evidence array outside a virtual list', () => {
@@ -108,7 +120,7 @@ describe('multimodal wizard UI contract', () => {
     expect(data).toContain('overscan: 6');
   });
 
-  it('shows fused topics as selectable cards with attribution and drawer edits', () => {
+  it('shows fused topics as selectable cards with attribution and inspector edits', () => {
     const source = read('./MultimodalCandidateStep.tsx');
 
     expect(source).toContain('paginateMultimodalItems(props.topics, page, 6)');
@@ -121,14 +133,14 @@ describe('multimodal wizard UI contract', () => {
     expect(source).not.toContain('skill-mm-topic-sources');
     expect(source).not.toContain('<textarea');
 
-    const drawer = read('./MultimodalDataDrawers.tsx');
-    expect(drawer).toContain('融合来源');
+    const inspector = read('./MultimodalDataDrawers.tsx');
+    expect(inspector).toContain('融合来源');
   });
 
-  it('edits, splits, and discards candidates inside the focused drawer', () => {
+  it('edits, splits, and discards candidates inside the focused inspector', () => {
     const source = read('./MultimodalDataDrawers.tsx');
 
-    expect(source).toContain("props.open === 'candidate'");
+    expect(source).toContain("props.view === 'candidate'");
     expect(source).toContain('候选标题');
     expect(source).toContain('props.onUpdateCandidate');
     expect(source).toContain('props.onSplitCandidate');

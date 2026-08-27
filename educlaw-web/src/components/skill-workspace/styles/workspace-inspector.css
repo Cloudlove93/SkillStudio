@@ -119,6 +119,46 @@
   flex: 1;
 }
 
+.skill-mm-inspector-content {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: auto;
+}
+
+.skill-mm-inspector-content > .skill-mm-drawer-dataset {
+  min-height: 0;
+  flex: 1;
+}
+
+.skill-mm-inspector-progress {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.skill-mm-inspector-progress section {
+  display: grid;
+  gap: 6px;
+  border-bottom: 1px solid var(--workspace-border);
+  padding: 0 0 12px;
+}
+
+.skill-mm-inspector-progress span,
+.skill-mm-inspector-progress p {
+  color: var(--workspace-muted);
+  font-size: var(--workspace-text-sm);
+  line-height: 1.6;
+}
+
+.skill-mm-inspector-progress strong {
+  color: var(--workspace-ink);
+  font-size: var(--workspace-text-md);
+  font-weight: 600;
+}
+
 .workspace-inspector-resize {
   position: absolute;
   z-index: 4;

@@ -5,6 +5,7 @@ import type {
   MultimodalCandidatePasses,
   MultimodalCandidateSuggestion,
 } from '@educlaw/shared';
+import { ADLER_LAYER_KEYS } from '@educlaw/shared';
 import { Check, Loader2, Sparkles } from 'lucide-react';
 import {
   LiteApiError,
@@ -32,8 +33,8 @@ import {
 import { MediaReviewPane } from './multimodal/MediaReviewPane';
 import { MultimodalCandidateStep } from './multimodal/MultimodalCandidateStep';
 import {
-  MultimodalDataDrawers,
-  type MultimodalDrawerKind,
+  MultimodalInspectorContent,
+  type MultimodalInspectorKind,
 } from './multimodal/MultimodalDataDrawers';
 import { MultimodalOverviewStep } from './multimodal/MultimodalOverviewStep';
 import { MultimodalProgressStep } from './multimodal/MultimodalProgressStep';
@@ -46,6 +47,34 @@ import {
   MULTIMODAL_WIZARD_STEPS,
   type MultimodalWizardStep,
 } from './multimodal/multimodal-wizard-model';
+import { InspectorPortal } from './InspectorPortal';
+import { useWorkspaceInspector } from './WorkspaceInspectorProvider';
+import type { InspectorView } from './workspace-inspector-state';
+
+const MULTIMODAL_INSPECTOR_CONFIG: Record<
+  Exclude<MultimodalInspectorKind, null>,
+  { view: InspectorView; title: string; description?: string }
+> = {
+  progress: {
+    view: 'multimodal-progress',
+    title: '处理状态',
+    description: '查看服务端保存的处理阶段与已形成证据。',
+  },
+  transcript: {
+    view: 'multimodal-transcript',
+    title: '完整转录',
+    description: '搜索和修订当前素材的时间对齐转录。',
+  },
+  evidence: {
+    view: 'multimodal-evidence',
+    title: '证据库',
+    description: '筛选声音、画面与转录证据，不改变原始素材。',
+  },
+  diagnostics: { view: 'multimodal-diagnostics', title: '处理诊断' },
+  overview: { view: 'multimodal-overview', title: '内容概览' },
+  candidate: { view: 'multimodal-candidate', title: '编辑候选' },
+  skill: { view: 'multimodal-skill', title: 'Skill 内容' },
+};
 const PASS_LABELS: Record<CandidatePassKey, string> = {
   frameworks: '框架',
   principles: '原则',
@@ -120,6 +149,12 @@ export function MultimodalSkillCreationPanel({
   onOpenRepository,
   onOpenGeneratedSkill,
 }: Props) {
+  const {
+    state: inspectorState,
+    openInspector,
+    closeInspector,
+    setInspectorDirty,
+  } = useWorkspaceInspector();
   const [state, dispatch] = useReducer(
     applyMultimodalEvent,
     undefined,
@@ -142,7 +177,6 @@ export function MultimodalSkillCreationPanel({
   const [selectedEvidenceIds, setSelectedEvidenceIds] = useState<string[]>([]);
   const [reviewStep, setReviewStep] =
     useState<MultimodalWizardStep>('processing');
-  const [drawerKind, setDrawerKind] = useState<MultimodalDrawerKind>(null);
   const [selectedLayer, setSelectedLayer] = useState<AdlerLayerKey | null>(
     null,
   );
@@ -161,6 +195,26 @@ export function MultimodalSkillCreationPanel({
   const appliedDetailRevisionRef = useRef<number | null>(null);
   const publishedNotificationRef = useRef<string | null>(null);
   const detail = state.detail;
+  const inspectorKind = inspectorState.descriptor?.owner === 'multimodal'
+    ? (Object.entries(MULTIMODAL_INSPECTOR_CONFIG).find(
+        ([, config]) => config.view === inspectorState.descriptor?.view,
+      )?.[0] as Exclude<MultimodalInspectorKind, null> | undefined) ?? null
+    : null;
+
+  const openMultimodalInspector = (
+    kind: Exclude<MultimodalInspectorKind, null>,
+    options?: { title?: string; itemId?: string; preferredWidth?: number },
+  ) => {
+    const config = MULTIMODAL_INSPECTOR_CONFIG[kind];
+    openInspector({
+      owner: 'multimodal',
+      view: config.view,
+      title: options?.title ?? config.title,
+      description: config.description,
+      itemId: options?.itemId,
+      preferredWidth: options?.preferredWidth,
+    });
+  };
   const confirmation = detail
     ? pendingConfirmationStage(detail.mediaStage)
     : null;
@@ -181,6 +235,43 @@ export function MultimodalSkillCreationPanel({
       })),
     [candidates, detail?.mediaState.candidateValidations],
   );
+
+  useEffect(() => {
+    const itemId = inspectorState.descriptor?.itemId;
+    if (!itemId || inspectorState.descriptor?.owner !== 'multimodal') return;
+    if (
+      inspectorKind === 'overview' &&
+      ADLER_LAYER_KEYS.includes(itemId as AdlerLayerKey)
+    ) {
+      setSelectedLayer((current) => current === itemId ? current : itemId as AdlerLayerKey);
+      return;
+    }
+    if (inspectorKind === 'candidate' && candidateDraft) {
+      const selected = flattenCandidates(candidateDraft).find(
+        ({ candidate }) => candidate.candidateId === itemId,
+      );
+      if (selected) {
+        setSelectedCandidateEditor((current) =>
+          current?.candidate.candidateId === itemId ? current : selected,
+        );
+      }
+      return;
+    }
+    if (inspectorKind === 'skill') {
+      const selected = detail?.mediaState.candidateSkills.find(
+        (skill) => skill.id === itemId,
+      );
+      if (selected) {
+        setSelectedSkill((current) => current?.id === itemId ? current : selected);
+      }
+    }
+  }, [
+    candidateDraft,
+    detail?.mediaState.candidateSkills,
+    inspectorKind,
+    inspectorState.descriptor?.itemId,
+    inspectorState.descriptor?.owner,
+  ]);
   const fusedTopicItems = useMemo(() => {
     if (!candidateDraft) return [];
     const fusedItems = candidateItems.filter(
@@ -605,6 +696,7 @@ export function MultimodalSkillCreationPanel({
     candidateId: string,
     patch: Partial<MultimodalCandidateSuggestion>,
   ) => {
+    setInspectorDirty(true);
     setCandidateDraft((current) =>
       current
         ? {
@@ -641,7 +733,8 @@ export function MultimodalSkillCreationPanel({
     );
     if (selectedCandidateEditor?.candidate.candidateId === candidateId) {
       setSelectedCandidateEditor(null);
-      setDrawerKind(null);
+      setInspectorDirty(false);
+      closeInspector({ force: true });
     }
   };
 
@@ -679,7 +772,8 @@ export function MultimodalSkillCreationPanel({
       current.filter((id) => id !== candidate.candidateId),
     );
     setSelectedCandidateEditor(null);
-    setDrawerKind(null);
+    setInspectorDirty(false);
+    closeInspector({ force: true });
   };
 
   const mergeSelectedCandidates = () => {
@@ -735,6 +829,7 @@ export function MultimodalSkillCreationPanel({
       ...current.filter((id) => !removedIds.has(id)),
       mergedId,
     ]);
+    setInspectorDirty(true);
   };
 
   const saveCandidates = async () => {
@@ -747,6 +842,7 @@ export function MultimodalSkillCreationPanel({
         candidatePasses: candidateDraft,
       });
       await refresh();
+      setInspectorDirty(false);
     }).catch(() => undefined);
   };
 
@@ -978,8 +1074,8 @@ export function MultimodalSkillCreationPanel({
                 dispatch({ type: 'player.seek', timeMs });
               }}
               onSeek={seekTo}
-              onOpenTranscript={() => setDrawerKind('transcript')}
-              onOpenEvidence={() => setDrawerKind('evidence')}
+              onOpenTranscript={() => openMultimodalInspector('transcript')}
+              onOpenEvidence={() => openMultimodalInspector('evidence')}
             />
           ) : (
             <div className="skill-mm-media-placeholder">
@@ -1008,7 +1104,7 @@ export function MultimodalSkillCreationPanel({
                 <button
                   type="button"
                   className="skill-primary-button"
-                  onClick={() => setDrawerKind('diagnostics')}
+                  onClick={() => openMultimodalInspector('diagnostics')}
                 >
                   查看诊断
                 </button>
@@ -1056,7 +1152,7 @@ export function MultimodalSkillCreationPanel({
             onStart={() => void startProcessing()}
             onCancel={() => void cancel()}
             onDeleteReference={() => void deleteSession()}
-            onOpenDiagnostics={() => setDrawerKind('diagnostics')}
+            onOpenDiagnostics={() => openMultimodalInspector('diagnostics')}
           />
         )}
 
@@ -1070,7 +1166,10 @@ export function MultimodalSkillCreationPanel({
               onSelectEvidence={selectOverviewEvidence}
               onExpandLayer={(layer) => {
                 setSelectedLayer(layer);
-                setDrawerKind('overview');
+                openMultimodalInspector('overview', {
+                  title: MULTIMODAL_INSPECTOR_CONFIG.overview.title,
+                  itemId: layer,
+                });
               }}
             />
           ) : (
@@ -1097,7 +1196,11 @@ export function MultimodalSkillCreationPanel({
                   passKey: 'fused',
                   candidate,
                 });
-                setDrawerKind('candidate');
+                openMultimodalInspector('candidate', {
+                  title: candidate.title,
+                  itemId: candidate.candidateId,
+                  preferredWidth: 440,
+                });
               }}
             />
           ) : (
@@ -1110,7 +1213,11 @@ export function MultimodalSkillCreationPanel({
               detail={detail}
               onOpenSkill={(skill) => {
                 setSelectedSkill(skill);
-                setDrawerKind('skill');
+                openMultimodalInspector('skill', {
+                  title: skill.name,
+                  itemId: skill.id,
+                  preferredWidth: 480,
+                });
               }}
               onOpenTrial={() => {
                 const generatedSkillId = Object.keys(
@@ -1133,31 +1240,32 @@ export function MultimodalSkillCreationPanel({
           ))}
       </MultimodalWizardShell>
 
-      <MultimodalDataDrawers
-        detail={detail}
-        error={visibleError}
-        open={drawerKind}
-        selectedLayer={selectedLayer}
-        selectedCandidate={selectedCandidateEditor}
-        selectedSkill={selectedSkill}
-        framePreview={framePreview}
-        onOpenChange={(open) => {
-          if (!open) setDrawerKind(null);
-        }}
-        onSeek={(timeMs) => seekTo(timeMs)}
-        onUpdateTranscript={(index, text, speaker) =>
-          void updateTranscript(index, text, speaker)
-        }
-        onPreviewFrame={(evidenceId, objectKey) =>
-          void previewFrame(evidenceId, objectKey)
-        }
-        onRemoveEvidence={(evidenceId) => void removeEvidence(evidenceId)}
-        onUpdateCandidate={updateCandidate}
-        onSplitCandidate={splitCandidate}
-        onDiscardCandidate={discardCandidate}
-        onMergeSelectedCandidates={mergeSelectedCandidates}
-        onSaveCandidates={() => void saveCandidates()}
-      />
+      <InspectorPortal owner="multimodal">
+        <MultimodalInspectorContent
+          detail={detail}
+          error={visibleError}
+          progress={state.progress}
+          statusText={connectionLabel}
+          view={inspectorKind}
+          selectedLayer={selectedLayer}
+          selectedCandidate={selectedCandidateEditor}
+          selectedSkill={selectedSkill}
+          framePreview={framePreview}
+          onSeek={(timeMs) => seekTo(timeMs)}
+          onUpdateTranscript={(index, text, speaker) =>
+            void updateTranscript(index, text, speaker)
+          }
+          onPreviewFrame={(evidenceId, objectKey) =>
+            void previewFrame(evidenceId, objectKey)
+          }
+          onRemoveEvidence={(evidenceId) => void removeEvidence(evidenceId)}
+          onUpdateCandidate={updateCandidate}
+          onSplitCandidate={splitCandidate}
+          onDiscardCandidate={discardCandidate}
+          onMergeSelectedCandidates={mergeSelectedCandidates}
+          onSaveCandidates={() => void saveCandidates()}
+        />
+      </InspectorPortal>
     </main>
   );
 }
