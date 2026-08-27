@@ -18,7 +18,9 @@ describe('Skill workspace visual contract', () => {
   it('defines workspace typography and semantic color tokens', () => {
     const tokens = read('./styles/workspace-tokens.css');
 
-    expect(tokens).toMatch(/--workspace-font-ui:\s*["']Noto Sans SC Variable["']/);
+    expect(tokens).toMatch(
+      /--workspace-font-ui:\s*["']Noto Sans SC Variable["']/,
+    );
     expect(tokens).toContain('--workspace-primary: #4658c9');
     expect(tokens).toContain('--workspace-evidence: #28766f');
     expect(tokens).toContain('--workspace-text-xs: 12px');
@@ -68,5 +70,27 @@ describe('Skill workspace visual contract', () => {
     expect(styles).not.toContain('.skill-mm-drawer-');
     expect(styles).not.toContain('.skill-context-popover');
     expect(styles).not.toContain('.skill-content-resize-');
+  });
+
+  it('keeps the inspector opaque and the compact sidebar readable on narrow screens', () => {
+    const inspector = read('./styles/workspace-inspector.css');
+    const shell = read('./styles/workspace-shell.css');
+
+    expect(inspector).toMatch(
+      /\.workspace-inspector-panel\s*\{[^}]*background:\s*var\(--workspace-surface\)/s,
+    );
+    expect(inspector).toMatch(
+      /@media \(max-width: 767px\)[\s\S]*\.skill-workspace-root\.is-context-open \.workspace-inspector\s*\{[^}]*width:\s*0/s,
+    );
+    expect(inspector).toMatch(
+      /@media \(max-width: 767px\)[\s\S]*\.workspace-inspector\.is-fullscreen\s*\{[^}]*flex:\s*0 0 0;[^}]*width:\s*0/s,
+    );
+    expect(inspector).toMatch(
+      /@media \(max-width: 767px\)[\s\S]*\.skill-content-column:has\(\.workspace-inspector\.is-fullscreen\)\s+\.skill-main-column\s*\{[^}]*display:\s*flex/s,
+    );
+    expect(shell).toContain('@media (max-width: 1100px)');
+    expect(shell).toMatch(
+      /@media \(max-width: 1100px\)[\s\S]*\.skill-new-button > span[\s\S]*\.skill-sidebar-empty\s*\{\s*display:\s*none/s,
+    );
   });
 });

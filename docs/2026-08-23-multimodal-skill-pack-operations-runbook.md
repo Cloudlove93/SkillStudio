@@ -162,3 +162,14 @@ git diff --check
 - HTTP 验收：`http://eduskill.localhost/login` 返回 200；MinIO live 返回 200；从 `http://eduskill.localhost` 发起的 PUT CORS preflight 返回 204，并精确返回该 Origin。
 
 本地验收不替代生产容量测试和产品人工走查。上线前仍需注入正式密钥与模型配置，按目标视频时长和并发量做压测，并轮换本地忽略文件中曾用于开发的真实样式凭据。上述活动不要求修改当前数据库或 Worker 架构。
+
+## 11. 2026-08-27 Skill 工作区前端验收补充
+
+- `pnpm check`：通过；Server/Web lint、Server tests、shared/Server/Web production build 全部通过。Server 为 77 个 test files 通过、1 个跳过，共 938 tests 通过、3 个跳过。
+- `pnpm --dir educlaw-web test`：24 个 test files、175 tests 全部通过。除共享 Inspector 状态、URL 深链、所有权切换、字体与响应式视觉契约外，新增真实 React 挂载测试，验证切换 Inspector 视图不会卸载多模态表单或丢失输入状态。
+- `python -m pytest python/media_worker -rs`：264 tests 通过、3 个因 Windows 当前账户无法创建 symlink 而跳过。
+- Docker production Web 镜像已使用当前代码重建；`http://eduskill.localhost/login` 与 MinIO live 均返回 200，PostgreSQL、MinIO、Server、Web、两个质量 Worker 和两个蒸馏 Worker 均在运行。
+- 浏览器矩阵使用当前 production Docker bundle，并仅拦截身份和首次只读列表接口以避免改写共享验收数据。375×812、768×1024、1024×768、1366×768、1440×900、1920×1080 六档均无横向溢出、页面异常或控制台错误，所有可见按钮均具有可访问名称。
+- 浅色与深色主题均已视觉走查；`prefers-reduced-motion: reduce` 下 Inspector transition 为 `0s`。键盘已验证打开/关闭 Inspector、桌面端以方向键调整宽度、转录搜索筛选与结果播报；切换“处理状态/完整转录/处理诊断”期间任务名称不丢失。
+- 音视频工作台的共享 Inspector 在桌面端占用固定右栏；768px 与 1024px 下收拢左栏并以不透底的右侧覆盖层呈现；375px 下以不透底的底部面板呈现。另覆盖“桌面全屏 Inspector 后缩至 375px”的断点切换，主内容仍可见且无横向溢出。
+- 当前多模态懒加载 chunk 为 78.19 kB（gzip 24.63 kB），相对本轮基线仍在 15% 性能预算内。Vite 仍会报告仓库中既有的若干非 Skill 工作区大 chunk；本轮没有扩大这些历史 chunk。

@@ -5,6 +5,7 @@ import {
   useEffect,
   useMemo,
   useReducer,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -40,10 +41,14 @@ type WorkspaceInspectorController = {
   clearInspectorOwner: (owner: InspectorOwner) => void;
 };
 
-const WorkspaceInspectorContext = createContext<WorkspaceInspectorController | null>(null);
+const WorkspaceInspectorContext =
+  createContext<WorkspaceInspectorController | null>(null);
 
 function clampWidth(width: number) {
-  return Math.min(MAX_INSPECTOR_WIDTH, Math.max(MIN_INSPECTOR_WIDTH, Math.round(width)));
+  return Math.min(
+    MAX_INSPECTOR_WIDTH,
+    Math.max(MIN_INSPECTOR_WIDTH, Math.round(width)),
+  );
 }
 
 function readStoredWidth() {
@@ -52,7 +57,11 @@ function readStoredWidth() {
   return Number.isFinite(parsed) ? clampWidth(parsed) : DEFAULT_INSPECTOR_WIDTH;
 }
 
-export function WorkspaceInspectorProvider({ children }: { children: ReactNode }) {
+export function WorkspaceInspectorProvider({
+  children,
+}: {
+  children: ReactNode;
+}) {
   const location = useLocation();
   const navigate = useNavigate();
   const [state, dispatch] = useReducer(
@@ -68,17 +77,31 @@ export function WorkspaceInspectorProvider({ children }: { children: ReactNode }
   );
   const [outlet, setOutlet] = useState<HTMLElement | null>(null);
   const [width, setWidthState] = useState(readStoredWidth);
+  const locationRef = useRef(location);
+  const stateRef = useRef(state);
 
-  const replaceInspectorSearch = useCallback((descriptor: InspectorDescriptor | null) => {
-    navigate(
-      {
-        pathname: location.pathname,
-        search: writeInspectorSearch(location.search, descriptor),
-        hash: location.hash,
-      },
-      { replace: true },
-    );
-  }, [location.hash, location.pathname, location.search, navigate]);
+  useEffect(() => {
+    locationRef.current = location;
+  }, [location]);
+
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
+
+  const replaceInspectorSearch = useCallback(
+    (descriptor: InspectorDescriptor | null) => {
+      const currentLocation = locationRef.current;
+      navigate(
+        {
+          pathname: currentLocation.pathname,
+          search: writeInspectorSearch(currentLocation.search, descriptor),
+          hash: currentLocation.hash,
+        },
+        { replace: true },
+      );
+    },
+    [navigate],
+  );
 
   useEffect(() => {
     const descriptor = parseInspectorSearch(location.search);
@@ -95,18 +118,28 @@ export function WorkspaceInspectorProvider({ children }: { children: ReactNode }
     }
   }, []);
 
-  const openInspector = useCallback((descriptor: InspectorDescriptor) => {
-    if (descriptor.preferredWidth) setWidth(descriptor.preferredWidth);
-    dispatch({ type: 'open', descriptor });
-    replaceInspectorSearch(descriptor);
-  }, [replaceInspectorSearch, setWidth]);
+  const openInspector = useCallback(
+    (descriptor: InspectorDescriptor) => {
+      if (descriptor.preferredWidth) setWidth(descriptor.preferredWidth);
+      dispatch({ type: 'open', descriptor });
+      replaceInspectorSearch(descriptor);
+    },
+    [replaceInspectorSearch, setWidth],
+  );
 
-  const closeInspector = useCallback((options?: CloseInspectorOptions) => {
-    if (!options?.force && requiresInspectorCloseConfirmation(state)) return false;
-    dispatch({ type: 'close' });
-    replaceInspectorSearch(null);
-    return true;
-  }, [replaceInspectorSearch, state]);
+  const closeInspector = useCallback(
+    (options?: CloseInspectorOptions) => {
+      if (
+        !options?.force &&
+        requiresInspectorCloseConfirmation(stateRef.current)
+      )
+        return false;
+      dispatch({ type: 'close' });
+      replaceInspectorSearch(null);
+      return true;
+    },
+    [replaceInspectorSearch],
+  );
 
   const setInspectorDirty = useCallback((dirty: boolean) => {
     dispatch({ type: 'set-dirty', dirty });
@@ -116,34 +149,40 @@ export function WorkspaceInspectorProvider({ children }: { children: ReactNode }
     dispatch({ type: 'toggle-fullscreen' });
   }, []);
 
-  const clearInspectorOwner = useCallback((owner: InspectorOwner) => {
-    if (state.descriptor?.owner !== owner) return;
-    dispatch({ type: 'clear-owner', owner });
-    replaceInspectorSearch(null);
-  }, [replaceInspectorSearch, state.descriptor?.owner]);
+  const clearInspectorOwner = useCallback(
+    (owner: InspectorOwner) => {
+      if (stateRef.current.descriptor?.owner !== owner) return;
+      dispatch({ type: 'clear-owner', owner });
+      replaceInspectorSearch(null);
+    },
+    [replaceInspectorSearch],
+  );
 
-  const value = useMemo<WorkspaceInspectorController>(() => ({
-    state,
-    outlet,
-    width,
-    setOutlet,
-    setWidth,
-    openInspector,
-    closeInspector,
-    setInspectorDirty,
-    toggleInspectorFullscreen,
-    clearInspectorOwner,
-  }), [
-    clearInspectorOwner,
-    closeInspector,
-    openInspector,
-    outlet,
-    setInspectorDirty,
-    setWidth,
-    state,
-    toggleInspectorFullscreen,
-    width,
-  ]);
+  const value = useMemo<WorkspaceInspectorController>(
+    () => ({
+      state,
+      outlet,
+      width,
+      setOutlet,
+      setWidth,
+      openInspector,
+      closeInspector,
+      setInspectorDirty,
+      toggleInspectorFullscreen,
+      clearInspectorOwner,
+    }),
+    [
+      clearInspectorOwner,
+      closeInspector,
+      openInspector,
+      outlet,
+      setInspectorDirty,
+      setWidth,
+      state,
+      toggleInspectorFullscreen,
+      width,
+    ],
+  );
 
   return (
     <WorkspaceInspectorContext.Provider value={value}>
@@ -155,7 +194,9 @@ export function WorkspaceInspectorProvider({ children }: { children: ReactNode }
 export function useWorkspaceInspector() {
   const value = useContext(WorkspaceInspectorContext);
   if (!value) {
-    throw new Error('useWorkspaceInspector must be used inside WorkspaceInspectorProvider');
+    throw new Error(
+      'useWorkspaceInspector must be used inside WorkspaceInspectorProvider',
+    );
   }
   return value;
 }

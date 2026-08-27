@@ -1010,6 +1010,7 @@
   height: 100%;
   min-height: 0;
   flex-direction: column;
+  background: var(--workspace-surface);
   opacity: 0;
   visibility: hidden;
   transform: translateX(8px);
@@ -1424,6 +1425,21 @@
 }
 
 @media (max-width: 767px) {
+  .skill-workspace-root.is-context-open .workspace-inspector {
+    flex-basis: 0;
+    width: 0;
+  }
+
+  .workspace-inspector.is-fullscreen {
+    flex: 0 0 0;
+    width: 0;
+  }
+
+  .skill-content-column:has(.workspace-inspector.is-fullscreen)
+    .skill-main-column {
+    display: flex;
+  }
+
   .workspace-inspector.is-open .workspace-inspector-panel,
   .workspace-inspector.is-fullscreen .workspace-inspector-panel {
     position: fixed;

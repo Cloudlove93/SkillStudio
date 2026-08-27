@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useDeferredValue, useMemo, useRef, useState } from 'react';
 import type {
   AdlerLayerKey,
   CandidatePassKey,
@@ -261,6 +261,7 @@ function VirtualEvidenceList(props: {
 
 export function MultimodalInspectorContent(props: Props) {
   const [query, setQuery] = useState('');
+  const deferredQuery = useDeferredValue(query);
   const [lowConfidenceOnly, setLowConfidenceOnly] = useState(false);
   const [editedOnly, setEditedOnly] = useState(false);
   const [evidenceKind, setEvidenceKind] = useState<
@@ -271,7 +272,7 @@ export function MultimodalInspectorContent(props: Props) {
   );
 
   const transcriptItems = useMemo(() => {
-    const normalized = query.trim().toLocaleLowerCase();
+    const normalized = deferredQuery.trim().toLocaleLowerCase();
     return (props.detail?.mediaState.transcript.segments ?? [])
       .map((segment, sourceIndex) => ({ segment, sourceIndex }))
       .filter(({ segment }) => {
@@ -290,10 +291,10 @@ export function MultimodalInspectorContent(props: Props) {
         if (editedOnly && !segment.editedByUser) return false;
         return true;
       });
-  }, [editedOnly, lowConfidenceOnly, props.detail, query]);
+  }, [deferredQuery, editedOnly, lowConfidenceOnly, props.detail]);
 
   const evidenceItems = useMemo(() => {
-    const normalized = query.trim().toLocaleLowerCase();
+    const normalized = deferredQuery.trim().toLocaleLowerCase();
     return (
       props.detail?.mediaState.evidenceTimeline.evidenceItems ?? []
     ).filter((item) => {
@@ -312,7 +313,7 @@ export function MultimodalInspectorContent(props: Props) {
       }
       return true;
     });
-  }, [claimType, evidenceKind, props.detail, query]);
+  }, [claimType, deferredQuery, evidenceKind, props.detail]);
 
   const selectedCandidateSources = useMemo(() => {
     if (props.selectedCandidate?.passKey !== 'fused' || props.detail === null) {
@@ -403,7 +404,11 @@ export function MultimodalInspectorContent(props: Props) {
               已人工修改
             </label>
           </div>
-          <span className="skill-mm-result-count">
+          <span
+            className="skill-mm-result-count"
+            role="status"
+            aria-live="polite"
+          >
             {transcriptItems.length} 个片段
           </span>
           <VirtualTranscriptList
@@ -460,7 +465,11 @@ export function MultimodalInspectorContent(props: Props) {
               </select>
             </label>
           </div>
-          <span className="skill-mm-result-count">
+          <span
+            className="skill-mm-result-count"
+            role="status"
+            aria-live="polite"
+          >
             {evidenceItems.length} 条证据
           </span>
           <VirtualEvidenceList

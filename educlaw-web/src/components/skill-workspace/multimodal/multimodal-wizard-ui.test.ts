@@ -62,6 +62,15 @@ describe('multimodal wizard UI contract', () => {
     expect(multimodalCss()).toContain('.skill-mm-auto-recovery-note');
   });
 
+  it('keeps the multimodal workflow mounted and defers large inspector searches', () => {
+    const panel = read('../MultimodalSkillCreationPanel.tsx');
+    const inspector = read('./MultimodalDataDrawers.tsx');
+
+    expect(panel).toContain('<InspectorPortal owner="multimodal">');
+    expect(panel).not.toContain('key={inspectorState.descriptor');
+    expect(inspector).toContain('useDeferredValue');
+  });
+
   it('keeps the nearest time-aligned evidence beside the player', () => {
     const source = read('./MediaReviewPane.tsx');
 
@@ -98,6 +107,8 @@ describe('multimodal wizard UI contract', () => {
     expect(data).toContain('useVirtualizer');
     expect(data).toContain('getVirtualItems()');
     expect(data).toContain('measureElement');
+    expect(data).toContain('role="status"');
+    expect(data).toContain('aria-live="polite"');
     expect(data).toContain('低置信度');
     expect(data).toContain('证据类型');
   });

@@ -56,9 +56,7 @@ describe('workspace inspector state', () => {
       itemId: 'segment-9',
     });
 
-    expect(search).toContain(
-      'inspector=multimodal%3Amultimodal-transcript',
-    );
+    expect(search).toContain('inspector=multimodal%3Amultimodal-transcript');
     expect(search).toContain('tab=skills');
     expect(parseInspectorSearch(search)).toEqual({
       ...transcript,
@@ -86,5 +84,32 @@ describe('workspace inspector state', () => {
     expect(writeInspectorSearch('?tab=skills&foo=bar', null)).toBe(
       '?tab=skills&foo=bar',
     );
+  });
+
+  it('drops a previous owner item when another owner takes over', () => {
+    const multimodal = workspaceInspectorReducer(
+      createWorkspaceInspectorState(),
+      {
+        type: 'open',
+        descriptor: { ...transcript, itemId: 'segment-9' },
+      },
+    );
+    const repository = workspaceInspectorReducer(multimodal, {
+      type: 'open',
+      descriptor: {
+        owner: 'repository',
+        view: 'repository-selection',
+        title: '仓库摘要',
+      },
+    });
+
+    expect(repository.descriptor?.owner).toBe('repository');
+    expect(repository.descriptor?.itemId).toBeUndefined();
+    expect(
+      writeInspectorSearch(
+        '?tab=skills&inspectorItem=stale',
+        repository.descriptor,
+      ),
+    ).toBe('?tab=skills&inspector=repository%3Arepository-selection');
   });
 });

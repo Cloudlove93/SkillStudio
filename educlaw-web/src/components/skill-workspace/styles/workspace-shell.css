@@ -1682,7 +1682,7 @@
   }
 }
 
-@media (max-width: 1023px) {
+@media (max-width: 1100px) {
   .skill-workspace-root {
     --skill-sidebar-current: 58px;
   }
@@ -1694,13 +1694,22 @@
 
   .skill-brand-title strong,
   .skill-sidebar-brand > button,
+  .skill-new-button > span,
+  .skill-repository-link > span,
   .skill-sidebar-commands span,
   .skill-search,
   .skill-session-copy,
   .skill-sidebar-action span,
   .skill-user-name,
-  .skill-sidebar-heading {
+  .skill-sidebar-heading,
+  .skill-sidebar-empty {
     display: none;
+  }
+
+  .skill-new-button,
+  .skill-repository-link {
+    justify-content: center;
+    padding-inline: 0;
   }
 
   .skill-sidebar-subnav {
