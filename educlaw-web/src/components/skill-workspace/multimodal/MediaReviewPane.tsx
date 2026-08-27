@@ -9,9 +9,7 @@ type Props = {
   playerTimeMs: number;
   visibleEvidence: MultimodalEvidence[];
   evidenceRelation: EvidenceAlignmentRelation | 'selected';
-  onPlayerElement: (
-    node: HTMLVideoElement | HTMLAudioElement | null,
-  ) => void;
+  onPlayerElement: (node: HTMLVideoElement | HTMLAudioElement | null) => void;
   onTimeUpdate: (timeMs: number) => void;
   onSeek: (timeMs: number) => void;
   onOpenTranscript: () => void;
@@ -42,9 +40,9 @@ export function MediaReviewPane(props: Props) {
       <header>
         <h2>
           {props.hasVisualTrack ? (
-            <FileVideo size={17} />
+            <FileVideo size={17} aria-hidden="true" />
           ) : (
-            <FileAudio size={17} />
+            <FileAudio size={17} aria-hidden="true" />
           )}
           {props.hasVisualTrack ? '视频回放' : '音频回放'}
         </h2>
@@ -56,6 +54,8 @@ export function MediaReviewPane(props: Props) {
           <video
             ref={props.onPlayerElement}
             controls
+            aria-label="课堂视频回放"
+            preload="metadata"
             src={props.previewUrl}
             onTimeUpdate={(event) =>
               props.onTimeUpdate(event.currentTarget.currentTime * 1_000)
@@ -65,6 +65,8 @@ export function MediaReviewPane(props: Props) {
           <audio
             ref={props.onPlayerElement}
             controls
+            aria-label="课堂音频回放"
+            preload="metadata"
             src={props.previewUrl}
             onTimeUpdate={(event) =>
               props.onTimeUpdate(event.currentTarget.currentTime * 1_000)
@@ -114,7 +116,7 @@ export function MediaReviewPane(props: Props) {
           className="skill-secondary-button"
           onClick={props.onOpenTranscript}
         >
-          <FileText size={14} />
+          <FileText size={14} aria-hidden="true" />
           完整转录
         </button>
         <button
@@ -122,7 +124,7 @@ export function MediaReviewPane(props: Props) {
           className="skill-secondary-button"
           onClick={props.onOpenEvidence}
         >
-          <Images size={14} />
+          <Images size={14} aria-hidden="true" />
           证据库
         </button>
       </footer>

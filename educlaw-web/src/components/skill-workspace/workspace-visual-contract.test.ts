@@ -12,16 +12,61 @@ describe('Skill workspace visual contract', () => {
     const main = read('../../main.tsx');
 
     expect(pkg.dependencies['@fontsource-variable/noto-sans-sc']).toBe('5.3.0');
-    expect(main).toContain("@fontsource-variable/noto-sans-sc/wght.css");
+    expect(main).toContain('@fontsource-variable/noto-sans-sc/wght.css');
   });
 
   it('defines workspace typography and semantic color tokens', () => {
     const tokens = read('./styles/workspace-tokens.css');
 
-    expect(tokens).toContain('--workspace-font-ui: "Noto Sans SC Variable"');
+    expect(tokens).toMatch(/--workspace-font-ui:\s*["']Noto Sans SC Variable["']/);
     expect(tokens).toContain('--workspace-primary: #4658c9');
     expect(tokens).toContain('--workspace-evidence: #28766f');
     expect(tokens).toContain('--workspace-text-xs: 12px');
     expect(tokens).not.toMatch(/--workspace-text-[^:]+:\s*(?:[0-9]|1[01])px/);
+  });
+
+  it('keeps the legacy stylesheet as an import-only compatibility entry', () => {
+    const css = read('./skill-workspace.css');
+    const expectedImports = [
+      'workspace-tokens.css',
+      'workspace-shell.css',
+      'workspace-controls.css',
+      'workspace-inspector.css',
+      'creation-workflows.css',
+      'multimodal-workbench.css',
+      'repository.css',
+      'skill-detail.css',
+    ];
+
+    for (const stylesheet of expectedImports) {
+      expect(css).toContain(stylesheet);
+    }
+    expect(css).not.toContain('.skill-workspace-root {');
+    expect(css).not.toContain('.workspace-inspector {');
+  });
+
+  it('keeps readable text, explicit focus, and motion-safe transitions', () => {
+    const styles = [
+      read('./styles/workspace-controls.css'),
+      read('./styles/workspace-inspector.css'),
+      read('./styles/multimodal-workbench.css'),
+    ].join('\n');
+
+    expect(styles).not.toMatch(/font-size:\s*(?:[0-9]|1[01])px/);
+    expect(styles).toContain(':focus-visible');
+    expect(styles).not.toContain('transition: all');
+    expect(styles).toContain('prefers-reduced-motion: reduce');
+  });
+
+  it('removes superseded drawer and popover shells', () => {
+    const styles = [
+      read('./styles/workspace-inspector.css'),
+      read('./styles/multimodal-workbench.css'),
+      read('./styles/skill-detail.css'),
+    ].join('\n');
+
+    expect(styles).not.toContain('.skill-mm-drawer-');
+    expect(styles).not.toContain('.skill-context-popover');
+    expect(styles).not.toContain('.skill-content-resize-');
   });
 });

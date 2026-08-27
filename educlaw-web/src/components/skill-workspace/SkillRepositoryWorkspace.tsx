@@ -38,6 +38,12 @@ export type RepositorySkill = {
 
 type RepositoryTab = 'created' | 'drafts';
 
+const repositoryDateFormatter = new Intl.DateTimeFormat('zh-CN', {
+  year: 'numeric',
+  month: 'short',
+  day: 'numeric',
+});
+
 type Props = {
   skills: RepositorySkill[];
   sessions: GuidedCreationSession[];
@@ -59,17 +65,27 @@ export function SkillRepositoryWorkspace({
   onDeleteSkills,
   onNew,
 }: Props) {
-  const { state: inspectorState, openInspector, closeInspector } = useWorkspaceInspector();
+  const {
+    state: inspectorState,
+    openInspector,
+    closeInspector,
+  } = useWorkspaceInspector();
   const [activeTab, setActiveTab] = useState<RepositoryTab>('created');
   const [page, setPage] = useState(1);
   const [managing, setManaging] = useState(false);
-  const [selectedSkillIds, setSelectedSkillIds] = useState<Set<string>>(new Set());
+  const [selectedSkillIds, setSelectedSkillIds] = useState<Set<string>>(
+    new Set(),
+  );
   const [menuSkillId, setMenuSkillId] = useState<string | null>(null);
   const [pendingDeletion, setPendingDeletion] = useState<RepositorySkill[]>([]);
-  const [deleteReturnFocusSkillId, setDeleteReturnFocusSkillId] = useState<string | null>(null);
+  const [deleteReturnFocusSkillId, setDeleteReturnFocusSkillId] = useState<
+    string | null
+  >(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
-  const [previewSkill, setPreviewSkill] = useState<RepositorySkill | null>(null);
+  const [previewSkill, setPreviewSkill] = useState<RepositorySkill | null>(
+    null,
+  );
 
   const created = useMemo(
     () => filterRepositorySkills(skills, search),
@@ -78,17 +94,24 @@ export function SkillRepositoryWorkspace({
   const drafts = useMemo(() => {
     const query = search.trim().toLocaleLowerCase();
     return sessions.filter(
-      (item) => item.status !== 'completed'
-        && item.status !== 'cancelled'
-        && (!query || getSessionName(item).toLocaleLowerCase().includes(query)),
+      (item) =>
+        item.status !== 'completed' &&
+        item.status !== 'cancelled' &&
+        (!query || getSessionName(item).toLocaleLowerCase().includes(query)),
     );
   }, [search, sessions]);
   const safePage = clampRepositoryPage(page, created.length);
   const pageItems = repositoryPageItems(created, safePage);
-  const pageCount = Math.max(1, Math.ceil(created.length / REPOSITORY_PAGE_SIZE));
-  const selectedSkills = created.filter((skill) => selectedSkillIds.has(skill.skillId));
-  const allFilteredSelected = created.length > 0
-    && created.every((skill) => selectedSkillIds.has(skill.skillId));
+  const pageCount = Math.max(
+    1,
+    Math.ceil(created.length / REPOSITORY_PAGE_SIZE),
+  );
+  const selectedSkills = created.filter((skill) =>
+    selectedSkillIds.has(skill.skillId),
+  );
+  const allFilteredSelected =
+    created.length > 0 &&
+    created.every((skill) => selectedSkillIds.has(skill.skillId));
 
   useEffect(() => {
     setPage((current) => clampRepositoryPage(current, created.length));
@@ -101,7 +124,9 @@ export function SkillRepositoryWorkspace({
     if (!itemId) return;
     const selected = skills.find((skill) => skill.skillId === itemId);
     if (selected) {
-      setPreviewSkill((current) => current?.skillId === itemId ? current : selected);
+      setPreviewSkill((current) =>
+        current?.skillId === itemId ? current : selected,
+      );
     }
   }, [inspectorState.descriptor, skills]);
 
@@ -153,7 +178,9 @@ export function SkillRepositoryWorkspace({
       setPendingDeletion([]);
       stopManaging();
     } catch (error) {
-      setDeleteError(error instanceof Error ? error.message : '删除失败，请稍后重试');
+      setDeleteError(
+        error instanceof Error ? error.message : '删除失败，请稍后重试',
+      );
     } finally {
       setDeleting(false);
     }
@@ -171,16 +198,26 @@ export function SkillRepositoryWorkspace({
           <h1>管理你的教育 Skill</h1>
           <p>查找、使用和整理已创建的 Skill。</p>
         </div>
-        <button className="skill-primary-button" onClick={onNew}><Plus size={16} />新建 Skill</button>
+        <button className="skill-primary-button" onClick={onNew}>
+          <Plus size={16} aria-hidden="true" />
+          新建 Skill
+        </button>
       </header>
 
-      <div className="skill-repository-tabs" role="tablist" aria-label="Skill 仓库内容">
+      <div
+        className="skill-repository-tabs"
+        role="tablist"
+        aria-label="Skill 仓库内容"
+      >
         <button
           type="button"
           role="tab"
           aria-selected={activeTab === 'created'}
           className={activeTab === 'created' ? 'is-active' : ''}
-          onClick={() => { setActiveTab('created'); setPage(1); }}
+          onClick={() => {
+            setActiveTab('created');
+            setPage(1);
+          }}
         >
           已创建 <span>{created.length}</span>
         </button>
@@ -189,7 +226,10 @@ export function SkillRepositoryWorkspace({
           role="tab"
           aria-selected={activeTab === 'drafts'}
           className={activeTab === 'drafts' ? 'is-active' : ''}
-          onClick={() => { setActiveTab('drafts'); stopManaging(); }}
+          onClick={() => {
+            setActiveTab('drafts');
+            stopManaging();
+          }}
         >
           未完成草稿 <span>{drafts.length}</span>
         </button>
@@ -197,12 +237,27 @@ export function SkillRepositoryWorkspace({
 
       <div className="skill-repository-toolbar">
         <label className="skill-repository-search">
-          <Search size={16} />
-          <input value={search} onChange={(event) => { onSearch(event.target.value); setPage(1); }} placeholder="搜索 Skill" />
+          <Search size={16} aria-hidden="true" />
+          <input
+            name="skill-repository-search"
+            type="search"
+            autoComplete="off"
+            value={search}
+            onChange={(event) => {
+              onSearch(event.target.value);
+              setPage(1);
+            }}
+            placeholder="搜索 Skill"
+          />
         </label>
         {activeTab === 'created' && !managing ? (
-          <button type="button" className="skill-repository-manage" onClick={startManaging}>
-            <CheckSquare2 size={15} />批量管理
+          <button
+            type="button"
+            className="skill-repository-manage"
+            onClick={startManaging}
+          >
+            <CheckSquare2 size={15} aria-hidden="true" />
+            批量管理
           </button>
         ) : null}
       </div>
@@ -211,14 +266,21 @@ export function SkillRepositoryWorkspace({
         <div className="skill-repository-bulkbar">
           <button
             type="button"
-            onClick={() => setSelectedSkillIds(
-              allFilteredSelected ? new Set() : selectionForFilteredSkills(created, selectedSkillIds),
-            )}
+            onClick={() =>
+              setSelectedSkillIds(
+                allFilteredSelected
+                  ? new Set()
+                  : selectionForFilteredSkills(created, selectedSkillIds),
+              )
+            }
           >
             {allFilteredSelected ? '取消全选' : '全选当前搜索结果'}
           </button>
           <span>已选择 {selectedSkills.length} 个 Skill</span>
-          <button type="button" onClick={stopManaging}><X size={14} />取消</button>
+          <button type="button" onClick={stopManaging}>
+            <X size={14} aria-hidden="true" />
+            取消
+          </button>
           <button
             type="button"
             className="is-destructive"
@@ -229,23 +291,38 @@ export function SkillRepositoryWorkspace({
               setPendingDeletion(selectedSkills);
             }}
           >
-            <Trash2 size={14} />删除
+            <Trash2 size={14} aria-hidden="true" />
+            删除
           </button>
         </div>
       ) : null}
 
       {activeTab === 'created' ? (
-        <section className="skill-repository-section" aria-label="已创建的 Skill">
+        <section
+          className="skill-repository-section"
+          aria-label="已创建的 Skill"
+        >
           {created.length === 0 ? (
-            <div className="skill-repository-empty"><Sparkles size={18} /><span>还没有已创建的 Skill</span></div>
+            <div className="skill-repository-empty">
+              <Sparkles size={18} />
+              <span>还没有已创建的 Skill</span>
+            </div>
           ) : (
             <div className="skill-repository-list">
               {pageItems.map((skill) => (
-                <div key={skill.key} className={`skill-repository-row ${selectedSkillIds.has(skill.skillId) ? 'is-selected' : ''}`}>
+                <div
+                  key={skill.key}
+                  className={`skill-repository-row ${selectedSkillIds.has(skill.skillId) ? 'is-selected' : ''}`}
+                >
                   {managing ? (
-                    <label className="skill-repository-checkbox" onClick={(event) => event.stopPropagation()}>
+                    <label
+                      className="skill-repository-checkbox"
+                      onClick={(event) => event.stopPropagation()}
+                    >
                       <input
                         type="checkbox"
+                        name="selected-skill"
+                        value={skill.skillId}
                         checked={selectedSkillIds.has(skill.skillId)}
                         onChange={() => toggleSelection(skill.skillId)}
                         aria-label={`选择 ${skill.name}`}
@@ -258,15 +335,30 @@ export function SkillRepositoryWorkspace({
                     onFocus={() => {
                       if (!managing) previewRepositorySkill(skill);
                     }}
-                    onClick={() => managing ? toggleSelection(skill.skillId) : onSelectSkill(skill)}
+                    onClick={() =>
+                      managing
+                        ? toggleSelection(skill.skillId)
+                        : onSelectSkill(skill)
+                    }
                   >
-                    <span className="skill-repository-item-icon"><Sparkles size={15} /></span>
+                    <span className="skill-repository-item-icon">
+                      <Sparkles size={15} aria-hidden="true" />
+                    </span>
                     <span className="skill-repository-item-copy">
                       <strong>{skill.name}</strong>
-                      <small>{skill.description || '可继续运行、测试、优化和管理版本'}</small>
+                      <small>
+                        {skill.description ||
+                          '可继续运行、测试、优化和管理版本'}
+                      </small>
                     </span>
-                    <time>{new Date(skill.updatedAt).toLocaleDateString()}</time>
-                    {!managing ? <ArrowRight size={15} /> : null}
+                    <time dateTime={skill.updatedAt}>
+                      {repositoryDateFormatter.format(
+                        new Date(skill.updatedAt),
+                      )}
+                    </time>
+                    {!managing ? (
+                      <ArrowRight size={15} aria-hidden="true" />
+                    ) : null}
                   </button>
                   {!managing ? (
                     <div className="skill-repository-row-menu">
@@ -277,10 +369,12 @@ export function SkillRepositoryWorkspace({
                         data-skill-delete-return={skill.skillId}
                         onClick={() => {
                           previewRepositorySkill(skill);
-                          setMenuSkillId((current) => current === skill.skillId ? null : skill.skillId);
+                          setMenuSkillId((current) =>
+                            current === skill.skillId ? null : skill.skillId,
+                          );
                         }}
                       >
-                        <MoreHorizontal size={16} />
+                        <MoreHorizontal size={16} aria-hidden="true" />
                       </button>
                       {menuSkillId === skill.skillId ? (
                         <div role="menu">
@@ -294,7 +388,8 @@ export function SkillRepositoryWorkspace({
                               setPendingDeletion([skill]);
                             }}
                           >
-                            <Trash2 size={14} />删除 Skill
+                            <Trash2 size={14} aria-hidden="true" />
+                            删除 Skill
                           </button>
                         </div>
                       ) : null}
@@ -305,13 +400,28 @@ export function SkillRepositoryWorkspace({
             </div>
           )}
           {created.length > 0 ? (
-            <nav className="skill-repository-pagination" aria-label="Skill 仓库分页">
-              <button type="button" disabled={safePage <= 1} onClick={() => setPage((current) => current - 1)} aria-label="上一页">
-                <ChevronLeft size={15} />
+            <nav
+              className="skill-repository-pagination"
+              aria-label="Skill 仓库分页"
+            >
+              <button
+                type="button"
+                disabled={safePage <= 1}
+                onClick={() => setPage((current) => current - 1)}
+                aria-label="上一页"
+              >
+                <ChevronLeft size={15} aria-hidden="true" />
               </button>
-              <span>{safePage} / {pageCount}</span>
-              <button type="button" disabled={safePage >= pageCount} onClick={() => setPage((current) => current + 1)} aria-label="下一页">
-                <ChevronRight size={15} />
+              <span>
+                {safePage} / {pageCount}
+              </span>
+              <button
+                type="button"
+                disabled={safePage >= pageCount}
+                onClick={() => setPage((current) => current + 1)}
+                aria-label="下一页"
+              >
+                <ChevronRight size={15} aria-hidden="true" />
               </button>
             </nav>
           ) : null}
@@ -319,19 +429,32 @@ export function SkillRepositoryWorkspace({
       ) : (
         <section className="skill-repository-section" aria-label="未完成草稿">
           {drafts.length === 0 ? (
-            <div className="skill-repository-empty"><Clock3 size={18} /><span>没有未完成草稿</span></div>
+            <div className="skill-repository-empty">
+              <Clock3 size={18} />
+              <span>没有未完成草稿</span>
+            </div>
           ) : (
             <div className="skill-repository-list">
               {drafts.map((item) => (
                 <div key={item.id} className="skill-repository-row">
-                  <button type="button" className="skill-repository-row-main" onClick={() => onSelectDraft(item)}>
-                    <span className="skill-repository-item-icon"><Clock3 size={15} /></span>
+                  <button
+                    type="button"
+                    className="skill-repository-row-main"
+                    onClick={() => onSelectDraft(item)}
+                  >
+                    <span className="skill-repository-item-icon">
+                      <Clock3 size={15} aria-hidden="true" />
+                    </span>
                     <span className="skill-repository-item-copy">
                       <strong>{getSessionName(item)}</strong>
                       <small>继续完善需求并生成 Skill</small>
                     </span>
-                    <time>{new Date(item.updated_at).toLocaleDateString()}</time>
-                    <ArrowRight size={15} />
+                    <time dateTime={item.updated_at}>
+                      {repositoryDateFormatter.format(
+                        new Date(item.updated_at),
+                      )}
+                    </time>
+                    <ArrowRight size={15} aria-hidden="true" />
                   </button>
                 </div>
               ))}
@@ -346,7 +469,12 @@ export function SkillRepositoryWorkspace({
           deleting={deleting}
           error={deleteError}
           returnFocusSkillId={deleteReturnFocusSkillId}
-          onCancel={() => { if (!deleting) { setPendingDeletion([]); setDeleteError(''); } }}
+          onCancel={() => {
+            if (!deleting) {
+              setPendingDeletion([]);
+              setDeleteError('');
+            }
+          }}
           onConfirm={() => void confirmDeletion()}
         />
       ) : null}

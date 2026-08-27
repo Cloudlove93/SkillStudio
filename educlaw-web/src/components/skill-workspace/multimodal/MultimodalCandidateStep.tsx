@@ -68,6 +68,8 @@ export function MultimodalCandidateStep(props: Props) {
               <label>
                 <input
                   type="checkbox"
+                  name="selected-multimodal-topic"
+                  value={fused.candidate.candidateId}
                   checked={selected}
                   disabled={disabled}
                   onChange={(event) =>

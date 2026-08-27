@@ -1,9 +1,5 @@
 import { useRef, useState } from 'react';
-import {
-  FileUp,
-  Loader2,
-  Sparkles,
-} from 'lucide-react';
+import { FileUp, Loader2, Sparkles } from 'lucide-react';
 import { liteApi } from '../../api/lite-api';
 import {
   createDocumentBatchPlan,
@@ -130,9 +126,8 @@ export function DocumentSkillCreationPanel({ token, onGenerated }: Props) {
 
     try {
       await Promise.all(
-        Array.from(
-          { length: Math.min(BATCH_CONCURRENCY, plan.length) },
-          () => runWorker(),
+        Array.from({ length: Math.min(BATCH_CONCURRENCY, plan.length) }, () =>
+          runWorker(),
         ),
       );
       setNotice(`生成完成：成功 ${successCount} 个，失败 ${failureCount} 个`);
@@ -168,6 +163,7 @@ export function DocumentSkillCreationPanel({ token, onGenerated }: Props) {
 
         <input
           ref={inputRef}
+          name="skill-source-documents"
           hidden
           type="file"
           multiple
@@ -183,7 +179,9 @@ export function DocumentSkillCreationPanel({ token, onGenerated }: Props) {
           onClick={() => inputRef.current?.click()}
           disabled={busy}
         >
-          <span><FileUp size={20} /></span>
+          <span>
+            <FileUp size={20} aria-hidden="true" />
+          </span>
           <span>
             <strong>拖入文档，或点击选择</strong>
             <small>支持 DOCX、Markdown、TXT 及原有文本与代码格式</small>
@@ -194,6 +192,8 @@ export function DocumentSkillCreationPanel({ token, onGenerated }: Props) {
         <label className="skill-document-create-instruction">
           <span>补充要求（可选）</span>
           <textarea
+            name="document-generation-instruction"
+            autoComplete="off"
             value={instruction}
             onChange={(event) => setInstruction(event.target.value)}
             placeholder="例如：统一面向初中教师，输出需包含可执行步骤……"
@@ -209,8 +209,14 @@ export function DocumentSkillCreationPanel({ token, onGenerated }: Props) {
             onClick={() => void generate()}
             disabled={documents.length === 0 || busy}
           >
-            {busy ? <Loader2 size={15} className="spin" /> : <Sparkles size={15} />}
-            {documents.length > 1 ? `批量生成 ${documents.length} 个 Skill` : '生成 Skill'}
+            {busy ? (
+              <Loader2 size={15} className="spin" aria-hidden="true" />
+            ) : (
+              <Sparkles size={15} aria-hidden="true" />
+            )}
+            {documents.length > 1
+              ? `批量生成 ${documents.length} 个 Skill`
+              : '生成 Skill'}
           </button>
         </footer>
       </div>
@@ -222,7 +228,9 @@ export function DocumentSkillCreationPanel({ token, onGenerated }: Props) {
           notice={notice}
           onRemoveDocument={(index) => {
             setDocuments((current) => {
-              const next = current.filter((_, itemIndex) => itemIndex !== index);
+              const next = current.filter(
+                (_, itemIndex) => itemIndex !== index,
+              );
               documentsRef.current = next;
               return next;
             });

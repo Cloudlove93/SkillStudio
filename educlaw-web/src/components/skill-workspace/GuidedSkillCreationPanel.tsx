@@ -66,13 +66,14 @@ const guidedStepLabels: Record<GuidedCreationStep, string> = {
   evidence_review: '效果复核',
 };
 
-const guidedInterviewSteps: Array<{ key: GuidedCreationStep; label: string }> = [
-  { key: 'intent_context', label: '目标与对象' },
-  { key: 'teacher_experience', label: '经验与依据' },
-  { key: 'strategy_co_creation', label: '教学策略' },
-  { key: 'action_adjustment', label: '行动与边界' },
-  { key: 'evidence_review', label: '效果与证据' },
-];
+const guidedInterviewSteps: Array<{ key: GuidedCreationStep; label: string }> =
+  [
+    { key: 'intent_context', label: '目标与对象' },
+    { key: 'teacher_experience', label: '经验与依据' },
+    { key: 'strategy_co_creation', label: '教学策略' },
+    { key: 'action_adjustment', label: '行动与边界' },
+    { key: 'evidence_review', label: '效果与证据' },
+  ];
 
 export function GuidedSkillCreationPanel(props: Props) {
   const [input, setInput] = useState('');
@@ -82,7 +83,8 @@ export function GuidedSkillCreationPanel(props: Props) {
   const isConfirmation = props.session?.status === 'ready_for_confirmation';
   const documentsLocked = Boolean(props.session);
   const isFinalizing = Boolean(
-    props.busy && ['generating', 'validating', 'saving'].includes(props.phase || ''),
+    props.busy &&
+    ['generating', 'validating', 'saving'].includes(props.phase || ''),
   );
   const showPendingMessage = shouldDisplayPendingGuidedMessage(
     props.pendingMessage,
@@ -90,16 +92,22 @@ export function GuidedSkillCreationPanel(props: Props) {
     props.session?.messages ?? [],
   );
   const hasConversation = Boolean(props.session || showPendingMessage);
-  const conversationTurns = useMemo(() => collectConversationTurns([
-    ...(props.session?.messages ?? []),
-    ...(showPendingMessage && props.pendingMessage
-      ? [{
-          id: props.pendingMessage.clientMessageId,
-          role: 'user',
-          content: props.pendingMessage.content,
-        }]
-      : []),
-  ]), [props.pendingMessage, props.session?.messages, showPendingMessage]);
+  const conversationTurns = useMemo(
+    () =>
+      collectConversationTurns([
+        ...(props.session?.messages ?? []),
+        ...(showPendingMessage && props.pendingMessage
+          ? [
+              {
+                id: props.pendingMessage.clientMessageId,
+                role: 'user',
+                content: props.pendingMessage.content,
+              },
+            ]
+          : []),
+      ]),
+    [props.pendingMessage, props.session?.messages, showPendingMessage],
+  );
   const guidedStage =
     props.session &&
     props.session.flow_version === 2 &&
@@ -112,19 +120,23 @@ export function GuidedSkillCreationPanel(props: Props) {
     props.session.status === 'collecting'
       ? props.session.current_step
       : null;
-  const guidedProgress = guidedStep && props.session
-    ? {
-        label: guidedStepLabels[guidedStep],
-        current: Math.min((props.session.completed_steps?.length ?? 0) + 1, 5),
-        total: 5,
-      }
-    : guidedStage && props.session
+  const guidedProgress =
+    guidedStep && props.session
       ? {
-          label: guidedStageLabels[guidedStage],
-          current: props.session.confirmed_stages.length + 1,
-          total: 6,
+          label: guidedStepLabels[guidedStep],
+          current: Math.min(
+            (props.session.completed_steps?.length ?? 0) + 1,
+            5,
+          ),
+          total: 5,
         }
-      : null;
+      : guidedStage && props.session
+        ? {
+            label: guidedStageLabels[guidedStage],
+            current: props.session.confirmed_stages.length + 1,
+            total: 6,
+          }
+        : null;
 
   const send = () => {
     const value = input.trim();
@@ -137,18 +149,34 @@ export function GuidedSkillCreationPanel(props: Props) {
     return (
       <main className="skill-center skill-generation-view">
         <div className="skill-generation-card skill-view-enter">
-          <div className="skill-generation-symbol"><Sparkles size={24} /></div>
+          <div className="skill-generation-symbol">
+            <Sparkles size={24} />
+          </div>
           <span className="skill-eyebrow">正在创建</span>
           <h1>正在把确认内容生成 Skill</h1>
           <p>生成过程中可以切换到其他草稿，任务会继续在后台完成。</p>
           <div className="skill-phase-list">
             {phaseSteps.map((step, index) => {
-              const activeIndex = Math.max(0, phaseSteps.findIndex((item) => item.key === props.phase));
+              const activeIndex = Math.max(
+                0,
+                phaseSteps.findIndex((item) => item.key === props.phase),
+              );
               const done = index < activeIndex;
               const active = index === activeIndex;
               return (
-                <div key={step.key} className={`skill-phase ${done ? 'is-done' : ''} ${active ? 'is-active' : ''}`}>
-                  <span>{done ? <Check size={13} /> : active ? <Loader2 size={13} className="spin" /> : index + 1}</span>
+                <div
+                  key={step.key}
+                  className={`skill-phase ${done ? 'is-done' : ''} ${active ? 'is-active' : ''}`}
+                >
+                  <span>
+                    {done ? (
+                      <Check size={13} />
+                    ) : active ? (
+                      <Loader2 size={13} className="spin" />
+                    ) : (
+                      index + 1
+                    )}
+                  </span>
                   <strong>{step.label}</strong>
                 </div>
               );
@@ -156,7 +184,11 @@ export function GuidedSkillCreationPanel(props: Props) {
           </div>
           {props.previews.length > 0 && (
             <details className="skill-file-preview">
-              <summary><FileText size={15} />查看生成文件<ChevronDown size={14} /></summary>
+              <summary>
+                <FileText size={15} />
+                查看生成文件
+                <ChevronDown size={14} />
+              </summary>
               {props.previews.map((file) => (
                 <div key={file.path} className="skill-preview-file">
                   <strong>{file.path}</strong>
@@ -174,25 +206,51 @@ export function GuidedSkillCreationPanel(props: Props) {
     return (
       <main className="skill-center skill-confirmation-view">
         <div className="skill-confirmation-page skill-view-enter">
-          <button className="skill-text-button" onClick={() => setShowConversation(true)}>
-            <ArrowLeft size={15} />返回对话补充
+          <button
+            className="skill-text-button"
+            onClick={() => setShowConversation(true)}
+          >
+            <ArrowLeft size={15} />
+            返回对话补充
           </button>
           <span className="skill-eyebrow">生成前确认</span>
           <h1>确认这个 Skill 的工作方式</h1>
-          <p className="skill-page-subtitle">确认后会创建 Skill v1，当前对话和草案都会继续保留。</p>
+          <p className="skill-page-subtitle">
+            确认后会创建 Skill v1，当前对话和草案都会继续保留。
+          </p>
           <div className="skill-confirm-grid">
             {props.session?.confirmation?.sections.map((section) => (
               <section key={section.key}>
-                <span><Check size={13} /></span>
-                <div><h3>{section.title}</h3><p>{section.content}</p></div>
+                <span>
+                  <Check size={13} />
+                </span>
+                <div>
+                  <h3>{section.title}</h3>
+                  <p>{section.content}</p>
+                </div>
               </section>
             ))}
           </div>
-          {props.error && <InlineError error={props.error} onRetry={props.onRetry} />}
+          {props.error && (
+            <InlineError error={props.error} onRetry={props.onRetry} />
+          )}
           <div className="skill-confirm-actions">
-            <button className="skill-secondary-button" onClick={() => setShowConversation(true)}>继续修改</button>
-            <button className="skill-primary-button" onClick={props.onConfirm} disabled={props.busy}>
-              {props.busy ? <Loader2 size={16} className="spin" /> : <Sparkles size={16} />}
+            <button
+              className="skill-secondary-button"
+              onClick={() => setShowConversation(true)}
+            >
+              继续修改
+            </button>
+            <button
+              className="skill-primary-button"
+              onClick={props.onConfirm}
+              disabled={props.busy}
+            >
+              {props.busy ? (
+                <Loader2 size={16} className="spin" />
+              ) : (
+                <Sparkles size={16} />
+              )}
               确认并生成 Skill
             </button>
           </div>
@@ -219,7 +277,12 @@ export function GuidedSkillCreationPanel(props: Props) {
         {isConfirmation && (
           <div className="skill-conversation-status">
             <span>需求已经整理完成</span>
-            <button className="skill-secondary-button" onClick={() => setShowConversation(false)}>查看确认页</button>
+            <button
+              className="skill-secondary-button"
+              onClick={() => setShowConversation(false)}
+            >
+              查看确认页
+            </button>
           </div>
         )}
 
@@ -232,73 +295,93 @@ export function GuidedSkillCreationPanel(props: Props) {
             ref={messageListRef}
             className={`skill-message-list ${hasConversation ? '' : 'is-empty'}`}
           >
-          {!hasConversation ? (
-            <div className="skill-empty-conversation">
-              <div className="skill-empty-icon"><Sparkles size={24} /></div>
-              <h2>从一个教学目标开始</h2>
-              <p>描述你的教学目标，我会协助梳理需求并生成可运行的 Skill。</p>
-              <div className="skill-starter-section">
-                <span>精选教学场景</span>
-                <div className="skill-starter-chips">
-                  {educationScenarios.map((scenario) => {
-                    const ScenarioIcon = scenario.tone === 'codex-orange' ? BookOpenCheck : Layers3;
-                    return (
-                      <button
-                        key={scenario.id}
-                        className={`skill-starter-card is-${scenario.tone}`}
-                        onClick={() => setInput(scenario.prompt)}
-                      >
-                        <span className="skill-starter-card-icon"><ScenarioIcon size={20} /></span>
-                        <span className="skill-starter-card-copy">
-                          <strong>{scenario.label}</strong>
-                          <small>{scenario.description}</small>
-                        </span>
-                      </button>
-                    );
-                  })}
+            {!hasConversation ? (
+              <div className="skill-empty-conversation">
+                <div className="skill-empty-icon">
+                  <Sparkles size={24} aria-hidden="true" />
+                </div>
+                <h2>从一个教学目标开始</h2>
+                <p>描述你的教学目标，我会协助梳理需求并生成可运行的 Skill。</p>
+                <div className="skill-starter-section">
+                  <span>精选教学场景</span>
+                  <div className="skill-starter-chips">
+                    {educationScenarios.map((scenario) => {
+                      const ScenarioIcon =
+                        scenario.tone === 'codex-orange'
+                          ? BookOpenCheck
+                          : Layers3;
+                      return (
+                        <button
+                          key={scenario.id}
+                          className={`skill-starter-card is-${scenario.tone}`}
+                          onClick={() => setInput(scenario.prompt)}
+                        >
+                          <span className="skill-starter-card-icon">
+                            <ScenarioIcon size={20} aria-hidden="true" />
+                          </span>
+                          <span className="skill-starter-card-copy">
+                            <strong>{scenario.label}</strong>
+                            <small>{scenario.description}</small>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
-            </div>
-          ) : (
-            <>
-              {props.session?.messages.map((message) => (
-                <MessageBubble
-                  key={message.id}
-                  message={message}
-                  turnId={message.role === 'user' ? `guided-turn-${message.id}` : undefined}
-                  onOption={(option) => setInput(option)}
-                />
-              ))}
-              {showPendingMessage && props.pendingMessage && (
-                <div
-                  id={`guided-turn-${props.pendingMessage.clientMessageId}`}
-                  className="skill-user-message is-pending"
-                >
-                  {props.pendingMessage.content}
-                </div>
-              )}
-            </>
-          )}
-          {props.busy && !isFinalizing && (
-            <div className="skill-assistant-message is-thinking"><span /><span /><span /></div>
-          )}
+            ) : (
+              <>
+                {props.session?.messages.map((message) => (
+                  <MessageBubble
+                    key={message.id}
+                    message={message}
+                    turnId={
+                      message.role === 'user'
+                        ? `guided-turn-${message.id}`
+                        : undefined
+                    }
+                    onOption={(option) => setInput(option)}
+                  />
+                ))}
+                {showPendingMessage && props.pendingMessage && (
+                  <div
+                    id={`guided-turn-${props.pendingMessage.clientMessageId}`}
+                    className="skill-user-message is-pending"
+                  >
+                    {props.pendingMessage.content}
+                  </div>
+                )}
+              </>
+            )}
+            {props.busy && !isFinalizing && (
+              <div className="skill-assistant-message is-thinking">
+                <span />
+                <span />
+                <span />
+              </div>
+            )}
           </div>
         </div>
 
-        {props.error && <InlineError error={props.error} onRetry={props.onRetry} />}
+        {props.error && (
+          <InlineError error={props.error} onRetry={props.onRetry} />
+        )}
 
         <div className="skill-composer-wrap">
           {guidedProgress && (
             <div className="skill-guided-progress" aria-label="共创进度">
               <span>共创进度</span>
               <strong>{guidedProgress.label}</strong>
-              <small>{guidedProgress.current} / {guidedProgress.total}</small>
+              <small>
+                {guidedProgress.current} / {guidedProgress.total}
+              </small>
             </div>
           )}
           {guidedStep && props.session && (
             <nav className="skill-interview-steps" aria-label="Skill 引导阶段">
               {guidedInterviewSteps.map((step, index) => {
-                const completed = props.session?.completed_steps?.includes(step.key) ?? false;
+                const completed =
+                  props.session?.completed_steps?.includes(step.key) ?? false;
                 const active = step.key === guidedStep;
                 return (
                   <span
@@ -317,9 +400,16 @@ export function GuidedSkillCreationPanel(props: Props) {
             <div className="skill-document-row">
               {props.documents.map((document, index) => (
                 <span key={`${document.name}-${index}`}>
-                  <FileText size={13} />{document.name}
+                  <FileText size={13} />
+                  {document.name}
                   {!documentsLocked && (
-                    <button onClick={() => props.onRemoveDocument(index)}><X size={12} /></button>
+                    <button
+                      type="button"
+                      onClick={() => props.onRemoveDocument(index)}
+                      aria-label={`移除 ${document.name}`}
+                    >
+                      <X size={12} aria-hidden="true" />
+                    </button>
                   )}
                 </span>
               ))}
@@ -327,6 +417,8 @@ export function GuidedSkillCreationPanel(props: Props) {
           )}
           <div className="skill-composer">
             <textarea
+              name="guided-skill-message"
+              autoComplete="off"
               value={input}
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={(event) => {
@@ -335,12 +427,17 @@ export function GuidedSkillCreationPanel(props: Props) {
                   send();
                 }
               }}
-              placeholder={props.session ? '补充你的想法，或选择上方建议…' : '描述你想创建的 Skill…'}
+              placeholder={
+                props.session
+                  ? '补充你的想法，或选择上方建议…'
+                  : '描述你想创建的 Skill…'
+              }
               rows={2}
             />
             <div className="skill-composer-actions">
               <input
                 ref={fileInputRef}
+                name="guided-skill-materials"
                 hidden
                 type="file"
                 multiple
@@ -355,16 +452,27 @@ export function GuidedSkillCreationPanel(props: Props) {
               {!documentsLocked && (
                 <button
                   className="skill-material-icon-button"
+                  type="button"
                   onClick={() => fileInputRef.current?.click()}
                   title="添加教学材料"
                   aria-label="添加教学材料"
                 >
-                  <Paperclip size={16} />
+                  <Paperclip size={16} aria-hidden="true" />
                 </button>
               )}
               <span>Enter 发送 · Shift + Enter 换行</span>
-              <button className="skill-send-button" onClick={send} disabled={!input.trim() || props.busy}>
-                {props.busy ? <Loader2 size={16} className="spin" /> : <ArrowUp size={16} />}
+              <button
+                type="button"
+                className="skill-send-button"
+                onClick={send}
+                disabled={!input.trim() || props.busy}
+                aria-label="发送共创消息"
+              >
+                {props.busy ? (
+                  <Loader2 size={16} className="spin" aria-hidden="true" />
+                ) : (
+                  <ArrowUp size={16} aria-hidden="true" />
+                )}
               </button>
             </div>
           </div>
@@ -385,19 +493,33 @@ function MessageBubble({
 }) {
   const options = useMemo(() => {
     const value = message.metadata.suggested_options;
-    return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+    return Array.isArray(value)
+      ? value.filter((item): item is string => typeof item === 'string')
+      : [];
   }, [message.metadata]);
   if (message.role === 'user') {
-    return <div id={turnId} className="skill-user-message">{message.content}</div>;
+    return (
+      <div id={turnId} className="skill-user-message">
+        {message.content}
+      </div>
+    );
   }
   return (
     <div className="skill-assistant-block">
-      <div className="skill-assistant-avatar"><Sparkles size={14} /></div>
+      <div className="skill-assistant-avatar">
+        <Sparkles size={14} />
+      </div>
       <div>
-        <div className="skill-assistant-message"><MarkdownContent content={message.content} /></div>
+        <div className="skill-assistant-message">
+          <MarkdownContent content={message.content} />
+        </div>
         {options.length > 0 && (
           <div className="skill-option-row">
-            {options.map((option) => <button key={option} onClick={() => onOption(option)}>{option}</button>)}
+            {options.map((option) => (
+              <button key={option} onClick={() => onOption(option)}>
+                {option}
+              </button>
+            ))}
           </div>
         )}
       </div>
@@ -414,9 +536,20 @@ function InlineError({
 }) {
   return (
     <div className="skill-inline-error">
-      <div><strong>刚才没有完成</strong><span>{error.message}</span></div>
-      {error.retryable && <button onClick={onRetry}><RotateCcw size={14} />重试</button>}
-      <details><summary>技术信息</summary><code>{error.code}</code></details>
+      <div>
+        <strong>刚才没有完成</strong>
+        <span>{error.message}</span>
+      </div>
+      {error.retryable && (
+        <button onClick={onRetry}>
+          <RotateCcw size={14} />
+          重试
+        </button>
+      )}
+      <details>
+        <summary>技术信息</summary>
+        <code>{error.code}</code>
+      </details>
     </div>
   );
 }

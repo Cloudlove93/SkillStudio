@@ -16,9 +16,17 @@ import type {
 import type { MultimodalWorkbenchError } from '../multimodal-guided-creation-state';
 
 const PROCESS_NODES = [
-  { key: 'security', label: '安全校验', stages: ['draft', 'uploading', 'ready_to_process'] },
+  {
+    key: 'security',
+    label: '安全校验',
+    stages: ['draft', 'uploading', 'ready_to_process'],
+  },
   { key: 'prepare', label: '媒体预处理', stages: ['preparing_media'] },
-  { key: 'transcript', label: '语音转录', stages: ['transcribing', 'reviewing_transcript'] },
+  {
+    key: 'transcript',
+    label: '语音转录',
+    stages: ['transcribing', 'reviewing_transcript'],
+  },
   {
     key: 'evidence',
     label: '关键帧与证据',
@@ -107,9 +115,13 @@ export function MultimodalProgressStep(props: Props) {
           <label>
             任务名称
             <input
+              name="multimodal-task-name"
+              autoComplete="off"
               value={props.displayName}
               maxLength={200}
-              onChange={(event) => props.onDisplayNameChange(event.target.value)}
+              onChange={(event) =>
+                props.onDisplayNameChange(event.target.value)
+              }
             />
           </label>
           <div className="skill-mm-source-buttons">
@@ -120,9 +132,9 @@ export function MultimodalProgressStep(props: Props) {
               disabled={Boolean(props.busyAction)}
             >
               {props.busyAction === 'upload' ? (
-                <Loader2 className="spin" size={16} />
+                <Loader2 className="spin" size={16} aria-hidden="true" />
               ) : (
-                <Upload size={16} />
+                <Upload size={16} aria-hidden="true" />
               )}
               上传音频或视频
             </button>
@@ -132,12 +144,13 @@ export function MultimodalProgressStep(props: Props) {
                 className="skill-secondary-button"
                 onClick={props.onCancelUpload}
               >
-                <CircleStop size={15} />
+                <CircleStop size={15} aria-hidden="true" />
                 取消上传
               </button>
             )}
             <input
               ref={props.fileInputRef}
+              name="multimodal-source-file"
               hidden
               type="file"
               accept="audio/*,video/*"
@@ -149,13 +162,22 @@ export function MultimodalProgressStep(props: Props) {
             />
           </div>
           {props.uploadPercent !== null && (
-            <div className="skill-mm-upload-progress">
+            <div
+              className="skill-mm-upload-progress"
+              role="progressbar"
+              aria-label="素材上传进度"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={props.uploadPercent}
+            >
               <span style={{ width: String(props.uploadPercent) + '%' }} />
               <small>{props.uploadPercent}%</small>
             </div>
           )}
           <div className="skill-mm-url-import">
             <input
+              name="multimodal-source-url"
+              autoComplete="url"
               type="url"
               value={props.sourceUrl}
               onChange={(event) => props.onSourceUrlChange(event.target.value)}
@@ -175,6 +197,7 @@ export function MultimodalProgressStep(props: Props) {
             </button>
             <label>
               <input
+                name="multimodal-rights-confirmed"
                 type="checkbox"
                 checked={props.rightsConfirmed}
                 onChange={(event) =>
@@ -190,13 +213,14 @@ export function MultimodalProgressStep(props: Props) {
       {hasSource && (
         <ol className="skill-mm-process-nodes">
           {PROCESS_NODES.map((node, index) => {
-            const status = isFailed && index === currentIndex
-              ? 'failed'
-              : processingComplete || index < currentIndex
-                ? 'complete'
-                : index === currentIndex
-                  ? 'current'
-                  : 'future';
+            const status =
+              isFailed && index === currentIndex
+                ? 'failed'
+                : processingComplete || index < currentIndex
+                  ? 'complete'
+                  : index === currentIndex
+                    ? 'current'
+                    : 'future';
             return (
               <li key={node.key} data-status={status}>
                 <span aria-hidden="true">
@@ -239,13 +263,13 @@ export function MultimodalProgressStep(props: Props) {
             onClick={props.onStart}
             disabled={Boolean(props.busyAction)}
           >
-            <Play size={15} />
+            <Play size={15} aria-hidden="true" />
             开始蒸馏
           </button>
         )}
         {isFailed && (
           <p className="skill-mm-auto-recovery-note">
-            <RefreshCw size={15} />
+            <RefreshCw size={15} aria-hidden="true" />
             系统已自动尝试恢复，仍未成功。请查看诊断。
           </p>
         )}
@@ -272,7 +296,7 @@ export function MultimodalProgressStep(props: Props) {
               onClick={props.onCancel}
               disabled={Boolean(props.busyAction)}
             >
-              <CircleStop size={15} />
+              <CircleStop size={15} aria-hidden="true" />
               取消处理
             </button>
           )}
@@ -284,7 +308,7 @@ export function MultimodalProgressStep(props: Props) {
               onClick={props.onDeleteReference}
               disabled={Boolean(props.busyAction)}
             >
-              <Trash2 size={14} />
+              <Trash2 size={14} aria-hidden="true" />
               删除工作区引用
             </button>
           )}

@@ -1,0 +1,118 @@
+.skill-primary-button,
+.skill-secondary-button,
+.skill-text-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border-radius: 9px;
+  padding: 9px 14px;
+  font-size: 12px;
+  font-weight: 560;
+  cursor: pointer;
+}
+.skill-primary-button {
+  border: 1px solid var(--primary);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--primary) 20%, transparent);
+}
+.skill-primary-button:hover {
+  background: var(--primary-hover);
+}
+.skill-primary-button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.skill-secondary-button {
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--foreground);
+}
+.skill-secondary-button:hover {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+.skill-text-button {
+  border: 0;
+  background: transparent;
+  color: var(--muted-foreground);
+  padding-inline: 0;
+}
+
+.skill-material-icon-button {
+  display: inline-grid;
+  width: 29px;
+  height: 29px;
+  flex: 0 0 29px;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+.skill-material-icon-button:hover {
+  background: var(--skill-hover);
+  color: var(--primary);
+}
+
+.skill-primary-button,
+.skill-secondary-button,
+.skill-text-button {
+  min-height: 38px;
+  border-radius: var(--workspace-radius-md);
+}
+
+.skill-primary-button {
+  box-shadow: none;
+}
+
+.skill-primary-button:active,
+.skill-secondary-button:active,
+.skill-text-button:active {
+  transform: translateY(1px);
+}
+
+.skill-icon-button:focus-visible,
+.skill-primary-button:focus-visible,
+.skill-secondary-button:focus-visible,
+.skill-text-button:focus-visible,
+.skill-material-icon-button:focus-visible,
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--workspace-focus);
+  outline-offset: 2px;
+}
+
+.skill-primary-button:disabled,
+.skill-secondary-button:disabled,
+.skill-text-button:disabled,
+.skill-icon-button:disabled,
+.skill-material-icon-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+@media (max-width: 767px) {
+  .skill-primary-button,
+  .skill-secondary-button,
+  .skill-icon-button,
+  .skill-material-icon-button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skill-primary-button,
+  .skill-secondary-button,
+  .skill-text-button,
+  .skill-icon-button,
+  .skill-material-icon-button {
+    transition: none !important;
+  }
+}

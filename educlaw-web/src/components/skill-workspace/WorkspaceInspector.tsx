@@ -1,4 +1,9 @@
-import { useRef, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react';
+import {
+  useRef,
+  type CSSProperties,
+  type KeyboardEvent,
+  type PointerEvent,
+} from 'react';
 import {
   Maximize2,
   Minimize2,
@@ -68,7 +73,9 @@ export function WorkspaceInspector({
     <aside
       className={`skill-context workspace-inspector ${state.open ? 'is-open' : 'is-collapsed'} ${state.fullscreen ? 'is-fullscreen' : ''}`}
       style={inspectorStyle}
-      aria-label={state.open ? state.descriptor?.title || '详细信息' : '右侧工具栏'}
+      aria-label={
+        state.open ? state.descriptor?.title || '详细信息' : '右侧工具栏'
+      }
     >
       <div className="workspace-inspector-rail" aria-hidden={state.open}>
         <button
@@ -79,7 +86,7 @@ export function WorkspaceInspector({
           title="展开右侧栏"
           tabIndex={state.open ? -1 : 0}
         >
-          <PanelRightOpen size={18} />
+          <PanelRightOpen size={18} aria-hidden="true" />
         </button>
       </div>
 
@@ -105,7 +112,9 @@ export function WorkspaceInspector({
           <div>
             <span className="skill-eyebrow">详细信息</span>
             <h2>{state.descriptor?.title || '当前任务'}</h2>
-            {state.descriptor?.description && <p>{state.descriptor.description}</p>}
+            {state.descriptor?.description && (
+              <p>{state.descriptor.description}</p>
+            )}
           </div>
           <div className="workspace-inspector-actions">
             <button
@@ -115,7 +124,11 @@ export function WorkspaceInspector({
               aria-label={state.fullscreen ? '退出全屏' : '全屏查看右侧栏'}
               title={state.fullscreen ? '退出全屏' : '全屏查看右侧栏'}
             >
-              {state.fullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+              {state.fullscreen ? (
+                <Minimize2 size={16} aria-hidden="true" />
+              ) : (
+                <Maximize2 size={16} aria-hidden="true" />
+              )}
             </button>
             <button
               className="skill-icon-button"
@@ -124,11 +137,15 @@ export function WorkspaceInspector({
               aria-label="收起右侧栏"
               title="收起右侧栏"
             >
-              <PanelRightClose size={17} />
+              <PanelRightClose size={17} aria-hidden="true" />
             </button>
           </div>
         </header>
-        <div ref={setOutlet} className="workspace-inspector-outlet" data-workspace-inspector-outlet />
+        <div
+          ref={setOutlet}
+          className="workspace-inspector-outlet"
+          data-workspace-inspector-outlet
+        />
       </div>
     </aside>
   );

@@ -1,4 +1,12 @@
-import { lazy, Suspense, useCallback, useEffect, useReducer, useRef, useState } from 'react';
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useReducer,
+  useRef,
+  useState,
+} from 'react';
 import type {
   ArenaThread,
   GuidedCreationDocument,
@@ -49,8 +57,6 @@ import {
   type SkillPinnedUpdate as SkillPinnedUpdateValue,
 } from '../components/skill-workspace/skill-workspace-state';
 import '../components/skill-workspace/skill-workspace.css';
-import '../components/skill-workspace/styles/workspace-shell.css';
-import '../components/skill-workspace/styles/workspace-inspector.css';
 import type {
   AnswerOptimizationRerunRequest,
   AnswerOptimizationSelection,
@@ -61,8 +67,11 @@ import {
   MULTIMODAL_RESUME_KEY,
 } from '../components/skill-workspace/multimodal-guided-creation-state';
 
-const MultimodalSkillCreationPanel = lazy(() => import('../components/skill-workspace/MultimodalSkillCreationPanel')
-  .then((module) => ({ default: module.MultimodalSkillCreationPanel })));
+const MultimodalSkillCreationPanel = lazy(() =>
+  import('../components/skill-workspace/MultimodalSkillCreationPanel').then(
+    (module) => ({ default: module.MultimodalSkillCreationPanel }),
+  ),
+);
 
 type StreamError = { code: string; message: string; retryable: boolean };
 
@@ -86,7 +95,8 @@ function initialCreateMode(): SkillCreateMode {
 }
 
 function createRequestId(prefix: string) {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  if (typeof crypto !== 'undefined' && crypto.randomUUID)
+    return crypto.randomUUID();
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
@@ -109,23 +119,31 @@ function SkillFirstWorkspaceContent() {
     closeInspector,
   } = useWorkspaceInspector();
   const [sessions, setSessions] = useState<GuidedCreationSession[]>([]);
-  const [repositorySkills, setRepositorySkills] = useState<RepositorySkill[]>([]);
+  const [repositorySkills, setRepositorySkills] = useState<RepositorySkill[]>(
+    [],
+  );
   const [workspaceSkillKeys, setWorkspaceSkillKeys] = useState<string[]>(() => {
     try {
       const stored = localStorage.getItem('educlaw:workspace-skills');
-      return stored ? JSON.parse(stored) as string[] : [];
+      return stored ? (JSON.parse(stored) as string[]) : [];
     } catch {
       return [];
     }
   });
-  const [session, setSession] = useState<GuidedCreationSessionDetail | null>(null);
+  const [session, setSession] = useState<GuidedCreationSessionDetail | null>(
+    null,
+  );
   const [pendingGuidedMessage, setPendingGuidedMessage] =
     useState<PendingGuidedMessage | null>(null);
-  const [selectedRepositorySkill, setSelectedRepositorySkill] = useState<RepositorySkill | null>(null);
-  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [selectedRepositorySkill, setSelectedRepositorySkill] =
+    useState<RepositorySkill | null>(null);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
+    null,
+  );
   const [documents, setDocuments] = useState<GuidedCreationDocument[]>([]);
   const [search, setSearch] = useState('');
-  const [createMode, setCreateMode] = useState<SkillCreateMode>(initialCreateMode);
+  const [createMode, setCreateMode] =
+    useState<SkillCreateMode>(initialCreateMode);
   const [multimodalCreationKey, setMultimodalCreationKey] = useState(0);
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -137,38 +155,52 @@ function SkillFirstWorkspaceContent() {
   );
   const [busy, setBusy] = useState(false);
   const [phase, setPhase] = useState<string | null>(null);
-  const [previews, setPreviews] = useState<Array<{ path: string; content: string }>>([]);
+  const [previews, setPreviews] = useState<
+    Array<{ path: string; content: string }>
+  >([]);
   const [error, setError] = useState<StreamError | null>(null);
   const [versions, setVersions] = useState<SkillVersionDetail[]>([]);
   const [currentVersionId, setCurrentVersionId] = useState<string | null>(null);
   const [versionsLoading, setVersionsLoading] = useState(false);
-  const [answerOptimization, setAnswerOptimization] = useState<AnswerOptimizationSelection | null>(null);
-  const [answerRerunRequest, setAnswerRerunRequest] = useState<AnswerOptimizationRerunRequest | null>(null);
+  const [answerOptimization, setAnswerOptimization] =
+    useState<AnswerOptimizationSelection | null>(null);
+  const [answerRerunRequest, setAnswerRerunRequest] =
+    useState<AnswerOptimizationRerunRequest | null>(null);
   const [conversations, setConversations] = useState<ArenaThread[]>([]);
-  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+  const [selectedConversationId, setSelectedConversationId] = useState<
+    string | null
+  >(null);
   const [conversationLoading, setConversationLoading] = useState(false);
-  const [runningConversationId, setRunningConversationId] = useState<string | null>(null);
-  const [completedConversationIds, setCompletedConversationIds] = useState<Set<string>>(new Set());
+  const [runningConversationId, setRunningConversationId] = useState<
+    string | null
+  >(null);
+  const [completedConversationIds, setCompletedConversationIds] = useState<
+    Set<string>
+  >(new Set());
   const lastActionRef = useRef<(() => void) | null>(null);
   const selectedRef = useRef<string | null>(null);
   const activeRunRef = useRef<string | null>(null);
-  const activeSkill: SkillDetailSelection | null = selectedRepositorySkill ?? (
-    session?.status === 'completed' && session.package_id && session.skill_id
+  const activeSkill: SkillDetailSelection | null =
+    selectedRepositorySkill ??
+    (session?.status === 'completed' && session.package_id && session.skill_id
       ? {
           packageId: session.package_id,
           skillId: session.skill_id,
-          name: session.education_draft?.educational_goal?.content?.trim()
-            || session.draft.goal
-            || '教育 Skill',
-          description: session.education_draft?.audience_context?.content?.trim()
-            || session.draft.roles
-            || '通过结构化流程完成教育场景任务',
+          name:
+            session.education_draft?.educational_goal?.content?.trim() ||
+            session.draft.goal ||
+            '教育 Skill',
+          description:
+            session.education_draft?.audience_context?.content?.trim() ||
+            session.draft.roles ||
+            '通过结构化流程完成教育场景任务',
           sections: session.confirmation?.sections,
         }
-      : null
-  );
+      : null);
   const visiblePendingGuidedMessage =
-    pendingGuidedMessage?.sessionId === selectedSessionId ? pendingGuidedMessage : null;
+    pendingGuidedMessage?.sessionId === selectedSessionId
+      ? pendingGuidedMessage
+      : null;
 
   useEffect(() => {
     selectedRef.current = selectedSessionId;
@@ -176,7 +208,10 @@ function SkillFirstWorkspaceContent() {
 
   useEffect(() => {
     try {
-      localStorage.setItem('educlaw:workspace-skills', JSON.stringify(workspaceSkillKeys));
+      localStorage.setItem(
+        'educlaw:workspace-skills',
+        JSON.stringify(workspaceSkillKeys),
+      );
     } catch {
       // ignore persistence errors
     }
@@ -200,14 +235,21 @@ function SkillFirstWorkspaceContent() {
     }
     setVersionsLoading(true);
     try {
-      const result = await liteApi.listSkillVersions(token, activeSkill.packageId, activeSkill.skillId, {
-        includeDiscarded: true,
-        limit: 100,
-      });
+      const result = await liteApi.listSkillVersions(
+        token,
+        activeSkill.packageId,
+        activeSkill.skillId,
+        {
+          includeDiscarded: true,
+          limit: 100,
+        },
+      );
       setVersions(result.items);
       setCurrentVersionId(result.currentVersionId);
     } catch (loadError) {
-      toast.error(loadError instanceof Error ? loadError.message : '版本加载失败');
+      toast.error(
+        loadError instanceof Error ? loadError.message : '版本加载失败',
+      );
     } finally {
       setVersionsLoading(false);
     }
@@ -227,16 +269,25 @@ function SkillFirstWorkspaceContent() {
     try {
       const threads = await liteApi.listThreads(token, activeSkill.packageId);
       const next = threads
-        .filter((thread) => isSkillConversationThread(thread, activeSkill.skillId))
-        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+        .filter((thread) =>
+          isSkillConversationThread(thread, activeSkill.skillId),
+        )
+        .sort(
+          (a, b) =>
+            new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+        );
       setConversations(next);
       setSelectedConversationId((current) =>
         current && next.some((thread) => String(thread.id) === current)
           ? current
-          : next[0] ? String(next[0].id) : null,
+          : next[0]
+            ? String(next[0].id)
+            : null,
       );
     } catch (loadError) {
-      toast.error(loadError instanceof Error ? loadError.message : '对话加载失败');
+      toast.error(
+        loadError instanceof Error ? loadError.message : '对话加载失败',
+      );
     } finally {
       setConversationLoading(false);
     }
@@ -255,32 +306,43 @@ function SkillFirstWorkspaceContent() {
     const entries = await Promise.all(
       packages.map(async (pkg) => {
         try {
-          const skills = await liteApi.listPackageSkills(token, String(pkg.id), true);
+          const skills = await liteApi.listPackageSkills(
+            token,
+            String(pkg.id),
+            true,
+          );
           return skills
             .filter((skill) => skill.status === 'active')
-            .map((skill): RepositorySkill => ({
-              key: `${pkg.id}:${skill.id}`,
-              packageId: String(pkg.id),
-              skillId: skill.id,
-              name: skill.name,
-              description: skill.description || pkg.description,
-              updatedAt: skill.updatedAt || pkg.updatedAt,
-            }));
+            .map(
+              (skill): RepositorySkill => ({
+                key: `${pkg.id}:${skill.id}`,
+                packageId: String(pkg.id),
+                skillId: skill.id,
+                name: skill.name,
+                description: skill.description || pkg.description,
+                updatedAt: skill.updatedAt || pkg.updatedAt,
+              }),
+            );
         } catch {
           return [];
         }
       }),
     );
-    const nextSkills = entries.flat().sort(
-      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
-    );
+    const nextSkills = entries
+      .flat()
+      .sort(
+        (a, b) =>
+          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+      );
     setRepositorySkills(nextSkills);
     return nextSkills;
   }, [token]);
 
   useEffect(() => {
     void refreshRepository().catch((loadError) => {
-      toast.error(loadError instanceof Error ? loadError.message : 'Skill 仓库加载失败');
+      toast.error(
+        loadError instanceof Error ? loadError.message : 'Skill 仓库加载失败',
+      );
     });
   }, [refreshRepository]);
 
@@ -292,7 +354,10 @@ function SkillFirstWorkspaceContent() {
         if (!cancelled) setSessions(result.items);
       })
       .catch((loadError) => {
-        if (!cancelled) toast.error(loadError instanceof Error ? loadError.message : '草稿加载失败');
+        if (!cancelled)
+          toast.error(
+            loadError instanceof Error ? loadError.message : '草稿加载失败',
+          );
       });
     return () => {
       cancelled = true;
@@ -303,7 +368,8 @@ function SkillFirstWorkspaceContent() {
     setSessions((current) => {
       const filtered = current.filter((item) => item.id !== next.id);
       return [next, ...filtered].sort(
-        (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+        (a, b) =>
+          new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
       );
     });
   };
@@ -337,9 +403,14 @@ function SkillFirstWorkspaceContent() {
       // 实时展示助手回复（在 done 之前先入列，避免消息闪断）
       setSession((current) => {
         if (!current) return current;
-        const exists = current.messages?.some((m) => m.id === event.data.message.id);
+        const exists = current.messages?.some(
+          (m) => m.id === event.data.message.id,
+        );
         if (exists) return current;
-        return { ...current, messages: [...(current.messages ?? []), event.data.message] };
+        return {
+          ...current,
+          messages: [...(current.messages ?? []), event.data.message],
+        };
       });
     }
     if (event.event === 'preview' && isVisibleRun) {
@@ -376,7 +447,8 @@ function SkillFirstWorkspaceContent() {
         );
       }
       mergeSession(next);
-      if (next.status === 'completed') void refreshRepository().catch(() => undefined);
+      if (next.status === 'completed')
+        void refreshRepository().catch(() => undefined);
       if (isVisibleRun) {
         setBusy(false);
         setPhase(null);
@@ -419,14 +491,17 @@ function SkillFirstWorkspaceContent() {
     activeRunRef.current = runId;
     resetStream();
     try {
-      await run((event) => handleStreamEvent(event, runSessionId, runId, clientMessageId));
+      await run((event) =>
+        handleStreamEvent(event, runSessionId, runId, clientMessageId),
+      );
     } catch (streamError) {
       if (activeRunRef.current !== runId) return;
       setBusy(false);
       setPhase(null);
       setError({
         code: 'NETWORK_ERROR',
-        message: streamError instanceof Error ? streamError.message : '网络请求失败',
+        message:
+          streamError instanceof Error ? streamError.message : '网络请求失败',
         retryable: true,
       });
     }
@@ -435,7 +510,9 @@ function SkillFirstWorkspaceContent() {
   const start = (content: string) => {
     openInspector({ owner: 'guided', view: 'summary', title: '需求摘要' });
     const clientMessageId = createRequestId('message');
-    setPendingGuidedMessage(createPendingGuidedMessage(content, clientMessageId, null));
+    setPendingGuidedMessage(
+      createPendingGuidedMessage(content, clientMessageId, null),
+    );
     const action = () =>
       runStream(
         (onEvent) =>
@@ -463,7 +540,9 @@ function SkillFirstWorkspaceContent() {
     openInspector({ owner: 'guided', view: 'summary', title: '需求摘要' });
     const sessionId = session.id;
     const clientMessageId = createRequestId('message');
-    setPendingGuidedMessage(createPendingGuidedMessage(content, clientMessageId, sessionId));
+    setPendingGuidedMessage(
+      createPendingGuidedMessage(content, clientMessageId, sessionId),
+    );
     const revisionNo = session.revision_no;
     const action = () =>
       runStream(
@@ -524,7 +603,9 @@ function SkillFirstWorkspaceContent() {
     setPhase(null);
     setPreviews([]);
     try {
-      const detail = await liteApi.getGuidedCreationDetail(token, { session_id: summary.id });
+      const detail = await liteApi.getGuidedCreationDetail(token, {
+        session_id: summary.id,
+      });
       if (selectedRef.current !== summary.id) return;
       setSession(detail);
       setDocuments(detail.documents);
@@ -532,18 +613,20 @@ function SkillFirstWorkspaceContent() {
         setBusy(true);
         setPhase('generating');
         const recoveryRequestId = createRequestId('finalize-recovery');
-        lastActionRef.current = () => runStream(
-          (onEvent) => liteApi.confirmGuidedCreationStream(
-            token,
-            {
-              session_id: detail.id,
-              revision_no: detail.revision_no,
-              request_id: recoveryRequestId,
-            },
-            onEvent,
-          ),
-          detail.id,
-        );
+        lastActionRef.current = () =>
+          runStream(
+            (onEvent) =>
+              liteApi.confirmGuidedCreationStream(
+                token,
+                {
+                  session_id: detail.id,
+                  revision_no: detail.revision_no,
+                  request_id: recoveryRequestId,
+                },
+                onEvent,
+              ),
+            detail.id,
+          );
       }
       if (detail.status === 'completed') {
         dispatchWorkspace({ type: 'navigate', view: 'run' });
@@ -553,7 +636,9 @@ function SkillFirstWorkspaceContent() {
         dispatchWorkspace({ type: 'navigate', view: 'create' });
       }
     } catch (loadError) {
-      toast.error(loadError instanceof Error ? loadError.message : '内容加载失败');
+      toast.error(
+        loadError instanceof Error ? loadError.message : '内容加载失败',
+      );
     }
   };
 
@@ -562,7 +647,9 @@ function SkillFirstWorkspaceContent() {
     let cancelled = false;
     const poll = async () => {
       try {
-        const detail = await liteApi.getGuidedCreationDetail(token, { session_id: session.id });
+        const detail = await liteApi.getGuidedCreationDetail(token, {
+          session_id: session.id,
+        });
         if (cancelled || selectedRef.current !== session.id) return;
         if (detail.status === 'finalizing') {
           if (isGuidedFinalizationStale(detail.updated_at)) {
@@ -641,7 +728,10 @@ function SkillFirstWorkspaceContent() {
     dispatchWorkspace({ type: 'dismiss-update' });
   };
 
-  const renameSession = async (item: GuidedCreationSession, displayName: string) => {
+  const renameSession = async (
+    item: GuidedCreationSession,
+    displayName: string,
+  ) => {
     try {
       const renamed = await liteApi.renameGuidedCreation(token, {
         session_id: item.id,
@@ -652,7 +742,9 @@ function SkillFirstWorkspaceContent() {
       if (selectedSessionId === item.id) setSession(renamed);
       toast.success('会话名称已更新');
     } catch (renameError) {
-      toast.error(renameError instanceof Error ? renameError.message : '重命名失败');
+      toast.error(
+        renameError instanceof Error ? renameError.message : '重命名失败',
+      );
       throw renameError;
     }
   };
@@ -663,7 +755,9 @@ function SkillFirstWorkspaceContent() {
         session_id: item.id,
         revision_no: item.revision_no,
       });
-      setSessions((current) => current.filter((candidate) => candidate.id !== item.id));
+      setSessions((current) =>
+        current.filter((candidate) => candidate.id !== item.id),
+      );
 
       if (selectedSessionId === item.id) {
         activeRunRef.current = null;
@@ -683,17 +777,22 @@ function SkillFirstWorkspaceContent() {
         else newSkill();
       }
 
-      toast.success(item.status === 'completed'
-        ? '会话已从最近使用中移除'
-        : '草稿已删除');
+      toast.success(
+        item.status === 'completed' ? '会话已从最近使用中移除' : '草稿已删除',
+      );
     } catch (deleteError) {
-      toast.error(deleteError instanceof Error ? deleteError.message : '删除失败');
+      toast.error(
+        deleteError instanceof Error ? deleteError.message : '删除失败',
+      );
       throw deleteError;
     }
   };
 
   const handleConversationCreated = (thread: ArenaThread) => {
-    setConversations((current) => [thread, ...current.filter((item) => item.id !== thread.id)]);
+    setConversations((current) => [
+      thread,
+      ...current.filter((item) => item.id !== thread.id),
+    ]);
     setSelectedConversationId(String(thread.id));
     setCompletedConversationIds((current) => {
       const next = new Set(current);
@@ -703,7 +802,9 @@ function SkillFirstWorkspaceContent() {
   };
 
   const handleConversationUpdated = (thread: ArenaThread) => {
-    setConversations((current) => current.map((item) => item.id === thread.id ? thread : item));
+    setConversations((current) =>
+      current.map((item) => (item.id === thread.id ? thread : item)),
+    );
   };
 
   const handleConversationSelect = (id: string) => {
@@ -712,7 +813,10 @@ function SkillFirstWorkspaceContent() {
     closeInspector({ force: true });
   };
 
-  const handleConversationRunState = (running: boolean, threadId?: string | null) => {
+  const handleConversationRunState = (
+    running: boolean,
+    threadId?: string | null,
+  ) => {
     if (running) {
       const runId = threadId ?? selectedConversationId;
       setRunningConversationId(runId);
@@ -747,25 +851,42 @@ function SkillFirstWorkspaceContent() {
 
   const renameConversation = async (thread: ArenaThread, title: string) => {
     if (!activeSkill) return;
-    const renamed = await liteApi.renameArenaThread(token, activeSkill.packageId, String(thread.id), title);
+    const renamed = await liteApi.renameArenaThread(
+      token,
+      activeSkill.packageId,
+      String(thread.id),
+      title,
+    );
     handleConversationUpdated(renamed);
   };
 
   const deleteConversation = async (thread: ArenaThread) => {
     if (!activeSkill) return;
     try {
-      await liteApi.deleteArenaThread(token, activeSkill.packageId, String(thread.id));
-      setConversations((current) => current.filter((item) => item.id !== thread.id));
-      setSelectedConversationId((current) => current === String(thread.id) ? null : current);
+      await liteApi.deleteArenaThread(
+        token,
+        activeSkill.packageId,
+        String(thread.id),
+      );
+      setConversations((current) =>
+        current.filter((item) => item.id !== thread.id),
+      );
+      setSelectedConversationId((current) =>
+        current === String(thread.id) ? null : current,
+      );
       setCompletedConversationIds((current) => {
         const next = new Set(current);
         next.delete(String(thread.id));
         return next;
       });
-      setRunningConversationId((current) => current === String(thread.id) ? null : current);
+      setRunningConversationId((current) =>
+        current === String(thread.id) ? null : current,
+      );
       toast.success('对话已删除');
     } catch (deleteError) {
-      toast.error(deleteError instanceof Error ? deleteError.message : '对话删除失败');
+      toast.error(
+        deleteError instanceof Error ? deleteError.message : '对话删除失败',
+      );
     }
   };
 
@@ -779,7 +900,9 @@ function SkillFirstWorkspaceContent() {
     setDocuments([]);
     setBusy(false);
     setError(null);
-    setWorkspaceSkillKeys((keys) => keys.includes(skill.key) ? keys : [...keys, skill.key]);
+    setWorkspaceSkillKeys((keys) =>
+      keys.includes(skill.key) ? keys : [...keys, skill.key],
+    );
     dispatchWorkspace({ type: 'navigate', view: 'run' });
     closeInspector({ force: true });
     dispatchWorkspace({ type: 'dismiss-update' });
@@ -821,12 +944,12 @@ function SkillFirstWorkspaceContent() {
         .map((skill) => skill.key),
     );
 
-    setRepositorySkills((current) => current.filter(
-      (skill) => !deletedSkillIds.has(skill.skillId),
-    ));
-    setWorkspaceSkillKeys((current) => current.filter(
-      (key) => !deletedSkillKeys.has(key),
-    ));
+    setRepositorySkills((current) =>
+      current.filter((skill) => !deletedSkillIds.has(skill.skillId)),
+    );
+    setWorkspaceSkillKeys((current) =>
+      current.filter((key) => !deletedSkillKeys.has(key)),
+    );
     if (activeSkill && deletedSkillIds.has(activeSkill.skillId)) {
       setSelectedRepositorySkill(null);
       setSession(null);
@@ -843,7 +966,10 @@ function SkillFirstWorkspaceContent() {
     toast.success(`已删除 ${result.deletedCount} 个 Skill`);
   };
 
-  const handleSkillMenuAction = (skill: RepositorySkill, action: SkillMenuAction) => {
+  const handleSkillMenuAction = (
+    skill: RepositorySkill,
+    action: SkillMenuAction,
+  ) => {
     if (action === 'remove') {
       removeFromWorkspace(skill);
       return;
@@ -858,11 +984,15 @@ function SkillFirstWorkspaceContent() {
 
   const addFiles = async (files: FileList) => {
     try {
-      const parsed = await Promise.all(Array.from(files).slice(0, 10).map(readDocument));
+      const parsed = await Promise.all(
+        Array.from(files).slice(0, 10).map(readDocument),
+      );
       setDocuments((current) => [...current, ...parsed].slice(0, 10));
       toast.success(`已添加 ${parsed.length} 份参考材料`);
     } catch (fileError) {
-      toast.error(fileError instanceof Error ? fileError.message : '材料读取失败');
+      toast.error(
+        fileError instanceof Error ? fileError.message : '材料读取失败',
+      );
     }
   };
 
@@ -879,20 +1009,29 @@ function SkillFirstWorkspaceContent() {
       setImportOpen(false);
       openRepository();
     } catch (importError) {
-      toast.error(importError instanceof Error ? importError.message : 'Skill 导入失败');
+      toast.error(
+        importError instanceof Error ? importError.message : 'Skill 导入失败',
+      );
     } finally {
       setImportBusy(false);
     }
   };
 
-  const activeSkillKey = activeSkill ? `${activeSkill.packageId}:${activeSkill.skillId}` : null;
-  const activeSkillName = repositorySkills.find((skill) => skill.key === activeSkillKey)?.name
-    || activeSkill?.name
-    || null;
-  const workspaceSkills = repositorySkills.filter((skill) => workspaceSkillKeys.includes(skill.key));
+  const activeSkillKey = activeSkill
+    ? `${activeSkill.packageId}:${activeSkill.skillId}`
+    : null;
+  const activeSkillName =
+    repositorySkills.find((skill) => skill.key === activeSkillKey)?.name ||
+    activeSkill?.name ||
+    null;
+  const workspaceSkills = repositorySkills.filter((skill) =>
+    workspaceSkillKeys.includes(skill.key),
+  );
 
   const detailView = (
-    ['overview', 'run', 'test', 'arena', 'optimize', 'versions'].includes(workspaceState.activeView)
+    ['overview', 'run', 'test', 'arena', 'optimize', 'versions'].includes(
+      workspaceState.activeView,
+    )
       ? workspaceState.activeView
       : 'run'
   ) as 'overview' | 'run' | 'test' | 'arena' | 'optimize' | 'versions';
@@ -914,8 +1053,16 @@ function SkillFirstWorkspaceContent() {
   };
 
   return (
-    <div className={`skill-workspace-root ${leftCollapsed ? 'is-left-collapsed' : ''} ${inspectorState.open ? 'is-context-open' : ''}`}
-        style={{ '--skill-context-current': inspectorState.open ? `${inspectorWidth}px` : '46px' } as React.CSSProperties}>
+    <div
+      className={`skill-workspace-root ${leftCollapsed ? 'is-left-collapsed' : ''} ${inspectorState.open ? 'is-context-open' : ''}`}
+      style={
+        {
+          '--skill-context-current': inspectorState.open
+            ? `${inspectorWidth}px`
+            : '46px',
+        } as React.CSSProperties
+      }
+    >
       <SkillWorkspaceSidebar
         sessions={sessions}
         selectedSessionId={selectedSessionId}
@@ -949,202 +1096,236 @@ function SkillFirstWorkspaceContent() {
         onLogout={logout}
       />
       <div className="skill-content-column">
-      <div className="skill-main-column">
-        <SkillPinnedUpdate
-          update={workspaceState.pinnedUpdate}
-          onAction={handlePinnedAction}
-          onDismiss={() => dispatchWorkspace({ type: 'dismiss-update' })}
-        />
-         <div
-           className={`skill-main-stage ${workspaceState.activeView === 'repository' ? 'is-repository' : ''}`}
-           key={workspaceState.activeView === 'repository' ? 'repository' : activeSkill ? `skill-${activeSkill.packageId}-${activeSkill.skillId}` : session?.id || 'new'}
-         >
-          {workspaceState.activeView === 'repository' ? (
-            <SkillRepositoryWorkspace
-              skills={repositorySkills}
-              sessions={sessions}
-              search={search}
-              onSearch={setSearch}
-              onSelectSkill={openRepositorySkill}
-              onSelectDraft={(item) => void openSession(item)}
-              onDeleteSkills={deleteRepositorySkills}
-              onNew={newSkill}
-            />
-          ) : activeSkill ? (
-            <SkillDetailWorkspace
-              token={token}
-              skill={activeSkill}
-              view={detailView}
-              versions={versions}
-              currentVersionId={currentVersionId}
-              versionsLoading={versionsLoading}
-              onNavigate={(view) => dispatchWorkspace({ type: 'navigate', view })}
-              onRunStateChange={handleConversationRunState}
-              onPublishUpdate={publishUpdate}
-              onReloadVersions={loadVersions}
-              onOptimizeAnswer={(selection) => {
-                setAnswerOptimization(selection);
-                openInspector({
-                  owner: 'skill',
-                  view: 'optimization',
-                  title: '改进这条回答',
-                  description: '先审阅建议，再决定是否保存为新版本。',
-                  preferredWidth: 500,
-                });
-              }}
-              conversations={conversations}
-              selectedConversationId={selectedConversationId}
-              onConversationCreated={handleConversationCreated}
-              onConversationUpdated={handleConversationUpdated}
-              answerRerunRequest={answerRerunRequest}
-            />
-          ) : session ? (
-            <GuidedSkillCreationPanel
-              session={session}
-              pendingMessage={visiblePendingGuidedMessage}
-              documents={documents}
-              busy={busy}
-              phase={phase}
-              previews={previews}
-              error={error}
-              onSend={send}
-              onConfirm={confirm}
-              onRetry={() => lastActionRef.current?.()}
-              onFiles={(files) => void addFiles(files)}
-              onRemoveDocument={(index) =>
-                setDocuments((current) => current.filter((_, itemIndex) => itemIndex !== index))
-              }
-            />
-          ) : createMode === 'multimodal' ? (
-            <Suspense fallback={<SkillWorkspaceLoadingState label="正在打开音视频蒸馏" />}>
-              <MultimodalSkillCreationPanel
-                key={multimodalCreationKey}
-                token={token}
-                onPublished={refreshRepository}
-                onOpenRepository={openRepository}
-                onOpenGeneratedSkill={openGeneratedSkill}
+        <div className="skill-main-column">
+          <SkillPinnedUpdate
+            update={workspaceState.pinnedUpdate}
+            onAction={handlePinnedAction}
+            onDismiss={() => dispatchWorkspace({ type: 'dismiss-update' })}
+          />
+          <div
+            className={`skill-main-stage ${workspaceState.activeView === 'repository' ? 'is-repository' : ''}`}
+            key={
+              workspaceState.activeView === 'repository'
+                ? 'repository'
+                : activeSkill
+                  ? `skill-${activeSkill.packageId}-${activeSkill.skillId}`
+                  : session?.id || 'new'
+            }
+          >
+            {workspaceState.activeView === 'repository' ? (
+              <SkillRepositoryWorkspace
+                skills={repositorySkills}
+                sessions={sessions}
+                search={search}
+                onSearch={setSearch}
+                onSelectSkill={openRepositorySkill}
+                onSelectDraft={(item) => void openSession(item)}
+                onDeleteSkills={deleteRepositorySkills}
+                onNew={newSkill}
               />
-            </Suspense>
-          ) : createMode === 'document' ? (
-            <DocumentSkillCreationPanel
-              token={token}
-              onGenerated={async () => {
-                await refreshRepository();
-                dispatchWorkspace({ type: 'navigate', view: 'repository' });
-                closeInspector({ force: true });
-              }}
-            />
-          ) : createMode === 'manual' ? (
-            <StructuredSkillCreationPanel
-              documents={documents}
-              busy={busy}
-              onSubmit={send}
-              onFiles={(files) => void addFiles(files)}
-              onRemoveDocument={(index) =>
-                setDocuments((current) => current.filter((_, itemIndex) => itemIndex !== index))
-              }
-            />
-          ) : (
-            <GuidedSkillCreationPanel
-              session={null}
-              pendingMessage={visiblePendingGuidedMessage}
-              documents={documents}
-              busy={busy}
-              phase={phase}
-              previews={previews}
-              error={error}
-              onSend={send}
-              onConfirm={confirm}
-              onRetry={() => lastActionRef.current?.()}
-              onFiles={(files) => void addFiles(files)}
-              onRemoveDocument={(index) =>
-                setDocuments((current) => current.filter((_, itemIndex) => itemIndex !== index))
-              }
-            />
-          )}
-        </div>
-      </div>
-      <InspectorPortal owner="guided">
-        <SkillInspectorContent
-          token={token}
-          descriptor={inspectorState.descriptor}
-          session={workspaceState.activeView === 'repository' ? null : session}
-          activeView={workspaceState.activeView}
-          versions={versions}
-          currentVersionId={currentVersionId}
-          versionsLoading={versionsLoading}
-          answerOptimization={answerOptimization}
-          onAnswerOptimizationSaved={() => { void loadVersions(); }}
-          onAnswerOptimizationRerun={(versionNumber, selection) => {
-            void (async () => {
-              await loadVersions();
-              dispatchWorkspace({ type: 'navigate', view: selection.origin });
-              setAnswerRerunRequest({ requestId: createRequestId('rerun'), versionNumber, selection });
-            })();
-          }}
-          onOpenVersionManager={() => {
-            dispatchWorkspace({ type: 'navigate', view: 'versions' });
-            closeInspector({ force: true });
-          }}
-        />
-      </InspectorPortal>
-      <InspectorPortal owner="skill">
-        <SkillInspectorContent
-          token={token}
-          descriptor={inspectorState.descriptor}
-          session={null}
-          activeView={workspaceState.activeView}
-          versions={versions}
-          currentVersionId={currentVersionId}
-          versionsLoading={versionsLoading}
-          answerOptimization={answerOptimization}
-          onAnswerOptimizationSaved={() => { void loadVersions(); }}
-          onAnswerOptimizationRerun={(versionNumber, selection) => {
-            void (async () => {
-              await loadVersions();
-              dispatchWorkspace({ type: 'navigate', view: selection.origin });
-              setAnswerRerunRequest({ requestId: createRequestId('rerun'), versionNumber, selection });
-            })();
-          }}
-          onOpenVersionManager={() => {
-            dispatchWorkspace({ type: 'navigate', view: 'versions' });
-            closeInspector({ force: true });
-          }}
-        />
-      </InspectorPortal>
-      <WorkspaceInspector
-        defaultDescriptor={workspaceState.activeView === 'repository'
-          ? {
-              owner: 'repository',
-              view: 'repository-selection',
-              title: '仓库摘要',
-              description: '聚焦 Skill 或进入批量管理后查看详情。',
-            }
-          : createMode === 'multimodal' && !session && !activeSkill
-          ? {
-              owner: 'multimodal',
-              view: 'multimodal-progress',
-              title: '处理状态',
-              description: '查看素材处理阶段和已经形成的证据。',
-            }
-          : createMode === 'document' && !session && !activeSkill
-            ? {
-                owner: 'document',
-                view: 'document-materials',
-                title: '文档与生成状态',
-              }
-            : createMode === 'manual' && !session && !activeSkill
-              ? {
-                  owner: 'structured',
-                  view: 'structured-summary',
-                  title: '填写摘要',
+            ) : activeSkill ? (
+              <SkillDetailWorkspace
+                token={token}
+                skill={activeSkill}
+                view={detailView}
+                versions={versions}
+                currentVersionId={currentVersionId}
+                versionsLoading={versionsLoading}
+                onNavigate={(view) =>
+                  dispatchWorkspace({ type: 'navigate', view })
                 }
-          : {
-              owner: activeSkill ? 'skill' : 'guided',
-              view: 'summary',
-              title: activeSkill ? '当前 Skill' : '需求摘要',
+                onRunStateChange={handleConversationRunState}
+                onPublishUpdate={publishUpdate}
+                onReloadVersions={loadVersions}
+                onOptimizeAnswer={(selection) => {
+                  setAnswerOptimization(selection);
+                  openInspector({
+                    owner: 'skill',
+                    view: 'optimization',
+                    title: '改进这条回答',
+                    description: '先审阅建议，再决定是否保存为新版本。',
+                    preferredWidth: 500,
+                  });
+                }}
+                conversations={conversations}
+                selectedConversationId={selectedConversationId}
+                onConversationCreated={handleConversationCreated}
+                onConversationUpdated={handleConversationUpdated}
+                answerRerunRequest={answerRerunRequest}
+              />
+            ) : session ? (
+              <GuidedSkillCreationPanel
+                session={session}
+                pendingMessage={visiblePendingGuidedMessage}
+                documents={documents}
+                busy={busy}
+                phase={phase}
+                previews={previews}
+                error={error}
+                onSend={send}
+                onConfirm={confirm}
+                onRetry={() => lastActionRef.current?.()}
+                onFiles={(files) => void addFiles(files)}
+                onRemoveDocument={(index) =>
+                  setDocuments((current) =>
+                    current.filter((_, itemIndex) => itemIndex !== index),
+                  )
+                }
+              />
+            ) : createMode === 'multimodal' ? (
+              <Suspense
+                fallback={
+                  <SkillWorkspaceLoadingState label="正在打开音视频蒸馏" />
+                }
+              >
+                <MultimodalSkillCreationPanel
+                  key={multimodalCreationKey}
+                  token={token}
+                  onPublished={refreshRepository}
+                  onOpenRepository={openRepository}
+                  onOpenGeneratedSkill={openGeneratedSkill}
+                />
+              </Suspense>
+            ) : createMode === 'document' ? (
+              <DocumentSkillCreationPanel
+                token={token}
+                onGenerated={async () => {
+                  await refreshRepository();
+                  dispatchWorkspace({ type: 'navigate', view: 'repository' });
+                  closeInspector({ force: true });
+                }}
+              />
+            ) : createMode === 'manual' ? (
+              <StructuredSkillCreationPanel
+                documents={documents}
+                busy={busy}
+                onSubmit={send}
+                onFiles={(files) => void addFiles(files)}
+                onRemoveDocument={(index) =>
+                  setDocuments((current) =>
+                    current.filter((_, itemIndex) => itemIndex !== index),
+                  )
+                }
+              />
+            ) : (
+              <GuidedSkillCreationPanel
+                session={null}
+                pendingMessage={visiblePendingGuidedMessage}
+                documents={documents}
+                busy={busy}
+                phase={phase}
+                previews={previews}
+                error={error}
+                onSend={send}
+                onConfirm={confirm}
+                onRetry={() => lastActionRef.current?.()}
+                onFiles={(files) => void addFiles(files)}
+                onRemoveDocument={(index) =>
+                  setDocuments((current) =>
+                    current.filter((_, itemIndex) => itemIndex !== index),
+                  )
+                }
+              />
+            )}
+          </div>
+        </div>
+        <InspectorPortal owner="guided">
+          <SkillInspectorContent
+            token={token}
+            descriptor={inspectorState.descriptor}
+            session={
+              workspaceState.activeView === 'repository' ? null : session
+            }
+            activeView={workspaceState.activeView}
+            versions={versions}
+            currentVersionId={currentVersionId}
+            versionsLoading={versionsLoading}
+            answerOptimization={answerOptimization}
+            onAnswerOptimizationSaved={() => {
+              void loadVersions();
             }}
-      />
+            onAnswerOptimizationRerun={(versionNumber, selection) => {
+              void (async () => {
+                await loadVersions();
+                dispatchWorkspace({ type: 'navigate', view: selection.origin });
+                setAnswerRerunRequest({
+                  requestId: createRequestId('rerun'),
+                  versionNumber,
+                  selection,
+                });
+              })();
+            }}
+            onOpenVersionManager={() => {
+              dispatchWorkspace({ type: 'navigate', view: 'versions' });
+              closeInspector({ force: true });
+            }}
+          />
+        </InspectorPortal>
+        <InspectorPortal owner="skill">
+          <SkillInspectorContent
+            token={token}
+            descriptor={inspectorState.descriptor}
+            session={null}
+            activeView={workspaceState.activeView}
+            versions={versions}
+            currentVersionId={currentVersionId}
+            versionsLoading={versionsLoading}
+            answerOptimization={answerOptimization}
+            onAnswerOptimizationSaved={() => {
+              void loadVersions();
+            }}
+            onAnswerOptimizationRerun={(versionNumber, selection) => {
+              void (async () => {
+                await loadVersions();
+                dispatchWorkspace({ type: 'navigate', view: selection.origin });
+                setAnswerRerunRequest({
+                  requestId: createRequestId('rerun'),
+                  versionNumber,
+                  selection,
+                });
+              })();
+            }}
+            onOpenVersionManager={() => {
+              dispatchWorkspace({ type: 'navigate', view: 'versions' });
+              closeInspector({ force: true });
+            }}
+          />
+        </InspectorPortal>
+        <WorkspaceInspector
+          defaultDescriptor={
+            workspaceState.activeView === 'repository'
+              ? {
+                  owner: 'repository',
+                  view: 'repository-selection',
+                  title: '仓库摘要',
+                  description: '聚焦 Skill 或进入批量管理后查看详情。',
+                }
+              : createMode === 'multimodal' && !session && !activeSkill
+                ? {
+                    owner: 'multimodal',
+                    view: 'multimodal-progress',
+                    title: '处理状态',
+                    description: '查看素材处理阶段和已经形成的证据。',
+                  }
+                : createMode === 'document' && !session && !activeSkill
+                  ? {
+                      owner: 'document',
+                      view: 'document-materials',
+                      title: '文档与生成状态',
+                    }
+                  : createMode === 'manual' && !session && !activeSkill
+                    ? {
+                        owner: 'structured',
+                        view: 'structured-summary',
+                        title: '填写摘要',
+                      }
+                    : {
+                        owner: activeSkill ? 'skill' : 'guided',
+                        view: 'summary',
+                        title: activeSkill ? '当前 Skill' : '需求摘要',
+                      }
+          }
+        />
       </div>
       <SkillImportDialog
         open={importOpen}
@@ -1161,7 +1342,9 @@ async function readDocument(file: File): Promise<GuidedCreationDocument> {
   let content: string;
   if (isDocx) {
     const mammoth = await import('mammoth');
-    const result = await mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() });
+    const result = await mammoth.extractRawText({
+      arrayBuffer: await file.arrayBuffer(),
+    });
     content = result.value.trim();
   } else {
     content = (await file.text()).trim();

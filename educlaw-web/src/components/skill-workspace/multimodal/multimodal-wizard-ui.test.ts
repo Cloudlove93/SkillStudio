@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 const read = (path: string) =>
   readFileSync(new URL(path, import.meta.url), 'utf8');
+const multimodalCss = () => read('../styles/multimodal-workbench.css');
 
 describe('multimodal wizard UI contract', () => {
   it('uses an ordered four-step process and a fixed action bar', () => {
@@ -25,7 +26,7 @@ describe('multimodal wizard UI contract', () => {
   });
 
   it('uses one page-level scroll context without nested scroll panes', () => {
-    const css = read('../skill-workspace.css');
+    const css = multimodalCss();
 
     expect(css).toMatch(
       /\.skill-multimodal-view\s*\{[^}]*overflow-y:\s*auto;/s,
@@ -58,9 +59,7 @@ describe('multimodal wizard UI contract', () => {
     expect(source).toContain('系统已自动尝试恢复');
     expect(source).toContain('查看处理诊断');
     expect(source).not.toContain('重试此步骤');
-    expect(read('../skill-workspace.css')).toContain(
-      '.skill-mm-auto-recovery-note',
-    );
+    expect(multimodalCss()).toContain('.skill-mm-auto-recovery-note');
   });
 
   it('keeps the nearest time-aligned evidence beside the player', () => {

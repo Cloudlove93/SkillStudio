@@ -10,7 +10,10 @@ import type {
 } from '@educlaw/shared';
 import { CANDIDATE_PASS_KEYS } from '@educlaw/shared';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import type { MediaSessionDetail, MediaSessionProgress } from '../../../api/lite-api';
+import type {
+  MediaSessionDetail,
+  MediaSessionProgress,
+} from '../../../api/lite-api';
 import type { MultimodalWorkbenchError } from '../multimodal-guided-creation-state';
 import {
   aggregateMultimodalDegradations,
@@ -130,6 +133,8 @@ function VirtualTranscriptList(props: {
                 {formatTime(item.segment.endMs)}
               </button>
               <textarea
+                name={'transcript-segment-' + String(item.sourceIndex + 1)}
+                autoComplete="off"
                 defaultValue={item.segment.text}
                 aria-label={'第 ' + String(item.sourceIndex + 1) + ' 段转录'}
                 onBlur={(event) =>
@@ -208,6 +213,10 @@ function VirtualEvidenceList(props: {
                   <img
                     src={props.framePreview.url}
                     alt={'关键帧：' + item.selectionReason}
+                    width={640}
+                    height={360}
+                    loading="lazy"
+                    decoding="async"
                   />
                 ) : (
                   <button
@@ -337,10 +346,15 @@ export function MultimodalInspectorContent(props: Props) {
           {props.progress?.currentJob && (
             <section>
               <span>正在处理</span>
-              <strong>{props.progress.currentJob.hint ?? props.progress.currentJob.jobType}</strong>
+              <strong>
+                {props.progress.currentJob.hint ??
+                  props.progress.currentJob.jobType}
+              </strong>
               {props.progress.currentJob.percent != null && (
                 <div className="skill-context-progress-track">
-                  <span style={{ width: `${props.progress.currentJob.percent}%` }} />
+                  <span
+                    style={{ width: `${props.progress.currentJob.percent}%` }}
+                  />
                 </div>
               )}
             </section>
@@ -348,8 +362,11 @@ export function MultimodalInspectorContent(props: Props) {
           <section>
             <span>已形成内容</span>
             <strong>
-              {props.detail?.mediaState.transcript.segments.length ?? 0} 段转录 ·{' '}
-              {props.detail?.mediaState.evidenceTimeline.evidenceItems.length ?? 0} 条证据
+              {props.detail?.mediaState.transcript.segments.length ?? 0} 段转录
+              ·{' '}
+              {props.detail?.mediaState.evidenceTimeline.evidenceItems.length ??
+                0}{' '}
+              条证据
             </strong>
           </section>
           <p>状态保存在服务端，可以安全离开后再回来继续。</p>
@@ -357,10 +374,12 @@ export function MultimodalInspectorContent(props: Props) {
       )}
 
       {props.view === 'transcript' && (
-        <div className="skill-mm-drawer-dataset">
-          <div className="skill-mm-drawer-filters">
+        <div className="skill-mm-inspector-dataset">
+          <div className="skill-mm-inspector-filters">
             <input
               type="search"
+              name="multimodal-transcript-search"
+              autoComplete="off"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="搜索转录"
@@ -368,6 +387,7 @@ export function MultimodalInspectorContent(props: Props) {
             <label>
               <input
                 type="checkbox"
+                name="transcript-low-confidence-only"
                 checked={lowConfidenceOnly}
                 onChange={(event) => setLowConfidenceOnly(event.target.checked)}
               />
@@ -376,6 +396,7 @@ export function MultimodalInspectorContent(props: Props) {
             <label>
               <input
                 type="checkbox"
+                name="transcript-edited-only"
                 checked={editedOnly}
                 onChange={(event) => setEditedOnly(event.target.checked)}
               />
@@ -394,10 +415,12 @@ export function MultimodalInspectorContent(props: Props) {
       )}
 
       {props.view === 'evidence' && (
-        <div className="skill-mm-drawer-dataset">
-          <div className="skill-mm-drawer-filters">
+        <div className="skill-mm-inspector-dataset">
+          <div className="skill-mm-inspector-filters">
             <input
               type="search"
+              name="multimodal-evidence-search"
+              autoComplete="off"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="搜索证据"
@@ -405,6 +428,7 @@ export function MultimodalInspectorContent(props: Props) {
             <label>
               证据类型
               <select
+                name="multimodal-evidence-kind"
                 value={evidenceKind}
                 onChange={(event) =>
                   setEvidenceKind(
@@ -421,6 +445,7 @@ export function MultimodalInspectorContent(props: Props) {
             <label>
               结论类型
               <select
+                name="multimodal-claim-type"
                 value={claimType}
                 onChange={(event) =>
                   setClaimType(
@@ -518,6 +543,8 @@ export function MultimodalInspectorContent(props: Props) {
           <label>
             候选标题
             <input
+              name="multimodal-candidate-title"
+              autoComplete="off"
               value={props.selectedCandidate.candidate.title}
               onChange={(event) =>
                 props.onUpdateCandidate(
@@ -531,6 +558,8 @@ export function MultimodalInspectorContent(props: Props) {
           <label>
             主题简介
             <textarea
+              name="multimodal-candidate-summary"
+              autoComplete="off"
               value={props.selectedCandidate.candidate.summary}
               onChange={(event) =>
                 props.onUpdateCandidate(
@@ -544,6 +573,8 @@ export function MultimodalInspectorContent(props: Props) {
           <label>
             可复用规则
             <textarea
+              name="multimodal-candidate-rule"
+              autoComplete="off"
               value={props.selectedCandidate.candidate.reusableRule}
               onChange={(event) =>
                 props.onUpdateCandidate(

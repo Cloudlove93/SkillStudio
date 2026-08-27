@@ -1,11 +1,13 @@
 .skill-workspace-root {
-  --workspace-font-ui: "Noto Sans SC Variable", "PingFang SC", "Microsoft YaHei UI", sans-serif;
-  --workspace-font-mono: "SFMono-Regular", "Cascadia Code", Consolas, monospace;
+  --workspace-font-ui:
+    'Noto Sans SC Variable', 'PingFang SC', 'Microsoft YaHei UI', sans-serif;
+  --workspace-font-mono: 'SFMono-Regular', 'Cascadia Code', Consolas, monospace;
   --workspace-canvas: #f4f6f5;
   --workspace-surface: #ffffff;
   --workspace-ink: #18212d;
   --workspace-muted: #66727e;
   --workspace-primary: #4658c9;
+  --workspace-focus: #4658c9;
   --workspace-evidence: #28766f;
   --workspace-warning: #b7652e;
   --workspace-danger: #c24141;
@@ -36,6 +38,7 @@
   --workspace-ink: #edf2f1;
   --workspace-muted: #a9b4b4;
   --workspace-primary: #9ba8ff;
+  --workspace-focus: #b7c0ff;
   --workspace-evidence: #67bdb4;
   --workspace-warning: #e2a070;
   --workspace-danger: #f08181;

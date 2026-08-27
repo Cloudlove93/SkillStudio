@@ -3,7 +3,10 @@ import type { ArenaThread, SkillVersionDetail } from '@educlaw/shared';
 import { ArrowUp, Check, Loader2, Save, Sparkles } from 'lucide-react';
 import { liteApi } from '../../api/lite-api';
 import { MarkdownContent } from '../lite/lite-rendering';
-import { createSkillOptimizeState, skillOptimizeReducer } from './skill-optimize-state';
+import {
+  createSkillOptimizeState,
+  skillOptimizeReducer,
+} from './skill-optimize-state';
 import { ConversationTurnNavigation } from './ConversationTurnNavigation';
 import { collectConversationTurns } from './conversation-turn-navigation';
 import { getConversationTitle } from './skill-conversation-list';
@@ -17,24 +20,44 @@ type Props = {
 };
 
 function requestId() {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  if (typeof crypto !== 'undefined' && crypto.randomUUID)
+    return crypto.randomUUID();
   return `skill-optimize-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-export function SkillOptimizeWorkspace({ token, packageId, version, onSaved, onThreadCreated }: Props) {
-  const [state, dispatch] = useReducer(skillOptimizeReducer, undefined, createSkillOptimizeState);
+export function SkillOptimizeWorkspace({
+  token,
+  packageId,
+  version,
+  onSaved,
+  onThreadCreated,
+}: Props) {
+  const [state, dispatch] = useReducer(
+    skillOptimizeReducer,
+    undefined,
+    createSkillOptimizeState,
+  );
   const [initializing, setInitializing] = useState(true);
   const sessionIdRef = useRef<string | undefined>(undefined);
   const threadIdRef = useRef<string | null>(null);
   const renamedRef = useRef(false);
+  const onThreadCreatedRef = useRef(onThreadCreated);
   const messageListRef = useRef<HTMLDivElement>(null);
-  const conversationTurns = useMemo(() => collectConversationTurns(
-    state.messages.map((message, index) => ({
-      id: `optimize-${index}`,
-      role: message.role,
-      content: message.content,
-    })),
-  ), [state.messages]);
+  const conversationTurns = useMemo(
+    () =>
+      collectConversationTurns(
+        state.messages.map((message, index) => ({
+          id: `optimize-${index}`,
+          role: message.role,
+          content: message.content,
+        })),
+      ),
+    [state.messages],
+  );
+
+  useEffect(() => {
+    onThreadCreatedRef.current = onThreadCreated;
+  }, [onThreadCreated]);
 
   useEffect(() => {
     let cancelled = false;
@@ -52,7 +75,7 @@ export function SkillOptimizeWorkspace({ token, packageId, version, onSaved, onT
           surface: 'optimize',
         });
         threadIdRef.current = String(thread.id);
-        onThreadCreated?.(thread);
+        onThreadCreatedRef.current?.(thread);
         const diagnosis = await liteApi.diagnosePackage(
           token,
           packageId,
@@ -61,8 +84,12 @@ export function SkillOptimizeWorkspace({ token, packageId, version, onSaved, onT
           version.skill.dirName,
         );
         if (cancelled) return;
-        sessionIdRef.current = diagnosis.session?.id ? String(diagnosis.session.id) : undefined;
-        const skillIssues = diagnosis.issues.filter((issue) => issue.target === 'skill');
+        sessionIdRef.current = diagnosis.session?.id
+          ? String(diagnosis.session.id)
+          : undefined;
+        const skillIssues = diagnosis.issues.filter(
+          (issue) => issue.target === 'skill',
+        );
         const issueSummary = skillIssues.length
           ? `\n\n我先发现了 ${skillIssues.length} 个 Skill 层面的改进点：\n${skillIssues.map((issue, index) => `${index + 1}. ${issue.title}：${issue.suggestion}`).join('\n')}`
           : '';
@@ -126,7 +153,9 @@ export function SkillOptimizeWorkspace({ token, packageId, version, onSaved, onT
       dispatch({
         type: 'reply',
         content: result.reply,
-        adoptions: result.newAdoptions.filter((change) => change.target === 'skill'),
+        adoptions: result.newAdoptions.filter(
+          (change) => change.target === 'skill',
+        ),
       });
     } catch (error) {
       dispatch({
@@ -161,27 +190,56 @@ export function SkillOptimizeWorkspace({ token, packageId, version, onSaved, onT
   return (
     <div className="skill-flat-conversation skill-optimize-workspace skill-view-enter">
       <div className="skill-message-scroll-region">
-        <ConversationTurnNavigation containerRef={messageListRef} turns={conversationTurns} />
+        <ConversationTurnNavigation
+          containerRef={messageListRef}
+          turns={conversationTurns}
+        />
         <div ref={messageListRef} className="skill-flat-messages">
-        {initializing ? (
-          <div className="skill-flat-empty"><Loader2 size={23} className="spin" /><h2>正在分析这个 Skill</h2><p>马上为你整理值得改进的地方。</p></div>
-        ) : (
-          state.messages.map((message, index) =>
-            message.role === 'user' ? (
-              <div id={`guided-turn-optimize-${index}`} className="skill-user-message" key={`${message.role}-${index}`}>{message.content}</div>
-            ) : (
-              <div className="skill-assistant-block" key={`${message.role}-${index}`}>
-                <div className="skill-assistant-avatar"><Sparkles size={14} /></div>
-                <div className="skill-assistant-message"><MarkdownContent content={message.content} /></div>
-              </div>
-            ),
-          )
-        )}
-        {state.busy && <div className="skill-assistant-message is-thinking"><span /><span /><span /></div>}
-        {state.error && <div className="skill-run-error">{state.error}</div>}
-        {state.savedVersionNumber && (
-          <div className="skill-optimize-saved"><Check size={14} />已生成 v{state.savedVersionNumber}</div>
-        )}
+          {initializing ? (
+            <div className="skill-flat-empty">
+              <Loader2 size={23} className="spin" />
+              <h2>正在分析这个 Skill</h2>
+              <p>马上为你整理值得改进的地方。</p>
+            </div>
+          ) : (
+            state.messages.map((message, index) =>
+              message.role === 'user' ? (
+                <div
+                  id={`guided-turn-optimize-${index}`}
+                  className="skill-user-message"
+                  key={`${message.role}-${index}`}
+                >
+                  {message.content}
+                </div>
+              ) : (
+                <div
+                  className="skill-assistant-block"
+                  key={`${message.role}-${index}`}
+                >
+                  <div className="skill-assistant-avatar">
+                    <Sparkles size={14} />
+                  </div>
+                  <div className="skill-assistant-message">
+                    <MarkdownContent content={message.content} />
+                  </div>
+                </div>
+              ),
+            )
+          )}
+          {state.busy && (
+            <div className="skill-assistant-message is-thinking">
+              <span />
+              <span />
+              <span />
+            </div>
+          )}
+          {state.error && <div className="skill-run-error">{state.error}</div>}
+          {state.savedVersionNumber && (
+            <div className="skill-optimize-saved">
+              <Check size={14} />
+              已生成 v{state.savedVersionNumber}
+            </div>
+          )}
         </div>
       </div>
 
@@ -189,7 +247,11 @@ export function SkillOptimizeWorkspace({ token, packageId, version, onSaved, onT
         <div className="skill-optimize-savebar">
           <span>{state.changes.length} 项修改待保存</span>
           <button onClick={() => void save()} disabled={state.saving}>
-            {state.saving ? <Loader2 size={14} className="spin" /> : <Save size={14} />}
+            {state.saving ? (
+              <Loader2 size={14} className="spin" />
+            ) : (
+              <Save size={14} />
+            )}
             保存为新版本
           </button>
         </div>
@@ -198,7 +260,9 @@ export function SkillOptimizeWorkspace({ token, packageId, version, onSaved, onT
       <div className="skill-test-composer">
         <textarea
           value={state.draft}
-          onChange={(event) => dispatch({ type: 'draft', value: event.target.value })}
+          onChange={(event) =>
+            dispatch({ type: 'draft', value: event.target.value })
+          }
           onKeyDown={(event) => {
             if (event.key === 'Enter' && !event.shiftKey) {
               event.preventDefault();
@@ -207,8 +271,15 @@ export function SkillOptimizeWorkspace({ token, packageId, version, onSaved, onT
           }}
           placeholder="说说希望改进的效果，或回复“采纳”…"
         />
-        <button onClick={() => void send()} disabled={!state.draft.trim() || state.busy || initializing}>
-          {state.busy ? <Loader2 size={15} className="spin" /> : <ArrowUp size={15} />}
+        <button
+          onClick={() => void send()}
+          disabled={!state.draft.trim() || state.busy || initializing}
+        >
+          {state.busy ? (
+            <Loader2 size={15} className="spin" />
+          ) : (
+            <ArrowUp size={15} />
+          )}
         </button>
       </div>
     </div>

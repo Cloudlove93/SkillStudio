@@ -16,18 +16,14 @@ type Props = {
 };
 
 export function MultimodalOverviewStep(props: Props) {
-  const layers = Object.keys(
-    props.overview.overview,
-  ) as AdlerLayerKey[];
+  const layers = Object.keys(props.overview.overview) as AdlerLayerKey[];
 
   return (
     <div className="skill-mm-overview-step">
       <header>
         <span className="skill-eyebrow">确认内容</span>
         <h2>这段课堂素材讲了什么</h2>
-        <p>
-          先核对模型整理的结论。点击任意结论，左侧会显示对应视频和证据。
-        </p>
+        <p>先核对模型整理的结论。点击任意结论，左侧会显示对应视频和证据。</p>
       </header>
 
       <div className="skill-mm-overview-layers">
@@ -49,9 +45,7 @@ export function MultimodalOverviewStep(props: Props) {
                     }
                   >
                     <span>{statement.text}</span>
-                    <small>
-                      {statement.evidenceIds.length} 条支撑证据
-                    </small>
+                    <small>{statement.evidenceIds.length} 条支撑证据</small>
                   </button>
                 ))}
               </div>
@@ -72,6 +66,8 @@ export function MultimodalOverviewStep(props: Props) {
       <details className="skill-mm-review-notes">
         <summary>添加确认意见（可选）</summary>
         <textarea
+          name="multimodal-review-notes"
+          autoComplete="off"
           aria-label="本次确认意见"
           value={props.notes}
           onChange={(event) => props.onNotesChange(event.target.value)}

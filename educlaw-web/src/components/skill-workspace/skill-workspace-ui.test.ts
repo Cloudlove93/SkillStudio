@@ -1,14 +1,31 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
+const read = (path: string) =>
+  readFileSync(new URL(path, import.meta.url), 'utf8');
+const workspaceCss = () =>
+  [
+    './styles/workspace-shell.css',
+    './styles/workspace-controls.css',
+    './styles/workspace-inspector.css',
+    './styles/creation-workflows.css',
+    './styles/multimodal-workbench.css',
+    './styles/repository.css',
+    './styles/skill-detail.css',
+  ]
+    .map(read)
+    .join('\n');
 
 describe('Skill-first workspace UI contract', () => {
   it('uses the Skill workspace as the authenticated default and keeps a legacy fallback', () => {
     const source = read('../../App.tsx');
 
-    expect(source).toContain('path="/" element={<RequireAuth><SkillFirstWorkspace /></RequireAuth>}');
-    expect(source).toContain('path="/legacy" element={<RequireAuth><Workspace /></RequireAuth>}');
+    expect(source).toContain(
+      'path="/" element={<RequireAuth><SkillFirstWorkspace /></RequireAuth>}',
+    );
+    expect(source).toContain(
+      'path="/legacy" element={<RequireAuth><Workspace /></RequireAuth>}',
+    );
   });
 
   it('provides one compact entry to the shared right inspector', () => {
@@ -46,7 +63,9 @@ describe('Skill-first workspace UI contract', () => {
     expect(context).toContain('data-workspace-inspector-outlet');
     expect(sidebar).not.toContain('!collapsed && <span>');
     expect(css).toContain('.workspace-inspector-panel');
-    expect(css).not.toContain('transition: width 220ms ease, opacity 180ms ease, transform 220ms ease;');
+    expect(css).not.toContain(
+      'transition: width 220ms ease, opacity 180ms ease, transform 220ms ease;',
+    );
   });
 
   it('does not explain the center and right panel layout inside runtime information', () => {
@@ -58,33 +77,36 @@ describe('Skill-first workspace UI contract', () => {
 
   it('renders status updates as auto-closing overlays without shifting the center layout', () => {
     const source = read('./SkillPinnedUpdate.tsx');
-    const css = read('./skill-workspace.css');
+    const css = workspaceCss();
 
     expect(source).toContain('skill-transient-notification');
     expect(source).toContain('getSkillNotificationDuration');
     expect(source).toContain('onMouseEnter');
     expect(source).toContain('onDismiss');
     expect(source).toContain('actionLabel');
-    expect(css).toContain('.skill-transient-notification { position: absolute');
+    expect(css).toMatch(/\.skill-transient-notification\s*\{\s*position:\s*absolute;/s);
   });
 
   it('expands the desktop context panel inside the grid instead of covering the main stage', () => {
-    const shell = read('./skill-workspace.css');
+    const shell = workspaceCss();
     const css = read('./styles/workspace-inspector.css');
 
-    expect(css).toMatch(/\.skill-workspace-root\.is-context-open \.workspace-inspector\s*\{/);
+    expect(css).toMatch(
+      /\.skill-workspace-root\.is-context-open \.workspace-inspector\s*\{/,
+    );
     expect(shell).toMatch(/\.skill-content-column\s*\{[^}]*display:\s*flex;/s);
     expect(css).toContain('flex-basis: var(--workspace-inspector-width)');
-    expect(css).toContain('@media (max-width: 620px)');
+    expect(css).toContain('@media (max-width: 767px)');
   });
 
   it('opens four focused Skill creation actions from the compact menu', () => {
     const source = read('./SkillWorkspaceSidebar.tsx');
-    const css = read('./skill-workspace.css');
+    const css = workspaceCss();
 
     expect(source).toContain('skill-create-menu');
-    expect(css).toMatch(/\.skill-sidebar\s*\{\s*overflow:\s*visible;/);
-    expect(css).toMatch(/\.skill-sidebar\s*\{\s*overflow:\s*visible;\s*z-index:\s*20;/);
+    const sidebarRule = css.match(/\.skill-sidebar\s*\{([^}]*)\}/s)?.[1] ?? '';
+    expect(sidebarRule).toContain('overflow: visible');
+    expect(sidebarRule).toContain('z-index: 20');
     expect(source).toContain('对话共创');
     expect(source).toContain('文档生成');
     expect(source).toContain('完整填写');
@@ -92,7 +114,9 @@ describe('Skill-first workspace UI contract', () => {
     expect(source).not.toContain("mode: 'template'");
     expect(source).not.toContain('自然对话创建');
     expect(source).not.toContain('从模板创建');
-    expect(source).not.toContain('skill-sidebar-subnav" aria-label="新建 Skill 的方式');
+    expect(source).not.toContain(
+      'skill-sidebar-subnav" aria-label="新建 Skill 的方式',
+    );
   });
 
   it('uses education scenarios as conversation starters instead of a template page', () => {
@@ -100,10 +124,14 @@ describe('Skill-first workspace UI contract', () => {
     const scenarios = read('./education-scenarios.ts');
 
     expect(source).toContain('从一个教学目标开始');
-    expect(source).toContain('描述你的教学目标，我会协助梳理需求并生成可运行的 Skill。');
+    expect(source).toContain(
+      '描述你的教学目标，我会协助梳理需求并生成可运行的 Skill。',
+    );
     expect(source).toContain('精选教学场景');
     expect(source).not.toContain('先简单描述目标，我会通过对话帮你逐步补全。');
-    expect(source).toContain("import { educationScenarios } from './education-scenarios'");
+    expect(source).toContain(
+      "import { educationScenarios } from './education-scenarios'",
+    );
     expect(source).toContain('educationScenarios.map((scenario)');
     expect(source).toContain('scenario.description');
     expect(source).toContain('scenario.tone');
@@ -118,7 +146,7 @@ describe('Skill-first workspace UI contract', () => {
 
   it('shows the current co-creation stage without adding another content layer', () => {
     const source = read('./GuidedSkillCreationPanel.tsx');
-    const css = read('./skill-workspace.css');
+    const css = workspaceCss();
 
     expect(source).toContain('skill-guided-progress');
     expect(source).toContain('提炼你的做法');
@@ -129,7 +157,7 @@ describe('Skill-first workspace UI contract', () => {
     expect(source).toContain('props.session.flow_version >= 3');
     expect(source).toContain('props.session.completed_steps?.length');
     expect(source).toContain('props.session.confirmed_stages.length + 1');
-    expect(source).toContain("total: 5");
+    expect(source).toContain('total: 5');
     expect(css).toMatch(/\.skill-guided-progress\s*\{[^}]*display:\s*flex;/s);
     expect(css).not.toContain('.skill-guided-stage-card');
   });
@@ -138,7 +166,7 @@ describe('Skill-first workspace UI contract', () => {
     const page = read('../../pages/SkillFirstWorkspace.tsx');
     const panel = read('./GuidedSkillCreationPanel.tsx');
 
-    expect(page).toContain('setPendingGuidedMessage(createPendingGuidedMessage(');
+    expect(page).toMatch(/setPendingGuidedMessage\(\s*createPendingGuidedMessage\(/s);
     expect(page).toContain('pendingMessage={visiblePendingGuidedMessage}');
     expect(panel).toContain('shouldDisplayPendingGuidedMessage(');
     expect(panel).toContain('props.pendingMessage.content');
@@ -146,34 +174,51 @@ describe('Skill-first workspace UI contract', () => {
 
   it('uses Codex accent colors only on the education scenario icons', () => {
     const source = read('./GuidedSkillCreationPanel.tsx');
-    const css = read('./skill-workspace.css');
+    const css = workspaceCss();
 
     expect(source).toContain("scenario.tone === 'codex-orange'");
-    expect(source).toContain('<ScenarioIcon size={20} />');
-    expect(css).toMatch(/\.skill-starter-card\.is-codex-orange\s*\{[^}]*--starter-accent:\s*#e25507;/s);
-    expect(css).toMatch(/\.skill-starter-card\.is-codex-green\s*\{[^}]*--starter-accent:\s*#00a240;/s);
-    expect(css).toMatch(/\.skill-starter-card-icon\s*\{[^}]*background:\s*transparent;/s);
-    expect(css).toMatch(/\.skill-starter-card:hover\s*\{[^}]*background:\s*color-mix\(in srgb, var\(--muted\)/s);
-    expect(css).not.toMatch(/\.skill-starter-card:hover\s*\{[^}]*var\(--starter-accent\)/s);
+    expect(source).toMatch(/<ScenarioIcon size=\{20\}[^>]*\/>/);
+    expect(css).toMatch(
+      /\.skill-starter-card\.is-codex-orange\s*\{[^}]*--starter-accent:\s*#e25507;/s,
+    );
+    expect(css).toMatch(
+      /\.skill-starter-card\.is-codex-green\s*\{[^}]*--starter-accent:\s*#00a240;/s,
+    );
+    expect(css).toMatch(
+      /\.skill-starter-card-icon\s*\{[^}]*background:\s*transparent;/s,
+    );
+    expect(css).toMatch(
+      /\.skill-starter-card:hover\s*\{[^}]*background:\s*color-mix\(in srgb, var\(--muted\)/s,
+    );
+    expect(css).not.toMatch(
+      /\.skill-starter-card:hover\s*\{[^}]*var\(--starter-accent\)/s,
+    );
   });
 
   it('uses centered, action-oriented empty states across Skill workspaces', () => {
     const run = read('./SkillRunWorkspace.tsx');
     const arena = read('./SkillArenaWorkspace.tsx');
     const optimize = read('./SkillOptimizeWorkspace.tsx');
-    const css = read('./skill-workspace.css');
+    const css = workspaceCss();
 
-    expect(run).toContain("purpose === 'test' ? '试一试当前 Skill' : '开始使用这个 Skill'");
-    expect(run).toContain("purpose === 'test' ? '用真实任务检查回答是否符合你的预期。' : '输入一个教学任务，看看它如何完成。'");
+    expect(run).toContain(
+      "purpose === 'test' ? '试一试当前 Skill' : '开始使用这个 Skill'",
+    );
+    expect(run).toContain('用真实任务检查回答是否符合你的预期。');
+    expect(run).toContain('输入一个教学任务，看看它如何完成。');
     expect(arena).toContain('<h2>版本对比</h2>');
     expect(arena).toContain('输入同一个任务，直观比较两个版本的回答效果');
     expect(optimize).toContain('正在分析这个 Skill');
     expect(optimize).toContain('马上为你整理值得改进的地方。');
     expect(run).not.toContain('系统会固定使用');
     expect(arena).not.toContain('保存在服务端');
-    expect(css).toMatch(/\.skill-flat-empty\s*\{[^}]*display:\s*flex;[^}]*align-items:\s*center;[^}]*flex-direction:\s*column;/s);
+    expect(css).toMatch(
+      /\.skill-flat-empty\s*\{[^}]*display:\s*flex;[^}]*align-items:\s*center;[^}]*flex-direction:\s*column;/s,
+    );
     expect(css).toMatch(/\.skill-flat-empty p\s*\{[^}]*max-width:/s);
-    expect(css).toMatch(/@media \(max-width: 620px\)[\s\S]*\.skill-starter-chips\s*\{\s*grid-template-columns:\s*1fr;/);
+    expect(css).toMatch(
+      /@media \(max-width: 767px\)[\s\S]*\.skill-starter-chips\s*\{\s*grid-template-columns:\s*1fr;/,
+    );
   });
 
   it('keeps the left sidebar focused on Skills and conversations', () => {
@@ -188,7 +233,7 @@ describe('Skill-first workspace UI contract', () => {
   it('provides rename and delete actions for recent sessions', () => {
     const sidebar = read('./SkillWorkspaceSidebar.tsx');
     const page = read('../../pages/SkillFirstWorkspace.tsx');
-    const css = read('./skill-workspace.css');
+    const css = workspaceCss();
 
     expect(sidebar).toContain('aria-label="会话操作"');
     expect(sidebar).toContain('重命名');
@@ -204,12 +249,14 @@ describe('Skill-first workspace UI contract', () => {
     const css = read('./styles/workspace-inspector.css');
 
     expect(css).toMatch(
-      /\.skill-content-column:has\(\.workspace-inspector\.is-fullscreen\) \.skill-main-column\s*\{[^}]*display:\s*none/s,
+      /\.skill-content-column:has\(\.workspace-inspector\.is-fullscreen\)\s+\.skill-main-column\s*\{[^}]*display:\s*none/s,
     );
     expect(css).not.toMatch(
       /\.workspace-inspector\.is-fullscreen\s*\{[^}]*inset:\s*12px;/s,
     );
-    expect(context).toContain("state.fullscreen ? '退出全屏' : '全屏查看右侧栏'");
+    expect(context).toContain(
+      "state.fullscreen ? '退出全屏' : '全屏查看右侧栏'",
+    );
   });
 
   it('does not publish a pinned notification after an ordinary Skill run', () => {
@@ -243,7 +290,7 @@ describe('Skill-first workspace UI contract', () => {
     const guided = read('./GuidedSkillCreationPanel.tsx');
     const page = read('../../pages/SkillFirstWorkspace.tsx');
 
-    expect(form).toContain('<form className="skill-structured-form');
+    expect(form).toMatch(/<form\s+className="skill-structured-form/s);
     expect(form).toContain('Skill 名称');
     expect(form).toContain('服务对象');
     expect(form).toContain('使用场景');
@@ -283,7 +330,7 @@ describe('Skill-first workspace UI contract', () => {
   });
 
   it('styles the refined creation flows with the existing theme variables', () => {
-    const css = read('./skill-workspace.css');
+    const css = workspaceCss();
 
     expect(css).toContain('.skill-starter-section');
     expect(css).toContain('.skill-structured-form');
@@ -323,7 +370,7 @@ describe('Skill-first workspace UI contract', () => {
     const arena = read('./SkillArenaWorkspace.tsx');
     const optimize = read('./SkillOptimizeWorkspace.tsx');
     const navigation = read('./ConversationTurnNavigation.tsx');
-    const css = read('./skill-workspace.css');
+    const css = workspaceCss();
 
     expect(guided).toContain('<ConversationTurnNavigation');
     expect(guided).toContain('containerRef={messageListRef}');
@@ -387,11 +434,15 @@ describe('Skill-first workspace UI contract', () => {
     expect(panel).toContain('answerSkillOptimizationApi.suggestions');
     expect(panel).toContain('answerSkillOptimizationApi.resolve');
     expect(panel).toContain('existingOptimizationId');
-    expect(panel).not.toContain("setError(cause instanceof Error ? cause.message : '暂时无法生成改进建议')");
+    expect(panel).not.toContain(
+      "setError(cause instanceof Error ? cause.message : '暂时无法生成改进建议')",
+    );
     expect(panel).toContain('ANSWER_OPTIMIZATION_SUGGESTION_FALLBACKS');
     expect(panel).toContain('skill-answer-optimization-suggestions');
     expect(panel).toContain('setFeedbackDraft(suggestion)');
-    expect(panel).toContain('<details className="skill-answer-optimization-origin"');
+    expect(panel).toContain(
+      '<details className="skill-answer-optimization-origin"',
+    );
     expect(panel).toContain('说说希望这条回答怎么改进');
     expect(panel).not.toContain('skill-answer-optimization-footer-status');
     expect(panel).toContain('onDoubleClick={resetPanelHeight}');
@@ -407,26 +458,44 @@ describe('Skill-first workspace UI contract', () => {
     expect(panel).toContain('detail.draft?.previewContent');
     expect(panel).toContain('buildChangeRemovalFeedback');
     expect(panel).toContain('准备生成新版本');
-    expect(panel).not.toContain("cause instanceof Error ? cause.message : '测试没有完成，请重试'");
-    expect(panel).not.toContain("cause instanceof Error ? cause.message : '保存失败，请重试'");
-    const css = read('./skill-workspace.css');
-    expect(css).toContain('.skill-answer-optimization-status-content::-webkit-scrollbar');
+    expect(panel).not.toContain(
+      "cause instanceof Error ? cause.message : '测试没有完成，请重试'",
+    );
+    expect(panel).not.toContain(
+      "cause instanceof Error ? cause.message : '保存失败，请重试'",
+    );
+    const css = workspaceCss();
+    expect(css).toContain(
+      '.skill-answer-optimization-status-content::-webkit-scrollbar',
+    );
     expect(css).toContain('min-height: 128px');
     expect(css).not.toContain('--skill-answer-composer-height');
     expect(css).not.toContain('.skill-answer-optimization-composer textarea');
-    expect(css).toContain('.skill-context-panel-body .skill-answer-optimization-panel { flex: 1; height: auto; min-height: 0; }');
-    expect(css).toContain('.skill-answer-optimization-panel .skill-assistant-message { max-width: 100%; }');
-    expect(css).not.toContain('.skill-answer-optimization-panel .prose { max-width: 100%; font-size: 10px');
-    expect(css).not.toContain('.skill-answer-optimization-panel .skill-assistant-avatar { width: 24px');
-    expect(css).not.toContain('.skill-answer-optimization-panel .skill-user-message { max-width: 90%; padding: 8px 11px; font-size: 10px; }');
+    expect(css).toMatch(
+      /\.workspace-inspector-outlet \.skill-answer-optimization-panel\s*\{[^}]*min-height:\s*0;[^}]*height:\s*auto;[^}]*flex:\s*1;/s,
+    );
+    expect(css).toMatch(/\.skill-answer-optimization-panel \.skill-assistant-message\s*\{[^}]*max-width:\s*100%;/s);
+    expect(css).not.toContain(
+      '.skill-answer-optimization-panel .prose { max-width: 100%; font-size: 10px',
+    );
+    expect(css).not.toContain(
+      '.skill-answer-optimization-panel .skill-assistant-avatar { width: 24px',
+    );
+    expect(css).not.toContain(
+      '.skill-answer-optimization-panel .skill-user-message { max-width: 90%; padding: 8px 11px; font-size: 10px; }',
+    );
   });
 
   it('renders overall Skill optimization replies with the shared Markdown renderer', () => {
     const optimize = read('./SkillOptimizeWorkspace.tsx');
 
-    expect(optimize).toContain("import { MarkdownContent } from '../lite/lite-rendering'");
+    expect(optimize).toContain(
+      "import { MarkdownContent } from '../lite/lite-rendering'",
+    );
     expect(optimize).toContain('<MarkdownContent content={message.content} />');
-    expect(optimize).not.toContain('<div className="skill-assistant-message">{message.content}</div>');
+    expect(optimize).not.toContain(
+      '<div className="skill-assistant-message">{message.content}</div>',
+    );
   });
 
   it('integrates the resumable multimodal Skill Pack flow behind a feature flag', () => {
@@ -434,12 +503,12 @@ describe('Skill-first workspace UI contract', () => {
     const panel = read('./MultimodalSkillCreationPanel.tsx');
     const state = read('./multimodal-guided-creation-state.ts');
     const page = read('../../pages/SkillFirstWorkspace.tsx');
-    const css = read('./skill-workspace.css');
+    const css = workspaceCss();
 
     expect(sidebar).toContain("VITE_MULTIMODAL_SKILL_PACK_ENABLED !== 'false'");
     expect(sidebar).toContain('音视频蒸馏');
-    expect(page).toContain("lazy(() => import('../components/skill-workspace/MultimodalSkillCreationPanel')");
-    expect(page).toContain('<Suspense fallback={<SkillWorkspaceLoadingState label="正在打开音视频蒸馏" />}>');
+    expect(page).toMatch(/lazy\(\(\)\s*=>\s*import\(['"]\.\.\/components\/skill-workspace\/MultimodalSkillCreationPanel['"]\)/s);
+    expect(page).toContain('label="正在打开音视频蒸馏"');
     expect(page).toContain("createMode === 'multimodal'");
     expect(page).toContain('<MultimodalSkillCreationPanel');
     expect(panel).toContain('streamMediaProgress');
@@ -471,7 +540,9 @@ describe('Skill-first workspace UI contract', () => {
     expect(page).toContain(
       'const [multimodalCreationKey, setMultimodalCreationKey] = useState(0);',
     );
-    expect(page).toContain('setMultimodalCreationKey((current) => current + 1);');
+    expect(page).toContain(
+      'setMultimodalCreationKey((current) => current + 1);',
+    );
     expect(page).toContain('key={multimodalCreationKey}');
   });
 
@@ -486,13 +557,17 @@ describe('Skill-first workspace UI contract', () => {
     expect(repository).toContain('repositoryPageItems');
     expect(repository).toContain('aria-label="Skill 操作"');
     expect(repository).toContain('data-skill-delete-return={skill.skillId}');
-    expect(repository).toContain('returnFocusSkillId={deleteReturnFocusSkillId}');
+    expect(repository).toContain(
+      'returnFocusSkillId={deleteReturnFocusSkillId}',
+    );
     expect(repository).toContain('<SkillDeleteConfirmDialog');
     expect(dialog).toContain('role="alertdialog"');
     expect(dialog).toContain('cancelButtonRef.current?.focus()');
     expect(dialog).toContain("event.key === 'Tab'");
     expect(dialog).toContain('previousFocus !== document.body');
-    expect(dialog).toContain('[data-skill-delete-return="${returnFocusSkillId}"]');
+    expect(dialog).toContain(
+      '[data-skill-delete-return="${returnFocusSkillId}"]',
+    );
     expect(dialog).toContain("'[data-skill-delete-return-focus]'");
     expect(dialog).toContain('删除选中的 Skill？');
     expect(dialog).toContain('原始素材与处理产物仍会保留');
@@ -520,7 +595,9 @@ describe('Skill-first workspace UI contract', () => {
     expect(multimodalModel).not.toContain('Skill Pack');
     expect(agentBuild).not.toContain('skill package');
     expect(versions).toContain('无法确认当前 Skill 版本，请刷新后重试');
-    expect(versions).not.toContain('无法确认当前 Package Version，请刷新后重试');
+    expect(versions).not.toContain(
+      '无法确认当前 Package Version，请刷新后重试',
+    );
   });
 
   it('cleans repository, workspace, and active selection after server-confirmed deletion', () => {
@@ -529,12 +606,16 @@ describe('Skill-first workspace UI contract', () => {
     expect(page).toContain('const deleteRepositorySkills = async');
     expect(page).toContain('liteApi.batchDeleteSkills(token, skillIds)');
     expect(page).toContain('result.deletedSkillIds');
-    expect(page).toContain('setRepositorySkills((current) => current.filter');
-    expect(page).toContain('setWorkspaceSkillKeys((current) => current.filter');
-    expect(page).toContain('activeSkill && deletedSkillIds.has(activeSkill.skillId)');
+    expect(page).toMatch(/setRepositorySkills\(\(current\)\s*=>\s*current\.filter/s);
+    expect(page).toMatch(/setWorkspaceSkillKeys\(\(current\)\s*=>\s*current\.filter/s);
+    expect(page).toContain(
+      'activeSkill && deletedSkillIds.has(activeSkill.skillId)',
+    );
     expect(page).toContain('setSession(null)');
     expect(page).toContain('setSelectedSessionId(null)');
-    expect(page).toContain("dispatchWorkspace({ type: 'navigate', view: 'repository' })");
+    expect(page).toContain(
+      "dispatchWorkspace({ type: 'navigate', view: 'repository' })",
+    );
     expect(page).toContain('await refreshRepository()');
     expect(page).toContain('Skill 已删除，但仓库同步失败，请刷新页面');
     expect(page).toContain('onDeleteSkills={deleteRepositorySkills}');
@@ -542,13 +623,18 @@ describe('Skill-first workspace UI contract', () => {
 
   it('uses the main page as the only repository scroll owner and styles management controls', () => {
     const page = read('../../pages/SkillFirstWorkspace.tsx');
-    const css = read('./skill-workspace.css');
-    const repositoryRule = css.match(/\.skill-repository\s*\{([^}]*)\}/)?.[1] || '';
+    const css = workspaceCss();
+    const repositoryRule =
+      css.match(/\.skill-repository\s*\{([^}]*)\}/)?.[1] || '';
 
-    expect(page).toContain("workspaceState.activeView === 'repository' ? 'is-repository' : ''");
+    expect(page).toContain(
+      "workspaceState.activeView === 'repository' ? 'is-repository' : ''",
+    );
     expect(repositoryRule).not.toMatch(/(^|;)\s*height:\s*100%/);
     expect(repositoryRule).not.toContain('overflow-y: auto');
-    expect(css).toMatch(/\.skill-main-stage\.is-repository\s*\{[^}]*overflow-y:\s*auto;/s);
+    expect(css).toMatch(
+      /\.skill-main-stage\.is-repository\s*\{[^}]*overflow-y:\s*auto;/s,
+    );
     expect(css).toContain('.skill-repository-tabs');
     expect(css).toContain('.skill-repository-bulkbar');
     expect(css).toContain('.skill-repository-row-menu');

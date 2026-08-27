@@ -1,16 +1,20 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
+const read = (path: string) =>
+  readFileSync(new URL(path, import.meta.url), 'utf8');
+const sidebarCss = () => read('./styles/workspace-shell.css');
 
 describe('Skill sidebar run status contract', () => {
   it('keeps Skill symbols on the left and conversation state on the right', () => {
     const sidebar = read('./SkillWorkspaceSidebar.tsx');
     const conversation = read('./SkillConversationList.tsx');
-    const css = read('./skill-workspace.css');
+    const css = sidebarCss();
 
     expect(sidebar).toContain('skill-skill-symbol');
-    expect(sidebar).not.toContain('<span className="skill-status-dot status-completed" />');
+    expect(sidebar).not.toContain(
+      '<span className="skill-status-dot status-completed" />',
+    );
     expect(conversation).toContain('running');
     expect(conversation).toContain('skill-conversation-status');
     expect(css).toContain('.skill-conversation-status');
@@ -28,7 +32,7 @@ describe('Skill sidebar run status contract', () => {
   it('uses hidden hover actions and shared right-click menus for Skill rows and conversations', () => {
     const sidebar = read('./SkillWorkspaceSidebar.tsx');
     const conversation = read('./SkillConversationList.tsx');
-    const css = read('./skill-workspace.css');
+    const css = sidebarCss();
 
     expect(sidebar).toContain('onSkillAction');
     expect(sidebar).toContain('onContextMenu');
