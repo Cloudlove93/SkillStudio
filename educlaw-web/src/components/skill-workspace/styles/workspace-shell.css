@@ -1,0 +1,22 @@
+.skill-workspace-root {
+  background: var(--workspace-canvas);
+  color: var(--workspace-ink);
+}
+
+.skill-content-column {
+  border-color: var(--workspace-border);
+  background: var(--workspace-surface);
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--workspace-ink) 5%, transparent);
+}
+
+.skill-main-column {
+  background: var(--workspace-surface);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skill-workspace-root,
+  .skill-content-column {
+    scroll-behavior: auto;
+  }
+}
+

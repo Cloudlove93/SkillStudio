@@ -11,30 +11,46 @@ describe('Skill-first workspace UI contract', () => {
     expect(source).toContain('path="/legacy" element={<RequireAuth><Workspace /></RequireAuth>}');
   });
 
-  it('provides separate information and version controls on the compact right rail', () => {
-    const source = read('./SkillContextPanel.tsx');
+  it('provides one compact entry to the shared right inspector', () => {
+    const source = read('./WorkspaceInspector.tsx');
 
-    expect(source).toContain('skill-context-rail');
-    expect(source).toContain('aria-label="功能选项"');
+    expect(source).toContain('workspace-inspector-rail');
     expect(source).toContain('aria-label="展开右侧栏"');
+    expect(source).not.toContain('aria-label="功能选项"');
+  });
+
+  it('uses one shared non-modal inspector instead of feature-owned right-panel dialogs', () => {
+    const provider = read('./WorkspaceInspectorProvider.tsx');
+    const inspector = read('./WorkspaceInspector.tsx');
+    const portal = read('./InspectorPortal.tsx');
+    const page = read('../../pages/SkillFirstWorkspace.tsx');
+
+    expect(provider).toContain('workspaceInspectorReducer');
+    expect(provider).toContain('eduskill:workspace-inspector:v1');
+    expect(inspector).toContain('<aside');
+    expect(inspector).toContain('data-workspace-inspector-outlet');
+    expect(inspector).not.toContain('role="dialog"');
+    expect(portal).toContain('createPortal');
+    expect(page).toContain('<WorkspaceInspectorProvider>');
+    expect(page).toContain('<InspectorPortal');
+    expect(page).not.toContain('<SkillContextPanel');
   });
 
   it('keeps both sidebars mounted while their columns animate', () => {
-    const context = read('./SkillContextPanel.tsx');
+    const context = read('./WorkspaceInspector.tsx');
     const sidebar = read('./SkillWorkspaceSidebar.tsx');
-    const css = read('./skill-workspace.css');
+    const css = read('./styles/workspace-inspector.css');
 
-    expect(context).toContain("props.open ? 'is-open' : 'is-collapsed'");
-    expect(context).toContain('skill-context-panel-body');
-    expect(context).not.toContain('if (!props.open)');
+    expect(context).toContain("state.open ? 'is-open' : 'is-collapsed'");
+    expect(context).toContain('workspace-inspector-panel');
+    expect(context).toContain('data-workspace-inspector-outlet');
     expect(sidebar).not.toContain('!collapsed && <span>');
-    expect(css).toContain('transition: grid-template-columns 240ms cubic-bezier(.2, .8, .2, 1);');
-    expect(css).toContain('.skill-context-panel-body');
+    expect(css).toContain('.workspace-inspector-panel');
     expect(css).not.toContain('transition: width 220ms ease, opacity 180ms ease, transform 220ms ease;');
   });
 
   it('does not explain the center and right panel layout inside runtime information', () => {
-    const context = read('./SkillContextPanel.tsx');
+    const context = read('./SkillInspectorContent.tsx');
 
     expect(context).not.toContain('中间区域用于任务和结果');
     expect(context).not.toContain('不挤占主要交互空间');
@@ -53,11 +69,12 @@ describe('Skill-first workspace UI contract', () => {
   });
 
   it('expands the desktop context panel inside the grid instead of covering the main stage', () => {
-    const css = read('./skill-workspace.css');
+    const shell = read('./skill-workspace.css');
+    const css = read('./styles/workspace-inspector.css');
 
-    expect(css).toMatch(/\.skill-workspace-root\.is-context-open\s*\{/);
-    expect(css).toMatch(/\.skill-content-column\s*\{[^}]*display:\s*flex;/s);
-    expect(css).toMatch(/\.skill-context\s*\{[^}]*flex:\s*0 0 var\(--skill-context-current\)/s);
+    expect(css).toMatch(/\.skill-workspace-root\.is-context-open \.workspace-inspector\s*\{/);
+    expect(shell).toMatch(/\.skill-content-column\s*\{[^}]*display:\s*flex;/s);
+    expect(css).toContain('flex-basis: var(--workspace-inspector-width)');
     expect(css).toContain('@media (max-width: 620px)');
   });
 
@@ -183,16 +200,16 @@ describe('Skill-first workspace UI contract', () => {
   });
 
   it('expands the right workspace without covering the left sidebar', () => {
-    const context = read('./SkillContextPanel.tsx');
-    const css = read('./skill-workspace.css');
+    const context = read('./WorkspaceInspector.tsx');
+    const css = read('./styles/workspace-inspector.css');
 
     expect(css).toMatch(
-      /\.skill-content-column:has\(\.skill-context\.is-fullscreen\) \.skill-main-column\s*\{[^}]*display:\s*none/s,
+      /\.skill-content-column:has\(\.workspace-inspector\.is-fullscreen\) \.skill-main-column\s*\{[^}]*display:\s*none/s,
     );
     expect(css).not.toMatch(
-      /\.skill-context\.is-fullscreen\s*\{[^}]*inset:\s*12px;/s,
+      /\.workspace-inspector\.is-fullscreen\s*\{[^}]*inset:\s*12px;/s,
     );
-    expect(context).toContain("fullscreen ? '退出全屏' : '全屏覆盖中间栏'");
+    expect(context).toContain("state.fullscreen ? '退出全屏' : '全屏查看右侧栏'");
   });
 
   it('does not publish a pinned notification after an ordinary Skill run', () => {
@@ -274,12 +291,12 @@ describe('Skill-first workspace UI contract', () => {
 
   it('keeps the center top bar minimal and puts panel controls on the right', () => {
     const detail = read('./SkillDetailWorkspace.tsx');
-    const context = read('./SkillContextPanel.tsx');
+    const context = read('./WorkspaceInspector.tsx');
     const sidebar = read('./SkillWorkspaceSidebar.tsx');
 
     expect(detail).not.toContain('skill-topbar-actions');
     expect(context).toContain('is-fullscreen');
-    expect(context).toContain('全屏覆盖中间栏');
+    expect(context).toContain('全屏查看右侧栏');
     expect(sidebar).toContain('skill-user-menu');
     expect(sidebar).toContain('skill-skill-conversations');
     expect(sidebar).toContain('skill-skill-group');

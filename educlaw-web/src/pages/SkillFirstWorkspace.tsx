@@ -21,7 +21,13 @@ import {
   createPendingGuidedMessage,
   type PendingGuidedMessage,
 } from '../components/skill-workspace/guided-optimistic-message';
-import { SkillContextPanel } from '../components/skill-workspace/SkillContextPanel';
+import { InspectorPortal } from '../components/skill-workspace/InspectorPortal';
+import { SkillInspectorContent } from '../components/skill-workspace/SkillInspectorContent';
+import { WorkspaceInspector } from '../components/skill-workspace/WorkspaceInspector';
+import {
+  WorkspaceInspectorProvider,
+  useWorkspaceInspector,
+} from '../components/skill-workspace/WorkspaceInspectorProvider';
 import {
   SkillWorkspaceSidebar,
   type SkillCreateAction,
@@ -43,6 +49,8 @@ import {
   type SkillPinnedUpdate as SkillPinnedUpdateValue,
 } from '../components/skill-workspace/skill-workspace-state';
 import '../components/skill-workspace/skill-workspace.css';
+import '../components/skill-workspace/styles/workspace-shell.css';
+import '../components/skill-workspace/styles/workspace-inspector.css';
 import type {
   AnswerOptimizationRerunRequest,
   AnswerOptimizationSelection,
@@ -83,9 +91,23 @@ function createRequestId(prefix: string) {
 }
 
 export default function SkillFirstWorkspace() {
+  return (
+    <WorkspaceInspectorProvider>
+      <SkillFirstWorkspaceContent />
+    </WorkspaceInspectorProvider>
+  );
+}
+
+function SkillFirstWorkspaceContent() {
   const token = useAuthStore((state) => state.token) || '';
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
+  const {
+    state: inspectorState,
+    width: inspectorWidth,
+    openInspector,
+    closeInspector,
+  } = useWorkspaceInspector();
   const [sessions, setSessions] = useState<GuidedCreationSession[]>([]);
   const [repositorySkills, setRepositorySkills] = useState<RepositorySkill[]>([]);
   const [workspaceSkillKeys, setWorkspaceSkillKeys] = useState<string[]>(() => {
@@ -122,10 +144,6 @@ export default function SkillFirstWorkspace() {
   const [versionsLoading, setVersionsLoading] = useState(false);
   const [answerOptimization, setAnswerOptimization] = useState<AnswerOptimizationSelection | null>(null);
   const [answerRerunRequest, setAnswerRerunRequest] = useState<AnswerOptimizationRerunRequest | null>(null);
-  const [contextWidth, setContextWidth] = useState<number | null>(null);
-  const isResizingRef = useRef(false);
-  const resizeStartXRef = useRef(0);
-  const resizeStartWidthRef = useRef(0);
   const [conversations, setConversations] = useState<ArenaThread[]>([]);
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [conversationLoading, setConversationLoading] = useState(false);
@@ -164,56 +182,14 @@ export default function SkillFirstWorkspace() {
     }
   }, [workspaceSkillKeys]);
 
-  useEffect(() => {
-    if (workspaceState.contextOpen && workspaceState.contextView === 'optimization') {
-      setContextWidth(Math.max(500, Math.floor(window.innerWidth * 0.45)));
-    } else if (!workspaceState.contextOpen) {
-      setContextWidth(null);
-    }
-  }, [workspaceState.contextOpen, workspaceState.contextView]);
-
-  const handleResizeStart = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    isResizingRef.current = true;
-    resizeStartXRef.current = e.clientX;
-    const contextEl = document.querySelector('.skill-context') as HTMLElement | null;
-    resizeStartWidthRef.current = contextEl ? contextEl.getBoundingClientRect().width : contextWidth || 276;
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-  }, [contextWidth]);
-
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isResizingRef.current) return;
-      const delta = resizeStartXRef.current - e.clientX;
-      const newWidth = Math.max(320, Math.min(700, resizeStartWidthRef.current + delta));
-      setContextWidth(newWidth);
-    };
-    const handleMouseUp = () => {
-      if (isResizingRef.current) {
-        isResizingRef.current = false;
-        document.body.style.cursor = '';
-        document.body.style.userSelect = '';
-      }
-    };
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, []);
-
   const publishUpdate = useCallback(
     (update: SkillPinnedUpdateValue, autoOpen = true) => {
-      dispatchWorkspace({
-        type: 'publish-update',
-        update,
-        contextView: 'summary',
-        autoOpen,
-      });
+      dispatchWorkspace({ type: 'publish-update', update });
+      if (autoOpen) {
+        openInspector({ owner: 'guided', view: 'summary', title: '需求摘要' });
+      }
     },
-    [],
+    [openInspector],
   );
 
   const loadVersions = useCallback(async () => {
@@ -457,7 +433,7 @@ export default function SkillFirstWorkspace() {
   };
 
   const start = (content: string) => {
-    dispatchWorkspace({ type: 'open-context', view: 'summary' });
+    openInspector({ owner: 'guided', view: 'summary', title: '需求摘要' });
     const clientMessageId = createRequestId('message');
     setPendingGuidedMessage(createPendingGuidedMessage(content, clientMessageId, null));
     const action = () =>
@@ -484,7 +460,7 @@ export default function SkillFirstWorkspace() {
       start(content);
       return;
     }
-    dispatchWorkspace({ type: 'open-context', view: 'summary' });
+    openInspector({ owner: 'guided', view: 'summary', title: '需求摘要' });
     const sessionId = session.id;
     const clientMessageId = createRequestId('message');
     setPendingGuidedMessage(createPendingGuidedMessage(content, clientMessageId, sessionId));
@@ -571,7 +547,7 @@ export default function SkillFirstWorkspace() {
       }
       if (detail.status === 'completed') {
         dispatchWorkspace({ type: 'navigate', view: 'run' });
-        dispatchWorkspace({ type: 'close-context' });
+        closeInspector({ force: true });
         dispatchWorkspace({ type: 'dismiss-update' });
       } else {
         dispatchWorkspace({ type: 'navigate', view: 'create' });
@@ -655,13 +631,13 @@ export default function SkillFirstWorkspace() {
     setVersions([]);
     setCurrentVersionId(null);
     dispatchWorkspace({ type: 'navigate', view: 'create' });
-    dispatchWorkspace({ type: 'close-context' });
+    closeInspector({ force: true });
     dispatchWorkspace({ type: 'dismiss-update' });
   };
 
   const openRepository = () => {
     dispatchWorkspace({ type: 'navigate', view: 'repository' });
-    dispatchWorkspace({ type: 'close-context' });
+    closeInspector({ force: true });
     dispatchWorkspace({ type: 'dismiss-update' });
   };
 
@@ -733,7 +709,7 @@ export default function SkillFirstWorkspace() {
   const handleConversationSelect = (id: string) => {
     setSelectedConversationId(id);
     dispatchWorkspace({ type: 'navigate', view: 'run' });
-    dispatchWorkspace({ type: 'close-context' });
+    closeInspector({ force: true });
   };
 
   const handleConversationRunState = (running: boolean, threadId?: string | null) => {
@@ -766,7 +742,7 @@ export default function SkillFirstWorkspace() {
   const handleNewConversation = () => {
     setSelectedConversationId(null);
     dispatchWorkspace({ type: 'navigate', view: 'run' });
-    dispatchWorkspace({ type: 'close-context' });
+    closeInspector({ force: true });
   };
 
   const renameConversation = async (thread: ArenaThread, title: string) => {
@@ -805,7 +781,7 @@ export default function SkillFirstWorkspace() {
     setError(null);
     setWorkspaceSkillKeys((keys) => keys.includes(skill.key) ? keys : [...keys, skill.key]);
     dispatchWorkspace({ type: 'navigate', view: 'run' });
-    dispatchWorkspace({ type: 'close-context' });
+    closeInspector({ force: true });
     dispatchWorkspace({ type: 'dismiss-update' });
   };
 
@@ -923,19 +899,23 @@ export default function SkillFirstWorkspace() {
   const handlePinnedAction = (update: SkillPinnedUpdateValue) => {
     if (update.id === 'version-changed') {
       dispatchWorkspace({ type: 'navigate', view: 'versions' });
-      dispatchWorkspace({ type: 'close-context' });
+      closeInspector({ force: true });
       return;
     }
     if (update.id === 'skill-created') {
       dispatchWorkspace({ type: 'navigate', view: 'run' });
       return;
     }
-    dispatchWorkspace({ type: 'open-context', view: 'summary' });
+    openInspector({
+      owner: activeSkill ? 'skill' : 'guided',
+      view: 'summary',
+      title: activeSkill ? '当前 Skill' : '需求摘要',
+    });
   };
 
   return (
-    <div className={`skill-workspace-root ${leftCollapsed ? 'is-left-collapsed' : ''} ${workspaceState.contextOpen ? 'is-context-open' : ''}`}
-        style={{ '--skill-context-current': contextWidth != null ? `${contextWidth}px` : (workspaceState.contextOpen ? '276px' : '46px') } as React.CSSProperties}>
+    <div className={`skill-workspace-root ${leftCollapsed ? 'is-left-collapsed' : ''} ${inspectorState.open ? 'is-context-open' : ''}`}
+        style={{ '--skill-context-current': inspectorState.open ? `${inspectorWidth}px` : '46px' } as React.CSSProperties}>
       <SkillWorkspaceSidebar
         sessions={sessions}
         selectedSessionId={selectedSessionId}
@@ -1004,7 +984,13 @@ export default function SkillFirstWorkspace() {
               onReloadVersions={loadVersions}
               onOptimizeAnswer={(selection) => {
                 setAnswerOptimization(selection);
-                dispatchWorkspace({ type: 'open-context', view: 'optimization' });
+                openInspector({
+                  owner: 'skill',
+                  view: 'optimization',
+                  title: '改进这条回答',
+                  description: '先审阅建议，再决定是否保存为新版本。',
+                  preferredWidth: 500,
+                });
               }}
               conversations={conversations}
               selectedConversationId={selectedConversationId}
@@ -1077,36 +1063,59 @@ export default function SkillFirstWorkspace() {
           )}
         </div>
       </div>
-      {workspaceState.contextOpen && (
-        <div className="skill-content-resize-handle" onMouseDown={handleResizeStart}>
-          <div className="skill-content-resize-grip" />
-        </div>
-      )}
-      <SkillContextPanel
-        token={token}
-        session={workspaceState.activeView === 'repository' ? null : session}
-        hasSkill={Boolean(activeSkill)}
-        open={workspaceState.contextOpen}
-        view={workspaceState.contextView}
-        activeView={workspaceState.activeView}
-        versions={versions}
-        currentVersionId={currentVersionId}
-        versionsLoading={versionsLoading}
-        answerOptimization={answerOptimization}
-        onAnswerOptimizationSaved={() => { void loadVersions(); }}
-        onAnswerOptimizationRerun={(versionNumber, selection) => {
-          void (async () => {
-            await loadVersions();
-            dispatchWorkspace({ type: 'navigate', view: selection.origin });
-            setAnswerRerunRequest({ requestId: createRequestId('rerun'), versionNumber, selection });
-          })();
-        }}
-        onOpen={(view) => dispatchWorkspace({ type: 'open-context', view })}
-        onClose={() => dispatchWorkspace({ type: 'close-context' })}
-        onNavigate={(view) => dispatchWorkspace({ type: 'navigate', view })}
-        onOpenVersionManager={() => {
-          dispatchWorkspace({ type: 'navigate', view: 'versions' });
-          dispatchWorkspace({ type: 'close-context' });
+      <InspectorPortal owner="guided">
+        <SkillInspectorContent
+          token={token}
+          descriptor={inspectorState.descriptor}
+          session={workspaceState.activeView === 'repository' ? null : session}
+          activeView={workspaceState.activeView}
+          versions={versions}
+          currentVersionId={currentVersionId}
+          versionsLoading={versionsLoading}
+          answerOptimization={answerOptimization}
+          onAnswerOptimizationSaved={() => { void loadVersions(); }}
+          onAnswerOptimizationRerun={(versionNumber, selection) => {
+            void (async () => {
+              await loadVersions();
+              dispatchWorkspace({ type: 'navigate', view: selection.origin });
+              setAnswerRerunRequest({ requestId: createRequestId('rerun'), versionNumber, selection });
+            })();
+          }}
+          onOpenVersionManager={() => {
+            dispatchWorkspace({ type: 'navigate', view: 'versions' });
+            closeInspector({ force: true });
+          }}
+        />
+      </InspectorPortal>
+      <InspectorPortal owner="skill">
+        <SkillInspectorContent
+          token={token}
+          descriptor={inspectorState.descriptor}
+          session={null}
+          activeView={workspaceState.activeView}
+          versions={versions}
+          currentVersionId={currentVersionId}
+          versionsLoading={versionsLoading}
+          answerOptimization={answerOptimization}
+          onAnswerOptimizationSaved={() => { void loadVersions(); }}
+          onAnswerOptimizationRerun={(versionNumber, selection) => {
+            void (async () => {
+              await loadVersions();
+              dispatchWorkspace({ type: 'navigate', view: selection.origin });
+              setAnswerRerunRequest({ requestId: createRequestId('rerun'), versionNumber, selection });
+            })();
+          }}
+          onOpenVersionManager={() => {
+            dispatchWorkspace({ type: 'navigate', view: 'versions' });
+            closeInspector({ force: true });
+          }}
+        />
+      </InspectorPortal>
+      <WorkspaceInspector
+        defaultDescriptor={{
+          owner: activeSkill ? 'skill' : 'guided',
+          view: 'summary',
+          title: activeSkill ? '当前 Skill' : '需求摘要',
         }}
       />
       </div>
