@@ -1,5 +1,7 @@
 # 教育 Skill 自然对话式引导生成工程规范
 
+> **适用范围说明：**本文件仅描述既有“自然对话式文本引导生成”流程，不是多模态 Skill Pack 的实施规范。涉及视频/音频、证据时间线、对象永久保留、媒体任务、Python Worker、Arena 门禁和多模态发布时，必须使用 `2026-08-20-multimodal-skill-pack-implementation-spec-feishu-v2.md`；两者冲突时，以该 V2 对多模态新增行为的规定为准。
+
 > 版本：V1.1
 >
 > 项目：EduSkill

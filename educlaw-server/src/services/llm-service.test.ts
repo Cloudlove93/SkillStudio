@@ -20,6 +20,30 @@ async function loadService(configOverrides: Partial<typeof baseConfig> = {}) {
   return import("./llm-service.js");
 }
 
+async function loadServiceWithLogger(
+  configOverrides: Partial<typeof baseConfig> = {},
+) {
+  const logger = {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  };
+  vi.resetModules();
+  vi.doMock("../config.js", () => ({
+    config: {
+      ...baseConfig,
+      ...configOverrides,
+    },
+  }));
+  vi.doMock("../lib/request-context.js", () => ({
+    getLogger: vi.fn(() => logger),
+  }));
+  return {
+    logger,
+    service: await import("./llm-service.js"),
+  };
+}
+
 function mockChatResponse(content: string, init: ResponseInit = {}) {
   return new Response(
     JSON.stringify({
@@ -67,10 +91,12 @@ function mockStreamResponse(chunks: string[]) {
 }
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   vi.resetModules();
   vi.doUnmock("../config.js");
+  vi.doUnmock("../lib/request-context.js");
 });
 
 describe("llm-service", () => {
@@ -162,6 +188,136 @@ describe("llm-service", () => {
     const body = JSON.parse(fetchMock.mock.calls[0]![1].body as string);
     expect(body.messages[0].content).toContain("Strict JSON output contract");
     expect(body.messages[1].content).toContain("Before sending the final answer");
+  });
+
+  it("automatically recovers from two transient network resets", async () => {
+    vi.useFakeTimers();
+    const resetError = () => new Error("fetch failed", {
+      cause: { code: "ECONNRESET" },
+    });
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(resetError())
+      .mockRejectedValueOnce(resetError())
+      .mockResolvedValueOnce(mockChatResponse('{"ok":true}'));
+    vi.stubGlobal("fetch", fetchMock);
+    const { generateJson } = await loadService({ llmNetworkRetries: 2 });
+
+    const resultPromise = generateJson<{ ok: boolean }>({
+      systemPrompt: "Return JSON",
+      userPrompt: "Give me data",
+    });
+    await vi.runAllTimersAsync();
+
+    await expect(resultPromise).resolves.toEqual({ ok: true });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("stops automatic network recovery after three total attempts", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn().mockRejectedValue(new Error("fetch failed", {
+      cause: { code: "ECONNRESET" },
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { generateJson } = await loadService({ llmNetworkRetries: 2 });
+
+    const resultPromise = generateJson<{ ok: boolean }>({
+      systemPrompt: "Return JSON",
+      userPrompt: "Give me data",
+    });
+    const rejection = expect(resultPromise).rejects.toThrow(
+      "LLM network request failed",
+    );
+    await vi.runAllTimersAsync();
+
+    await rejection;
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("can hide prompt content from logs for multimodal adapters without changing default behavior", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockChatResponse('{"ok":true}')));
+    const { logger, service } = await loadServiceWithLogger();
+
+    await service.generateJson<{ ok: boolean }>({
+      systemPrompt: "SYSTEM SECRET SENTINEL",
+      userPrompt: "TRANSCRIPT SECRET SENTINEL",
+      hidePromptContentInLogs: true,
+    });
+
+    expect(JSON.stringify(logger.info.mock.calls)).not.toContain("SYSTEM SECRET SENTINEL");
+    expect(JSON.stringify(logger.info.mock.calls)).not.toContain("TRANSCRIPT SECRET SENTINEL");
+
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockChatResponse('{"ok":true}')));
+    const second = await loadServiceWithLogger();
+    await second.service.generateJson<{ ok: boolean }>({
+      systemPrompt: "VISIBLE SYSTEM SENTINEL",
+      userPrompt: "VISIBLE USER SENTINEL",
+    });
+
+    expect(JSON.stringify(second.logger.info.mock.calls)).toContain("VISIBLE USER SENTINEL");
+  });
+
+  it("sends image URLs as ephemeral multimodal content without logging signed URLs", async () => {
+    const signedUrl =
+      "https://storage.example.test/frame.png?X-Amz-Signature=secret-sentinel";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(mockChatResponse('{"rankings":[]}'));
+    vi.stubGlobal("fetch", fetchMock);
+    const { logger, service } = await loadServiceWithLogger();
+
+    const result = await service.generateMultimodalJson<{ rankings: unknown[] }>({
+      systemPrompt: "Return rankings as JSON",
+      userPrompt: "Rank this teaching frame",
+      images: [{ imageUrl: signedUrl }],
+      model: "kimi-k2.5",
+      maxTokens: 512,
+    });
+
+    expect(result).toEqual({ rankings: [] });
+    const body = JSON.parse(fetchMock.mock.calls[0]![1].body as string);
+    expect(body).toMatchObject({
+      model: "kimi-k2.5",
+      stream: false,
+      thinking: { type: "disabled" },
+      max_tokens: 512,
+    });
+    expect(body.messages[1].content).toEqual([
+      expect.objectContaining({ type: "text" }),
+      {
+        type: "image_url",
+        image_url: { url: signedUrl, detail: "high" },
+      },
+    ]);
+    expect(JSON.stringify(logger.info.mock.calls)).not.toContain(signedUrl);
+    expect(JSON.stringify(logger.warn.mock.calls)).not.toContain(signedUrl);
+    expect(JSON.stringify(logger.error.mock.calls)).not.toContain(signedUrl);
+  });
+
+  it("accepts a bounded inline teaching image without logging its contents", async () => {
+    const dataUrl = `data:image/png;base64,${Buffer.from("small-png-fixture").toString("base64")}`;
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(mockChatResponse('{"rankings":[]}'));
+    vi.stubGlobal("fetch", fetchMock);
+    const { logger, service } = await loadServiceWithLogger();
+
+    await service.generateMultimodalJson<{ rankings: unknown[] }>({
+      systemPrompt: "Return rankings as JSON",
+      userPrompt: "Rank this teaching frame",
+      images: [{ imageUrl: dataUrl, detail: "low" }],
+      model: "kimi-k2.5",
+      maxTokens: 512,
+    });
+
+    const body = JSON.parse(fetchMock.mock.calls[0]![1].body as string);
+    expect(body.messages[1].content[1]).toEqual({
+      type: "image_url",
+      image_url: { url: dataUrl, detail: "low" },
+    });
+    expect(JSON.stringify(logger.info.mock.calls)).not.toContain(dataUrl);
+    expect(JSON.stringify(logger.warn.mock.calls)).not.toContain(dataUrl);
+    expect(JSON.stringify(logger.error.mock.calls)).not.toContain(dataUrl);
   });
 
   it("does not repeat a JSON request that exhausted its output limit", async () => {

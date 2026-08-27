@@ -1,6 +1,6 @@
 import { checkDbConnection, query } from './db.js';
 
-export const schemaStatements = [
+const historicalSchemaStatements = [
   `
     create table if not exists agent_packages (
       id bigserial primary key,
@@ -540,6 +540,85 @@ export const schemaStatements = [
     create index if not exists idx_auto_eval_runs_user_id on auto_eval_runs (user_id)
   `,
 ];
+
+export const multimodalSchemaStatements = [
+  `
+    alter table skill_guided_creation_sessions
+      add column if not exists creation_mode text not null default 'guided'
+  `,
+  `
+    alter table skill_guided_creation_sessions
+      add column if not exists start_request_hash text
+  `,
+  `
+    alter table skill_guided_creation_sessions
+      add column if not exists media_stage text
+  `,
+  `
+    alter table skill_guided_creation_sessions
+      add column if not exists media_state_json jsonb not null default '{}'::jsonb
+  `,
+  `
+    alter table skill_guided_creation_sessions
+      add column if not exists package_version_id bigint
+  `,
+  `
+    alter table skill_guided_creation_sessions
+      add column if not exists finalize_request_hash text
+  `,
+  `
+    create table if not exists skill_media_jobs (
+      id bigserial primary key,
+      session_id bigint not null,
+      job_type text not null,
+      status text not null default 'queued',
+      idempotency_key text not null,
+      request_hash text not null,
+      attempt_no integer not null default 0,
+      max_attempts integer not null default 3,
+      available_at timestamptz not null default now(),
+      lease_owner text,
+      lease_token_hash text,
+      lease_expires_at timestamptz,
+      heartbeat_at timestamptz,
+      progress_json jsonb not null default '{}'::jsonb,
+      input_manifest_json jsonb not null default '{}'::jsonb,
+      output_manifest_json jsonb,
+      result_hash text,
+      error_json jsonb,
+      cancel_requested_at timestamptz,
+      started_at timestamptz,
+      finished_at timestamptz,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )
+  `,
+  `
+    create unique index if not exists uq_skill_media_jobs_idempotency
+      on skill_media_jobs (session_id, job_type, idempotency_key)
+  `,
+  `
+    create index if not exists idx_skill_media_jobs_claimable
+      on skill_media_jobs (status, available_at, job_type, created_at)
+  `,
+  `
+    create index if not exists idx_skill_media_jobs_lease_expiry
+      on skill_media_jobs (status, lease_expires_at)
+  `,
+  `
+    create index if not exists idx_skill_media_jobs_session_history
+      on skill_media_jobs (session_id, created_at desc)
+  `,
+  `
+    create index if not exists idx_guided_sessions_multimodal_listing
+      on skill_guided_creation_sessions (user_id, creation_mode, updated_at desc)
+      where deleted_at is null
+  `,
+];
+
+export const schemaStatements = historicalSchemaStatements.concat(
+  multimodalSchemaStatements,
+);
 
 /**
  * Migrate existing columns to the current schema shape.

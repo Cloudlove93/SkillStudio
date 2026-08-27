@@ -72,7 +72,22 @@ export async function register(
   inviteCode?: string,
   username?: string,
 ): Promise<StoredTokenResponse> {
-  return submitPasswordAuth('register', username || email, password, inviteCode, email);
+  const loginName = username || email;
+  try {
+    await apiFetchJson<{ ok: true }>(`/auth/password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(
+        buildPasswordAuthRequest('register', loginName, password, inviteCode, email),
+      ),
+    });
+  } catch (err: unknown) {
+    if (err instanceof Error) {
+      throw new Error(translateError(err.message), { cause: err });
+    }
+    throw err;
+  }
+  return submitPasswordAuth('login', email, password);
 }
 
 export async function getMe(token: string): Promise<AuthUser> {

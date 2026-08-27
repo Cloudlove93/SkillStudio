@@ -5,7 +5,6 @@ import {
   Check,
   ChevronRight,
   ExternalLink,
-  FileText,
   FlaskConical,
   GitBranch,
   LayoutGrid,
@@ -60,11 +59,7 @@ const fallbackTopics = [
   { key: 'recovery_completion', title: '异常与完成标准', fields: ['exception_recovery', 'completion_evidence'] },
 ] as const;
 
-const CONTEXT_OPTIONS: { view: SkillContextView; label: string; icon: typeof FileText; desc: string }[] = [
-  { view: 'summary', label: '摘要', icon: FileText, desc: '查看当前信息' },
-  { view: 'versions', label: '版本', icon: GitBranch, desc: '浏览版本列表' },
-  { view: 'optimization', label: '优化', icon: WandSparkles, desc: '回答优化面板' },
-];
+
 
 const VIEW_OPTIONS = [
   { view: 'run' as const, label: '使用', icon: Play, desc: '运行当前版本' },
@@ -83,7 +78,7 @@ function summaryTitle(activeView: SkillWorkspaceView) {
 }
 
 export function SkillContextPanel(props: Props) {
-  const [menuOpen, setMenuOpen] = useState(true);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const menuBtnRef = useRef<HTMLButtonElement>(null);
   const [popoverPos, setPopoverPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
@@ -108,7 +103,7 @@ export function SkillContextPanel(props: Props) {
     }
   }, []);
 
-  const wasMenuOpenRef = useRef(true);
+  const wasMenuOpenRef = useRef(false);
 
   useEffect(() => {
     if (props.open) {

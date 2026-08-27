@@ -1,5 +1,7 @@
 # EduSkill 多模态 Skill Pack 功能实现规范书
 
+> **历史版本，不得作为 Codex 实施依据。** 本文件已由 `2026-08-20-multimodal-skill-pack-implementation-spec-feishu-v2.md` 取代；多模态 Skill Pack 的范围、数据库约束、对象永久保留、音频 M1 和 Python Worker 横向扩展均以 V2 为准。
+
 > 文档状态：待产品与工程审核  
 > 当前约束：**本文档未审核通过前，不编码、不建表、不提交、不推送。**  
 > 第一阶段目标：先完成“单个视频 → 可追溯证据 → 单个 Skill → 测试 → 发布 → Arena 验证”的最小闭环。

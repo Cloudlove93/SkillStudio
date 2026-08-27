@@ -29,8 +29,7 @@ import {
   buildSkillUserPrompt,
 } from '../prompts/package-generation.js';
 import { randomUUID } from 'node:crypto';
-import type { PoolClient } from 'pg';
-import { query, withTransaction } from './db.js';
+import { query, withTransaction, type Queryable } from './db.js';
 import type { DbRowPackage, DbRowPackageVersion } from '../types.js';
 import { parseDbJson } from '../utils/json.js';
 import { syncPackageVersionSkillsFromSnapshot } from './skill-version-service.js';
@@ -2243,10 +2242,12 @@ export async function updateVersionNote(
 export interface CreatedPackageSnapshotIds {
   packageId: number;
   packageVersionId: number;
+  packageVersionNumber: number;
+  skillVersionIds: Record<string, string>;
 }
 
 export async function createPackageWithSnapshotTx(
-  client: PoolClient,
+  client: Queryable,
   userId: string,
   snapshot: AgentPackageSnapshot,
   source: PackageVersion['source'],
@@ -2263,7 +2264,7 @@ export async function createPackageWithSnapshotTx(
     [packageId, 1, source, JSON.stringify(fixedSnapshot), now],
   );
   const packageVersionId = verResult.rows[0].id;
-  await syncPackageVersionSkillsFromSnapshot(client, {
+  const syncedVersions = await syncPackageVersionSkillsFromSnapshot(client, {
     packageId,
     packageVersionId,
     packageVersionNumber: 1,
@@ -2274,7 +2275,102 @@ export async function createPackageWithSnapshotTx(
     'update agent_packages set current_version_id = $1 where id = $2',
     [packageVersionId, packageId],
   );
-  return { packageId, packageVersionId };
+  return {
+    packageId,
+    packageVersionId,
+    packageVersionNumber: 1,
+    skillVersionIds: Object.fromEntries(
+      [...syncedVersions].map(([skillUid, version]) => [skillUid, version.id]),
+    ),
+  };
+}
+
+export async function createPackageVersionWithSnapshotTx(
+  client: Queryable,
+  input: {
+    userId: string;
+    packageId: string | number;
+    expectedPackageVersionId: string | number;
+    snapshot: AgentPackageSnapshot;
+    source: PackageVersion['source'];
+    note?: string;
+  },
+): Promise<CreatedPackageSnapshotIds> {
+  const now = new Date().toISOString();
+  const packageResult = await client.query<DbRowPackage>(
+    'select * from agent_packages where id = $1 and user_id = $2 for update',
+    [input.packageId, input.userId],
+  );
+  const pkg = packageResult.rows[0];
+  if (!pkg) throw new Error('智能体不存在');
+  if (String(pkg.current_version_id) !== String(input.expectedPackageVersionId)) {
+    throw new Error('PACKAGE_VERSION_CONFLICT');
+  }
+  const currentVersionResult = await client.query<DbRowPackageVersion>(
+    'select * from agent_package_versions where id = $1 and package_id = $2',
+    [input.expectedPackageVersionId, input.packageId],
+  );
+  const currentVersion = currentVersionResult.rows[0];
+  if (!currentVersion) throw new Error('PACKAGE_VERSION_CONFLICT');
+  const currentSnapshot = parseDbJson<AgentPackageSnapshot>(
+    currentVersion.snapshot_json,
+    emptyPackageSnapshot(),
+  );
+  await syncPackageVersionSkillsFromSnapshot(client, {
+    packageId: input.packageId,
+    packageVersionId: currentVersion.id,
+    packageVersionNumber: currentVersion.version_number,
+    source: currentVersion.source as PackageVersion['source'],
+    snapshot: currentSnapshot,
+  });
+  const nextVersionNumber = currentVersion.version_number + 1;
+  const fixedSnapshot = ensureSkillIds({
+    ...input.snapshot,
+    name: input.snapshot.name || pkg.name,
+    description: input.snapshot.description || pkg.description,
+    versionLabel: `v${nextVersionNumber}`,
+  });
+  const versionResult = await client.query<{ id: number }>(
+    'insert into agent_package_versions (package_id, version_number, source, snapshot_json, note, created_at) values ($1, $2, $3, $4, $5, $6) returning id',
+    [
+      input.packageId,
+      nextVersionNumber,
+      input.source,
+      JSON.stringify(fixedSnapshot),
+      input.note ?? '',
+      now,
+    ],
+  );
+  const packageVersionId = versionResult.rows[0].id;
+  const syncedVersions = await syncPackageVersionSkillsFromSnapshot(client, {
+    packageId: input.packageId,
+    packageVersionId,
+    packageVersionNumber: nextVersionNumber,
+    source: input.source,
+    snapshot: fixedSnapshot,
+    note: input.note,
+  });
+  await client.query(
+    `update agent_packages
+        set name = $1, description = $2, current_version_id = $3, updated_at = $4
+      where id = $5 and user_id = $6`,
+    [
+      fixedSnapshot.name,
+      fixedSnapshot.description,
+      packageVersionId,
+      now,
+      input.packageId,
+      input.userId,
+    ],
+  );
+  return {
+    packageId: Number(input.packageId),
+    packageVersionId,
+    packageVersionNumber: nextVersionNumber,
+    skillVersionIds: Object.fromEntries(
+      [...syncedVersions].map(([skillUid, version]) => [skillUid, version.id]),
+    ),
+  };
 }
 
 async function createPackageWithSnapshot(

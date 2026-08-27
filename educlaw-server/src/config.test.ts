@@ -14,6 +14,21 @@ const CONFIG_ENV_KEYS = [
   "LLM_MODEL",
   "LLM_NETWORK_RETRIES",
   "LLM_BASELINE_MODEL",
+  "MULTIMODAL_ADLER_MODEL",
+  "MULTIMODAL_CANDIDATE_MODEL",
+  "MULTIMODAL_VALIDATION_MODEL",
+  "MULTIMODAL_RIA_MODEL",
+  "MULTIMODAL_VISION_MODEL",
+  "MULTIMODAL_MODEL_MAX_TOKENS",
+  "MULTIMODAL_ASR_CHUNK_DURATION_MS",
+  "MULTIMODAL_UPLOAD_MAX_MB",
+  "MULTIMODAL_SINGLE_PUT_MAX_MB",
+  "MULTIMODAL_MULTIPART_PART_MB",
+  "MEDIA_UPLOAD_TOKEN_SECRET",
+  "MULTIMODAL_PIPELINE_RUNNER_ENABLED",
+  "MULTIMODAL_PIPELINE_RUNNER_POLL_INTERVAL_MS",
+  "MULTIMODAL_PIPELINE_RUNNER_BATCH_LIMIT",
+  "MULTIMODAL_PIPELINE_RUNNER_CONCURRENCY",
 ];
 
 const DEFAULT_LOCAL_DATABASE_URL = "postgres://educlawlite:local-dev-password@127.0.0.1:5435/educlawlite";
@@ -88,6 +103,21 @@ describe("config", () => {
     expect(config.llmModel).toBe("gpt-4.1-mini");
     expect(config.llmNetworkRetries).toBe(2);
     expect(config.llmBaselineModel).toBe("");
+    expect(config.multimodalAdlerModel).toBe("");
+    expect(config.multimodalCandidateModel).toBe("");
+    expect(config.multimodalValidationModel).toBe("");
+    expect(config.multimodalRiaModel).toBe("");
+    expect(config.multimodalVisionModel).toBe("");
+    expect(config.multimodalModelMaxTokens).toBe(8192);
+    expect(config.multimodalAsrChunkDurationMs).toBe(1_200_000);
+    expect(config.multimodalUploadMaxBytes).toBe(1024 * 1024 * 1024);
+    expect(config.multimodalSinglePutMaxBytes).toBe(256 * 1024 * 1024);
+    expect(config.multimodalMultipartPartBytes).toBe(64 * 1024 * 1024);
+    expect(config.mediaUploadTokenSecret).toBe("");
+    expect(config.multimodalPipelineRunnerEnabled).toBe(false);
+    expect(config.multimodalPipelineRunnerPollIntervalMs).toBe(15000);
+    expect(config.multimodalPipelineRunnerBatchLimit).toBe(8);
+    expect(config.multimodalPipelineRunnerConcurrency).toBe(2);
   });
 
   it("parses numbers, booleans, lists, and trims the LLM base URL", async () => {
@@ -99,6 +129,21 @@ describe("config", () => {
         UPLOAD_LIMIT_MB: "3",
         LLM_BASE_URL: "https://llm.example.test/v1///",
         LLM_NETWORK_RETRIES: "5",
+        MULTIMODAL_ADLER_MODEL: "adler-model",
+        MULTIMODAL_CANDIDATE_MODEL: "candidate-model",
+        MULTIMODAL_VALIDATION_MODEL: "validation-model",
+        MULTIMODAL_RIA_MODEL: "ria-model",
+        MULTIMODAL_VISION_MODEL: "kimi-k2.5",
+        MULTIMODAL_MODEL_MAX_TOKENS: "4096",
+        MULTIMODAL_ASR_CHUNK_DURATION_MS: "900000",
+        MULTIMODAL_UPLOAD_MAX_MB: "2048",
+        MULTIMODAL_SINGLE_PUT_MAX_MB: "512",
+        MULTIMODAL_MULTIPART_PART_MB: "96",
+        MEDIA_UPLOAD_TOKEN_SECRET: "test-upload-token-secret-value-0123456789",
+        MULTIMODAL_PIPELINE_RUNNER_ENABLED: "true",
+        MULTIMODAL_PIPELINE_RUNNER_POLL_INTERVAL_MS: "30000",
+        MULTIMODAL_PIPELINE_RUNNER_BATCH_LIMIT: "12",
+        MULTIMODAL_PIPELINE_RUNNER_CONCURRENCY: "4",
       },
     });
 
@@ -108,6 +153,23 @@ describe("config", () => {
     expect(config.uploadLimitBytes).toBe(3 * 1024 * 1024);
     expect(config.llmBaseUrl).toBe("https://llm.example.test/v1");
     expect(config.llmNetworkRetries).toBe(5);
+    expect(config.multimodalAdlerModel).toBe("adler-model");
+    expect(config.multimodalCandidateModel).toBe("candidate-model");
+    expect(config.multimodalValidationModel).toBe("validation-model");
+    expect(config.multimodalRiaModel).toBe("ria-model");
+    expect(config.multimodalVisionModel).toBe("kimi-k2.5");
+    expect(config.multimodalModelMaxTokens).toBe(4096);
+    expect(config.multimodalAsrChunkDurationMs).toBe(900_000);
+    expect(config.multimodalUploadMaxBytes).toBe(2048 * 1024 * 1024);
+    expect(config.multimodalSinglePutMaxBytes).toBe(512 * 1024 * 1024);
+    expect(config.multimodalMultipartPartBytes).toBe(96 * 1024 * 1024);
+    expect(config.mediaUploadTokenSecret).toBe(
+      "test-upload-token-secret-value-0123456789",
+    );
+    expect(config.multimodalPipelineRunnerEnabled).toBe(true);
+    expect(config.multimodalPipelineRunnerPollIntervalMs).toBe(30000);
+    expect(config.multimodalPipelineRunnerBatchLimit).toBe(12);
+    expect(config.multimodalPipelineRunnerConcurrency).toBe(4);
   });
 
   it("falls back when numeric environment values are invalid", async () => {
@@ -116,12 +178,26 @@ describe("config", () => {
         PORT: "not-a-number",
         LLM_TIMEOUT_MS: "NaN",
         UPLOAD_LIMIT_MB: "bad",
+        MULTIMODAL_MODEL_MAX_TOKENS: "0",
+        MULTIMODAL_UPLOAD_MAX_MB: "0",
+        MULTIMODAL_SINGLE_PUT_MAX_MB: "NaN",
+        MULTIMODAL_MULTIPART_PART_MB: "3",
+        MULTIMODAL_PIPELINE_RUNNER_POLL_INTERVAL_MS: "Infinity",
+        MULTIMODAL_PIPELINE_RUNNER_BATCH_LIMIT: "0",
+        MULTIMODAL_PIPELINE_RUNNER_CONCURRENCY: "oops",
       },
     });
 
     expect(config.port).toBe(3001);
     expect(config.llmTimeoutMs).toBe(300_000);
     expect(config.uploadLimitBytes).toBe(25 * 1024 * 1024);
+    expect(config.multimodalModelMaxTokens).toBe(8192);
+    expect(config.multimodalUploadMaxBytes).toBe(1024 * 1024 * 1024);
+    expect(config.multimodalSinglePutMaxBytes).toBe(256 * 1024 * 1024);
+    expect(config.multimodalMultipartPartBytes).toBe(64 * 1024 * 1024);
+    expect(config.multimodalPipelineRunnerPollIntervalMs).toBe(15000);
+    expect(config.multimodalPipelineRunnerBatchLimit).toBe(8);
+    expect(config.multimodalPipelineRunnerConcurrency).toBe(2);
   });
 
   it("loads values from .env without overriding existing process env", async () => {

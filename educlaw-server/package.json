@@ -11,12 +11,15 @@
     "format": "prettier --write \"src/**/*.ts\""
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1115.0",
+    "@aws-sdk/s3-request-presigner": "^3.1115.0",
     "@educlaw/shared": "workspace:*",
     "adm-zip": "^0.5.16",
     "bcryptjs": "^3.0.2",
     "compression": "^1.8.0",
     "cors": "^2.8.5",
     "express": "^5.1.0",
+    "ipaddr.js": "2.5.0",
     "jsonrepair": "^3.14.0",
     "jsonwebtoken": "^9.0.2",
     "multer": "^1.4.5-lts.2",

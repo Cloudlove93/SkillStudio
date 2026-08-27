@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import type { ArenaThread, GuidedCreationSession } from '@educlaw/shared';
 import {
+  AudioLines,
   FileText,
   FileUp,
   FlaskConical,
@@ -28,7 +29,7 @@ import { SkillContextMenu } from './SkillContextMenu';
 import type { RepositorySkill } from './SkillRepositoryWorkspace';
 // skill-conversation-list / 新建对话 / 鏂板缓瀵硅瘽 / onConversationSelect
 
-export type SkillCreateMode = 'conversation' | 'document' | 'manual';
+export type SkillCreateMode = 'conversation' | 'multimodal' | 'document' | 'manual';
 export type SkillCreateAction = SkillCreateMode | 'import';
 export type SkillMenuAction = 'open' | 'overview' | 'test' | 'versions' | 'remove';
 
@@ -67,6 +68,12 @@ type Props = {
 
 const creationModes = [
   {
+    mode: 'multimodal',
+    label: '音视频蒸馏',
+    description: '从课堂视频或播客生成 Skill',
+    icon: AudioLines,
+  },
+  {
     mode: 'conversation',
     label: '对话共创',
     description: '边聊边完善，也可从常用场景开始',
@@ -91,6 +98,9 @@ const creationModes = [
     icon: FileUp,
   },
 ] as const;
+
+const multimodalCreationEnabled =
+  import.meta.env.VITE_MULTIMODAL_SKILL_PACK_ENABLED !== 'false';
 
 const statusLabel: Record<string, string> = {
   collecting: '待完善',
@@ -237,7 +247,9 @@ export function SkillWorkspaceSidebar({
         </summary>
         <div className="skill-create-popover" role="menu" aria-label="新建 Skill 的方式">
           <span className="skill-create-popover-title">创建方式</span>
-          {creationModes.map(({ mode, label, description, icon: Icon }) => (
+          {creationModes
+            .filter(({ mode }) => mode !== 'multimodal' || multimodalCreationEnabled)
+            .map(({ mode, label, description, icon: Icon }) => (
             <button
               key={mode}
               type="button"

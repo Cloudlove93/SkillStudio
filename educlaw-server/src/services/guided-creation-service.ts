@@ -1375,7 +1375,7 @@ async function generateAssistantTurn(input: {
       });
     }
     let effectiveDraft = input.session.education_draft ?? {};
-    let effectiveCompletedSteps = [...(input.session.completed_steps ?? [])];
+    const effectiveCompletedSteps = [...(input.session.completed_steps ?? [])];
     if (currentStep && !effectiveCompletedSteps.includes(currentStep)) {
       const stepRounds = input.session.messages.filter(
         (m) =>

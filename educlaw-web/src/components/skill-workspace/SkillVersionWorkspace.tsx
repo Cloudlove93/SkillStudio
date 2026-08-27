@@ -49,7 +49,7 @@ export function SkillVersionWorkspace(props: Props) {
     setMutating(true);
     try {
       if (pending.kind === 'rollback') {
-        if (!current) throw new Error('无法确认当前 Package Version，请刷新后重试');
+        if (!current) throw new Error('无法确认当前 Skill 版本，请刷新后重试');
         await liteApi.rollbackSkillVersion(props.token, props.packageId, {
           skillId: pending.version.skillId,
           versionId: pending.version.id,

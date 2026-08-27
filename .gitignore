@@ -35,6 +35,18 @@ npm-debug.log*
 .claude/
 CLAUDE.md
 
+# Local agent and diagnostic artifacts
+.codex_tmp/
+.runlogs/
+.superpowers/
+educlaw-web/.codex_tmp/
+_q.sql
+-version
+
+# Python worker local environment
+python/media_worker/.venv/
+python/media_worker/-version
+
 # Local planning artifacts
 docs/superpowers/*
 !docs/superpowers/specs/

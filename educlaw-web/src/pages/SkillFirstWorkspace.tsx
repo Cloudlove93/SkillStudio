@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import type {
   ArenaThread,
   GuidedCreationDocument,
@@ -48,8 +48,34 @@ import type {
   AnswerOptimizationSelection,
 } from '../components/skill-workspace/answer-optimization-selection';
 import { isSkillConversationThread } from '../components/skill-workspace/skill-conversation-list';
+import {
+  hasMultimodalResumeState,
+  MULTIMODAL_RESUME_KEY,
+} from '../components/skill-workspace/multimodal-guided-creation-state';
+
+const MultimodalSkillCreationPanel = lazy(() => import('../components/skill-workspace/MultimodalSkillCreationPanel')
+  .then((module) => ({ default: module.MultimodalSkillCreationPanel })));
 
 type StreamError = { code: string; message: string; retryable: boolean };
+
+function SkillWorkspaceLoadingState({ label }: { label: string }) {
+  return (
+    <div className="skill-workspace-loading" role="status" aria-live="polite">
+      <span className="skill-workspace-loading-spinner" aria-hidden="true" />
+      <span>{label}</span>
+    </div>
+  );
+}
+
+function initialCreateMode(): SkillCreateMode {
+  if (
+    typeof localStorage !== 'undefined' &&
+    hasMultimodalResumeState(localStorage.getItem(MULTIMODAL_RESUME_KEY))
+  ) {
+    return 'multimodal';
+  }
+  return 'conversation';
+}
 
 function createRequestId(prefix: string) {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
@@ -77,7 +103,8 @@ export default function SkillFirstWorkspace() {
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [documents, setDocuments] = useState<GuidedCreationDocument[]>([]);
   const [search, setSearch] = useState('');
-  const [createMode, setCreateMode] = useState<SkillCreateMode>('conversation');
+  const [createMode, setCreateMode] = useState<SkillCreateMode>(initialCreateMode);
+  const [multimodalCreationKey, setMultimodalCreationKey] = useState(0);
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [importBusy, setImportBusy] = useState(false);
@@ -268,9 +295,11 @@ export default function SkillFirstWorkspace() {
         }
       }),
     );
-    setRepositorySkills(entries.flat().sort(
+    const nextSkills = entries.flat().sort(
       (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
-    ));
+    );
+    setRepositorySkills(nextSkills);
+    return nextSkills;
   }, [token]);
 
   useEffect(() => {
@@ -610,6 +639,10 @@ export default function SkillFirstWorkspace() {
     activeRunRef.current = null;
     setPendingGuidedMessage(null);
     setCreateMode(mode);
+    if (mode === 'multimodal') {
+      localStorage.removeItem(MULTIMODAL_RESUME_KEY);
+      setMultimodalCreationKey((current) => current + 1);
+    }
     setSession(null);
     setSelectedRepositorySkill(null);
     setSelectedSessionId(null);
@@ -776,12 +809,62 @@ export default function SkillFirstWorkspace() {
     dispatchWorkspace({ type: 'dismiss-update' });
   };
 
+  const openGeneratedSkill = async (skillId: string) => {
+    try {
+      const skills = await refreshRepository();
+      const generated = skills.find((skill) => skill.skillId === skillId);
+      if (generated) {
+        openRepositorySkill(generated);
+        return;
+      }
+      openRepository();
+      toast.info('Skill 已生成，请在仓库中选择后试用');
+    } catch (loadError) {
+      openRepository();
+      toast.error(
+        loadError instanceof Error ? loadError.message : 'Skill 仓库同步失败',
+      );
+    }
+  };
+
   const removeFromWorkspace = (skill: RepositorySkill) => {
     setWorkspaceSkillKeys((keys) => keys.filter((k) => k !== skill.key));
     if (selectedRepositorySkill?.key === skill.key) {
       setSelectedRepositorySkill(null);
       dispatchWorkspace({ type: 'navigate', view: 'overview' });
     }
+  };
+
+  const deleteRepositorySkills = async (skills: RepositorySkill[]) => {
+    const skillIds = [...new Set(skills.map((skill) => skill.skillId))];
+    const result = await liteApi.batchDeleteSkills(token, skillIds);
+    const deletedSkillIds = new Set(result.deletedSkillIds);
+    const deletedSkillKeys = new Set(
+      skills
+        .filter((skill) => deletedSkillIds.has(skill.skillId))
+        .map((skill) => skill.key),
+    );
+
+    setRepositorySkills((current) => current.filter(
+      (skill) => !deletedSkillIds.has(skill.skillId),
+    ));
+    setWorkspaceSkillKeys((current) => current.filter(
+      (key) => !deletedSkillKeys.has(key),
+    ));
+    if (activeSkill && deletedSkillIds.has(activeSkill.skillId)) {
+      setSelectedRepositorySkill(null);
+      setSession(null);
+      setSelectedSessionId(null);
+      setConversations([]);
+      setSelectedConversationId(null);
+      dispatchWorkspace({ type: 'navigate', view: 'repository' });
+    }
+    try {
+      await refreshRepository();
+    } catch {
+      toast.error('Skill 已删除，但仓库同步失败，请刷新页面');
+    }
+    toast.success(`已删除 ${result.deletedCount} 个 Skill`);
   };
 
   const handleSkillMenuAction = (skill: RepositorySkill, action: SkillMenuAction) => {
@@ -892,7 +975,10 @@ export default function SkillFirstWorkspace() {
           onAction={handlePinnedAction}
           onDismiss={() => dispatchWorkspace({ type: 'dismiss-update' })}
         />
-        <div className="skill-main-stage" key={workspaceState.activeView === 'repository' ? 'repository' : activeSkill ? `skill-${activeSkill.packageId}-${activeSkill.skillId}` : session?.id || 'new'}>
+         <div
+           className={`skill-main-stage ${workspaceState.activeView === 'repository' ? 'is-repository' : ''}`}
+           key={workspaceState.activeView === 'repository' ? 'repository' : activeSkill ? `skill-${activeSkill.packageId}-${activeSkill.skillId}` : session?.id || 'new'}
+         >
           {workspaceState.activeView === 'repository' ? (
             <SkillRepositoryWorkspace
               skills={repositorySkills}
@@ -901,6 +987,7 @@ export default function SkillFirstWorkspace() {
               onSearch={setSearch}
               onSelectSkill={openRepositorySkill}
               onSelectDraft={(item) => void openSession(item)}
+              onDeleteSkills={deleteRepositorySkills}
               onNew={newSkill}
             />
           ) : activeSkill ? (
@@ -942,6 +1029,16 @@ export default function SkillFirstWorkspace() {
                 setDocuments((current) => current.filter((_, itemIndex) => itemIndex !== index))
               }
             />
+          ) : createMode === 'multimodal' ? (
+            <Suspense fallback={<SkillWorkspaceLoadingState label="正在打开音视频蒸馏" />}>
+              <MultimodalSkillCreationPanel
+                key={multimodalCreationKey}
+                token={token}
+                onPublished={refreshRepository}
+                onOpenRepository={openRepository}
+                onOpenGeneratedSkill={openGeneratedSkill}
+              />
+            </Suspense>
           ) : createMode === 'document' ? (
             <DocumentSkillCreationPanel
               token={token}

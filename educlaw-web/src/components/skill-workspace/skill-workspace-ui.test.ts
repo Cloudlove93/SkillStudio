@@ -398,4 +398,132 @@ describe('Skill-first workspace UI contract', () => {
     expect(optimize).toContain('<MarkdownContent content={message.content} />');
     expect(optimize).not.toContain('<div className="skill-assistant-message">{message.content}</div>');
   });
+
+  it('integrates the resumable multimodal Skill Pack flow behind a feature flag', () => {
+    const sidebar = read('./SkillWorkspaceSidebar.tsx');
+    const panel = read('./MultimodalSkillCreationPanel.tsx');
+    const state = read('./multimodal-guided-creation-state.ts');
+    const page = read('../../pages/SkillFirstWorkspace.tsx');
+    const css = read('./skill-workspace.css');
+
+    expect(sidebar).toContain("VITE_MULTIMODAL_SKILL_PACK_ENABLED !== 'false'");
+    expect(sidebar).toContain('音视频蒸馏');
+    expect(page).toContain("lazy(() => import('../components/skill-workspace/MultimodalSkillCreationPanel')");
+    expect(page).toContain('<Suspense fallback={<SkillWorkspaceLoadingState label="正在打开音视频蒸馏" />}>');
+    expect(page).toContain("createMode === 'multimodal'");
+    expect(page).toContain('<MultimodalSkillCreationPanel');
+    expect(panel).toContain('streamMediaProgress');
+    expect(panel).toContain('scheduleSseReconnect');
+    expect(panel).toContain('streamAbortController.abort()');
+    expect(panel).toContain('streamAbortController.signal');
+    expect(panel).not.toContain('retryMediaProcessing');
+    expect(panel).toContain('系统已自动尝试恢复，仍未成功。请查看诊断。');
+    expect(panel).toContain('createMediaAssetPreview');
+    expect(panel).toContain('<MultimodalWizardShell');
+    expect(panel).toContain("reviewStep === 'processing'");
+    expect(panel).toContain("reviewStep === 'overview'");
+    expect(panel).toContain("reviewStep === 'candidates'");
+    expect(panel).toContain("reviewStep === 'release'");
+    expect(panel).toContain('confirmGeneratedMediaSkills');
+    expect(panel).not.toContain('startMediaArenaTest');
+    expect(panel).not.toContain('运行固定 Arena 测试');
+    expect(panel).toContain('确认生成');
+    expect(panel).not.toContain('等待发布门禁接入');
+    expect(panel).toContain('个融合主题并构建 Skill');
+    expect(state).toContain("connection: 'polling'");
+    expect(css).toContain('.skill-mm-shell');
+    expect(css).toContain('@media (max-width: 900px)');
+  });
+
+  it('remounts the multimodal workbench when starting another distillation', () => {
+    const page = read('../../pages/SkillFirstWorkspace.tsx');
+
+    expect(page).toContain(
+      'const [multimodalCreationKey, setMultimodalCreationKey] = useState(0);',
+    );
+    expect(page).toContain('setMultimodalCreationKey((current) => current + 1);');
+    expect(page).toContain('key={multimodalCreationKey}');
+  });
+
+  it('supports precise single and batch deletion from a paginated Skill repository', () => {
+    const repository = read('./SkillRepositoryWorkspace.tsx');
+    const dialog = read('./SkillDeleteConfirmDialog.tsx');
+    const api = read('../../api/lite-api.ts');
+
+    expect(repository).toContain("type RepositoryTab = 'created' | 'drafts'");
+    expect(repository).toContain('批量管理');
+    expect(repository).toContain('全选当前搜索结果');
+    expect(repository).toContain('repositoryPageItems');
+    expect(repository).toContain('aria-label="Skill 操作"');
+    expect(repository).toContain('data-skill-delete-return={skill.skillId}');
+    expect(repository).toContain('returnFocusSkillId={deleteReturnFocusSkillId}');
+    expect(repository).toContain('<SkillDeleteConfirmDialog');
+    expect(dialog).toContain('role="alertdialog"');
+    expect(dialog).toContain('cancelButtonRef.current?.focus()');
+    expect(dialog).toContain("event.key === 'Tab'");
+    expect(dialog).toContain('previousFocus !== document.body');
+    expect(dialog).toContain('[data-skill-delete-return="${returnFocusSkillId}"]');
+    expect(dialog).toContain("'[data-skill-delete-return-focus]'");
+    expect(dialog).toContain('删除选中的 Skill？');
+    expect(dialog).toContain('原始素材与处理产物仍会保留');
+    expect(api).toContain("'/skills/batch-delete'");
+    expect(api).toContain("method: 'POST'");
+  });
+
+  it('keeps internal package terminology out of the visible Skill workspace copy', () => {
+    const sidebar = read('./SkillWorkspaceSidebar.tsx');
+    const multimodal = read('./MultimodalSkillCreationPanel.tsx');
+    const multimodalWizard = read('./multimodal/MultimodalWizardShell.tsx');
+    const multimodalRelease = read('./multimodal/MultimodalReleaseStep.tsx');
+    const multimodalModel = read('./multimodal/multimodal-wizard-model.ts');
+    const agentBuild = read('../agent/build-components.tsx');
+    const versions = read('./SkillVersionWorkspace.tsx');
+
+    expect(sidebar).toContain('从课堂视频或播客生成 Skill');
+    expect(sidebar).not.toContain('从课堂视频或播客生成 Skill Pack');
+    expect(multimodal).toContain('确认生成');
+    expect(multimodal).not.toContain('确认发布 Skill Pack');
+    expect(multimodal).toContain('尚未生成 Skill。');
+    expect(multimodal).not.toContain('尚未生成 Skill Pack。');
+    expect(multimodalWizard).not.toContain('Skill Pack');
+    expect(multimodalRelease).not.toContain('Skill Pack');
+    expect(multimodalModel).not.toContain('Skill Pack');
+    expect(agentBuild).not.toContain('skill package');
+    expect(versions).toContain('无法确认当前 Skill 版本，请刷新后重试');
+    expect(versions).not.toContain('无法确认当前 Package Version，请刷新后重试');
+  });
+
+  it('cleans repository, workspace, and active selection after server-confirmed deletion', () => {
+    const page = read('../../pages/SkillFirstWorkspace.tsx');
+
+    expect(page).toContain('const deleteRepositorySkills = async');
+    expect(page).toContain('liteApi.batchDeleteSkills(token, skillIds)');
+    expect(page).toContain('result.deletedSkillIds');
+    expect(page).toContain('setRepositorySkills((current) => current.filter');
+    expect(page).toContain('setWorkspaceSkillKeys((current) => current.filter');
+    expect(page).toContain('activeSkill && deletedSkillIds.has(activeSkill.skillId)');
+    expect(page).toContain('setSession(null)');
+    expect(page).toContain('setSelectedSessionId(null)');
+    expect(page).toContain("dispatchWorkspace({ type: 'navigate', view: 'repository' })");
+    expect(page).toContain('await refreshRepository()');
+    expect(page).toContain('Skill 已删除，但仓库同步失败，请刷新页面');
+    expect(page).toContain('onDeleteSkills={deleteRepositorySkills}');
+  });
+
+  it('uses the main page as the only repository scroll owner and styles management controls', () => {
+    const page = read('../../pages/SkillFirstWorkspace.tsx');
+    const css = read('./skill-workspace.css');
+    const repositoryRule = css.match(/\.skill-repository\s*\{([^}]*)\}/)?.[1] || '';
+
+    expect(page).toContain("workspaceState.activeView === 'repository' ? 'is-repository' : ''");
+    expect(repositoryRule).not.toMatch(/(^|;)\s*height:\s*100%/);
+    expect(repositoryRule).not.toContain('overflow-y: auto');
+    expect(css).toMatch(/\.skill-main-stage\.is-repository\s*\{[^}]*overflow-y:\s*auto;/s);
+    expect(css).toContain('.skill-repository-tabs');
+    expect(css).toContain('.skill-repository-bulkbar');
+    expect(css).toContain('.skill-repository-row-menu');
+    expect(css).toContain('.skill-repository-pagination');
+    expect(css).toContain('.skill-delete-dialog-backdrop');
+    expect(css).toContain('.skill-delete-dialog');
+  });
 });

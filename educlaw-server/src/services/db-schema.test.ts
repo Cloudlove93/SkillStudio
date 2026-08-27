@@ -173,6 +173,54 @@ describe('db schema initialization', () => {
     );
   });
 
+  it('exports multimodal schema statements with only the approved additions', async () => {
+    const { multimodalSchemaStatements } = await import('./db-schema.js');
+    const schemaSql = multimodalSchemaStatements.join('\n').toLowerCase();
+
+    expect(schemaSql).toContain(
+      'add column if not exists creation_mode text not null default \'guided\'',
+    );
+    expect(schemaSql).toContain(
+      'add column if not exists start_request_hash text',
+    );
+    expect(schemaSql).toContain('add column if not exists media_stage text');
+    expect(schemaSql).toContain(
+      "add column if not exists media_state_json jsonb not null default '{}'::jsonb",
+    );
+    expect(schemaSql).toContain(
+      'add column if not exists package_version_id bigint',
+    );
+    expect(schemaSql).toContain(
+      'add column if not exists finalize_request_hash text',
+    );
+    expect(schemaSql).toContain(
+      'create table if not exists skill_media_jobs',
+    );
+    expect(schemaSql).toContain(
+      'create unique index if not exists uq_skill_media_jobs_idempotency',
+    );
+    expect(schemaSql).toContain(
+      'create index if not exists idx_skill_media_jobs_claimable',
+    );
+    expect(schemaSql).toContain(
+      'create index if not exists idx_skill_media_jobs_lease_expiry',
+    );
+    expect(schemaSql).toContain(
+      'create index if not exists idx_skill_media_jobs_session_history',
+    );
+    expect(schemaSql).toContain(
+      'create index if not exists idx_guided_sessions_multimodal_listing',
+    );
+    expect(schemaSql).not.toContain('references ');
+    expect(schemaSql).not.toContain(' foreign key ');
+    expect(schemaSql).not.toContain(' check ');
+    expect(schemaSql).not.toContain('trigger');
+    expect(schemaSql).not.toContain('procedure');
+    expect(schemaSql).not.toContain('checkpoint');
+    expect(schemaSql).not.toContain('current_job_id');
+    expect(schemaSql).not.toContain('current_run_id');
+  });
+
   it('defines stored JSON columns as jsonb with jsonb defaults', async () => {
     const { schemaStatements, migrationStatements } =
       await import('./db-schema.js');

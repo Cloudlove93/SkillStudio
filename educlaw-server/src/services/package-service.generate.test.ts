@@ -94,7 +94,7 @@ async function loadService() {
   }));
 
   vi.doMock('./skill-version-service.js', () => ({
-    syncPackageVersionSkillsFromSnapshot: vi.fn(),
+    syncPackageVersionSkillsFromSnapshot: vi.fn().mockResolvedValue(new Map()),
   }));
 
   vi.doMock('./llm-service.js', () => ({

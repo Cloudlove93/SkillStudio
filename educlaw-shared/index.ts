@@ -104,7 +104,8 @@ export interface PackageVersion {
     | "optimized"
     | "manual"
     | "interactive"
-    | "rollback";
+    | "rollback"
+    | "distilled";
   note: string;
   snapshot: AgentPackageSnapshot;
 }
@@ -584,3 +585,4 @@ export type GuidedCreationStreamEvent =
   | { type: "done"; session: GuidedCreationSession }
   | { type: "error"; code: string; message: string; retryable: boolean }
   | { type: "stream_end" };
+export * from "./src/multimodal-contract.js";

@@ -2,10 +2,12 @@ import express from "express";
 import cors from "cors";
 import compression from "compression";
 import { config } from "./config.js";
-import { getLogger } from "./lib/request-context.js";
+import { getLogger, getRequestId } from "./lib/request-context.js";
 import { safeError } from "./lib/logger.js";
 import { withRequestContext } from "./middleware/request-context.js";
 import { checkDbConnection } from "./services/db.js";
+import { startProductionMultimodalPipelineRuntimeIfEnabled } from "./services/multimodal-pipeline-runtime.js";
+import { buildInternalErrorPayload } from "./utils/http.js";
 import apiRoutes from "./routes/index.js";
 import compatRoutes from "./routes/compat.js";
 
@@ -34,16 +36,30 @@ app.use(compatRoutes);
 
 app.use((err: unknown, req: express.Request, res: express.Response, next: express.NextFunction) => {
   void next;
+  const requestId = getRequestId();
   getLogger().error({
     event: "request.error",
     path: req.originalUrl || req.url,
     method: req.method,
     error: safeError(err),
   }, "request.error");
-  res.status(500).json({ error: err instanceof Error ? err.message : "Internal server error" });
+  res.status(500).json(buildInternalErrorPayload(requestId));
 });
 
 await checkDbConnection();
+const runtime = startProductionMultimodalPipelineRuntimeIfEnabled({
+  enabled: config.multimodalPipelineRunnerEnabled,
+  pollIntervalMs: config.multimodalPipelineRunnerPollIntervalMs,
+  batchLimit: config.multimodalPipelineRunnerBatchLimit,
+  concurrency: config.multimodalPipelineRunnerConcurrency,
+});
+if (runtime) {
+  getLogger({
+    pollIntervalMs: config.multimodalPipelineRunnerPollIntervalMs,
+    batchLimit: config.multimodalPipelineRunnerBatchLimit,
+    concurrency: config.multimodalPipelineRunnerConcurrency,
+  }).info("multimodal.pipeline.runner.enabled");
+}
 app.listen(config.port, () => {
   getLogger({ port: config.port }).info("server.listen");
 });

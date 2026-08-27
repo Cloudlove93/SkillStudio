@@ -94,6 +94,36 @@ function positiveId(value: string | number, fieldName: string): string {
   return text;
 }
 
+function normalizeBatchSkillIds(values: unknown): string[] {
+  if (!Array.isArray(values)) {
+    throw new SkillVersionError(
+      'INVALID_ARGUMENT',
+      'skillIds must be an array',
+      400,
+    );
+  }
+  if (values.some((value) => typeof value !== 'string' || !/^[1-9]\d*$/.test(value))) {
+    throw new SkillVersionError(
+      'INVALID_ARGUMENT',
+      'skillIds must contain positive integer strings',
+      400,
+    );
+  }
+  const ids = [...new Set(values as string[])];
+  if (ids.length === 0 || ids.length > 100) {
+    throw new SkillVersionError(
+      'INVALID_ARGUMENT',
+      'skillIds must contain between 1 and 100 unique ids',
+      400,
+    );
+  }
+  return ids.sort((left, right) => {
+    const leftId = BigInt(left);
+    const rightId = BigInt(right);
+    return leftId < rightId ? -1 : leftId > rightId ? 1 : 0;
+  });
+}
+
 function validateSkillUid(value: string): string {
   const text = String(value || '').trim();
   if (!text) {
@@ -658,6 +688,185 @@ export async function listPackageSkills(input: {
       status: row.status,
       updatedAt: row.updated_at,
     }));
+  });
+}
+
+export async function batchDeleteSkills(input: {
+  authUserId: string;
+  skillIds: string[];
+}): Promise<{ deletedSkillIds: string[]; deletedCount: number }> {
+  const skillIds = normalizeBatchSkillIds(input.skillIds);
+
+  return withTransaction(async (client) => {
+    const ownershipResult = await client.query<DbSkillRow>(
+      `select s.*
+       from agent_package_skills s
+       join agent_packages p on p.id = s.package_id
+       where s.id = any($1::bigint[]) and p.user_id = $2
+       order by s.id asc`,
+      [skillIds, input.authUserId],
+    );
+    const foundIds = new Set(ownershipResult.rows.map((row) => String(row.id)));
+    if (skillIds.some((skillId) => !foundIds.has(skillId))) {
+      throw new SkillVersionError(
+        'SKILL_NOT_FOUND',
+        'Skill not found',
+        404,
+      );
+    }
+
+    const packageIds = [...new Set(
+      ownershipResult.rows.map((row) => String(row.package_id)),
+    )].sort((left, right) => {
+      const leftId = BigInt(left);
+      const rightId = BigInt(right);
+      return leftId < rightId ? -1 : leftId > rightId ? 1 : 0;
+    });
+    const packagesResult = await client.query<DbRowPackage>(
+      `select * from agent_packages
+       where user_id = $1 and id = any($2::bigint[])
+       order by id asc
+       for update`,
+      [input.authUserId, packageIds],
+    );
+    if (packagesResult.rows.length !== packageIds.length) {
+      throw new SkillVersionError(
+        'SKILL_NOT_FOUND',
+        'Skill not found',
+        404,
+      );
+    }
+
+    const targetResult = await client.query<DbSkillRow>(
+      `select s.*
+       from agent_package_skills s
+       join agent_packages p on p.id = s.package_id
+       where s.id = any($1::bigint[]) and p.user_id = $2
+       order by s.id asc
+       for update of s`,
+      [skillIds, input.authUserId],
+    );
+    const lockedIds = new Set(targetResult.rows.map((row) => String(row.id)));
+    if (skillIds.some((skillId) => !lockedIds.has(skillId))) {
+      throw new SkillVersionError(
+        'SKILL_NOT_FOUND',
+        'Skill not found',
+        404,
+      );
+    }
+    const activeTargets = targetResult.rows.filter(
+      (row) => row.status === 'active',
+    );
+    if (activeTargets.length === 0) {
+      return { deletedSkillIds: skillIds, deletedCount: skillIds.length };
+    }
+
+    const targetsByPackage = new Map<string, DbSkillRow[]>();
+    for (const target of activeTargets) {
+      const packageId = String(target.package_id);
+      const grouped = targetsByPackage.get(packageId) || [];
+      grouped.push(target);
+      targetsByPackage.set(packageId, grouped);
+    }
+    const activePackageIds = new Set(targetsByPackage.keys());
+
+    const now = new Date().toISOString();
+    for (const pkg of packagesResult.rows.filter((row) => (
+      activePackageIds.has(String(row.id))
+    ))) {
+      const packageId = String(pkg.id);
+      const currentVersionResult = await client.query<DbRowPackageVersion>(
+        `select * from agent_package_versions
+         where id = $1 and package_id = $2`,
+        [pkg.current_version_id, packageId],
+      );
+      const currentVersion = currentVersionResult.rows[0];
+      if (!currentVersion) {
+        throw new SkillVersionError(
+          'SKILL_DELETE_CONFLICT',
+          'Skill has changed. Refresh before retrying.',
+          409,
+        );
+      }
+      const currentSnapshot = parseDbJson<AgentPackageSnapshot>(
+        currentVersion.snapshot_json,
+        emptySnapshot(),
+      );
+      const removedSkillUids = new Set(
+        targetsByPackage.get(packageId)?.map((row) => row.skill_uid) || [],
+      );
+      const nextVersionNumber = currentVersion.version_number + 1;
+      const nextSnapshot: AgentPackageSnapshot = {
+        ...currentSnapshot,
+        versionLabel: `v${nextVersionNumber}`,
+        skills: currentSnapshot.skills.filter(
+          (skill) => !removedSkillUids.has(skill.id),
+        ),
+      };
+      const packageVersionResult = await client.query<{ id: string }>(
+        `insert into agent_package_versions
+          (package_id, version_number, source, snapshot_json, note, created_at)
+         values ($1, $2, 'manual', $3, $4, $5)
+         returning id`,
+        [
+          packageId,
+          nextVersionNumber,
+          JSON.stringify(nextSnapshot),
+          `Deleted ${removedSkillUids.size} Skills`,
+          now,
+        ],
+      );
+      const nextPackageVersionId = packageVersionResult.rows[0]?.id;
+      if (!nextPackageVersionId) {
+        throw new SkillVersionError(
+          'SKILL_DELETE_FAILED',
+          'Skill deletion failed',
+          500,
+        );
+      }
+
+      await syncPackageVersionSkillsFromSnapshot(client, {
+        packageId,
+        packageVersionId: nextPackageVersionId,
+        packageVersionNumber: nextVersionNumber,
+        source: 'manual',
+        snapshot: nextSnapshot,
+        note: `Deleted ${removedSkillUids.size} Skills`,
+      });
+
+      const packageUpdate = await client.query(
+        `update agent_packages
+         set current_version_id = $1, updated_at = $2
+         where id = $3 and user_id = $4 and current_version_id = $5`,
+        [
+          nextPackageVersionId,
+          now,
+          packageId,
+          input.authUserId,
+          pkg.current_version_id,
+        ],
+      );
+      if ((packageUpdate.rowCount || 0) !== 1) {
+        throw new SkillVersionError(
+          'SKILL_DELETE_CONFLICT',
+          'Skill has changed. Refresh before retrying.',
+          409,
+        );
+      }
+    }
+
+    await client.query(
+      `update agent_package_skills
+       set status = 'removed',
+           removed_at = $2,
+           removed_by = $3,
+           remove_reason = 'deleted by user',
+           updated_at = $2
+       where id = any($1::bigint[])`,
+      [activeTargets.map((row) => String(row.id)), now, input.authUserId],
+    );
+
+    return { deletedSkillIds: skillIds, deletedCount: skillIds.length };
   });
 }
 

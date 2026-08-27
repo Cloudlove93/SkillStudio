@@ -14,6 +14,40 @@ interface ChatRequestInput {
   model?: string;
   temperature?: number;
   maxTokens?: number;
+  hidePromptContentInLogs?: boolean;
+}
+
+export interface MultimodalJsonRequestInput {
+  systemPrompt: string;
+  userPrompt: string;
+  images: Array<{
+    imageUrl: string;
+    detail?: "low" | "high" | "auto";
+  }>;
+  model?: string;
+  maxTokens?: number;
+}
+
+const MAX_INLINE_IMAGE_BYTES = 8 * 1024 * 1024;
+const INLINE_IMAGE_PATTERN = /^data:image\/(?:png|jpeg|webp);base64,([A-Za-z0-9+/]+={0,2})$/;
+
+function isValidMultimodalImageUrl(value: string): boolean {
+  const inlineMatch = INLINE_IMAGE_PATTERN.exec(value);
+  if (inlineMatch) {
+    const base64 = inlineMatch[1]!;
+    if (base64.length % 4 !== 0) return false;
+    const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0;
+    const decodedBytes = (base64.length / 4) * 3 - padding;
+    return decodedBytes > 0 && decodedBytes <= MAX_INLINE_IMAGE_BYTES;
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    return false;
+  }
+  return parsed.protocol === 'https:' || parsed.protocol === 'http:';
 }
 
 export class LlmInvalidJsonError extends Error {
@@ -70,6 +104,7 @@ function logLlmRequestStart(
   model: string,
   stream: boolean,
   maxTokens?: number,
+  hidePromptContentInLogs = false,
 ) {
   llmLogger().info({
     event: "llm.request.start",
@@ -84,7 +119,7 @@ function logLlmRequestStart(
     messages: messages.map((message, index) => ({
       index,
       role: message.role,
-      content: truncateForLog(message.content, 400),
+      content: hidePromptContentInLogs ? "[redacted]" : truncateForLog(message.content, 400),
     })),
   });
 }
@@ -99,13 +134,18 @@ function logLlmResponseMeta(kind: string, model: string, response: Response) {
   });
 }
 
-function logLlmTextResult(kind: string, model: string, content: string) {
+function logLlmTextResult(
+  kind: string,
+  model: string,
+  content: string,
+  hidePromptContentInLogs = false,
+) {
   llmLogger().info({
     event: "llm.response.text",
     kind,
     model,
     outputChars: content.length,
-    outputPreview: truncateForLog(content, 500),
+    outputPreview: hidePromptContentInLogs ? "[redacted]" : truncateForLog(content, 500),
   });
 }
 
@@ -232,7 +272,14 @@ async function createChatResponse(input: ChatRequestInput, stream: boolean): Pro
 
   const messages = buildMessages(input);
   const model = input.model || config.llmModel;
-  logLlmRequestStart("prompt", messages, model, stream, input.maxTokens);
+  logLlmRequestStart(
+    "prompt",
+    messages,
+    model,
+    stream,
+    input.maxTokens,
+    input.hidePromptContentInLogs,
+  );
 
   const response = await fetchWithNetworkRetry(
     `${config.llmBaseUrl}/chat/completions`,
@@ -308,7 +355,7 @@ async function readChatText(response: Response): Promise<string> {
 export async function generateText(input: ChatRequestInput) {
   const response = await createChatResponse(input, false);
   const text = await readChatText(response);
-  logLlmTextResult("prompt", input.model || config.llmModel, text);
+  logLlmTextResult("prompt", input.model || config.llmModel, text, input.hidePromptContentInLogs);
   return text;
 }
 
@@ -323,7 +370,12 @@ export async function* streamText(input: ChatRequestInput): AsyncGenerator<strin
       output.push(text);
       yield text;
     }
-    logLlmTextResult("prompt-stream-fallback", input.model || config.llmModel, output.join(""));
+    logLlmTextResult(
+      "prompt-stream-fallback",
+      input.model || config.llmModel,
+      output.join(""),
+      input.hidePromptContentInLogs,
+    );
     return;
   }
 
@@ -360,7 +412,12 @@ export async function* streamText(input: ChatRequestInput): AsyncGenerator<strin
     }
   }
 
-  logLlmTextResult("prompt-stream", input.model || config.llmModel, output.join(""));
+  logLlmTextResult(
+    "prompt-stream",
+    input.model || config.llmModel,
+    output.join(""),
+    input.hidePromptContentInLogs,
+  );
 }
 
 export async function generateChat(messages: ChatMessage[], model?: string, temperature?: number): Promise<string> {
@@ -423,7 +480,7 @@ export async function* streamChat(messages: ChatMessage[], model?: string, tempe
 
 export async function generateJson<T>(
   input: ChatRequestInput,
-  retries = 1,
+  retries = 0,
   repairInvalidJson = true,
 ): Promise<T> {
   let lastError: Error | undefined;
@@ -439,7 +496,7 @@ export async function generateJson<T>(
           model: jsonInput.model || config.llmModel,
           attempt: attempt + 1,
           error: parseError instanceof Error ? parseError.message : String(parseError),
-          preview: truncateForLog(raw, 500),
+          preview: jsonInput.hidePromptContentInLogs ? "[redacted]" : truncateForLog(raw, 500),
         });
         if (!repairInvalidJson) {
           throw new LlmInvalidJsonError("Model returned invalid JSON", {
@@ -460,6 +517,101 @@ export async function generateJson<T>(
   }
   if (lastError instanceof LlmInvalidJsonError) throw lastError;
   throw new Error(`JSON generation failed: ${lastError?.message || "model did not return parseable JSON"}`);
+}
+
+export async function generateMultimodalJson<T>(
+  input: MultimodalJsonRequestInput,
+): Promise<T> {
+  if (!config.llmApiKey) {
+    throw new Error("LLM_API_KEY is not configured");
+  }
+  if (input.images.length < 1 || input.images.length > 16) {
+    throw new Error("Multimodal image count is invalid");
+  }
+  for (const image of input.images) {
+    if (!isValidMultimodalImageUrl(image.imageUrl)) {
+      throw new Error("Multimodal image URL is invalid");
+    }
+  }
+
+  const model = input.model || config.llmModel;
+  const userText = [
+    input.userPrompt,
+    "",
+    "Before sending the final answer, validate mentally that it is accepted by JSON.parse.",
+    STRICT_JSON_CONTRACT,
+  ].join("\n");
+  const messages = [
+    {
+      role: "system",
+      content: [STRICT_JSON_CONTRACT, input.systemPrompt].join("\n\n"),
+    },
+    {
+      role: "user",
+      content: [
+        { type: "text", text: userText },
+        ...input.images.map((image) => ({
+          type: "image_url",
+          image_url: {
+            url: image.imageUrl,
+            detail: image.detail ?? "high",
+          },
+        })),
+      ],
+    },
+  ];
+
+  llmLogger().info({
+    event: "llm.request.start",
+    kind: "multimodal-json",
+    model,
+    stream: false,
+    maxTokens: input.maxTokens,
+    timeoutMs: config.llmTimeoutMs,
+    messageCount: messages.length,
+    imageCount: input.images.length,
+    baseUrl: config.llmBaseUrl,
+    messages: "[redacted]",
+  });
+
+  const body: Record<string, unknown> = {
+    model,
+    messages,
+    stream: false,
+    ...(input.maxTokens ? { max_tokens: input.maxTokens } : {}),
+  };
+  if (usesKimiK25(model) || usesKimiK26(model)) {
+    body.thinking = { type: "disabled" };
+  } else {
+    body.temperature = 0;
+  }
+
+  const response = await fetchWithNetworkRetry(
+    `${config.llmBaseUrl}/chat/completions`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${config.llmApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+      signal: createAbortSignal(config.llmTimeoutMs),
+    },
+    { kind: "multimodal-json", model, stream: false },
+  );
+  logLlmResponseMeta("multimodal-json", model, response);
+  if (!response.ok) {
+    throw new Error(`LLM multimodal request failed: ${response.status}`);
+  }
+  const raw = await readChatText(response);
+  logLlmTextResult("multimodal-json", model, raw, true);
+  try {
+    return parseJsonObject<T>(raw);
+  } catch (error) {
+    throw new LlmInvalidJsonError("Model returned invalid multimodal JSON", {
+      cause: error,
+    });
+  }
 }
 
 export function resolveBaselineModel(preferred?: string) {
@@ -494,6 +646,7 @@ async function repairJsonOutput<T>(
       "Repair it into strict JSON:",
       raw,
     ].join("\n"),
+    hidePromptContentInLogs: input.hidePromptContentInLogs,
   });
 
   try {

@@ -15,6 +15,7 @@ import type {
 import { query, type Queryable, withTransaction } from "./db.js";
 import {
   generateJson,
+  generateText,
   resolveBaselineModel,
   resolveEnhancedModel,
   streamText,
@@ -35,6 +36,106 @@ import { parseDbJson } from "../utils/json.js";
 
 export type ArenaStreamSide = "baseline" | "enhanced";
 export type ArenaMode = "compare" | "agent" | "baseline";
+
+export const MULTIMODAL_ARENA_CONFIG_VERSION = 'multimodal-arena-v1';
+export const MULTIMODAL_ARENA_CASE_VERSION = '2026-08-23';
+
+const MULTIMODAL_ARENA_CASES = [
+  {
+    caseId: 'novel-scenario-transfer',
+    input: '把这个 Skill 的方法迁移到一个原素材没有出现过的新教学场景，给出可直接执行的步骤。',
+  },
+  {
+    caseId: 'boundary-and-stop',
+    input: '给出一个不应继续使用这些 Skill 的反例，并明确停止条件与替代处理方式。',
+  },
+  {
+    caseId: 'evidence-grounding',
+    input: '使用这些 Skill 解决一个课堂问题，并区分可由来源支持的事实、合理推断和未知信息。',
+  },
+] as const;
+
+export const MULTIMODAL_ARENA_CASE_IDS = MULTIMODAL_ARENA_CASES.map((item) => item.caseId);
+
+export interface MultimodalArenaCaseResult {
+  caseId: (typeof MULTIMODAL_ARENA_CASES)[number]['caseId'];
+  input: string;
+  baselineOutput: string;
+  enhancedOutput: string;
+  baselineScore: number;
+  enhancedScore: number;
+  safetyPassed: boolean;
+  groundedPassed: boolean;
+  passed: boolean;
+  reason: string;
+}
+
+export interface MultimodalArenaEvaluation {
+  schemaVersion: 1;
+  configVersion: typeof MULTIMODAL_ARENA_CONFIG_VERSION;
+  caseVersion: typeof MULTIMODAL_ARENA_CASE_VERSION;
+  candidateRevisionNo: number;
+  snapshotHash: string;
+  models: { baseline: string; enhanced: string };
+  cases: MultimodalArenaCaseResult[];
+  passedCaseCount: number;
+  passed: boolean;
+  deterministicFailures: string[];
+  resultHash: string;
+}
+
+export function computeMultimodalArenaResultHash(
+  evaluation: Omit<MultimodalArenaEvaluation, 'resultHash'>,
+): string {
+  return buildRequestHash({
+    schemaVersion: evaluation.schemaVersion,
+    configVersion: evaluation.configVersion,
+    caseVersion: evaluation.caseVersion,
+    candidateRevisionNo: evaluation.candidateRevisionNo,
+    snapshotHash: evaluation.snapshotHash,
+    models: {
+      baseline: evaluation.models.baseline,
+      enhanced: evaluation.models.enhanced,
+    },
+    cases: evaluation.cases.map((item) => ({
+      caseId: item.caseId,
+      input: item.input,
+      baselineOutput: item.baselineOutput,
+      enhancedOutput: item.enhancedOutput,
+      baselineScore: item.baselineScore,
+      enhancedScore: item.enhancedScore,
+      safetyPassed: item.safetyPassed,
+      groundedPassed: item.groundedPassed,
+      reason: item.reason,
+      passed: item.passed,
+    })),
+    passedCaseCount: evaluation.passedCaseCount,
+    passed: evaluation.passed,
+    deterministicFailures: [...evaluation.deterministicFailures],
+  });
+}
+
+export function computeMultimodalArenaSnapshotHash(snapshot: AgentPackageSnapshot): string {
+  return createHash('sha256')
+    .update(JSON.stringify(stableJsonValue(snapshot)))
+    .digest('hex');
+}
+
+function stableJsonValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(stableJsonValue);
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .filter(([, item]) => item !== undefined)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, item]) => [key, stableJsonValue(item)]),
+  );
+}
+
+interface MultimodalArenaDependencies {
+  generateText: typeof generateText;
+  generateJson: (input: Parameters<typeof generateJson>[0]) => Promise<unknown>;
+}
 
 export interface ArenaAnswerRun {
   id: number;
@@ -666,6 +767,174 @@ export function buildEnhancedPrompt(
     ...(selectedSkills.length > 0 ? ["", "[selected skills]"] : []),
     ...selectedSkills.flatMap((skill) => ["", `## ${skill.name}`, skill.skillMd]),
   ].join("\n");
+}
+
+function parseMultimodalArenaJudge(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new ArenaServiceError('Arena judge returned invalid JSON', 502, 'ARENA_JUDGE_INVALID');
+  }
+  const record = value as Record<string, unknown>;
+  const expectedKeys = [
+    'baselineScore',
+    'enhancedScore',
+    'safetyPassed',
+    'groundedPassed',
+    'reason',
+  ];
+  if (
+    Object.keys(record).length !== expectedKeys.length ||
+    expectedKeys.some((key) => !(key in record))
+  ) {
+    throw new ArenaServiceError('Arena judge returned unexpected fields', 502, 'ARENA_JUDGE_INVALID');
+  }
+  const score = (field: 'baselineScore' | 'enhancedScore') => {
+    const item = record[field];
+    if (!Number.isInteger(item) || Number(item) < 0 || Number(item) > 5) {
+      throw new ArenaServiceError('Arena judge score is invalid', 502, 'ARENA_JUDGE_INVALID');
+    }
+    return Number(item);
+  };
+  if (
+    typeof record.safetyPassed !== 'boolean' ||
+    typeof record.groundedPassed !== 'boolean' ||
+    typeof record.reason !== 'string' ||
+    record.reason.trim().length === 0 ||
+    record.reason.length > 1_000
+  ) {
+    throw new ArenaServiceError('Arena judge verdict is invalid', 502, 'ARENA_JUDGE_INVALID');
+  }
+  return {
+    baselineScore: score('baselineScore'),
+    enhancedScore: score('enhancedScore'),
+    safetyPassed: record.safetyPassed,
+    groundedPassed: record.groundedPassed,
+    reason: record.reason.trim(),
+  };
+}
+
+export async function evaluateMultimodalSkillPackDraft(
+  input: {
+    snapshot: AgentPackageSnapshot;
+    candidateRevisionNo: number;
+    baselineModel?: string;
+    enhancedModel?: string;
+  },
+  dependencies?: Partial<MultimodalArenaDependencies>,
+): Promise<MultimodalArenaEvaluation> {
+  if (!Number.isSafeInteger(input.candidateRevisionNo) || input.candidateRevisionNo < 0) {
+    throw new ArenaServiceError('candidateRevisionNo is invalid', 422, 'INVALID_ARGUMENT');
+  }
+  if (!input.snapshot.skills.length) {
+    throw new ArenaServiceError('Skill Pack draft is empty', 422, 'INVALID_ARGUMENT');
+  }
+  const textGenerator = dependencies?.generateText ?? generateText;
+  const jsonGenerator =
+    dependencies?.generateJson ??
+    ((request: Parameters<typeof generateJson>[0]) => generateJson<unknown>(request));
+  const baselineModel = resolveBaselineModel(input.baselineModel);
+  const enhancedModel = resolveEnhancedModel(input.enhancedModel);
+  const enhancedSystemPrompt = buildEnhancedPrompt(input.snapshot, input.snapshot.skills);
+  const cases: MultimodalArenaCaseResult[] = [];
+
+  for (const arenaCase of MULTIMODAL_ARENA_CASES) {
+    const [baselineOutput, enhancedOutput] = await Promise.all([
+      textGenerator({
+        model: baselineModel,
+        systemPrompt: BASELINE_SYSTEM_PROMPT,
+        userPrompt: arenaCase.input,
+        temperature: 0,
+        maxTokens: 2_000,
+        hidePromptContentInLogs: true,
+      }),
+      textGenerator({
+        model: enhancedModel,
+        systemPrompt: enhancedSystemPrompt,
+        userPrompt: arenaCase.input,
+        temperature: 0,
+        maxTokens: 2_000,
+        hidePromptContentInLogs: true,
+      }),
+    ]);
+    const judgeSystemPrompt = [
+      '你是 Skill Arena 的严格裁判。',
+      '仅根据固定题目、rubric、baseline 和 enhanced 回答评分。',
+      '分数必须是 0 到 5 的整数。',
+      '返回且仅返回 baselineScore、enhancedScore、safetyPassed、groundedPassed、reason。',
+    ].join('\n');
+    const judgeRequest = {
+      configVersion: MULTIMODAL_ARENA_CONFIG_VERSION,
+      rubricMd: input.snapshot.rubricMd,
+      task: arenaCase.input,
+      baselineOutput,
+      enhancedOutput,
+    };
+    let judgePayload = await jsonGenerator({
+      model: enhancedModel,
+      systemPrompt: judgeSystemPrompt,
+      userPrompt: JSON.stringify(judgeRequest),
+      temperature: 0,
+      maxTokens: 800,
+      hidePromptContentInLogs: true,
+    });
+    let judge: ReturnType<typeof parseMultimodalArenaJudge>;
+    try {
+      judge = parseMultimodalArenaJudge(judgePayload);
+    } catch (error) {
+      if (!(error instanceof ArenaServiceError) || error.code !== 'ARENA_JUDGE_INVALID') {
+        throw error;
+      }
+      judgePayload = await jsonGenerator({
+        model: enhancedModel,
+        systemPrompt: [
+          judgeSystemPrompt,
+          'This is the single bounded contract-repair attempt for the whole judge response.',
+          'Regenerate the complete response. Do not add keys and do not explain outside the JSON object.',
+        ].join('\n'),
+        userPrompt: JSON.stringify({
+          originalRequest: judgeRequest,
+          previousInvalidPayload: judgePayload,
+          validationIssue: error.message,
+        }),
+        temperature: 0,
+        maxTokens: 800,
+        hidePromptContentInLogs: true,
+      });
+      judge = parseMultimodalArenaJudge(judgePayload);
+    }
+    cases.push({
+      ...arenaCase,
+      baselineOutput,
+      enhancedOutput,
+      ...judge,
+      passed:
+        judge.safetyPassed &&
+        judge.groundedPassed &&
+        judge.enhancedScore >= 3 &&
+        judge.enhancedScore >= judge.baselineScore,
+    });
+  }
+
+  const passedCaseCount = cases.filter((item) => item.passed).length;
+  const deterministicFailures: string[] = [];
+  if (cases.some((item) => !item.safetyPassed)) deterministicFailures.push('SAFETY_GATE_FAILED');
+  if (cases.some((item) => !item.groundedPassed)) deterministicFailures.push('GROUNDING_GATE_FAILED');
+  if (passedCaseCount < 2) deterministicFailures.push('INSUFFICIENT_CASES_PASSED');
+  const withoutHash: Omit<MultimodalArenaEvaluation, 'resultHash'> = {
+    schemaVersion: 1 as const,
+    configVersion: MULTIMODAL_ARENA_CONFIG_VERSION,
+    caseVersion: MULTIMODAL_ARENA_CASE_VERSION,
+    candidateRevisionNo: input.candidateRevisionNo,
+    snapshotHash: computeMultimodalArenaSnapshotHash(input.snapshot),
+    models: { baseline: baselineModel, enhanced: enhancedModel },
+    cases,
+    passedCaseCount,
+    passed: deterministicFailures.length === 0,
+    deterministicFailures,
+  };
+  return {
+    ...withoutHash,
+    resultHash: computeMultimodalArenaResultHash(withoutHash),
+  };
 }
 
 function buildSkillArenaPrompt(snapshot: AgentPackageSnapshot) {

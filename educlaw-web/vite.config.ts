@@ -4,7 +4,9 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
-  base: './',
+  // The web app is served from the domain root. Root-relative assets keep the
+  // favicon resolvable when the browser is on a nested client-side route.
+  base: '/',
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {

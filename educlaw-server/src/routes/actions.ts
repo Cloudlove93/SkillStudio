@@ -2,6 +2,10 @@ import { Router } from 'express';
 import type { AuthedRequest } from '../types.js';
 import { requireAuth } from '../middleware/auth.js';
 import {
+  createInternalWorkerAuth,
+  isInternalMediaJobAction,
+} from '../middleware/internal-worker-auth.js';
+import {
   ArenaServiceError,
   createArenaThread,
   getArenaThreadDetail,
@@ -19,6 +23,7 @@ import {
   undiscardSkillVersion,
 } from '../services/skill-version-service.js';
 import { GuidedCreationError } from '../services/guided-creation-service.js';
+import { MultimodalJobServiceError } from '../services/multimodal-job-service.js';
 import {
   handleGuidedCreationJsonAction,
   handleGuidedCreationStreamAction,
@@ -26,6 +31,10 @@ import {
   isGuidedCreationStreamAction,
   parseGuidedCreationRequest,
 } from './guided-creation-actions.js';
+import {
+  handleInternalMediaJobAction,
+  MediaJobActionError,
+} from './media-job-actions.js';
 
 type ApiHandler = (input: {
   body: Record<string, unknown>;
@@ -33,6 +42,7 @@ type ApiHandler = (input: {
 }) => Promise<unknown>;
 
 const router: import('express').Router = Router();
+const internalWorkerAuth = createInternalWorkerAuth();
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -129,10 +139,17 @@ function optionalLimit(value: unknown): number | undefined {
   return value;
 }
 
-function optionalArenaSurface(value: unknown): 'run' | 'test' | 'arena' | 'optimize' | undefined {
+function optionalArenaSurface(
+  value: unknown,
+): 'run' | 'test' | 'arena' | 'optimize' | undefined {
   const surface = optionalString(value, 'surface', 20);
   if (surface === undefined) return undefined;
-  if (surface !== 'run' && surface !== 'test' && surface !== 'arena' && surface !== 'optimize') {
+  if (
+    surface !== 'run' &&
+    surface !== 'test' &&
+    surface !== 'arena' &&
+    surface !== 'optimize'
+  ) {
     throw new SkillVersionError(
       'INVALID_ARGUMENT',
       'surface must be run, test, arena or optimize',
@@ -395,72 +412,119 @@ const actionMap = new Map<string, ApiHandler>([
   ],
 ]);
 
-router.post('/', requireAuth, async (req, res, next) => {
-  try {
+router.post(
+  '/',
+  (req, res, next) => {
     const body = req.body as unknown;
-    if (!isPlainObject(body) || typeof body.action !== 'string') {
-      res
-        .status(400)
-        .json({ code: 'UNKNOWN_ACTION', message: 'Unknown action' });
-      return;
+    const action =
+      isPlainObject(body) && typeof body.action === 'string'
+        ? body.action
+        : undefined;
+
+    if (isInternalMediaJobAction(action)) {
+      return internalWorkerAuth.requireInternalWorker(req, res, next);
     }
-    if (isGuidedCreationAction(body.action)) {
-      const request = parseGuidedCreationRequest(body);
-      const authUserId = (req as AuthedRequest).userId || '';
-      if (isGuidedCreationStreamAction(request.action)) {
-        await handleGuidedCreationStreamAction({
+
+    return internalWorkerAuth.rejectWorkerTokenOnUserAction(
+      req,
+      res,
+      (error) => {
+        if (error) {
+          next(error);
+          return;
+        }
+        requireAuth(req as AuthedRequest, res, next);
+      },
+    );
+  },
+  async (req, res, next) => {
+    try {
+      const body = req.body as unknown;
+      if (!isPlainObject(body) || typeof body.action !== 'string') {
+        res
+          .status(400)
+          .json({ code: 'UNKNOWN_ACTION', message: 'Unknown action' });
+        return;
+      }
+      if (isInternalMediaJobAction(body.action)) {
+        const data = await handleInternalMediaJobAction(body);
+        res.json({ success: true, data });
+        return;
+      }
+      if (isGuidedCreationAction(body.action)) {
+        const request = parseGuidedCreationRequest(body);
+        const authUserId = (req as AuthedRequest).userId || '';
+        if (isGuidedCreationStreamAction(request.action)) {
+          await handleGuidedCreationStreamAction({
+            auth_user_id: authUserId,
+            request,
+            response: res,
+          });
+          return;
+        }
+        const data = await handleGuidedCreationJsonAction({
           auth_user_id: authUserId,
           request,
-          response: res,
+        });
+        res.json({ success: true, data });
+        return;
+      }
+      const handler = actionMap.get(body.action);
+      if (!handler) {
+        res
+          .status(400)
+          .json({ code: 'UNKNOWN_ACTION', message: 'Unknown action' });
+        return;
+      }
+      const data = await handler({
+        body,
+        authUserId: (req as AuthedRequest).userId || '',
+      });
+      res.json({ success: true, data });
+    } catch (error) {
+      if (error instanceof GuidedCreationError) {
+        res.status(error.statusCode).json({
+          code: error.code,
+          message: error.message,
+          retryable: error.retryable,
         });
         return;
       }
-      const data = await handleGuidedCreationJsonAction({
-        auth_user_id: authUserId,
-        request,
-      });
-      res.json({ success: true, data });
-      return;
+      if (error instanceof MultimodalJobServiceError) {
+        res.status(error.status).json({
+          code: error.code,
+          message: error.message,
+          retryable: error.retryable,
+        });
+        return;
+      }
+      if (error instanceof MediaJobActionError) {
+        res.status(error.status).json({
+          code: error.code,
+          message: error.message,
+          ...(error.details || {}),
+        });
+        return;
+      }
+      if (error instanceof SkillVersionError) {
+        res.status(error.status).json({
+          code: error.code,
+          message: error.message,
+          ...(error.details || {}),
+        });
+        return;
+      }
+      if (error instanceof ArenaServiceError) {
+        res.status(error.status).json({
+          code: error.code,
+          message: error.message,
+          ...(error.details || {}),
+        });
+        return;
+      }
+      next(error);
     }
-    const handler = actionMap.get(body.action);
-    if (!handler) {
-      res
-        .status(400)
-        .json({ code: 'UNKNOWN_ACTION', message: 'Unknown action' });
-      return;
-    }
-    const data = await handler({
-      body,
-      authUserId: (req as AuthedRequest).userId || '',
-    });
-    res.json({ success: true, data });
-  } catch (error) {
-    if (error instanceof GuidedCreationError) {
-      res.status(error.statusCode).json({
-        code: error.code,
-        message: error.message,
-        retryable: error.retryable,
-      });
-      return;
-    }
-    if (error instanceof SkillVersionError) {
-      res.status(error.status).json({
-        code: error.code,
-        message: error.message,
-        ...(error.details || {}),
-      });
-      return;
-    }
-    if (error instanceof ArenaServiceError) {
-      res.status(error.status).json({
-        code: error.code,
-        message: error.message,
-        ...(error.details || {}),
-      });
-      return;
-    }
-    next(error);
-  }
-});
+  },
+);
 
 export default router;

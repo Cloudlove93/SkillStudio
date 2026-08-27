@@ -1,0 +1,623 @@
+import { useMemo, useRef, useState } from 'react';
+import type {
+  AdlerLayerKey,
+  CandidatePassKey,
+  MultimodalCandidateSuggestion,
+  MultimodalClaimType,
+  MultimodalEvidence,
+  MultimodalEvidenceKind,
+  MultimodalTranscriptSegment,
+} from '@educlaw/shared';
+import { CANDIDATE_PASS_KEYS } from '@educlaw/shared';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import type { MediaSessionDetail } from '../../../api/lite-api';
+import type { MultimodalWorkbenchError } from '../multimodal-guided-creation-state';
+import {
+  ADLER_LAYER_LABELS,
+  aggregateMultimodalDegradations,
+  CLAIM_TYPE_LABELS,
+  degradationPresentation,
+  EVIDENCE_KIND_LABELS,
+} from './multimodal-wizard-model';
+import { MultimodalDrawer } from './MultimodalDrawer';
+
+export type MultimodalDrawerKind =
+  | 'transcript'
+  | 'evidence'
+  | 'diagnostics'
+  | 'overview'
+  | 'candidate'
+  | 'skill'
+  | null;
+
+type CandidateSkill =
+  MediaSessionDetail['mediaState']['candidateSkills'][number];
+
+type Props = {
+  detail: MediaSessionDetail | null;
+  error: MultimodalWorkbenchError | null;
+  open: MultimodalDrawerKind;
+  selectedLayer: AdlerLayerKey | null;
+  selectedCandidate: {
+    passKey: CandidatePassKey;
+    candidate: MultimodalCandidateSuggestion;
+  } | null;
+  selectedSkill: CandidateSkill | null;
+  framePreview: { evidenceId: string; url: string } | null;
+  onOpenChange: (open: boolean) => void;
+  onSeek: (timeMs: number) => void;
+  onUpdateTranscript: (
+    index: number,
+    text: string,
+    speaker: string | null,
+  ) => void;
+  onPreviewFrame: (evidenceId: string, objectKey: string) => void;
+  onRemoveEvidence: (evidenceId: string) => void;
+  onUpdateCandidate: (
+    passKey: CandidatePassKey,
+    candidateId: string,
+    patch: Partial<MultimodalCandidateSuggestion>,
+  ) => void;
+  onSplitCandidate: (
+    passKey: CandidatePassKey,
+    candidate: MultimodalCandidateSuggestion,
+  ) => void;
+  onDiscardCandidate: (passKey: CandidatePassKey, candidateId: string) => void;
+  onMergeSelectedCandidates: () => void;
+  onSaveCandidates: () => void;
+};
+
+function formatTime(value: number) {
+  const seconds = Math.max(0, Math.floor(value / 1_000));
+  return (
+    String(Math.floor(seconds / 60)) +
+    ':' +
+    String(seconds % 60).padStart(2, '0')
+  );
+}
+
+function VirtualTranscriptList(props: {
+  items: Array<{ segment: MultimodalTranscriptSegment; sourceIndex: number }>;
+  onSeek: (timeMs: number) => void;
+  onUpdate: (index: number, text: string, speaker: string | null) => void;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  // TanStack Virtual intentionally exposes imperative functions; keep this
+  // list outside React Compiler memoization to avoid stale measurements.
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const rowVirtualizer = useVirtualizer({
+    count: props.items.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 108,
+    overscan: 6,
+    getItemKey: (index) => {
+      const item = props.items[index];
+      return (
+        String(item.segment.startMs) +
+        ':' +
+        String(item.segment.endMs) +
+        ':' +
+        String(item.sourceIndex)
+      );
+    },
+  });
+
+  return (
+    <div ref={scrollRef} className="skill-mm-virtual-scroll">
+      <div
+        className="skill-mm-virtual-canvas"
+        style={{ height: rowVirtualizer.getTotalSize() }}
+      >
+        {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+          const item = props.items[virtualRow.index];
+          return (
+            <article
+              ref={rowVirtualizer.measureElement}
+              data-index={virtualRow.index}
+              key={virtualRow.key}
+              className="skill-mm-transcript-row"
+              style={{
+                position: 'absolute',
+                transform: 'translateY(' + String(virtualRow.start) + 'px)',
+                width: '100%',
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => props.onSeek(item.segment.startMs)}
+              >
+                {formatTime(item.segment.startMs)}–
+                {formatTime(item.segment.endMs)}
+              </button>
+              <textarea
+                defaultValue={item.segment.text}
+                aria-label={'第 ' + String(item.sourceIndex + 1) + ' 段转录'}
+                onBlur={(event) =>
+                  props.onUpdate(
+                    item.sourceIndex,
+                    event.target.value,
+                    item.segment.speaker ?? null,
+                  )
+                }
+              />
+              <small>
+                {item.segment.speaker ?? '未标注说话人'}
+                {item.segment.confidence != null
+                  ? ' · 置信度 ' +
+                    String(Math.round(item.segment.confidence * 100)) +
+                    '%'
+                  : ''}
+                {item.segment.editedByUser ? ' · 已人工修订' : ''}
+                {item.segment.correctedByModel ? ' · 已模型纠错' : ''}
+              </small>
+            </article>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function VirtualEvidenceList(props: {
+  items: MultimodalEvidence[];
+  canRemove: boolean;
+  framePreview: { evidenceId: string; url: string } | null;
+  onSeek: (timeMs: number) => void;
+  onPreviewFrame: (evidenceId: string, objectKey: string) => void;
+  onRemove: (evidenceId: string) => void;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  // TanStack Virtual intentionally exposes imperative functions; keep this
+  // list outside React Compiler memoization to avoid stale measurements.
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const rowVirtualizer = useVirtualizer({
+    count: props.items.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 132,
+    overscan: 6,
+    getItemKey: (index) => props.items[index].evidenceId,
+  });
+
+  return (
+    <div ref={scrollRef} className="skill-mm-virtual-scroll">
+      <div
+        className="skill-mm-virtual-canvas"
+        style={{ height: rowVirtualizer.getTotalSize() }}
+      >
+        {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+          const item = props.items[virtualRow.index];
+          return (
+            <article
+              ref={rowVirtualizer.measureElement}
+              data-index={virtualRow.index}
+              key={virtualRow.key}
+              className="skill-mm-evidence-row"
+              style={{
+                position: 'absolute',
+                transform: 'translateY(' + String(virtualRow.start) + 'px)',
+                width: '100%',
+              }}
+            >
+              <header>
+                <span>{EVIDENCE_KIND_LABELS[item.kind]}</span>
+                <span>{CLAIM_TYPE_LABELS[item.claimType]}</span>
+              </header>
+              {item.kind === 'frame' &&
+                item.assetRef &&
+                (props.framePreview?.evidenceId === item.evidenceId ? (
+                  <img
+                    src={props.framePreview.url}
+                    alt={'关键帧：' + item.selectionReason}
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    className="skill-mm-frame-preview"
+                    onClick={() =>
+                      props.onPreviewFrame(
+                        item.evidenceId,
+                        item.assetRef!.objectKey,
+                      )
+                    }
+                  >
+                    预览关键帧
+                  </button>
+                ))}
+              <button
+                type="button"
+                className="skill-text-button"
+                onClick={() => props.onSeek(item.timeRange.startMs)}
+              >
+                {formatTime(item.timeRange.startMs)}–
+                {formatTime(item.timeRange.endMs)}
+              </button>
+              <p>{item.text}</p>
+              <small>{item.selectionReason}</small>
+              {props.canRemove && (
+                <button
+                  type="button"
+                  className="skill-text-button"
+                  onClick={() => props.onRemove(item.evidenceId)}
+                >
+                  撤销引用（对象仍保留）
+                </button>
+              )}
+            </article>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+export function MultimodalDataDrawers(props: Props) {
+  const [query, setQuery] = useState('');
+  const [lowConfidenceOnly, setLowConfidenceOnly] = useState(false);
+  const [editedOnly, setEditedOnly] = useState(false);
+  const [evidenceKind, setEvidenceKind] = useState<
+    MultimodalEvidenceKind | 'all'
+  >('all');
+  const [claimType, setClaimType] = useState<MultimodalClaimType | 'all'>(
+    'all',
+  );
+
+  const transcriptItems = useMemo(() => {
+    const normalized = query.trim().toLocaleLowerCase();
+    return (props.detail?.mediaState.transcript.segments ?? [])
+      .map((segment, sourceIndex) => ({ segment, sourceIndex }))
+      .filter(({ segment }) => {
+        if (
+          normalized &&
+          !segment.text.toLocaleLowerCase().includes(normalized)
+        ) {
+          return false;
+        }
+        if (
+          lowConfidenceOnly &&
+          (segment.confidence == null || segment.confidence >= 0.7)
+        ) {
+          return false;
+        }
+        if (editedOnly && !segment.editedByUser) return false;
+        return true;
+      });
+  }, [editedOnly, lowConfidenceOnly, props.detail, query]);
+
+  const evidenceItems = useMemo(() => {
+    const normalized = query.trim().toLocaleLowerCase();
+    return (
+      props.detail?.mediaState.evidenceTimeline.evidenceItems ?? []
+    ).filter((item) => {
+      if (
+        normalized &&
+        !item.text.toLocaleLowerCase().includes(normalized) &&
+        !item.selectionReason.toLocaleLowerCase().includes(normalized)
+      ) {
+        return false;
+      }
+      if (evidenceKind !== 'all' && item.kind !== evidenceKind) {
+        return false;
+      }
+      if (claimType !== 'all' && item.claimType !== claimType) {
+        return false;
+      }
+      return true;
+    });
+  }, [claimType, evidenceKind, props.detail, query]);
+
+  const selectedCandidateSources = useMemo(() => {
+    if (props.selectedCandidate?.passKey !== 'fused' || props.detail === null) {
+      return [];
+    }
+    const evidenceIds = new Set(props.selectedCandidate.candidate.evidenceIds);
+    const detail = props.detail;
+    return CANDIDATE_PASS_KEYS.flatMap(
+      (passKey) => detail.mediaState.candidatePasses[passKey],
+    ).filter((candidate) =>
+      candidate.evidenceIds.some((evidenceId) => evidenceIds.has(evidenceId)),
+    );
+  }, [props.detail, props.selectedCandidate]);
+
+  const degradationItems = aggregateMultimodalDegradations(
+    props.detail?.mediaState.degradations ?? [],
+  );
+  const selectedLayerStatements =
+    props.selectedLayer && props.detail?.mediaState.adlerOverview
+      ? props.detail.mediaState.adlerOverview.overview[props.selectedLayer]
+      : [];
+
+  const title =
+    props.open === 'transcript'
+      ? '完整转录'
+      : props.open === 'evidence'
+        ? '证据库'
+        : props.open === 'diagnostics'
+          ? '处理诊断'
+          : props.open === 'overview'
+            ? props.selectedLayer
+              ? ADLER_LAYER_LABELS[props.selectedLayer]
+              : '内容概览'
+            : props.open === 'candidate'
+              ? (props.selectedCandidate?.candidate.title ?? '编辑候选')
+              : (props.selectedSkill?.name ?? 'Skill 内容');
+
+  return (
+    <MultimodalDrawer
+      open={props.open !== null}
+      onOpenChange={props.onOpenChange}
+      title={title}
+      description={
+        props.open === 'transcript' || props.open === 'evidence'
+          ? '搜索结果只渲染当前可见范围，不改变原始证据。'
+          : undefined
+      }
+    >
+      {props.open === 'transcript' && (
+        <div className="skill-mm-drawer-dataset">
+          <div className="skill-mm-drawer-filters">
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="搜索转录"
+            />
+            <label>
+              <input
+                type="checkbox"
+                checked={lowConfidenceOnly}
+                onChange={(event) => setLowConfidenceOnly(event.target.checked)}
+              />
+              低置信度
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={editedOnly}
+                onChange={(event) => setEditedOnly(event.target.checked)}
+              />
+              已人工修改
+            </label>
+          </div>
+          <span className="skill-mm-result-count">
+            {transcriptItems.length} 个片段
+          </span>
+          <VirtualTranscriptList
+            items={transcriptItems}
+            onSeek={props.onSeek}
+            onUpdate={props.onUpdateTranscript}
+          />
+        </div>
+      )}
+
+      {props.open === 'evidence' && (
+        <div className="skill-mm-drawer-dataset">
+          <div className="skill-mm-drawer-filters">
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="搜索证据"
+            />
+            <label>
+              证据类型
+              <select
+                value={evidenceKind}
+                onChange={(event) =>
+                  setEvidenceKind(
+                    event.target.value as MultimodalEvidenceKind | 'all',
+                  )
+                }
+              >
+                <option value="all">全部</option>
+                <option value="transcript">转录</option>
+                <option value="audio_segment">音频片段</option>
+                <option value="frame">关键帧</option>
+              </select>
+            </label>
+            <label>
+              结论类型
+              <select
+                value={claimType}
+                onChange={(event) =>
+                  setClaimType(
+                    event.target.value as MultimodalClaimType | 'all',
+                  )
+                }
+              >
+                <option value="all">全部</option>
+                <option value="sourceFact">原文事实</option>
+                <option value="modelInference">模型推断</option>
+                <option value="userInput">人工输入</option>
+              </select>
+            </label>
+          </div>
+          <span className="skill-mm-result-count">
+            {evidenceItems.length} 条证据
+          </span>
+          <VirtualEvidenceList
+            items={evidenceItems}
+            canRemove={
+              props.detail?.mediaStage === 'awaiting_adler_overview' &&
+              evidenceItems.length > 1
+            }
+            framePreview={props.framePreview}
+            onSeek={props.onSeek}
+            onPreviewFrame={props.onPreviewFrame}
+            onRemove={props.onRemoveEvidence}
+          />
+        </div>
+      )}
+
+      {props.open === 'diagnostics' && (
+        <div className="skill-mm-diagnostics">
+          {props.error && (
+            <article className="skill-mm-diagnostic-item" role="alert">
+              <header>
+                <strong>{props.error.message}</strong>
+                <span>{props.error.code}</span>
+              </header>
+              <p>
+                {props.error.retryable
+                  ? '本次操作没有完成，可以刷新状态后再次尝试。'
+                  : '请根据提示修正当前状态后再继续。'}
+                {props.error.requestId
+                  ? ` 诊断编号：${props.error.requestId}`
+                  : ''}
+              </p>
+            </article>
+          )}
+          {degradationItems.length ? (
+            degradationItems.map((item) => {
+              const display = degradationPresentation(item.code, item.message);
+              return (
+                <article
+                  key={item.code + ':' + item.message}
+                  className="skill-mm-diagnostic-item"
+                >
+                  <header>
+                    <strong>{display.title}</strong>
+                    <span>{item.count} 个片段</span>
+                  </header>
+                  <p>{display.detail}</p>
+                </article>
+              );
+            })
+          ) : !props.error ? (
+            <p className="skill-media-muted">本次处理没有记录降级信息。</p>
+          ) : null}
+        </div>
+      )}
+
+      {props.open === 'overview' && (
+        <div className="skill-mm-overview-expanded">
+          {selectedLayerStatements.map((statement, index) => (
+            <button
+              type="button"
+              key={String(index)}
+              onClick={() => {
+                const evidence =
+                  props.detail?.mediaState.evidenceTimeline.evidenceItems.find(
+                    (item) => statement.evidenceIds.includes(item.evidenceId),
+                  );
+                if (evidence) props.onSeek(evidence.timeRange.startMs);
+              }}
+            >
+              <span>{statement.text}</span>
+              <small>{statement.evidenceIds.length} 条证据</small>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {props.open === 'candidate' && props.selectedCandidate && (
+        <div className="skill-mm-candidate-editor">
+          <label>
+            候选标题
+            <input
+              value={props.selectedCandidate.candidate.title}
+              onChange={(event) =>
+                props.onUpdateCandidate(
+                  props.selectedCandidate!.passKey,
+                  props.selectedCandidate!.candidate.candidateId,
+                  { title: event.target.value },
+                )
+              }
+            />
+          </label>
+          <label>
+            主题简介
+            <textarea
+              value={props.selectedCandidate.candidate.summary}
+              onChange={(event) =>
+                props.onUpdateCandidate(
+                  props.selectedCandidate!.passKey,
+                  props.selectedCandidate!.candidate.candidateId,
+                  { summary: event.target.value },
+                )
+              }
+            />
+          </label>
+          <label>
+            可复用规则
+            <textarea
+              value={props.selectedCandidate.candidate.reusableRule}
+              onChange={(event) =>
+                props.onUpdateCandidate(
+                  props.selectedCandidate!.passKey,
+                  props.selectedCandidate!.candidate.candidateId,
+                  { reusableRule: event.target.value },
+                )
+              }
+            />
+          </label>
+          <small>
+            {props.selectedCandidate.candidate.evidenceIds.length} 条证据 ·{' '}
+            {props.selectedCandidate.candidate.claimType}
+          </small>
+          <section className="skill-mm-candidate-sources">
+            <h3>融合来源</h3>
+            {selectedCandidateSources.length > 0 ? (
+              <ul>
+                {selectedCandidateSources.map((candidate) => (
+                  <li key={candidate.candidateId}>
+                    <strong>{candidate.title}</strong>
+                    <span>{candidate.evidenceIds.length} 条证据</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p>这个主题基于证据关联形成，没有额外的原子候选来源。</p>
+            )}
+          </section>
+          <div className="skill-mm-candidate-editor-actions">
+            <button
+              type="button"
+              className="skill-secondary-button"
+              onClick={() =>
+                props.onSplitCandidate(
+                  props.selectedCandidate!.passKey,
+                  props.selectedCandidate!.candidate,
+                )
+              }
+            >
+              拆分候选
+            </button>
+            <button
+              type="button"
+              className="skill-secondary-button"
+              onClick={props.onMergeSelectedCandidates}
+            >
+              合并所选同类候选
+            </button>
+            <button
+              type="button"
+              className="skill-secondary-button"
+              onClick={props.onSaveCandidates}
+            >
+              保存并重新验证
+            </button>
+            <button
+              type="button"
+              className="skill-text-button"
+              onClick={() =>
+                props.onDiscardCandidate(
+                  props.selectedCandidate!.passKey,
+                  props.selectedCandidate!.candidate.candidateId,
+                )
+              }
+            >
+              废弃候选
+            </button>
+          </div>
+        </div>
+      )}
+
+      {props.open === 'skill' && props.selectedSkill && (
+        <div className="skill-mm-skill-document">
+          <p>{props.selectedSkill.description}</p>
+          <pre>{props.selectedSkill.skillMd}</pre>
+        </div>
+      )}
+    </MultimodalDrawer>
+  );
+}

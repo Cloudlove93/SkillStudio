@@ -18,6 +18,13 @@ import type {
   GuidedCreationSession,
   GuidedCreationSessionDetail,
   GuidedCreationStartPayload,
+  MediaConfirmationStage,
+  MediaJobStatus,
+  MediaJobType,
+  MediaStage,
+  MultimodalCandidatePasses,
+  MultimodalEvidence,
+  PublicMultimodalSessionState,
   OptimizationResult,
   PackageSkillRecord,
   PackageVersion,
@@ -230,6 +237,245 @@ export type GuidedCreationSseEvent =
   | { event: 'stream_end'; data: Record<string, never> }
   | { event: 'ping'; data: Record<string, never> };
 
+export type ConfirmationStage = MediaConfirmationStage;
+
+export interface MediaSessionSummary {
+  sessionId: string;
+  displayName: string;
+  status:
+    | 'collecting'
+    | 'ready_for_confirmation'
+    | 'finalizing'
+    | 'completed'
+    | 'failed'
+    | 'cancelled';
+  mediaStage: MediaStage;
+  revisionNo: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MediaSessionDetail extends MediaSessionSummary {
+  mediaState: PublicMultimodalSessionState;
+  error: {
+    code: string;
+    stage: MediaStage;
+    resumeStage: MediaStage;
+    retryable: boolean;
+    message: string;
+  } | null;
+  arenaEvaluation?: MediaArenaEvaluation | null;
+  publishedPackage?: {
+    packageId: string;
+    packageVersionId: string;
+    packageVersionNumber: number;
+    skillVersionIds: Record<string, string>;
+    publishedAt: string;
+  } | null;
+}
+
+export type MediaJsonAction =
+  | 'skill.media.session.create'
+  | 'skill.media.session.list'
+  | 'skill.media.asset.preview'
+  | 'skill.media.upload.intent'
+  | 'skill.media.upload.confirm'
+  | 'skill.media.url.import'
+  | 'skill.media.process.start'
+  | 'skill.media.retry'
+  | 'skill.media.cancel'
+  | 'skill.media.session.delete'
+  | 'skill.media.transcript.update'
+  | 'skill.media.evidence.update'
+  | 'skill.media.candidate.update'
+  | 'skill.media.overview.confirm'
+  | 'skill.media.candidate.confirm'
+  | 'skill.media.test.start'
+  | 'skill.media.generate.confirm'
+  | 'skill.media.publish';
+
+export interface MediaArenaEvaluation {
+  schemaVersion: 1;
+  configVersion: 'multimodal-arena-v1';
+  caseVersion: string;
+  candidateRevisionNo: number;
+  snapshotHash: string;
+  models: { baseline: string; enhanced: string };
+  cases: Array<{
+    caseId: string;
+    input: string;
+    baselineOutput: string;
+    enhancedOutput: string;
+    baselineScore: number;
+    enhancedScore: number;
+    safetyPassed: boolean;
+    groundedPassed: boolean;
+    passed: boolean;
+    reason: string;
+  }>;
+  passedCaseCount: number;
+  passed: boolean;
+  deterministicFailures: string[];
+  resultHash: string;
+}
+
+export interface MediaArenaTestResult {
+  sessionId: string;
+  revisionNo: number;
+  mediaStage: 'arena_testing' | 'ready_to_publish';
+  passed: boolean;
+  evaluation: MediaArenaEvaluation;
+  replayed: boolean;
+}
+
+export interface MediaPublishResult {
+  sessionId: string;
+  revisionNo: number;
+  mediaStage: 'published';
+  packageId: string;
+  packageVersionId: string;
+  packageVersionNumber: number;
+  skillVersionIds: Record<string, string>;
+  publishedAt: string;
+  replayed: boolean;
+}
+
+export type MediaUploadIntent =
+  | {
+      sessionId: string;
+      revisionNo: number;
+      mediaStage: 'uploading';
+      uploadMode: 'single_put';
+      expiresAt: string;
+      uploadToken: string;
+      upload: {
+        method: 'PUT';
+        url: string;
+        requiredHeaders: Record<string, string>;
+      };
+      replayed: boolean;
+    }
+  | {
+      sessionId: string;
+      revisionNo: number;
+      mediaStage: 'uploading';
+      uploadMode: 'multipart';
+      expiresAt: string;
+      uploadToken: string;
+      multipart: {
+        partSizeBytes: number;
+        partCount: number;
+        parts: Array<{
+          partNumber: number;
+          url: string;
+          expiresAt: string;
+          requiredHeaders: Record<string, string>;
+        }>;
+      };
+      replayed: boolean;
+    };
+
+export interface MediaUploadConfirmResult {
+  sessionId: string;
+  revisionNo: number;
+  mediaStage: 'uploading' | 'ready_to_process';
+  materialStatus: 'verifying';
+  jobId: string;
+  observedSizeBytes: number;
+  observedContentType: string;
+  jobType: 'media_quality_check';
+  replayed: boolean;
+}
+
+export interface MediaUrlImportResult {
+  sessionId: string;
+  revisionNo: number;
+  mediaStage: MediaStage;
+  jobId: string;
+  jobType: 'media_quality_check';
+  sizeBytes: number;
+  contentType: string;
+  replayed: boolean;
+}
+
+export interface MediaProcessStartResult {
+  sessionId: string;
+  revisionNo: number;
+  mediaStage: 'preparing_media';
+  job: { jobId: string; jobType: string; status: string; attemptNo: number };
+  pipelinePlan: {
+    transcribe: boolean;
+    frameMaterialize: boolean;
+    visualOnly: boolean;
+  };
+  replayed: boolean;
+}
+
+export interface MediaMutationResult {
+  sessionId: string;
+  revisionNo: number;
+  mediaStage: MediaStage;
+  invalidatedFrom:
+    | 'semantic_moments'
+    | 'adler_overview'
+    | 'candidate_validation';
+  replayed: boolean;
+}
+
+export interface MediaConfirmationResult {
+  sessionId: string;
+  revisionNo: number;
+  mediaStage: MediaStage;
+  confirmedStage: 'adler_overview' | 'evidence_and_candidates';
+  replayed: boolean;
+}
+
+export interface MediaSessionProgress extends MediaSessionSummary {
+  currentJob: {
+    jobId: string;
+    jobType: MediaJobType;
+    status: MediaJobStatus;
+    percent: number | null;
+    hint: string | null;
+  } | null;
+}
+
+export type MediaProgressSseEvent =
+  | {
+      event: 'progress';
+      data: {
+        progress: MediaSessionProgress;
+      };
+    }
+  | {
+      event: 'confirmation';
+      data: {
+        session: MediaSessionDetail;
+        confirmationStage: ConfirmationStage;
+      };
+    }
+  | {
+      event: 'done';
+      data: {
+        session: MediaSessionDetail;
+      };
+    }
+  | {
+      event: 'error';
+      data: {
+        code: string;
+        message: string;
+        retryable: boolean;
+      };
+    }
+  | {
+      event: 'stream_end';
+      data: {
+        reason?: 'not_started';
+      };
+    }
+  | { event: 'ping'; data: Record<string, never> };
+
 export type ArenaMessageStreamEvent =
   | { event: 'phase'; data: { label: string } }
   | { event: 'shared'; data: { message: ArenaMessage } }
@@ -336,7 +582,10 @@ async function actionRequest<T>(
 
 async function guidedActionRequest<T>(
   token: string,
-  action: GuidedCreationAction,
+  action:
+    | GuidedCreationAction
+    | 'skill.media.session.detail'
+    | 'skill.media.progress',
   payload: Record<string, unknown> = {},
 ): Promise<T> {
   const response = await apiFetch('/api', {
@@ -361,18 +610,66 @@ async function guidedActionRequest<T>(
   return body.data as T;
 }
 
-function guidedStreamRequest(
+async function mediaActionRequest<T>(
   token: string,
-  action: GuidedCreationAction,
+  action: MediaJsonAction,
+  input: {
+    sessionId?: string;
+    idempotencyKey?: string;
+    payload?: Record<string, unknown>;
+  } = {},
+): Promise<T> {
+  const response = await apiFetch('/api', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({
+      action,
+      ...(input.sessionId ? { sessionId: input.sessionId } : {}),
+      ...(input.idempotencyKey
+        ? { idempotencyKey: input.idempotencyKey }
+        : {}),
+      payload: input.payload ?? {},
+    }),
+  });
+  const body = await response
+    .json()
+    .catch(() => ({ message: `HTTP ${response.status}` }));
+  if (!response.ok) {
+    const message =
+      typeof body?.message === 'string' && body.message.trim()
+        ? body.message
+        : typeof body?.error === 'string' && body.error.trim()
+          ? body.error
+          : `HTTP ${response.status}`;
+    throw new LiteApiError(
+      message,
+      typeof body?.code === 'string' ? body.code : undefined,
+      response.status,
+      body && typeof body === 'object' ? body : undefined,
+    );
+  }
+  return body.data as T;
+}
+
+function guidedStreamRequest<
+  TEvent extends GuidedCreationSseEvent | MediaProgressSseEvent,
+>(
+  token: string,
+  action: GuidedCreationAction | 'skill.media.progress.stream',
   payload: Record<string, unknown>,
-  onEvent: (event: GuidedCreationSseEvent) => void,
+  onEvent: (event: TEvent) => void,
+  signal?: AbortSignal,
 ) {
-  return streamRequest<GuidedCreationSseEvent>(
+  return streamRequest<TEvent>(
     '',
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action, payload }),
+      signal,
     },
     token,
     onEvent,
@@ -423,6 +720,317 @@ async function streamRequest<TEvent>(
 }
 
 export const liteApi = {
+  createMediaSession: (
+    token: string,
+    input: { idempotencyKey: string; displayName: string },
+  ) =>
+    mediaActionRequest<MediaSessionDetail>(token, 'skill.media.session.create', {
+      idempotencyKey: input.idempotencyKey,
+      payload: { displayName: input.displayName },
+    }),
+  listMediaSessions: (
+    token: string,
+    input: { limit?: number; cursor?: string } = {},
+  ) =>
+    mediaActionRequest<{
+      items: MediaSessionSummary[];
+      nextCursor: string | null;
+    }>(token, 'skill.media.session.list', { payload: input }),
+  createMediaAssetPreview: (
+    token: string,
+    input: { sessionId: string; objectKey: string },
+  ) =>
+    mediaActionRequest<{ url: string; expiresAt: string; mimeType: string }>(
+      token,
+      'skill.media.asset.preview',
+      { payload: input },
+    ),
+  createMediaUploadIntent: (
+    token: string,
+    input: {
+      sessionId: string;
+      idempotencyKey: string;
+      fileName: string;
+      declaredMimeType: string;
+      sizeBytes: number;
+    },
+  ) =>
+    mediaActionRequest<MediaUploadIntent>(token, 'skill.media.upload.intent', {
+      sessionId: input.sessionId,
+      idempotencyKey: input.idempotencyKey,
+      payload: {
+        fileName: input.fileName,
+        declaredMimeType: input.declaredMimeType,
+        sizeBytes: input.sizeBytes,
+      },
+    }),
+  confirmMediaUpload: (
+    token: string,
+    input: {
+      sessionId: string;
+      idempotencyKey: string;
+      uploadToken: string;
+      expectedRevisionNo: number;
+      parts?: Array<{ partNumber: number; etag: string }>;
+    },
+  ) =>
+    mediaActionRequest<MediaUploadConfirmResult>(
+      token,
+      'skill.media.upload.confirm',
+      {
+        sessionId: input.sessionId,
+        idempotencyKey: input.idempotencyKey,
+        payload: {
+          uploadToken: input.uploadToken,
+          expectedRevisionNo: input.expectedRevisionNo,
+          ...(input.parts ? { parts: input.parts } : {}),
+        },
+      },
+    ),
+  importMediaUrl: (
+    token: string,
+    input: {
+      sessionId: string;
+      idempotencyKey: string;
+      url: string;
+      rightsConfirmed: true;
+    },
+  ) =>
+    mediaActionRequest<MediaUrlImportResult>(token, 'skill.media.url.import', {
+      sessionId: input.sessionId,
+      idempotencyKey: input.idempotencyKey,
+      payload: { url: input.url, rightsConfirmed: input.rightsConfirmed },
+    }),
+  startMediaProcessing: (
+    token: string,
+    input: {
+      sessionId: string;
+      idempotencyKey: string;
+      expectedRevisionNo: number;
+      understandingMode: 'auto' | 'nativeVideo' | 'compatible';
+    },
+  ) =>
+    mediaActionRequest<MediaProcessStartResult>(
+      token,
+      'skill.media.process.start',
+      {
+        sessionId: input.sessionId,
+        idempotencyKey: input.idempotencyKey,
+        payload: {
+          expectedRevisionNo: input.expectedRevisionNo,
+          understandingMode: input.understandingMode,
+          transcriptionMode: 'deploymentDefault',
+        },
+      },
+    ),
+  retryMediaProcessing: (
+    token: string,
+    input: {
+      sessionId: string;
+      idempotencyKey: string;
+      expectedRevisionNo: number;
+      failedJobId?: string;
+    },
+  ) =>
+    mediaActionRequest<{
+      sessionId: string;
+      revisionNo: number;
+      mediaStage: MediaStage;
+      retriedJobId: string | null;
+      job: { jobId: string; jobType: string; status: string; attemptNo: number } | null;
+      replayed: boolean;
+    }>(token, 'skill.media.retry', {
+      sessionId: input.sessionId,
+      idempotencyKey: input.idempotencyKey,
+      payload: {
+        expectedRevisionNo: input.expectedRevisionNo,
+        ...(input.failedJobId ? { failedJobId: input.failedJobId } : {}),
+      },
+    }),
+  cancelMediaProcessing: (
+    token: string,
+    input: { sessionId: string; expectedRevisionNo: number },
+  ) =>
+    mediaActionRequest<{
+      sessionId: string;
+      revisionNo: number;
+      mediaStage: 'cancelled';
+      cancelledJobCount: number;
+    }>(token, 'skill.media.cancel', {
+      sessionId: input.sessionId,
+      payload: { expectedRevisionNo: input.expectedRevisionNo },
+    }),
+  deleteMediaSession: (
+    token: string,
+    input: { sessionId: string; expectedRevisionNo: number },
+  ) =>
+    mediaActionRequest<{ sessionId: string; revisionNo: number; deletedAt: string }>(
+      token,
+      'skill.media.session.delete',
+      {
+        sessionId: input.sessionId,
+        payload: { expectedRevisionNo: input.expectedRevisionNo },
+      },
+    ),
+  updateMediaTranscriptSegment: (
+    token: string,
+    input: {
+      sessionId: string;
+      idempotencyKey: string;
+      expectedRevisionNo: number;
+      segmentIndex: number;
+      expectedSegmentRevisionNo: number;
+      text: string;
+      speaker: string | null;
+    },
+  ) =>
+    mediaActionRequest<MediaMutationResult>(
+      token,
+      'skill.media.transcript.update',
+      {
+        sessionId: input.sessionId,
+        idempotencyKey: input.idempotencyKey,
+        payload: {
+          expectedRevisionNo: input.expectedRevisionNo,
+          segmentIndex: input.segmentIndex,
+          expectedSegmentRevisionNo: input.expectedSegmentRevisionNo,
+          text: input.text,
+          speaker: input.speaker,
+        },
+      },
+    ),
+  updateMediaEvidence: (
+    token: string,
+    input: {
+      sessionId: string;
+      idempotencyKey: string;
+      expectedRevisionNo: number;
+      evidenceItems: MultimodalEvidence[];
+    },
+  ) =>
+    mediaActionRequest<MediaMutationResult>(token, 'skill.media.evidence.update', {
+      sessionId: input.sessionId,
+      idempotencyKey: input.idempotencyKey,
+      payload: {
+        expectedRevisionNo: input.expectedRevisionNo,
+        evidenceItems: input.evidenceItems,
+      },
+    }),
+  updateMediaCandidates: (
+    token: string,
+    input: {
+      sessionId: string;
+      idempotencyKey: string;
+      expectedRevisionNo: number;
+      candidatePasses: MultimodalCandidatePasses;
+    },
+  ) =>
+    mediaActionRequest<MediaMutationResult>(token, 'skill.media.candidate.update', {
+      sessionId: input.sessionId,
+      idempotencyKey: input.idempotencyKey,
+      payload: {
+        expectedRevisionNo: input.expectedRevisionNo,
+        candidatePasses: input.candidatePasses,
+      },
+    }),
+  confirmMediaOverview: (
+    token: string,
+    input: {
+      sessionId: string;
+      idempotencyKey: string;
+      expectedRevisionNo: number;
+      title: string;
+      userNotes: string;
+    },
+  ) =>
+    mediaActionRequest<MediaConfirmationResult>(
+      token,
+      'skill.media.overview.confirm',
+      {
+        sessionId: input.sessionId,
+        idempotencyKey: input.idempotencyKey,
+        payload: {
+          expectedRevisionNo: input.expectedRevisionNo,
+          overview: {
+            title: input.title,
+            approved: true,
+            userNotes: input.userNotes,
+          },
+        },
+      },
+    ),
+  confirmMediaCandidates: (
+    token: string,
+    input: {
+      sessionId: string;
+      idempotencyKey: string;
+      expectedRevisionNo: number;
+      selectedCandidateIds: string[];
+    },
+  ) =>
+    mediaActionRequest<MediaConfirmationResult>(
+      token,
+      'skill.media.candidate.confirm',
+      {
+        sessionId: input.sessionId,
+        idempotencyKey: input.idempotencyKey,
+        payload: {
+          expectedRevisionNo: input.expectedRevisionNo,
+          selectedCandidateIds: input.selectedCandidateIds,
+        },
+      },
+    ),
+  startMediaArenaTest: (
+    token: string,
+    input: {
+      sessionId: string;
+      idempotencyKey: string;
+      expectedRevisionNo: number;
+    },
+  ) =>
+    mediaActionRequest<MediaArenaTestResult>(token, 'skill.media.test.start', {
+      sessionId: input.sessionId,
+      idempotencyKey: input.idempotencyKey,
+      payload: { expectedRevisionNo: input.expectedRevisionNo },
+    }),
+  confirmGeneratedMediaSkills: (
+    token: string,
+    input: {
+      sessionId: string;
+      idempotencyKey: string;
+      expectedRevisionNo: number;
+      targetPackageId: string | null;
+      expectedPackageVersionId: string | null;
+    },
+  ) =>
+    mediaActionRequest<MediaPublishResult>(token, 'skill.media.generate.confirm', {
+      sessionId: input.sessionId,
+      idempotencyKey: input.idempotencyKey,
+      payload: {
+        expectedRevisionNo: input.expectedRevisionNo,
+        targetPackageId: input.targetPackageId,
+        expectedPackageVersionId: input.expectedPackageVersionId,
+      },
+    }),
+  publishMediaSkillPack: (
+    token: string,
+    input: {
+      sessionId: string;
+      idempotencyKey: string;
+      expectedRevisionNo: number;
+      targetPackageId: string | null;
+      expectedPackageVersionId: string | null;
+    },
+  ) =>
+    mediaActionRequest<MediaPublishResult>(token, 'skill.media.publish', {
+      sessionId: input.sessionId,
+      idempotencyKey: input.idempotencyKey,
+      payload: {
+        expectedRevisionNo: input.expectedRevisionNo,
+        targetPackageId: input.targetPackageId,
+        expectedPackageVersionId: input.expectedPackageVersionId,
+      },
+    }),
   listGuidedCreations: (token: string, payload: GuidedCreationListPayload = {}) =>
     guidedActionRequest<{
       items: GuidedCreationSession[];
@@ -435,6 +1043,28 @@ export const liteApi = {
     guidedActionRequest<GuidedCreationSessionDetail>(
       token,
       'SkillGuidedCreationDetail',
+      payload as unknown as Record<string, unknown>,
+    ),
+  getMediaSessionDetail: (
+    token: string,
+    payload: {
+      sessionId: string;
+    },
+  ) =>
+    guidedActionRequest<MediaSessionDetail>(
+      token,
+      'skill.media.session.detail',
+      payload as unknown as Record<string, unknown>,
+    ),
+  getMediaProgress: (
+    token: string,
+    payload: {
+      sessionId: string;
+    },
+  ) =>
+    guidedActionRequest<MediaSessionProgress>(
+      token,
+      'skill.media.progress',
       payload as unknown as Record<string, unknown>,
     ),
   cancelGuidedCreation: (
@@ -496,6 +1126,21 @@ export const liteApi = {
       'SkillGuidedCreationConfirm',
       payload as unknown as Record<string, unknown>,
       onEvent,
+    ),
+  streamMediaProgress: (
+    token: string,
+    payload: {
+      sessionId: string;
+    },
+    onEvent: (event: MediaProgressSseEvent) => void,
+    signal?: AbortSignal,
+  ) =>
+    guidedStreamRequest(
+      token,
+      'skill.media.progress.stream',
+      payload as unknown as Record<string, unknown>,
+      onEvent,
+      signal,
     ),
   me: (token: string) => request<UserSummary>('/auth/me', {}, token),
   listPackages: (token: string) =>
@@ -645,6 +1290,12 @@ export const liteApi = {
     request<{ ok: boolean }>(
       `/packages/${packageId}`,
       { method: 'DELETE' },
+      token,
+    ),
+  batchDeleteSkills: (token: string, skillIds: string[]) =>
+    request<{ deletedSkillIds: string[]; deletedCount: number }>(
+      '/skills/batch-delete',
+      { method: 'POST', body: JSON.stringify({ skillIds }) },
       token,
     ),
   listThreads: (token: string, packageId: string) =>
