@@ -1,3 +1,5 @@
+@import "./styles/workspace-tokens.css";
+
 .skill-workspace-root {
   --skill-sidebar-width: 232px;
   --skill-sidebar-current: var(--skill-sidebar-width);
