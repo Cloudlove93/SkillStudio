@@ -107,11 +107,12 @@ test('API mutations send IDs and feedback but never a client-owned package snaps
   );
 });
 
-test('revise only submits targetSkillId while resolving target selection', () => {
-  assert.match(
-    dialogSource,
-    /detail\.status === 'target_selection_required' && targetSkillId/,
-  );
+test('revise submits only the selected Skill IDs while resolving target selection', () => {
+  assert.match(dialogSource, /const isTargetSelection =/);
+  assert.match(dialogSource, /isTargetSelection && selectedSkillIds\.length === 1/);
+  assert.match(dialogSource, /\{ targetSkillId: selectedSkillIds\[0\] \}/);
+  assert.match(dialogSource, /\{ targetSkillIds: selectedSkillIds \}/);
+  assert.match(dialogSource, /\.\.\.targetSelectionPayload/);
 });
 
 test('draft refinement submits only the opinion, source, and current revision', () => {
@@ -119,7 +120,8 @@ test('draft refinement submits only the opinion, source, and current revision', 
     dialogSource,
     /\.\.\.\(normalized \? \{ additionalFeedback: normalized \} : \{\}\)/,
   );
-  assert.match(dialogSource, /revisionSource,/);
+  assert.match(dialogSource, /revisionSource: 'draft_review' as const/);
+  assert.match(dialogSource, /revisionSource: 'test_failure' as const/);
   assert.match(dialogSource, /expectedRevision:\s*detail\.revision/);
   assert.doesNotMatch(
     apiSource,

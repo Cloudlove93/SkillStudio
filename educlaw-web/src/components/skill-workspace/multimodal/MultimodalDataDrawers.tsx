@@ -20,6 +20,8 @@ import {
   CLAIM_TYPE_LABELS,
   degradationPresentation,
   EVIDENCE_KIND_LABELS,
+  mediaJobProgressLabel,
+  mediaJobProgressPercent,
 } from './multimodal-wizard-model';
 
 export type MultimodalInspectorKind =
@@ -335,6 +337,13 @@ export function MultimodalInspectorContent(props: Props) {
     props.selectedLayer && props.detail?.mediaState.adlerOverview
       ? props.detail.mediaState.adlerOverview.overview[props.selectedLayer]
       : [];
+  const currentProgressJob = props.progress?.currentJob ?? null;
+  const currentProgressLabel = currentProgressJob
+    ? mediaJobProgressLabel(currentProgressJob)
+    : null;
+  const currentProgressPercent = currentProgressJob
+    ? mediaJobProgressPercent(currentProgressJob)
+    : null;
 
   return (
     <div className="skill-mm-inspector-content">
@@ -344,17 +353,26 @@ export function MultimodalInspectorContent(props: Props) {
             <span>当前状态</span>
             <strong>{props.statusText}</strong>
           </section>
-          {props.progress?.currentJob && (
+          {currentProgressJob && currentProgressLabel && (
             <section>
-              <span>正在处理</span>
-              <strong>
-                {props.progress.currentJob.hint ??
-                  props.progress.currentJob.jobType}
-              </strong>
-              {props.progress.currentJob.percent != null && (
-                <div className="skill-context-progress-track">
+              <span>
+                {currentProgressJob.status === 'queued' ||
+                currentProgressJob.status === 'leased'
+                  ? '正在处理'
+                  : '最近任务'}
+              </span>
+              <strong aria-live="polite">{currentProgressLabel}</strong>
+              {currentProgressPercent != null && (
+                <div
+                  className="skill-context-progress-track"
+                  role="progressbar"
+                  aria-label={`${currentProgressLabel}进度`}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={currentProgressPercent}
+                >
                   <span
-                    style={{ width: `${props.progress.currentJob.percent}%` }}
+                    style={{ width: `${currentProgressPercent}%` }}
                   />
                 </div>
               )}

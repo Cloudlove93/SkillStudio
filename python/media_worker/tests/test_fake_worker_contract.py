@@ -668,7 +668,30 @@ def test_run_forever_backs_off_on_idle_and_retryable_claim_errors() -> None:
 
     runner.run_forever(stop_predicate=stop_predicate)
 
-    assert sleep_calls == [2.5, 2.5, 2.5]
+    assert sleep_calls == [2.5, 5.0, 10.0]
+
+
+def test_run_forever_resets_idle_backoff_after_claiming_work() -> None:
+    sleep_calls: list[float] = []
+    stop_state = {"calls": 0}
+    client = RecordingClient(
+        claim_effects=[None, make_job(), None],
+        heartbeat_effects=[{"ok": True}, {"ok": True}],
+    )
+    runner = WorkerRunner(
+        config=make_config(),
+        client=client,
+        executor=FakeExecutor(),
+        sleep=sleep_calls.append,
+    )
+
+    def stop_predicate() -> bool:
+        stop_state["calls"] += 1
+        return stop_state["calls"] > 3
+
+    runner.run_forever(stop_predicate=stop_predicate)
+
+    assert sleep_calls == [2.5, 2.5]
 
 
 def test_run_forever_propagates_non_retryable_claim_errors_without_sleep() -> None:

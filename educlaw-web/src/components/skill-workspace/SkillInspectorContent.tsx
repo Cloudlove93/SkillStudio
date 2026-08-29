@@ -3,11 +3,17 @@ import type {
   GuidedEducationDimension,
   SkillVersionDetail,
 } from '@educlaw/shared';
+import { lazy, Suspense } from 'react';
 import { Check, ChevronRight, GitBranch, Sparkles } from 'lucide-react';
 import type { AnswerOptimizationSelection } from './answer-optimization-selection';
-import { SkillAnswerOptimizationPanel } from './SkillAnswerOptimizationPanel';
 import type { SkillWorkspaceView } from './skill-workspace-state';
 import type { InspectorDescriptor } from './workspace-inspector-state';
+
+const SkillAnswerOptimizationPanel = lazy(() =>
+  import('./SkillAnswerOptimizationPanel').then((module) => ({
+    default: module.SkillAnswerOptimizationPanel,
+  })),
+);
 
 const EDUCATION_DIMENSIONS: { key: GuidedEducationDimension; title: string }[] =
   [
@@ -82,12 +88,16 @@ export function SkillInspectorContent(props: Props) {
   }
   if (props.descriptor?.view === 'optimization' && props.answerOptimization) {
     return (
-      <SkillAnswerOptimizationPanel
-        token={props.token}
-        selection={props.answerOptimization}
-        onSaved={props.onAnswerOptimizationSaved}
-        onRerun={props.onAnswerOptimizationRerun}
-      />
+      <Suspense
+        fallback={<div className="skill-workspace-loading" role="status">正在打开优化建议…</div>}
+      >
+        <SkillAnswerOptimizationPanel
+          token={props.token}
+          selection={props.answerOptimization}
+          onSaved={props.onAnswerOptimizationSaved}
+          onRerun={props.onAnswerOptimizationRerun}
+        />
+      </Suspense>
     );
   }
   return (

@@ -5,22 +5,20 @@ const read = (path: string) =>
   readFileSync(new URL(path, import.meta.url), 'utf8');
 
 describe('Skill workspace visual contract', () => {
-  it('self-hosts one Simplified Chinese variable UI font', () => {
+  it('uses a local operating-system Chinese UI font stack without loading font assets', () => {
     const pkg = JSON.parse(read('../../../package.json')) as {
       dependencies: Record<string, string>;
     };
     const main = read('../../main.tsx');
 
-    expect(pkg.dependencies['@fontsource-variable/noto-sans-sc']).toBe('5.3.0');
-    expect(main).toContain('@fontsource-variable/noto-sans-sc/wght.css');
+    expect(pkg.dependencies['@fontsource-variable/noto-sans-sc']).toBeUndefined();
+    expect(main).not.toContain('@fontsource-variable/noto-sans-sc');
   });
 
   it('defines workspace typography and semantic color tokens', () => {
     const tokens = read('./styles/workspace-tokens.css');
 
-    expect(tokens).toMatch(
-      /--workspace-font-ui:\s*["']Noto Sans SC Variable["']/,
-    );
+    expect(tokens).toContain("--workspace-font-ui:\n    'PingFang SC', 'Microsoft YaHei UI', 'Hiragino Sans GB', sans-serif");
     expect(tokens).toContain('--workspace-primary: #4658c9');
     expect(tokens).toContain('--workspace-evidence: #28766f');
     expect(tokens).toContain('--workspace-text-xs: 12px');
@@ -77,6 +75,9 @@ describe('Skill workspace visual contract', () => {
     const shell = read('./styles/workspace-shell.css');
 
     expect(inspector).toMatch(
+      /\.workspace-inspector\.is-open\s*\{[^}]*flex-basis:\s*var\(--workspace-inspector-width\);[^}]*width:\s*var\(--workspace-inspector-width\)/s,
+    );
+    expect(inspector).toMatch(
       /\.workspace-inspector-panel\s*\{[^}]*background:\s*var\(--workspace-surface\)/s,
     );
     expect(inspector).toMatch(
@@ -91,6 +92,24 @@ describe('Skill workspace visual contract', () => {
     expect(shell).toContain('@media (max-width: 1100px)');
     expect(shell).toMatch(
       /@media \(max-width: 1100px\)[\s\S]*\.skill-new-button > span[\s\S]*\.skill-sidebar-empty\s*\{\s*display:\s*none/s,
+    );
+  });
+
+  it('keeps thinking controls compact, bounded, token-based, and motion-safe', () => {
+    const detail = read('./styles/skill-detail.css');
+
+    expect(detail).toMatch(
+      /\.skill-test-composer \.skill-thinking-toggle\s*\{[^}]*min-height:\s*44px/s,
+    );
+    expect(detail).toMatch(
+      /\.skill-reasoning-content\s*\{[^}]*max-height:\s*12rem;[^}]*overflow:\s*auto/s,
+    );
+    expect(detail).toContain('.skill-thinking-toggle:focus-visible');
+    expect(detail).toMatch(
+      /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.skill-reasoning-spinner/s,
+    );
+    expect(detail).not.toMatch(
+      /\.skill-(?:thinking|reasoning)[^{]*\{[^}]*(?:linear-gradient|radial-gradient)/s,
     );
   });
 });

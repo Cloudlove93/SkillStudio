@@ -1509,6 +1509,7 @@ export default function LiteArenaPanel() {
         prompt,
         undefined,
         arenaMode,
+        false,
         (event) => {
           if (event.event === 'phase') {
             if (!isCurrentReplyThread()) return;
@@ -4197,6 +4198,25 @@ export default function LiteArenaPanel() {
                         >
                           导入
                         </button>
+                        {rubricHasContent && (
+                          <>
+                            <span className="ec-action-divider" />
+                            <button
+                              onClick={() => {
+                                setRightExpanded(false);
+                                setCenterPreview({
+                                  type: 'rubric',
+                                  name: 'rubric.md',
+                                  content: rubricPreviewContent,
+                                });
+                              }}
+                              className="ec-action"
+                              aria-label="在中间打开评分规则"
+                            >
+                              在中间打开
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
                     <input
@@ -4222,17 +4242,7 @@ export default function LiteArenaPanel() {
                               </div>
                             </div>
                           )}
-                          <div
-                            className="cursor-pointer text-sm transition-colors hover:bg-muted/50 overflow-auto max-h-[60vh]"
-                            onClick={() => {
-                              setRightExpanded(false);
-                              setCenterPreview({
-                                type: 'rubric',
-                                name: 'rubric.md',
-                                content: rubricPreviewContent,
-                              });
-                            }}
-                          >
+                          <div className="max-h-[60vh] overflow-auto text-sm">
                             <RubricStructuredView content={rubricDisplayText} />
                           </div>
                         </>

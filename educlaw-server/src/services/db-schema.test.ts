@@ -265,6 +265,27 @@ describe('db schema initialization', () => {
     );
   });
 
+  it('adds nullable message reasoning without forbidden constraints', async () => {
+    const { schemaStatements, migrationStatements } =
+      await import('./db-schema.js');
+    const schemaSql = schemaStatements.join('\n').toLowerCase();
+    const migrationSql = migrationStatements.join('\n').toLowerCase();
+
+    expect(schemaSql).toMatch(
+      /create table if not exists arena_messages[\s\S]*reasoning_content text/,
+    );
+    expect(migrationSql).toContain(
+      'alter table arena_messages add column if not exists reasoning_content text',
+    );
+    const reasoningMigrations = migrationStatements.filter((statement) =>
+      statement.toLowerCase().includes('reasoning_content'),
+    );
+    expect(reasoningMigrations).toHaveLength(1);
+    expect(reasoningMigrations[0]?.toLowerCase()).not.toMatch(
+      /references|foreign key|check\s*\(/,
+    );
+  });
+
   it('defines skill arena thread metadata and relational variant links', async () => {
     const { schemaStatements, migrationStatements } =
       await import('./db-schema.js');

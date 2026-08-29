@@ -41,6 +41,7 @@ const historicalSchemaStatements = [
       skill_uid text not null,
       dir_name text not null,
       name text not null,
+      display_name text,
       description text not null default '',
       status text not null default 'active' check (status in ('active', 'removed')),
       next_version_number integer not null default 1 check (next_version_number > 0),
@@ -308,6 +309,7 @@ const historicalSchemaStatements = [
       side text not null,
       role text not null,
       content text not null,
+      reasoning_content text,
       created_at timestamptz not null
     )
   `,
@@ -626,6 +628,7 @@ export const schemaStatements = historicalSchemaStatements.concat(
  */
 export const migrationStatements = [
   // JSON text columns to JSONB.
+  `alter table agent_package_skills add column if not exists display_name text`,
   `alter table agent_package_versions alter column snapshot_json type jsonb using snapshot_json::jsonb`,
   `alter table api_idempotency_keys add column if not exists status text not null default 'pending'`,
   `alter table api_idempotency_keys add column if not exists response_status integer`,
@@ -843,6 +846,7 @@ export const migrationStatements = [
   `alter table arena_threads alter column updated_at type timestamptz using updated_at::timestamptz`,
   // arena_messages
   `alter table arena_messages alter column created_at type timestamptz using created_at::timestamptz`,
+  `alter table arena_messages add column if not exists reasoning_content text`,
   // arena_answer_runs
   `alter table arena_answer_runs add column if not exists context_message_ids jsonb`,
   `alter table arena_answer_runs add column if not exists enhanced_model text`,

@@ -1311,6 +1311,42 @@
   font-size: 16px;
   font-weight: 630;
 }
+.skill-rename-dialog header p {
+  margin-top: 7px;
+  line-height: 1.55;
+}
+.skill-rename-dialog > label {
+  display: block;
+  margin-top: 16px;
+  color: var(--foreground);
+  font-size: var(--workspace-text-sm);
+  font-weight: 560;
+}
+.skill-rename-dialog > label + input {
+  margin-top: 7px;
+}
+.skill-rename-dialog-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 6px;
+  color: var(--muted-foreground);
+  font-size: var(--workspace-text-xs);
+}
+.skill-rename-dialog-error {
+  margin-top: 8px;
+  color: var(--destructive);
+  line-height: 1.5;
+}
+.skill-rename-dialog footer button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.skill-rename-dialog .is-spinning {
+  animation: spin 900ms linear infinite;
+}
 .skill-session-dialog p {
   margin: 12px 0 0;
   color: var(--muted-foreground);
@@ -1525,7 +1561,12 @@
   pointer-events: auto;
 }
 .skill-skill-row .skill-session-copy strong {
+  overflow: hidden;
   font-weight: 500;
+  font-size: var(--workspace-text-sm);
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--foreground);
 }
 .skill-skill-row .skill-session-copy small {

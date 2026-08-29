@@ -1,4 +1,4 @@
-FROM node:20-slim AS builder
+FROM node:22-slim AS builder
 
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
@@ -19,7 +19,7 @@ COPY educlaw-server ./educlaw-server
 RUN pnpm --filter @educlaw/shared build
 RUN pnpm --filter educlaw-server build
 
-FROM node:20-slim AS runner
+FROM node:22-slim AS runner
 
 WORKDIR /app
 

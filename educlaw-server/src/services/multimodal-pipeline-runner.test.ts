@@ -116,9 +116,14 @@ describe('multimodal pipeline runner', () => {
       ])
       .mockResolvedValueOnce([])
       .mockResolvedValue([]);
-    const runCandidatePipeline = vi.fn().mockResolvedValue(undefined);
-    const runSkillBuildPipeline = vi.fn().mockResolvedValue(undefined);
+    const runCandidatePipeline = vi.fn().mockResolvedValue({
+      mediaStage: 'awaiting_candidates',
+    });
+    const runSkillBuildPipeline = vi.fn().mockResolvedValue({
+      mediaStage: 'arena_testing',
+    });
     const logger = {
+      debug: vi.fn(),
       info: vi.fn(),
       warn: vi.fn(),
       error: vi.fn(),
@@ -158,7 +163,7 @@ describe('multimodal pipeline runner', () => {
       authUserId: 'user-2',
       sessionId: '102',
     });
-    const scheduledEntry = logger.info.mock.calls
+    const scheduledEntry = logger.debug.mock.calls
       .map(([entry]) => entry)
       .find((entry) => entry?.event === 'multimodal.pipeline.runner.scheduled');
     expect(unref).toHaveBeenCalled();
@@ -166,6 +171,58 @@ describe('multimodal pipeline runner', () => {
       event: 'multimodal.pipeline.runner.scheduled',
       pollIntervalMs: 5_000,
     });
+    expect(logger.info).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: 'multimodal.pipeline.runner.session_advanced',
+        sessionId: '101',
+        previousMediaStage: 'extracting_candidates',
+        mediaStage: 'awaiting_candidates',
+        durationMs: expect.any(Number),
+      }),
+      'multimodal.pipeline.runner.session_advanced',
+    );
+  });
+
+  it('logs a quiet waiting event instead of claiming completion when a worker-backed stage has not advanced', async () => {
+    const logger = {
+      debug: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      child: vi.fn().mockReturnThis(),
+    };
+    const runner = createMultimodalPipelineRunner({
+      store: {
+        scanRunnableSessions: vi.fn().mockResolvedValue([{
+          sessionId: '204',
+          authUserId: 'user-4',
+          mediaStage: 'building_evidence',
+        }]),
+      },
+      orchestrator: {
+        runDistillationPipeline: vi.fn().mockResolvedValue({
+          mediaStage: 'building_evidence',
+        }),
+        runCandidatePipeline: vi.fn(),
+        runSkillBuildPipeline: vi.fn(),
+      },
+      logger,
+      pollIntervalMs: 5_000,
+      batchLimit: 1,
+      concurrency: 1,
+    });
+
+    await runner.runOnce();
+
+    expect(logger.info).not.toHaveBeenCalled();
+    expect(logger.debug).toHaveBeenCalledWith(
+      {
+        event: 'multimodal.pipeline.runner.session_waiting',
+        sessionId: '204',
+        mediaStage: 'building_evidence',
+      },
+      'multimodal.pipeline.runner.session_waiting',
+    );
   });
 
   it('avoids runOnce reentry and per-session duplicate dispatch while work is still in flight', async () => {

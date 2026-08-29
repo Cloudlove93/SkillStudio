@@ -1589,6 +1589,16 @@ describe('multimodal model adapters', () => {
       'exact keys: "candidateId", "passKey", "title", "summary", "reusableRule", "sourceCandidateIds", "claimType", "visualAssertion"',
     );
     expect(fusedPrompt).toContain('Do not output "evidenceIds"');
+    const fusedRequest = JSON.parse(
+      generateJson.mock.calls[0]?.[0].userPrompt as string,
+    ) as {
+      evidenceTimeline: unknown[];
+      allowedEvidenceIds: unknown[];
+      candidates: Array<Record<string, unknown>>;
+    };
+    expect(fusedRequest.evidenceTimeline).toEqual([]);
+    expect(fusedRequest.allowedEvidenceIds).toEqual([]);
+    expect(fusedRequest.candidates[0]).not.toHaveProperty('evidenceIds');
   });
 
   it('accepts a deterministic bounded evidence union when fused sources exceed the shared evidence limit', async () => {

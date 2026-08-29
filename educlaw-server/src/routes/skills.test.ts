@@ -3,6 +3,7 @@ import express from 'express';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const batchDeleteSkillsMock = vi.fn();
+const listRepositorySkillsMock = vi.fn();
 
 async function createApp() {
   vi.resetModules();
@@ -17,6 +18,7 @@ async function createApp() {
       }
     },
     batchDeleteSkills: batchDeleteSkillsMock,
+    listRepositorySkills: listRepositorySkillsMock,
   }));
   const routes = (await import('./skills.js')).default;
   const app = express();
@@ -45,6 +47,61 @@ afterEach(() => {
   vi.resetModules();
   vi.doUnmock('../services/skill-version-service.js');
   batchDeleteSkillsMock.mockReset();
+  listRepositorySkillsMock.mockReset();
+});
+
+describe('GET /api/skills/repository', () => {
+  it('lists an authenticated repository page with an opaque cursor', async () => {
+    listRepositorySkillsMock.mockResolvedValueOnce({
+      items: [{ id: '11', name: '函数教学' }],
+      nextCursor: 'next-page',
+    });
+    const { server, url } = await listen(await createApp());
+
+    try {
+      const response = await fetch(
+        `${url}/api/skills/repository?cursor=current-page&limit=25`,
+        { headers: { 'X-User-Id': 'real-user' } },
+      );
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({
+        items: [{ id: '11', name: '函数教学' }],
+        nextCursor: 'next-page',
+      });
+      expect(listRepositorySkillsMock).toHaveBeenCalledWith({
+        authUserId: 'real-user',
+        cursor: 'current-page',
+        limit: 25,
+      });
+    } finally {
+      await close(server);
+    }
+  });
+
+  it('rejects malformed, repeated, and unknown query parameters', async () => {
+    const { server, url } = await listen(await createApp());
+
+    try {
+      for (const query of [
+        'limit=0',
+        'limit=2.5',
+        'limit=101',
+        'limit=20&limit=30',
+        'cursor=',
+        'cursor=a&cursor=b',
+        'userId=attacker',
+      ]) {
+        const response = await fetch(`${url}/api/skills/repository?${query}`, {
+          headers: { 'X-User-Id': 'real-user' },
+        });
+        expect(response.status).toBe(422);
+      }
+      expect(listRepositorySkillsMock).not.toHaveBeenCalled();
+    } finally {
+      await close(server);
+    }
+  });
 });
 
 describe('POST /api/skills/batch-delete', () => {

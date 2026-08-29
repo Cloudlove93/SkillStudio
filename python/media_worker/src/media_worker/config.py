@@ -23,6 +23,8 @@ DEFAULT_MAX_MEDIA_DURATION_MS = 12 * 60 * 60 * 1000
 MAX_MEDIA_DURATION_MS_LIMIT = 7 * 24 * 60 * 60 * 1000
 DEFAULT_HEARTBEAT_INTERVAL_SECONDS = 15.0
 MAX_HEARTBEAT_INTERVAL_SECONDS = 30.0
+DEFAULT_MAX_IDLE_POLL_INTERVAL_SECONDS = 30.0
+MAX_IDLE_POLL_INTERVAL_SECONDS_LIMIT = 300.0
 SAFE_ASR_RUNTIME_PATTERN = re.compile(r"^[^\x00-\x1f\x7f]{1,512}$")
 SAFE_ASR_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 SAFE_ASR_LANGUAGE_PATTERN = re.compile(r"^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$")
@@ -194,12 +196,28 @@ class WorkerConfig:
     asr_compute_type: str = "default"
     asr_language: str | None = None
     asr_beam_size: int = 5
+    max_idle_poll_interval_seconds: float = DEFAULT_MAX_IDLE_POLL_INTERVAL_SECONDS
 
     @classmethod
     def from_env(cls, env: Mapping[str, str]) -> "WorkerConfig":
         executor_mode = _parse_executor_mode(
             _required_text(env, "MEDIA_WORKER_EXECUTOR_MODE")
         )
+        poll_interval_seconds = _positive_finite_float(
+            env,
+            "MEDIA_WORKER_POLL_INTERVAL_SECONDS",
+            "2",
+        )
+        max_idle_poll_interval_seconds = _positive_bounded_float(
+            env,
+            "MEDIA_WORKER_MAX_IDLE_POLL_INTERVAL_SECONDS",
+            str(DEFAULT_MAX_IDLE_POLL_INTERVAL_SECONDS),
+            maximum=MAX_IDLE_POLL_INTERVAL_SECONDS_LIMIT,
+        )
+        if max_idle_poll_interval_seconds < poll_interval_seconds:
+            raise WorkerConfigError(
+                "MEDIA_WORKER_MAX_IDLE_POLL_INTERVAL_SECONDS must be greater than or equal to MEDIA_WORKER_POLL_INTERVAL_SECONDS"
+            )
         return cls(
             base_url=_normalize_base_url(_required_text(env, "MEDIA_WORKER_BASE_URL")),
             service_token=_required_text(env, "MEDIA_WORKER_SERVICE_TOKEN"),
@@ -209,11 +227,7 @@ class WorkerConfig:
                 "MEDIA_WORKER_REQUEST_TIMEOUT_SECONDS",
                 "10",
             ),
-            poll_interval_seconds=_positive_finite_float(
-                env,
-                "MEDIA_WORKER_POLL_INTERVAL_SECONDS",
-                "2",
-            ),
+            poll_interval_seconds=poll_interval_seconds,
             accepted_job_types=_parse_accepted_job_types(
                 env.get("MEDIA_WORKER_ACCEPTED_JOB_TYPES"),
                 executor_mode=executor_mode,
@@ -252,4 +266,5 @@ class WorkerConfig:
             asr_beam_size=_positive_bounded_int(
                 env, "MEDIA_WORKER_ASR_BEAM_SIZE", "5", maximum=128
             ),
+            max_idle_poll_interval_seconds=max_idle_poll_interval_seconds,
         )

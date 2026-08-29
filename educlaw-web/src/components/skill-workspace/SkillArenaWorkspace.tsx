@@ -130,6 +130,7 @@ export function SkillArenaWorkspace({
           content,
           undefined,
           'compare',
+          false,
           (event) => {
             if (event.event === 'delta')
               dispatch({
@@ -368,6 +369,7 @@ export function SkillArenaWorkspace({
       </div>
       <div className="skill-test-composer">
         <textarea
+          aria-label="输入对比测试任务"
           name="arena-task"
           autoComplete="off"
           value={state.draft}

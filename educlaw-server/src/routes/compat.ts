@@ -1,7 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import type { AuthedRequest } from "../types.js";
 import { requireAuth } from "../middleware/auth.js";
-import { randomUUID } from "node:crypto";
 import { query } from "../services/db.js";
 import { listPackages, getPackage, generatePackage, deletePackage, exportPackageZip, importPackageZip } from "../services/package-service.js";
 import { listThreads, createThread, getThreadDetail, sendMessage, streamMessage, generateReport } from "../services/arena-service.js";
@@ -22,6 +21,12 @@ const router: import("express").Router = Router();
 function ok(res: Response, data: unknown) { res.json(data); }
 function bad(res: Response, message: string) { res.status(400).json({ error: message }); }
 function notFound(res: Response, message = "Not found") { res.status(404).json({ error: message }); }
+function retired(res: Response, feature: string) {
+  res.status(410).json({
+    code: "FEATURE_RETIRED",
+    error: `${feature} 已停用，请使用当前工作区功能`,
+  });
+}
 
 function pickUserId(req: Request) {
   return (req as AuthedRequest).userId || "";
@@ -74,64 +79,47 @@ router.get("/llm/models", (_req, res) => {
   if (config.llmModel) {
     models.push({ name: config.llmModel, modelName: config.llmModel });
   }
-  models.push({ name: "gpt-4.1-mini", modelName: "gpt-4.1-mini" });
-  models.push({ name: "gpt-4.1", modelName: "gpt-4.1" });
   ok(res, models);
 });
 
 /* ─── Runtimes ─── */
 
-router.get("/runtimes", (_req, res) => ok(res, []));
+router.get("/runtimes", (_req, res) => retired(res, "旧运行时管理"));
 router.get("/profiles", requireAuth, async (req, res) => {
   try {
     const packages = await listPackages(pickUserId(req));
     ok(res, packages.map((p) => ({ fileName: p.id, name: p.name, description: p.description, details: "", agent_runtime: "default", agent_template: "default", tools: [], skills: [], subagents: [], isPublished: false, publishedName: null })));
   } catch (e) { bad(res, e instanceof Error ? e.message : "Failed"); }
 });
-router.get("/agents", requireAuth, async (_req, res) => ok(res, []));
-router.get("/api/chat/sessions", requireAuth, async (_req, res) => ok(res, []));
-function writeCompatEventStream(_req: Request, res: Response) {
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
-  res.setHeader("Connection", "keep-alive");
-  res.write("data: {\"type\":\"connected\"}\n\n");
-  setTimeout(() => res.end(), 1000);
-}
-router.get("/api/events", writeCompatEventStream);
-router.get("/events", writeCompatEventStream);
+router.get("/agents", requireAuth, async (_req, res) => retired(res, "旧 Agent 管理"));
+router.get("/api/chat/sessions", requireAuth, async (_req, res) => retired(res, "旧聊天会话"));
+router.get("/api/events", (_req, res) => retired(res, "旧事件流"));
+router.get("/events", (_req, res) => retired(res, "旧事件流"));
 
-router.get("/api/sidebar-groups", requireAuth, async (_req, res) => ok(res, []));
-router.post("/api/sidebar-groups", requireAuth, async (req, res) => ok(res, {
-  id: randomUUID(),
-  user_id: pickUserId(req),
-  name: String(req.body?.name || "新分组"),
-  icon: String(req.body?.icon || "folder"),
-  sort_order: 0,
-  created_at: new Date().toISOString(),
-  items: [],
-}));
-router.patch("/api/sidebar-groups/:id", requireAuth, async (_req, res) => ok(res, { ok: true }));
-router.delete("/api/sidebar-groups/:id", requireAuth, async (_req, res) => ok(res, { ok: true }));
-router.post("/api/sidebar-groups/:groupId/items", requireAuth, async (_req, res) => ok(res, { ok: true }));
-router.delete("/api/sidebar-groups/:groupId/items/:itemId/:itemType", requireAuth, async (_req, res) => ok(res, { ok: true }));
-router.post("/api/sidebar-groups/move-item", requireAuth, async (_req, res) => ok(res, { ok: true }));
+router.get("/api/sidebar-groups", requireAuth, async (_req, res) => retired(res, "旧侧栏分组"));
+router.post("/api/sidebar-groups", requireAuth, async (_req, res) => retired(res, "旧侧栏分组"));
+router.patch("/api/sidebar-groups/:id", requireAuth, async (_req, res) => retired(res, "旧侧栏分组"));
+router.delete("/api/sidebar-groups/:id", requireAuth, async (_req, res) => retired(res, "旧侧栏分组"));
+router.post("/api/sidebar-groups/:groupId/items", requireAuth, async (_req, res) => retired(res, "旧侧栏分组"));
+router.delete("/api/sidebar-groups/:groupId/items/:itemId/:itemType", requireAuth, async (_req, res) => retired(res, "旧侧栏分组"));
+router.post("/api/sidebar-groups/move-item", requireAuth, async (_req, res) => retired(res, "旧侧栏分组"));
 
 /* ─── Agents (stub) ─── */
 
-router.post("/agents", requireAuth, (_req, res) => ok(res, { id: randomUUID(), name: "stub", profileFileName: "", status: "stopped" }));
-router.post("/agents/:id/delete", requireAuth, (_req, res) => ok(res, { ok: true }));
-router.post("/agents/:id/start", requireAuth, (req, res) => ok(res, { id: String(req.params.id), status: "running" }));
-router.post("/agents/:id/stop", requireAuth, (req, res) => ok(res, { id: String(req.params.id), status: "stopped" }));
-router.post("/agents/:id/sync-db", requireAuth, (_req, res) => ok(res, { ok: true }));
-router.post("/agents/:id/settings", requireAuth, (_req, res) => ok(res, { ok: true }));
-router.get("/agents/:id/files", requireAuth, (_req, res) => ok(res, []));
-router.get("/agents/:id/file-content", requireAuth, (_req, res) => ok(res, { content: "" }));
-router.put("/agents/:id/file-content", requireAuth, (_req, res) => ok(res, { ok: true }));
-router.post("/agents/:id/fs/create-file", requireAuth, (_req, res) => ok(res, { ok: true }));
-router.post("/agents/:id/fs/create-dir", requireAuth, (_req, res) => ok(res, { ok: true }));
-router.post("/agents/:id/fs/rename", requireAuth, (_req, res) => ok(res, { ok: true }));
-router.post("/agents/:id/fs/delete", requireAuth, (_req, res) => ok(res, { ok: true }));
-router.post("/agents/:id/fs/upload", requireAuth, (_req, res) => ok(res, { ok: true }));
+router.post("/agents", requireAuth, (_req, res) => retired(res, "旧 Agent 管理"));
+router.post("/agents/:id/delete", requireAuth, (_req, res) => retired(res, "旧 Agent 管理"));
+router.post("/agents/:id/start", requireAuth, (_req, res) => retired(res, "旧 Agent 管理"));
+router.post("/agents/:id/stop", requireAuth, (_req, res) => retired(res, "旧 Agent 管理"));
+router.post("/agents/:id/sync-db", requireAuth, (_req, res) => retired(res, "旧 Agent 管理"));
+router.post("/agents/:id/settings", requireAuth, (_req, res) => retired(res, "旧 Agent 管理"));
+router.get("/agents/:id/files", requireAuth, (_req, res) => retired(res, "旧 Agent 文件管理"));
+router.get("/agents/:id/file-content", requireAuth, (_req, res) => retired(res, "旧 Agent 文件管理"));
+router.put("/agents/:id/file-content", requireAuth, (_req, res) => retired(res, "旧 Agent 文件管理"));
+router.post("/agents/:id/fs/create-file", requireAuth, (_req, res) => retired(res, "旧 Agent 文件管理"));
+router.post("/agents/:id/fs/create-dir", requireAuth, (_req, res) => retired(res, "旧 Agent 文件管理"));
+router.post("/agents/:id/fs/rename", requireAuth, (_req, res) => retired(res, "旧 Agent 文件管理"));
+router.post("/agents/:id/fs/delete", requireAuth, (_req, res) => retired(res, "旧 Agent 文件管理"));
+router.post("/agents/:id/fs/upload", requireAuth, (_req, res) => retired(res, "旧 Agent 文件管理"));
 
 /* ─── Profiles ─── */
 
@@ -163,7 +151,8 @@ router.post("/profiles/user", requireAuth, async (req, res) => {
 });
 
 router.put("/profiles/user/:fileName", requireAuth, async (req, res) => {
-  ok(res, { ok: true });
+  void req;
+  retired(res, "旧资料更新接口");
 });
 
 router.post("/profiles/user/:fileName/delete", requireAuth, async (req, res) => {
@@ -201,33 +190,18 @@ router.post("/profiles/user/import", requireAuth, upload.single("file"), async (
   } catch (e) { bad(res, e instanceof Error ? e.message : "Failed"); }
 });
 
-router.post("/profiles/published/:fileName", requireAuth, async (_req, res) => ok(res, { ok: true }));
-router.post("/profiles/published/:fileName/delete", requireAuth, async (_req, res) => ok(res, { ok: true }));
+router.post("/profiles/published/:fileName", requireAuth, async (_req, res) => retired(res, "旧发布接口"));
+router.post("/profiles/published/:fileName/delete", requireAuth, async (_req, res) => retired(res, "旧发布接口"));
 
 /* ─── Arena (legacy stubs) ─── */
 
-router.post("/arena/profile/:fileName", requireAuth, async (req, res) => {
-  try {
-    await createThread(pickUserId(req), String(req.params.fileName));
-    ok(res, { id: randomUUID(), target_kind: "profile", target_ref: String(req.params.fileName), status: "completed", created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
-  } catch (e) { bad(res, e instanceof Error ? e.message : "Failed"); }
-});
+router.post("/arena/profile/:fileName", requireAuth, async (_req, res) => retired(res, "旧 Arena 运行接口"));
+router.post("/arena/skill/:dirName", requireAuth, async (_req, res) => retired(res, "旧 Arena 运行接口"));
+router.post("/arena/agent/:id", requireAuth, async (_req, res) => retired(res, "旧 Arena 运行接口"));
 
-router.post("/arena/skill/:dirName", requireAuth, async (req, res) => {
-  try {
-    ok(res, { id: randomUUID(), target_kind: "skill", target_ref: String(req.params.dirName), status: "completed", created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
-  } catch (e) { bad(res, e instanceof Error ? e.message : "Failed"); }
-});
-
-router.post("/arena/agent/:id", requireAuth, async (req, res) => {
-  try {
-    ok(res, { id: randomUUID(), target_kind: "agent", target_ref: String(req.params.id), status: "completed", created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
-  } catch (e) { bad(res, e instanceof Error ? e.message : "Failed"); }
-});
-
-router.get("/arena/runs", requireAuth, async (_req, res) => ok(res, []));
-router.get("/arena/runs/:runId", requireAuth, async (_req, res) => notFound(res));
-router.post("/arena/runs/:runId/delete", requireAuth, async (_req, res) => ok(res, { ok: true }));
+router.get("/arena/runs", requireAuth, async (_req, res) => retired(res, "旧 Arena 运行记录"));
+router.get("/arena/runs/:runId", requireAuth, async (_req, res) => retired(res, "旧 Arena 运行记录"));
+router.post("/arena/runs/:runId/delete", requireAuth, async (_req, res) => retired(res, "旧 Arena 运行记录"));
 
 /* ─── Arena Chat ─── */
 

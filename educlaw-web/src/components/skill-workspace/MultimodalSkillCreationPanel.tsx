@@ -998,7 +998,7 @@ export function MultimodalSkillCreationPanel({
       {fusedTopicItems.length > 0 && (
         <button
           type="button"
-          className="skill-secondary-button"
+          className="skill-secondary-button skill-mm-action-muted"
           onClick={() => void saveCandidates()}
           disabled={Boolean(state.busyAction) || candidates.length === 0}
         >
@@ -1007,7 +1007,7 @@ export function MultimodalSkillCreationPanel({
       )}
       <button
         type="button"
-        className="skill-primary-button"
+        className="skill-primary-button skill-mm-action-confirm"
         onClick={() => void confirmCandidates()}
         disabled={
           Boolean(state.busyAction) ||
@@ -1015,7 +1015,7 @@ export function MultimodalSkillCreationPanel({
           selectedCandidateIds.length > MULTIMODAL_SELECTION_LIMIT
         }
       >
-        <Sparkles size={16} />
+        <Sparkles size={16} aria-hidden="true" />
         确认 {selectedCandidateIds.length} 个融合主题并构建 Skill
       </button>
     </>

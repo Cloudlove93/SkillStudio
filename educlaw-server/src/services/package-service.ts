@@ -33,6 +33,10 @@ import { query, withTransaction, type Queryable } from './db.js';
 import type { DbRowPackage, DbRowPackageVersion } from '../types.js';
 import { parseDbJson } from '../utils/json.js';
 import { syncPackageVersionSkillsFromSnapshot } from './skill-version-service.js';
+import {
+  createPackageZipReader,
+  PackageZipSecurityError,
+} from './package-import-security.js';
 
 interface PackageGenerationResult {
   name: string;
@@ -2120,20 +2124,24 @@ async function getPackageRow(userId: string, packageId: string | number) {
 }
 
 export async function listPackages(userId: string) {
-  const result = await query<DbRowPackage>(
-    'select * from agent_packages where user_id = $1 order by updated_at desc',
+  const result = await query<
+    DbRowPackage & { current_version_number: number }
+  >(
+    `select p.*, v.version_number as current_version_number
+     from agent_packages p
+     join agent_package_versions v on v.id = p.current_version_id
+     where p.user_id = $1
+     order by p.updated_at desc`,
     [userId],
   );
-  const items: AgentPackageSummary[] = [];
-  for (const row of result.rows) {
-    const versionResult = await query<DbRowPackageVersion>(
-      'select * from agent_package_versions where id = $1',
-      [row.current_version_id],
-    );
-    const version = versionResult.rows[0];
-    if (version) items.push(toSummary(row, version));
-  }
-  return items;
+  return result.rows.map((row) => ({
+    id: row.id,
+    userId: row.user_id,
+    name: row.name,
+    description: row.description,
+    versionNumber: row.current_version_number,
+    updatedAt: row.updated_at,
+  }));
 }
 
 export async function getPackage(userId: string, packageId: string | number) {
@@ -2685,6 +2693,7 @@ async function importPackageWithVersions(
 export async function importPackageZip(userId: string, zipBuffer: Buffer) {
   const zip = new AdmZip(zipBuffer);
   const entries = zip.getEntries();
+  const zipReader = createPackageZipReader(entries);
   const manifestEntry = entries.find((entry: IZipEntry) =>
     entry.entryName.endsWith('manifest.json'),
   );
@@ -2704,7 +2713,7 @@ export async function importPackageZip(userId: string, zipBuffer: Buffer) {
   if (versionsEntry) {
     try {
       const versions = JSON.parse(
-        zip.readAsText(versionsEntry, 'utf8'),
+        zipReader.readText(versionsEntry),
       ) as Array<{
         versionNumber: number;
         source: string;
@@ -2714,7 +2723,8 @@ export async function importPackageZip(userId: string, zipBuffer: Buffer) {
       if (Array.isArray(versions) && versions.length > 0) {
         return importPackageWithVersions(userId, versions);
       }
-    } catch {
+    } catch (error) {
+      if (error instanceof PackageZipSecurityError) throw error;
       // fallback to snapshot or normal import
     }
   }
@@ -2722,7 +2732,7 @@ export async function importPackageZip(userId: string, zipBuffer: Buffer) {
   if (snapshotEntry) {
     try {
       const snapshot = JSON.parse(
-        zip.readAsText(snapshotEntry, 'utf8'),
+        zipReader.readText(snapshotEntry),
       ) as AgentPackageSnapshot;
       if (snapshot?.agentMd && Array.isArray(snapshot.skills)) {
         return createPackageWithSnapshot(
@@ -2740,7 +2750,8 @@ export async function importPackageZip(userId: string, zipBuffer: Buffer) {
           'imported',
         );
       }
-    } catch {
+    } catch (error) {
+      if (error instanceof PackageZipSecurityError) throw error;
       // fallback to normal import
     }
   }
@@ -2751,7 +2762,7 @@ export async function importPackageZip(userId: string, zipBuffer: Buffer) {
     );
   }
 
-  const manifest = JSON.parse(zip.readAsText(manifestEntry, 'utf8')) as {
+  const manifest = JSON.parse(zipReader.readText(manifestEntry)) as {
     name?: string;
     description?: string;
   };
@@ -2763,7 +2774,7 @@ export async function importPackageZip(userId: string, zipBuffer: Buffer) {
   const skills: PackageSkill[] = skillEntries.map((entry: IZipEntry) => {
     const parts = entry.entryName.split('/');
     const dirName = parts[parts.length - 2]!;
-    const content = zip.readAsText(entry, 'utf8');
+    const content = zipReader.readText(entry);
     const title =
       content
         .split('\n')
@@ -2782,8 +2793,8 @@ export async function importPackageZip(userId: string, zipBuffer: Buffer) {
     name: manifest.name?.trim() || '导入的智能体',
     description: manifest.description?.trim() || '导入的智能体',
     versionLabel: 'v1',
-    agentMd: zip.readAsText(agentEntry, 'utf8').trim(),
-    rubricMd: rubricEntry ? zip.readAsText(rubricEntry, 'utf8').trim() : '',
+    agentMd: zipReader.readText(agentEntry).trim(),
+    rubricMd: rubricEntry ? zipReader.readText(rubricEntry).trim() : '',
     skills,
   };
 

@@ -38,6 +38,129 @@ afterEach(() => {
 });
 
 describe('skill version service', () => {
+  it('stores a user-facing Skill name without creating a new version', async () => {
+    queryMock.mockImplementation(async (sql: string, params?: unknown[]) => {
+      if (sql.startsWith('update agent_package_skills')) {
+        expect(params?.[0]).toBe('函数概念辨析');
+        expect(params?.[2]).toBe('11');
+        expect(params?.[3]).toBe('7');
+        expect(params?.[4]).toBe('user-1');
+        return {
+          rows: [
+            {
+              id: '11',
+              package_id: '7',
+              skill_uid: 'function-concepts',
+              dir_name: 'function-concepts',
+              name: '原始 Skill 名称',
+              display_name: '函数概念辨析',
+              description: '辨析函数概念',
+              status: 'active',
+              next_version_number: 2,
+              created_at: '2026-08-20T00:00:00.000Z',
+              updated_at: '2026-08-27T00:00:00.000Z',
+            },
+          ],
+          rowCount: 1,
+        };
+      }
+      throw new Error(`Unexpected query: ${sql}`);
+    });
+    const service = await loadService();
+
+    const renamed = await service.renameSkill({
+      authUserId: 'user-1',
+      packageId: '7',
+      skillId: '11',
+      displayName: '  函数概念辨析  ',
+    });
+
+    expect(renamed).toMatchObject({
+      id: '11',
+      packageId: '7',
+      name: '函数概念辨析',
+    });
+    expect(
+      queryMock.mock.calls.some((call) =>
+        String(call[0]).includes('agent_package_versions'),
+      ),
+    ).toBe(false);
+  });
+
+  it('rejects empty and overlong Skill display names before querying', async () => {
+    const service = await loadService();
+
+    await expect(
+      service.renameSkill({
+        authUserId: 'user-1',
+        packageId: '7',
+        skillId: '11',
+        displayName: '   ',
+      }),
+    ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' });
+    await expect(
+      service.renameSkill({
+        authUserId: 'user-1',
+        packageId: '7',
+        skillId: '11',
+        displayName: '名'.repeat(81),
+      }),
+    ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' });
+    expect(queryMock).not.toHaveBeenCalled();
+  });
+
+  it('does not reveal or rename a Skill outside the authenticated owner', async () => {
+    queryMock.mockResolvedValue({ rows: [], rowCount: 0 });
+    const service = await loadService();
+
+    await expect(
+      service.renameSkill({
+        authUserId: 'other-user',
+        packageId: '7',
+        skillId: '11',
+        displayName: '不应成功',
+      }),
+    ).rejects.toMatchObject({ code: 'SKILL_NOT_FOUND', status: 404 });
+
+    const [sql, params] = queryMock.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain('p.user_id = $5');
+    expect(params[4]).toBe('other-user');
+  });
+
+  it('returns the persisted display name without replacing Skill content', async () => {
+    queryMock.mockResolvedValue({
+      rows: [
+        {
+          id: '11',
+          package_id: '7',
+          skill_uid: 'function-concepts',
+          dir_name: 'function-concepts',
+          name: '版本中的原始名称',
+          display_name: '教师自定义名称',
+          description: '原始内容保持不变',
+          status: 'active',
+          next_version_number: 2,
+          created_at: '2026-08-20T00:00:00.000Z',
+          updated_at: '2026-08-27T00:00:00.000Z',
+        },
+      ],
+      rowCount: 1,
+    });
+    const service = await loadService();
+
+    await expect(
+      service.listPackageSkills({
+        authUserId: 'user-1',
+        packageId: '7',
+      }),
+    ).resolves.toMatchObject([
+      {
+        name: '教师自定义名称',
+        description: '原始内容保持不变',
+      },
+    ]);
+  });
+
   it('rejects unsafe skill dir names before syncing version history', async () => {
     queryMock.mockImplementation(async (sql: string) => {
       if (sql.includes('from agent_package_skills')) {

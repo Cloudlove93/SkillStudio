@@ -5,6 +5,7 @@ import {
   CompleteMultipartUploadCommand,
   CreateMultipartUploadCommand,
   GetObjectCommand,
+  HeadBucketCommand,
   HeadObjectCommand,
   PutObjectCommand,
   S3Client,
@@ -90,6 +91,10 @@ export function createObjectStorageService(options: {
     options.createRandomId ?? (() => randomUUID().toLowerCase());
 
   return {
+    async checkHealth(): Promise<void> {
+      await s3Client.send(new HeadBucketCommand({ Bucket: config.bucket }));
+    },
+
     createSessionObjectKey(input: {
       sessionId: string;
       category:

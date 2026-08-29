@@ -261,17 +261,28 @@ class WorkerRunner:
         return RunOnceOutcome(kind="failed", job_id=job_id, code=error_code)
 
     def run_forever(self, *, stop_predicate: Callable[[], bool]) -> None:
+        idle_delay = self._config.poll_interval_seconds
         while not stop_predicate():
             try:
                 outcome = self.run_once()
             except InternalApiError as error:
                 if error.retryable:
-                    self._sleep(self._config.poll_interval_seconds)
+                    self._sleep(idle_delay)
+                    idle_delay = min(
+                        idle_delay * 2,
+                        self._config.max_idle_poll_interval_seconds,
+                    )
                     continue
                 raise
 
             if outcome.kind == "idle":
-                self._sleep(self._config.poll_interval_seconds)
+                self._sleep(idle_delay)
+                idle_delay = min(
+                    idle_delay * 2,
+                    self._config.max_idle_poll_interval_seconds,
+                )
+            else:
+                idle_delay = self._config.poll_interval_seconds
 
 
 def main(argv: list[str] | None = None) -> int:

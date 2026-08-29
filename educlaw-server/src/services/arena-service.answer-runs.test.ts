@@ -5,7 +5,7 @@ import type { DbRowMessage } from "../types.js";
 const queryMock = vi.fn();
 const transactionQueryMock = vi.fn();
 const withTransactionMock = vi.fn();
-const streamTextMock = vi.fn();
+const streamTextPartsMock = vi.fn();
 const resolveBaselineModelMock = vi.fn();
 const resolveEnhancedModelMock = vi.fn();
 const getPackageMock = vi.fn();
@@ -84,7 +84,8 @@ async function loadService() {
     generateJson: vi.fn(),
     resolveBaselineModel: resolveBaselineModelMock,
     resolveEnhancedModel: resolveEnhancedModelMock,
-    streamText: streamTextMock,
+    streamTextParts: streamTextPartsMock,
+    supportsExplicitThinking: vi.fn(() => false),
   }));
   vi.doMock("./package-service.js", () => ({
     assertRubricConfigured: vi.fn(),
@@ -112,7 +113,7 @@ function configureDatabaseMocks() {
         rowCount: 1,
       };
     }
-    if (sql.startsWith("select * from arena_messages where thread_id = $1")) {
+    if (sql.includes("from arena_messages") && sql.includes("where thread_id = $1")) {
       return {
         rows: storedThreadMessages,
         rowCount: storedThreadMessages.length,
@@ -160,7 +161,7 @@ beforeEach(() => {
   queryMock.mockReset();
   transactionQueryMock.mockReset();
   withTransactionMock.mockReset();
-  streamTextMock.mockReset();
+  streamTextPartsMock.mockReset();
   resolveBaselineModelMock.mockReset();
   resolveEnhancedModelMock.mockReset();
   getPackageMock.mockReset();
@@ -174,11 +175,14 @@ beforeEach(() => {
   );
   resolveBaselineModelMock.mockReturnValue("baseline-model");
   resolveEnhancedModelMock.mockReturnValue("resolved-enhanced-model");
-  streamTextMock.mockImplementation((input: StreamTextInput) =>
+  streamTextPartsMock.mockImplementation((input: StreamTextInput) =>
     (async function* () {
-      yield input.systemPrompt.includes("[agent.md]")
-        ? "enhanced answer"
-        : "baseline answer";
+      yield {
+        type: "content",
+        delta: input.systemPrompt.includes("[agent.md]")
+          ? "enhanced answer"
+          : "baseline answer",
+      };
     })(),
   );
   getPackageWithVersionIdMock.mockResolvedValue(createPackageContext());
@@ -234,7 +238,7 @@ describe("Arena answer run provenance", () => {
       "resolved-enhanced-model",
     ]);
 
-    const enhancedModelCall = streamTextMock.mock.calls.find((call) =>
+    const enhancedModelCall = streamTextPartsMock.mock.calls.find((call) =>
       String((call[0] as StreamTextInput).systemPrompt).includes("[agent.md]"),
     );
     const enhancedPrompt = (enhancedModelCall?.[0] as StreamTextInput)
@@ -313,7 +317,7 @@ describe("Arena answer run provenance", () => {
     ) as unknown[];
     expect(runValues[8]).toBe(JSON.stringify([901, 903]));
 
-    const enhancedCall = streamTextMock.mock.calls.find((call) =>
+    const enhancedCall = streamTextPartsMock.mock.calls.find((call) =>
       String((call[0] as StreamTextInput).systemPrompt).includes("[agent.md]"),
     );
     expect((enhancedCall?.[0] as StreamTextInput).userPrompt).toBe(
@@ -328,7 +332,7 @@ describe("Arena answer run provenance", () => {
     );
     expect(queryMock).toHaveBeenCalledWith(
       expect.stringContaining("order by created_at asc, id asc"),
-      [101, "user-1"],
+      [101, "user-1", 200],
     );
   });
 
@@ -343,7 +347,7 @@ describe("Arena answer run provenance", () => {
     const runValues = (
       findTransactionCall("insert into arena_answer_runs")?.[1] ?? []
     ) as unknown[];
-    const enhancedCall = streamTextMock.mock.calls[0]?.[0] as StreamTextInput;
+    const enhancedCall = streamTextPartsMock.mock.calls[0]?.[0] as StreamTextInput;
     expect(resolveEnhancedModelMock).toHaveBeenCalledWith(undefined);
     expect(enhancedCall.model).toBe("resolved-default-model");
     expect(runValues[9]).toBe("resolved-default-model");
@@ -388,7 +392,7 @@ describe("Arena answer run provenance", () => {
     ) as unknown[];
     expect(runValues[7]).toBe(JSON.stringify(["skill-family"]));
     const enhancedPrompt = (
-      streamTextMock.mock.calls[0]?.[0] as StreamTextInput
+      streamTextPartsMock.mock.calls[0]?.[0] as StreamTextInput
     ).systemPrompt;
     expect(enhancedPrompt).toContain("FAMILY_COMMUNICATION");
     expect(enhancedPrompt).not.toContain("UNRELATED_SKILL_BODY");
@@ -434,7 +438,7 @@ describe("Arena answer run provenance", () => {
       findTransactionCall("insert into arena_answer_runs")?.[1] ?? []
     ) as unknown[];
     expect(runValues[7]).toBe(JSON.stringify([]));
-    const enhancedPrompt = (streamTextMock.mock.calls[0]?.[0] as StreamTextInput)
+    const enhancedPrompt = (streamTextPartsMock.mock.calls[0]?.[0] as StreamTextInput)
       .systemPrompt;
     expect(enhancedPrompt).not.toContain("UNRELATED_SKILL_BODY");
     expect(events.some((event) => event.event === "done")).toBe(true);
@@ -445,12 +449,15 @@ describe("Arena answer run provenance", () => {
     getPackageWithVersionIdMock.mockImplementation(async () =>
       createPackageContext(simulatedCurrentVersionId),
     );
-    streamTextMock.mockImplementation((input: StreamTextInput) =>
+    streamTextPartsMock.mockImplementation((input: StreamTextInput) =>
       (async function* () {
         simulatedCurrentVersionId = 701;
-        yield input.systemPrompt.includes("[agent.md]")
-          ? "enhanced answer"
-          : "baseline answer";
+        yield {
+          type: "content",
+          delta: input.systemPrompt.includes("[agent.md]")
+            ? "enhanced answer"
+            : "baseline answer",
+        };
       })(),
     );
     const { streamMessage } = await loadService();

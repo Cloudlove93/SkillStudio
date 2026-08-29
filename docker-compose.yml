@@ -27,6 +27,8 @@ services:
       - LLM_API_KEY=${LLM_API_KEY}
       - LLM_MODEL=${LLM_MODEL}
       - LLM_BASELINE_MODEL=${LLM_BASELINE_MODEL}
+      - MEDIA_UPLOAD_TOKEN_SECRET=${MEDIA_UPLOAD_TOKEN_SECRET}
+      - INTERNAL_WORKER_TOKENS=${INTERNAL_WORKER_TOKENS}
     depends_on:
       educlaw-db:
         condition: service_healthy
@@ -76,7 +78,7 @@ services:
     extra_hosts:
       - "eduskill.localhost:host-gateway"
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/readyz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -156,6 +158,7 @@ services:
       - MEDIA_WORKER_MAX_DURATION_MS=${MEDIA_WORKER_MAX_DURATION_MS:-43200000}
       - MEDIA_WORKER_HEARTBEAT_INTERVAL_SECONDS=${MEDIA_WORKER_HEARTBEAT_INTERVAL_SECONDS:-15}
       - MEDIA_WORKER_POLL_INTERVAL_SECONDS=${MEDIA_WORKER_POLL_INTERVAL_SECONDS:-2}
+      - MEDIA_WORKER_MAX_IDLE_POLL_INTERVAL_SECONDS=${MEDIA_WORKER_MAX_IDLE_POLL_INTERVAL_SECONDS:-30}
       - MEDIA_WORKER_REQUEST_TIMEOUT_SECONDS=${MEDIA_WORKER_REQUEST_TIMEOUT_SECONDS:-15}
     depends_on:
       educlaw-server:
@@ -182,6 +185,7 @@ services:
       - MEDIA_WORKER_MAX_DURATION_MS=${MEDIA_WORKER_MAX_DURATION_MS:-43200000}
       - MEDIA_WORKER_HEARTBEAT_INTERVAL_SECONDS=${MEDIA_WORKER_HEARTBEAT_INTERVAL_SECONDS:-15}
       - MEDIA_WORKER_POLL_INTERVAL_SECONDS=${MEDIA_WORKER_POLL_INTERVAL_SECONDS:-2}
+      - MEDIA_WORKER_MAX_IDLE_POLL_INTERVAL_SECONDS=${MEDIA_WORKER_MAX_IDLE_POLL_INTERVAL_SECONDS:-30}
       - MEDIA_WORKER_REQUEST_TIMEOUT_SECONDS=${MEDIA_WORKER_REQUEST_TIMEOUT_SECONDS:-15}
       - MEDIA_WORKER_ASR_MODEL=${MEDIA_WORKER_ASR_MODEL:-small}
       - MEDIA_WORKER_ASR_MANIFEST_MODEL_ID=${MEDIA_WORKER_ASR_MANIFEST_MODEL_ID:-faster-whisper-small}

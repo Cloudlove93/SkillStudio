@@ -88,7 +88,7 @@ export function SkillPreviewCard({ preview }: { preview: SkillPreview }) {
       )}
       <div className="flex items-center gap-2 text-xs text-muted-foreground pt-1 border-t border-border">
         <Loader2 className="size-3 animate-spin" />
-        <span>Preparing standalone skill package</span>
+            <span>Preparing standalone skill</span>
       </div>
     </div>
   );

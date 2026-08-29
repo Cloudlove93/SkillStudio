@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { ArenaMessageStreamEvent } from './lite-api';
 import { LiteApiError, liteApi } from './lite-api';
 
 const encoder = new TextEncoder();
@@ -326,6 +327,42 @@ describe('liteApi multimodal media progress helpers', () => {
     ).rejects.toBeInstanceOf(LiteApiError);
   });
 
+  it('sends the thinking preference and parses reasoning stream events', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      createSseResponse([
+        'event: thinking_status\ndata: {"requested":true,"enabled":true,"supported":true}\n\n',
+        'event: reasoning_delta\ndata: {"side":"enhanced","delta":"分析"}\n\n',
+        'event: delta\ndata: {"side":"enhanced","delta":"答案"}\n\n',
+        'event: stream_end\ndata: {"ok":true}\n\n',
+      ]),
+    );
+    const controller = new AbortController();
+    const events: ArenaMessageStreamEvent[] = [];
+
+    await liteApi.sendMessageStream(
+      'token-arena',
+      '91',
+      '问题',
+      undefined,
+      'agent',
+      true,
+      (event) => events.push(event),
+      controller.signal,
+    );
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).toMatchObject({
+      content: '问题',
+      mode: 'agent',
+      thinkingEnabled: true,
+    });
+    expect(init.signal).toBe(controller.signal);
+    expect(events[1]).toEqual({
+      event: 'reasoning_delta',
+      data: { side: 'enhanced', delta: '分析' },
+    });
+  });
+
   it('keeps media mutation routing fields at the server envelope top level', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       createJsonResponse({
@@ -513,5 +550,70 @@ describe('liteApi multimodal media progress helpers', () => {
         requestId: 'request-generate-500',
       },
     });
+  });
+});
+
+describe('liteApi Skill repository pagination', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('requests one authenticated repository page instead of enumerating packages', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      createJsonResponse({
+        items: [{
+          id: '11',
+          packageId: '7',
+          skillUid: 'function-teaching',
+          dirName: 'function-teaching',
+          name: '函数教学',
+          description: '函数概念课',
+          updatedAt: '2026-08-29T08:00:00.000Z',
+          packageName: '高等数学',
+          packageDescription: '课程技能',
+        }],
+        nextCursor: 'next-page',
+      }),
+    );
+
+    const page = await liteApi.listRepositorySkills('token-3', {
+      cursor: 'current-page',
+      limit: 25,
+    });
+
+    expect(page.nextCursor).toBe('next-page');
+    expect(page.items[0]?.name).toBe('函数教学');
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('/api/skills/repository?cursor=current-page&limit=25');
+    expect(new Headers(init.headers).get('Authorization')).toBe('Bearer token-3');
+  });
+});
+
+describe('liteApi Skill conversation pagination', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('requests a server-filtered conversation page for one Skill', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      createJsonResponse({
+        items: [],
+        nextCursor: 'next-page',
+      }),
+    );
+
+    const page = await liteApi.listThreadPage('token-4', {
+      packageId: '7',
+      skillId: '42',
+      cursor: 'current-page',
+      limit: 25,
+    });
+
+    expect(page).toEqual({ items: [], nextCursor: 'next-page' });
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(
+      '/api/arena/threads/page?packageId=7&skillId=42&cursor=current-page&limit=25',
+    );
+    expect(new Headers(init.headers).get('Authorization')).toBe('Bearer token-4');
   });
 });

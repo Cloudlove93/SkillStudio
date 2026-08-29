@@ -739,12 +739,101 @@ describe('multimodal guided creation service', () => {
         jobType: 'transcribe',
         status: 'leased',
         percent: 30,
-        hint: 'transcribing',
+        hint: '正在识别语音内容',
       },
     });
     expect(String(query.mock.calls[0]?.[0])).toContain('user_id = $2');
     expect(String(query.mock.calls[1]?.[0])).toContain('where session_id = $1');
     expect(String(query.mock.calls[1]?.[0])).not.toContain('user_id');
+  });
+
+  it('translates internal worker phases before returning progress', async () => {
+    const { service, query } = createServiceHarness();
+    query
+      .mockResolvedValueOnce({
+        rows: [createSessionRow()],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          createJobRow({
+            job_type: 'transcribe',
+            progress_json: { phase: 'downloading_audio', percent: 15 },
+          }),
+        ],
+        rowCount: 1,
+      });
+
+    const progress = await service.getSessionProgress({
+      authUserId: 'user-1',
+      sessionId: '101',
+    });
+
+    expect(progress.currentJob).toMatchObject({
+      percent: 15,
+      hint: '正在读取音轨',
+    });
+    expect(JSON.stringify(progress)).not.toContain('downloading_audio');
+  });
+
+  it('falls back to a Chinese job label for unknown or mixed worker phases', async () => {
+    const { service, query } = createServiceHarness();
+    query
+      .mockResolvedValueOnce({
+        rows: [createSessionRow()],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          createJobRow({
+            job_type: 'transcribe',
+            progress_json: {
+              phase: 'downloading_audio（重试）',
+              percent: 15,
+            },
+          }),
+        ],
+        rowCount: 1,
+      });
+
+    const progress = await service.getSessionProgress({
+      authUserId: 'user-1',
+      sessionId: '101',
+    });
+
+    expect(progress.currentJob?.hint).toBe('正在进行语音转录');
+    expect(JSON.stringify(progress)).not.toContain('downloading_audio');
+  });
+
+  it('reports a succeeded worker job as complete instead of retaining 95 percent', async () => {
+    const { service, query } = createServiceHarness();
+    query
+      .mockResolvedValueOnce({
+        rows: [createSessionRow()],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          createJobRow({
+            job_type: 'media_quality_check',
+            status: 'succeeded',
+            progress_json: { phase: 'ready_to_complete', percent: 95 },
+          }),
+        ],
+        rowCount: 1,
+      });
+
+    const progress = await service.getSessionProgress({
+      authUserId: 'user-1',
+      sessionId: '101',
+    });
+
+    expect(progress.currentJob).toMatchObject({
+      status: 'succeeded',
+      percent: 100,
+      hint: '安全校验完成',
+    });
+    expect(JSON.stringify(progress)).not.toContain('ready_to_complete');
   });
 
   it('rejects corrupted media job ids or mismatched session ids during progress reads', async () => {

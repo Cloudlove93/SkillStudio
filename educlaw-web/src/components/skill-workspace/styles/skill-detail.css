@@ -364,6 +364,98 @@
   background: var(--primary-soft);
   color: var(--primary);
 }
+.skill-run-workspace .skill-test-composer {
+  align-items: stretch;
+  gap: 3px;
+  flex-direction: column;
+  padding: 7px;
+}
+.skill-composer-input-row {
+  display: flex;
+  min-width: 0;
+  align-items: flex-end;
+  gap: 8px;
+}
+.skill-composer-input-row textarea {
+  min-width: 0;
+}
+.skill-composer-input-row > button {
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  margin: 0 1px 2px 0;
+}
+.skill-composer-input-row > .skill-composer-stop {
+  background: var(--muted);
+  color: var(--foreground);
+}
+.skill-composer-input-row > .skill-composer-stop:hover {
+  background: var(--destructive-soft);
+  color: var(--destructive);
+}
+.skill-composer-helper-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 2px 1px;
+}
+.skill-thinking-control {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+.skill-test-composer .skill-thinking-toggle {
+  display: inline-flex;
+  width: auto;
+  min-width: 0;
+  height: 44px;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted-foreground);
+  padding: 0 9px;
+  font-size: var(--workspace-text-xs);
+  font-weight: 500;
+  white-space: nowrap;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease;
+}
+.skill-test-composer .skill-thinking-toggle:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--primary) 24%, var(--border));
+  background: var(--skill-hover);
+  color: var(--foreground);
+}
+.skill-test-composer .skill-thinking-toggle.is-active {
+  border-color: color-mix(in srgb, var(--primary) 28%, var(--border));
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+.skill-test-composer .skill-thinking-toggle:disabled {
+  border-color: var(--border);
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: not-allowed;
+  opacity: 0.68;
+}
+.skill-thinking-capability,
+.skill-composer-shortcut {
+  color: var(--muted-foreground);
+  font-size: var(--workspace-text-xs);
+  line-height: 1.4;
+}
+.skill-composer-shortcut {
+  flex: 0 1 auto;
+  text-align: right;
+}
 .skill-composer-mode-tooltip {
   position: absolute;
   z-index: 8;
@@ -713,6 +805,84 @@
 }
 .skill-run-workspace .skill-assistant-message {
   white-space: normal;
+}
+.skill-reasoning-block {
+  overflow: hidden;
+  margin: 0 0 9px;
+  border-left: 2px solid color-mix(in srgb, var(--primary) 40%, var(--border));
+  border-radius: 0 9px 9px 0;
+  background: color-mix(in srgb, var(--muted) 62%, transparent);
+}
+.skill-reasoning-block.is-streaming {
+  border-left-color: var(--primary);
+}
+.skill-reasoning-header {
+  display: flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 6px 2px 9px;
+}
+.skill-reasoning-toggle,
+.skill-reasoning-copy {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted-foreground);
+  padding: 0 7px;
+  font: inherit;
+  font-size: var(--workspace-text-xs);
+  cursor: pointer;
+}
+.skill-reasoning-toggle {
+  min-width: 0;
+  color: var(--foreground);
+  font-weight: 550;
+}
+.skill-reasoning-toggle:hover,
+.skill-reasoning-copy:hover {
+  background: var(--skill-hover);
+  color: var(--primary);
+}
+.skill-reasoning-chevron {
+  transition: transform 140ms ease;
+}
+.skill-reasoning-toggle[aria-expanded='true'] .skill-reasoning-chevron {
+  transform: rotate(180deg);
+}
+.skill-reasoning-spinner {
+  animation: skill-spin 1s linear infinite;
+}
+.skill-reasoning-content {
+  max-height: 12rem;
+  overflow: auto;
+  border-top: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  color: var(--muted-foreground);
+  padding: 10px 13px 12px;
+  font-size: var(--workspace-text-xs);
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.skill-thinking-notice {
+  align-self: center;
+  color: var(--muted-foreground);
+  padding: 1px 10px;
+  font-size: var(--workspace-text-xs);
+  line-height: 1.5;
+  text-align: center;
+}
+.skill-thinking-toggle:focus-visible,
+.skill-reasoning-toggle:focus-visible,
+.skill-reasoning-copy:focus-visible,
+.skill-composer-input-row > button:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--primary) 68%, transparent);
+  outline-offset: 2px;
 }
 .skill-run-error {
   align-self: center;
@@ -1283,11 +1453,37 @@
   .skill-test-toolbar > span {
     display: none;
   }
+
+  .skill-flat-conversation {
+    padding-inline: 16px;
+  }
+
+  .skill-composer-helper-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .skill-thinking-control {
+    max-width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .skill-composer-shortcut {
+    padding-left: 2px;
+    text-align: left;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .spin,
-  .skill-workspace-loading-spinner {
+  .skill-workspace-loading-spinner,
+  .skill-reasoning-spinner {
     animation: none !important;
+  }
+
+  .skill-thinking-toggle,
+  .skill-reasoning-chevron {
+    transition: none !important;
   }
 }

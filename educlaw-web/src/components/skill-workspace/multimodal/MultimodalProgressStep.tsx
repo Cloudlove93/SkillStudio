@@ -14,12 +14,16 @@ import type {
   MediaSessionProgress,
 } from '../../../api/lite-api';
 import type { MultimodalWorkbenchError } from '../multimodal-guided-creation-state';
+import {
+  mediaJobProgressLabel,
+  mediaJobProgressPercent,
+} from './multimodal-wizard-model';
 
 const PROCESS_NODES = [
   {
     key: 'security',
     label: '安全校验',
-    stages: ['draft', 'uploading', 'ready_to_process'],
+    stages: ['draft', 'uploading'],
   },
   { key: 'prepare', label: '媒体预处理', stages: ['preparing_media'] },
   {
@@ -49,6 +53,13 @@ const COMPLETE_PROCESSING_STAGES = new Set([
   'publishing',
   'published',
 ]);
+
+const PROCESS_NODE_STATUS_LABELS = {
+  complete: '已完成',
+  current: '处理中',
+  future: '未开始',
+  failed: '处理失败',
+} as const;
 
 type Props = {
   detail: MediaSessionDetail | null;
@@ -97,6 +108,21 @@ export function MultimodalProgressStep(props: Props) {
     : false;
   const isFailed = props.detail?.mediaStage === 'failed';
   const hasSource = Boolean(props.detail?.mediaState.primarySource);
+  const readyToStart = props.detail?.mediaStage === 'ready_to_process';
+  const currentJob = props.progress?.currentJob ?? null;
+  const currentJobIndex =
+    currentJob?.jobType === 'media_prepare'
+      ? 1
+      : currentJob?.jobType === 'transcribe'
+        ? 2
+        : currentJob?.jobType === 'frame_materialize'
+          ? 3
+          : 0;
+  const currentJobIsActive =
+    currentJob?.status === 'queued' || currentJob?.status === 'leased';
+  const currentJobPercent = currentJob
+    ? mediaJobProgressPercent(currentJob)
+    : null;
 
   return (
     <div className="skill-mm-progress-step">
@@ -214,7 +240,11 @@ export function MultimodalProgressStep(props: Props) {
         <ol className="skill-mm-process-nodes">
           {PROCESS_NODES.map((node, index) => {
             const status =
-              isFailed && index === currentIndex
+              readyToStart
+                ? index === 0
+                  ? 'complete'
+                  : 'future'
+                : isFailed && index === currentIndex
                 ? 'failed'
                 : processingComplete || index < currentIndex
                   ? 'complete'
@@ -222,7 +252,11 @@ export function MultimodalProgressStep(props: Props) {
                     ? 'current'
                     : 'future';
             return (
-              <li key={node.key} data-status={status}>
+              <li
+                key={node.key}
+                data-status={status}
+                aria-label={`${node.label}：${PROCESS_NODE_STATUS_LABELS[status]}`}
+              >
                 <span aria-hidden="true">
                   {status === 'complete' ? (
                     <Check size={15} />
@@ -235,9 +269,10 @@ export function MultimodalProgressStep(props: Props) {
                 <div>
                   <strong>{node.label}</strong>
                   {status === 'current' && (
-                    <small>
-                      {props.progress?.currentJob?.hint ??
-                        '等待服务端更新处理状态'}
+                    <small aria-live="polite">
+                      {currentJobIsActive && currentJobIndex === index
+                        ? mediaJobProgressLabel(currentJob)
+                        : '等待服务端更新处理状态'}
                     </small>
                   )}
                   {status === 'failed' && (
@@ -245,9 +280,13 @@ export function MultimodalProgressStep(props: Props) {
                   )}
                 </div>
                 {status === 'current' &&
-                  props.progress?.currentJob?.percent !== null &&
-                  props.progress?.currentJob?.percent !== undefined && (
-                    <b>{props.progress.currentJob.percent}%</b>
+                  currentJobIsActive &&
+                  currentJobIndex === index &&
+                  currentJobPercent !== null &&
+                  currentJobPercent !== undefined && (
+                    <b aria-label={`${node.label}进度 ${currentJobPercent}%`}>
+                      {currentJobPercent}%
+                    </b>
                   )}
               </li>
             );
@@ -256,16 +295,25 @@ export function MultimodalProgressStep(props: Props) {
       )}
 
       <div className="skill-mm-progress-actions">
-        {props.detail?.mediaStage === 'ready_to_process' && (
-          <button
-            type="button"
-            className="skill-primary-button"
-            onClick={props.onStart}
-            disabled={Boolean(props.busyAction)}
-          >
-            <Play size={15} aria-hidden="true" />
-            开始蒸馏
-          </button>
+        {readyToStart && (
+          <>
+            <div className="skill-mm-ready-notice" role="status">
+              <Check size={16} aria-hidden="true" />
+              <div>
+                <strong>素材安全校验已完成</strong>
+                <small>确认后将开始语音转录、关键帧与证据提取。</small>
+              </div>
+            </div>
+            <button
+              type="button"
+              className="skill-primary-button"
+              onClick={props.onStart}
+              disabled={Boolean(props.busyAction)}
+            >
+              <Play size={15} aria-hidden="true" />
+              开始蒸馏
+            </button>
+          </>
         )}
         {isFailed && (
           <p className="skill-mm-auto-recovery-note">

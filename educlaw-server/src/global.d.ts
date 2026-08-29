@@ -1,6 +1,15 @@
 declare module 'adm-zip' {
+  interface IZipEntryHeader {
+    size: number;
+    compressedSize: number;
+    encrypted?: boolean;
+  }
+
   interface IZipEntry {
     entryName: string;
+    isDirectory: boolean;
+    header: IZipEntryHeader;
+    getData(): Buffer;
   }
   class AdmZip {
     constructor(buffer?: Buffer);

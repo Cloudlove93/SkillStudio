@@ -33,6 +33,7 @@ interface DbSkillRow {
   skill_uid: string;
   dir_name: string;
   name: string;
+  display_name: string | null;
   description: string;
   status: 'active' | 'removed';
   next_version_number: number;
@@ -603,6 +604,107 @@ export async function syncPackageVersionSkillsFromSnapshot(
   return syncedVersions;
 }
 
+function toSkillSummary(row: DbSkillRow) {
+  return {
+    id: String(row.id),
+    packageId: String(row.package_id),
+    skillUid: row.skill_uid,
+    dirName: row.dir_name,
+    name: row.display_name?.trim() || row.name,
+    description: row.description,
+    status: row.status,
+    updatedAt: row.updated_at,
+  };
+}
+
+interface DbRepositorySkillRow extends DbSkillRow {
+  package_name: string;
+  package_description: string;
+}
+
+function decodeRepositoryCursor(cursor: string | undefined) {
+  if (!cursor) return null;
+  try {
+    const parsed = JSON.parse(
+      Buffer.from(cursor, 'base64url').toString('utf8'),
+    ) as { updatedAt?: unknown; id?: unknown };
+    if (
+      typeof parsed.updatedAt !== 'string' ||
+      Number.isNaN(Date.parse(parsed.updatedAt)) ||
+      typeof parsed.id !== 'string' ||
+      !/^[1-9]\d*$/.test(parsed.id)
+    ) {
+      throw new Error('invalid cursor');
+    }
+    return { updatedAt: parsed.updatedAt, id: parsed.id };
+  } catch {
+    throw new SkillVersionError(
+      'INVALID_ARGUMENT',
+      'Repository cursor is invalid',
+      422,
+    );
+  }
+}
+
+function encodeRepositoryCursor(row: DbRepositorySkillRow) {
+  return Buffer.from(
+    JSON.stringify({ updatedAt: row.updated_at, id: String(row.id) }),
+    'utf8',
+  ).toString('base64url');
+}
+
+export async function listRepositorySkills(input: {
+  authUserId: string;
+  cursor?: string;
+  limit?: number;
+}) {
+  const limit = input.limit ?? 100;
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+    throw new SkillVersionError(
+      'INVALID_ARGUMENT',
+      'limit must be an integer from 1 to 100',
+      422,
+    );
+  }
+  const cursor = decodeRepositoryCursor(input.cursor);
+
+  return withTransaction(async (client) => {
+    const result = await client.query<DbRepositorySkillRow>(
+      `select s.*, p.name as package_name, p.description as package_description
+       from agent_package_skills s
+       join agent_packages p on p.id = s.package_id
+       where p.user_id = $1
+         and s.status = 'active'
+         and (
+           $2::timestamptz is null
+           or (s.updated_at, s.id) < ($2::timestamptz, $3::bigint)
+         )
+       order by s.updated_at desc, s.id desc
+       limit $4`,
+      [input.authUserId, cursor?.updatedAt ?? null, cursor?.id ?? null, limit + 1],
+    );
+    const hasMore = result.rows.length > limit;
+    const pageRows = result.rows.slice(0, limit);
+    return {
+      items: pageRows.map((row) => ({
+        id: String(row.id),
+        packageId: String(row.package_id),
+        skillUid: row.skill_uid,
+        dirName: row.dir_name,
+        name: row.display_name?.trim() || row.name,
+        description: row.description,
+        updatedAt: row.updated_at,
+        packageName: row.package_name,
+        packageDescription: row.package_description,
+      })),
+      nextCursor:
+        hasMore && pageRows.length > 0
+          ? encodeRepositoryCursor(pageRows[pageRows.length - 1]!)
+          : null,
+    };
+  });
+}
+
 async function ensurePackageSkillHistory(client: Queryable, pkg: DbRowPackage) {
   const versions = await client.query<DbRowPackageVersion>(
     `select * from agent_package_versions
@@ -678,16 +780,46 @@ export async function listPackageSkills(input: {
        order by id asc`,
       [packageId, Boolean(input.includeRemoved)],
     );
-    return result.rows.map((row) => ({
-      id: String(row.id),
-      packageId: String(row.package_id),
-      skillUid: row.skill_uid,
-      dirName: row.dir_name,
-      name: row.name,
-      description: row.description,
-      status: row.status,
-      updatedAt: row.updated_at,
-    }));
+    return result.rows.map(toSkillSummary);
+  });
+}
+
+export async function renameSkill(input: {
+  authUserId: string;
+  packageId: string;
+  skillId: string;
+  displayName: string;
+}) {
+  const packageId = positiveId(input.packageId, 'packageId');
+  const skillId = positiveId(input.skillId, 'skillId');
+  const displayName = input.displayName.trim();
+  if (!displayName || displayName.length > 80) {
+    throw new SkillVersionError(
+      'INVALID_ARGUMENT',
+      displayName ? 'Skill name must not exceed 80 characters' : 'Skill name is required',
+      422,
+    );
+  }
+
+  return withTransaction(async (client) => {
+    const now = new Date().toISOString();
+    const result = await client.query<DbSkillRow>(
+      `update agent_package_skills s
+       set display_name = $1, updated_at = $2
+       from agent_packages p
+       where s.id = $3
+         and s.package_id = $4
+         and s.status = 'active'
+         and p.id = s.package_id
+         and p.user_id = $5
+       returning s.*`,
+      [displayName, now, skillId, packageId, input.authUserId],
+    );
+    const row = result.rows[0];
+    if (!row) {
+      throw new SkillVersionError('SKILL_NOT_FOUND', 'Skill not found', 404);
+    }
+    return toSkillSummary(row);
   });
 }
 

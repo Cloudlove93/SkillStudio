@@ -232,7 +232,7 @@ function promptEnvelope(input: {
   adlerOverview?: AdlerOverview;
   adlerOverviewReview?: AdlerOverviewReview;
   candidate?: MultimodalCandidateSuggestion;
-  candidates?: MultimodalCandidateSuggestion[];
+  candidates?: unknown[];
   skillDirectory?: MultimodalRiaSkillDirectoryEntry[];
   degradations?: readonly MediaEvidenceDegradation[];
   passKey?: CandidatePassKey;
@@ -1560,10 +1560,11 @@ export function createProductionMultimodalModelAdapters(options?: {
               promptVersion: MULTIMODAL_PROMPT_VERSIONS.fused,
             };
           }
-          const allowedEvidenceIds = input.evidenceTimeline.map(
-            (evidence) => evidence.evidenceId,
-          );
-          const allowedEvidenceIdSet = new Set(allowedEvidenceIds);
+          const compactCandidates = candidates.map((candidate) => {
+            const { evidenceIds: _evidenceIds, ...compactCandidate } = candidate;
+            void _evidenceIds;
+            return compactCandidate;
+          });
           const requestJson = createJsonRequester(
             generateJsonImpl,
             models.fused,
@@ -1581,12 +1582,7 @@ export function createProductionMultimodalModelAdapters(options?: {
           const userPrompt = promptEnvelope({
             task: 'candidate_fusion',
             passKey: CANDIDATE_FUSED_PASS_KEY,
-            candidates,
-            evidenceTimeline: input.evidenceTimeline.filter((evidence) =>
-              allowedEvidenceIdSet.has(evidence.evidenceId),
-            ),
-            allowedEvidenceIds,
-            sourceFactEligibleEvidenceIds: [],
+            candidates: compactCandidates,
           });
           const attemptParse = () =>
             parseFusedCandidatePayload({
@@ -1609,6 +1605,9 @@ export function createProductionMultimodalModelAdapters(options?: {
               canonicalJson({
                 originalRequest: JSON.parse(userPrompt) as unknown,
                 previousInvalidPayload: payload,
+                requiredSourceCandidateIds: candidates.map(
+                  (candidate) => candidate.candidateId,
+                ),
                 validationIssues: [
                   'The response must use the exact fused schema, declare only known sourceCandidateIds, cover every source candidate exactly once, and omit evidenceIds.',
                 ],

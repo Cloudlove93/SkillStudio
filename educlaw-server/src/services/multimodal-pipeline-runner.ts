@@ -5,6 +5,7 @@ import type {
 } from './multimodal-pipeline-store.js';
 
 interface LoggerLike {
+  debug?(payload: Record<string, unknown>, message: string): void;
   info(payload: Record<string, unknown>, message: string): void;
   warn(payload: Record<string, unknown>, message: string): void;
   error(payload: Record<string, unknown>, message: string): void;
@@ -56,6 +57,14 @@ function isStaleWorkError(error: unknown): error is GuidedCreationError {
   return error instanceof GuidedCreationError && STALE_WORK_CODES.has(error.code);
 }
 
+function returnedMediaStage(value: unknown): string | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return null;
+  }
+  const mediaStage = (value as Record<string, unknown>).mediaStage;
+  return typeof mediaStage === 'string' && mediaStage.length > 0 ? mediaStage : null;
+}
+
 export function createMultimodalPipelineRunner(
   deps: MultimodalPipelineRunnerDependencies,
 ): MultimodalPipelineRunner {
@@ -84,7 +93,7 @@ export function createMultimodalPipelineRunner(
       void runOnce();
     }, pollIntervalMs);
     timer.unref?.();
-    logger.info(
+    logger.debug?.(
       {
         event: 'multimodal.pipeline.runner.scheduled',
         pollIntervalMs,
@@ -100,7 +109,7 @@ export function createMultimodalPipelineRunner(
     }
 
     if (inFlightSessionIds.has(session.sessionId)) {
-      logger.info(
+      logger.debug?.(
         {
           event: 'multimodal.pipeline.runner.session_already_inflight',
           sessionId: session.sessionId,
@@ -111,29 +120,28 @@ export function createMultimodalPipelineRunner(
       return;
     }
 
+    const startedAtMs = nowMs();
     inFlightSessionIds.add(session.sessionId);
     try {
-      const runClaimedSession = async () => {
+      const runClaimedSession = async (): Promise<unknown> => {
         if (
           session.mediaStage === 'building_semantic_windows' ||
           session.mediaStage === 'building_evidence' ||
           session.mediaStage === 'building_adler'
         ) {
-          await deps.orchestrator.runDistillationPipeline({
+          return deps.orchestrator.runDistillationPipeline({
             authUserId: session.authUserId,
             sessionId: session.sessionId,
           });
-          return;
         }
         if (session.mediaStage === 'building_skills') {
-          await deps.orchestrator.runSkillBuildPipeline({
+          return deps.orchestrator.runSkillBuildPipeline({
             authUserId: session.authUserId,
             sessionId: session.sessionId,
           });
-          return;
         }
 
-        await deps.orchestrator.runCandidatePipeline({
+        return deps.orchestrator.runCandidatePipeline({
           authUserId: session.authUserId,
           sessionId: session.sessionId,
         });
@@ -146,7 +154,7 @@ export function createMultimodalPipelineRunner(
           )
         : { acquired: true as const, result: await runClaimedSession() };
       if (!leaseResult.acquired) {
-        logger.info(
+        logger.debug?.(
           {
             event: 'multimodal.pipeline.runner.session_lease_busy',
             sessionId: session.sessionId,
@@ -157,6 +165,28 @@ export function createMultimodalPipelineRunner(
         return;
       }
       retryAfterBySessionId.delete(session.sessionId);
+      const nextMediaStage = returnedMediaStage(leaseResult.result);
+      if (nextMediaStage === null || nextMediaStage === session.mediaStage) {
+        logger.debug?.(
+          {
+            event: 'multimodal.pipeline.runner.session_waiting',
+            sessionId: session.sessionId,
+            mediaStage: session.mediaStage,
+          },
+          'multimodal.pipeline.runner.session_waiting',
+        );
+      } else {
+        logger.info(
+          {
+            event: 'multimodal.pipeline.runner.session_advanced',
+            sessionId: session.sessionId,
+            previousMediaStage: session.mediaStage,
+            mediaStage: nextMediaStage,
+            durationMs: Math.max(0, nowMs() - startedAtMs),
+          },
+          'multimodal.pipeline.runner.session_advanced',
+        );
+      }
     } catch (error) {
       if (isStaleWorkError(error)) {
         retryAfterBySessionId.delete(session.sessionId);

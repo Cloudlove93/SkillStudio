@@ -26,7 +26,7 @@ function resolveArenaReportLabels(
     return labelsOrEnhancedLabel;
   }
   return {
-    baseline: 'Baseline',
+    baseline: '基础模型',
     enhanced: labelsOrEnhancedLabel || 'Enhanced',
   };
 }

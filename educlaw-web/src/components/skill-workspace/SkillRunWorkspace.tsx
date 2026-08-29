@@ -1,6 +1,13 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from 'react';
 import type { ArenaThread, SkillVersionDetail } from '@educlaw/shared';
-import { ArrowUp, Loader2, Play, Sparkles, WandSparkles } from 'lucide-react';
+import { ArrowUp, Play, Sparkles, Square, WandSparkles } from 'lucide-react';
 import { liteApi } from '../../api/lite-api';
 import { createSkillRunState, skillRunReducer } from './skill-run-state';
 import type {
@@ -11,6 +18,13 @@ import { ConversationTurnNavigation } from './ConversationTurnNavigation';
 import { collectConversationTurns } from './conversation-turn-navigation';
 import { getConversationTitle } from './skill-conversation-list';
 import { MarkdownContent } from '../lite/lite-rendering';
+import { SkillReasoningBlock } from './SkillReasoningBlock';
+import { SkillThinkingToggle } from './SkillThinkingToggle';
+import {
+  readThinkingPreference,
+  writeThinkingPreference,
+} from './skill-thinking-preference';
+import { createSkillStreamBuffer } from './skill-stream-buffer';
 
 type Props = {
   token: string;
@@ -33,6 +47,18 @@ function requestId() {
   return `skill-run-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+function scheduleStreamFlush(callback: () => void): number {
+  return typeof window.requestAnimationFrame === 'function'
+    ? window.requestAnimationFrame(callback)
+    : window.setTimeout(callback, 16);
+}
+
+function cancelStreamFlush(handle: number) {
+  if (typeof window.cancelAnimationFrame === 'function')
+    window.cancelAnimationFrame(handle);
+  else window.clearTimeout(handle);
+}
+
 export function SkillRunWorkspace({
   token,
   packageId,
@@ -52,10 +78,18 @@ export function SkillRunWorkspace({
     undefined,
     createSkillRunState,
   );
+  const [thinkingPreference, setThinkingPreference] = useState(() =>
+    readThinkingPreference(),
+  );
   const threadIdRef = useRef<string | null>(null);
   const messageListRef = useRef<HTMLDivElement>(null);
   const hydrateRequestRef = useRef(0);
   const handledRerunRef = useRef<string | null>(null);
+  const activeRequestRef = useRef(0);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const streamBufferRef = useRef<
+    ReturnType<typeof createSkillStreamBuffer> | null
+  >(null);
   const conversationTurns = useMemo(
     () =>
       collectConversationTurns(
@@ -71,6 +105,11 @@ export function SkillRunWorkspace({
   useEffect(() => {
     const requestNo = hydrateRequestRef.current + 1;
     hydrateRequestRef.current = requestNo;
+    activeRequestRef.current += 1;
+    streamBufferRef.current?.dispose();
+    streamBufferRef.current = null;
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
     const previousThreadId = threadIdRef.current;
     threadIdRef.current = selectedThreadId;
     if (!selectedThreadId) {
@@ -117,6 +156,7 @@ export function SkillRunWorkspace({
             messages.push({
               role: 'assistant',
               content: message.content,
+              reasoningContent: message.reasoningContent ?? null,
               messageId: message.id,
               questionMessageId: currentQuestionId,
               threadId: message.threadId,
@@ -135,12 +175,31 @@ export function SkillRunWorkspace({
       });
   }, [packageId, selectedThreadId, token, version?.versionNumber]);
 
+  useEffect(
+    () => () => {
+      activeRequestRef.current += 1;
+      streamBufferRef.current?.dispose();
+      abortControllerRef.current?.abort();
+    },
+    [],
+  );
+
   const sendContent = useCallback(
     async (rawContent: string) => {
       const content = rawContent.trim();
       if (!content || state.busy || !version) return;
+      const requestNo = activeRequestRef.current + 1;
+      activeRequestRef.current = requestNo;
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+      const requestedThinking = thinkingPreference;
       onRunStateChange?.(true, threadIdRef.current);
-      dispatch({ type: 'submit', content });
+      dispatch({
+        type: 'submit',
+        content,
+        thinkingRequested: requestedThinking,
+      });
+      let buffer: ReturnType<typeof createSkillStreamBuffer> | null = null;
       try {
         if (!threadIdRef.current) {
           const thread = await liteApi.createArenaThread(token, packageId, {
@@ -165,28 +224,71 @@ export function SkillRunWorkspace({
             // A title is convenience metadata; a failed rename must not fail the run.
           }
         }
+        if (
+          activeRequestRef.current !== requestNo ||
+          controller.signal.aborted
+        )
+          return;
         const streamThreadId = threadIdRef.current;
         if (!streamThreadId) return;
         let finished = false;
+        buffer = createSkillStreamBuffer(
+          ({ reasoning, content: contentDelta }) => {
+            if (
+              activeRequestRef.current !== requestNo ||
+              threadIdRef.current !== streamThreadId
+            )
+              return;
+            if (reasoning)
+              dispatch({
+                type: 'reasoning_delta',
+                side: 'enhanced',
+                delta: reasoning,
+              });
+            if (contentDelta)
+              dispatch({
+                type: 'delta',
+                side: 'enhanced',
+                delta: contentDelta,
+              });
+          },
+          scheduleStreamFlush,
+          cancelStreamFlush,
+        );
+        streamBufferRef.current = buffer;
         await liteApi.sendMessageStream(
           token,
           streamThreadId,
           content,
           undefined,
           'agent',
+          requestedThinking,
           (event) => {
-            if (threadIdRef.current !== streamThreadId) return;
+            if (
+              activeRequestRef.current !== requestNo ||
+              threadIdRef.current !== streamThreadId
+            )
+              return;
+            if (event.event === 'thinking_status') {
+              dispatch({ type: 'thinking_status', ...event.data });
+            }
+            if (event.event === 'reasoning_delta') {
+              if (event.data.side === 'enhanced')
+                buffer?.append('reasoning', event.data.delta);
+            }
             if (event.event === 'delta') {
-              dispatch({
-                type: 'delta',
-                side: event.data.side,
-                delta: event.data.delta,
-              });
+              if (event.data.side === 'enhanced')
+                buffer?.append('content', event.data.delta);
             }
             if (event.event === 'side_done' && event.data.side === 'enhanced') {
+              buffer?.flushNow();
               finished = true;
               if (event.data.ok) {
-                dispatch({ type: 'done', content: event.data.content });
+                dispatch({
+                  type: 'done',
+                  content: event.data.content,
+                  reasoningContent: event.data.reasoningContent,
+                });
                 onCompleted?.();
               } else {
                 dispatch({
@@ -219,21 +321,43 @@ export function SkillRunWorkspace({
               }
             }
             if (event.event === 'error') {
+              buffer?.flushNow();
               finished = true;
               dispatch({ type: 'error', message: event.data.error });
             }
             if (event.event === 'stream_end' && !event.data.ok && !finished) {
+              buffer?.flushNow();
               dispatch({ type: 'error', message: 'Skill 执行中断，请重试' });
             }
           },
+          controller.signal,
         );
       } catch (error) {
-        dispatch({
-          type: 'error',
-          message: error instanceof Error ? error.message : 'Skill 执行失败',
-        });
+        buffer?.flushNow();
+        if (activeRequestRef.current === requestNo) {
+          if (
+            controller.signal.aborted ||
+            (error instanceof Error && error.name === 'AbortError')
+          ) {
+            dispatch({ type: 'stop' });
+          } else {
+            dispatch({
+              type: 'error',
+              message:
+                error instanceof Error ? error.message : 'Skill 执行失败',
+            });
+          }
+        }
       } finally {
-        onRunStateChange?.(false, threadIdRef.current);
+        if (activeRequestRef.current === requestNo) {
+          if (streamBufferRef.current === buffer) {
+            buffer?.dispose();
+            streamBufferRef.current = null;
+          }
+          if (abortControllerRef.current === controller)
+            abortControllerRef.current = null;
+          onRunStateChange?.(false, threadIdRef.current);
+        }
       }
     },
     [
@@ -244,12 +368,28 @@ export function SkillRunWorkspace({
       packageId,
       purpose,
       state.busy,
+      thinkingPreference,
       token,
       version,
     ],
   );
 
   const send = () => sendContent(state.draft);
+  const stop = useCallback(() => {
+    streamBufferRef.current?.flushNow();
+    activeRequestRef.current += 1;
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
+    streamBufferRef.current?.dispose();
+    streamBufferRef.current = null;
+    dispatch({ type: 'stop' });
+    onRunStateChange?.(false, threadIdRef.current);
+  }, [onRunStateChange]);
+
+  const setThinking = (enabled: boolean) => {
+    setThinkingPreference(enabled);
+    writeThinkingPreference(enabled);
+  };
 
   useEffect(() => {
     if (
@@ -272,7 +412,9 @@ export function SkillRunWorkspace({
           turns={conversationTurns}
         />
         <div ref={messageListRef} className="skill-flat-messages">
-          {state.messages.length === 0 && !state.streaming ? (
+          {state.messages.length === 0 &&
+          !state.streaming &&
+          !state.streamingReasoning ? (
             <div className="skill-flat-empty">
               <Play size={24} />
               <h2>
@@ -303,6 +445,12 @@ export function SkillRunWorkspace({
                     <Sparkles size={14} />
                   </div>
                   <div className="skill-assistant-response">
+                    {message.reasoningContent ? (
+                      <SkillReasoningBlock
+                        text={message.reasoningContent}
+                        streaming={false}
+                      />
+                    ) : null}
                     <div className="skill-assistant-message">
                       <MarkdownContent content={message.content} />
                     </div>
@@ -361,47 +509,93 @@ export function SkillRunWorkspace({
               ),
             )
           )}
-          {state.streaming && (
+          {(state.streaming || state.streamingReasoning) && (
             <div className="skill-assistant-block">
               <div className="skill-assistant-avatar">
                 <Sparkles size={14} />
               </div>
-              <div className="skill-assistant-message">
-                <MarkdownContent content={state.streaming} />
+              <div className="skill-assistant-response">
+                <SkillReasoningBlock
+                  text={state.streamingReasoning}
+                  streaming={state.busy}
+                  expandedByDefault={state.stopped}
+                />
+                {state.streaming ? (
+                  <div className="skill-assistant-message">
+                    <MarkdownContent content={state.streaming} />
+                  </div>
+                ) : null}
               </div>
             </div>
           )}
+          {state.thinkingNotice && state.thinkingSupported !== false ? (
+            <div className="skill-thinking-notice" role="status">
+              {state.thinkingNotice}
+            </div>
+          ) : null}
+          {state.stopped ? (
+            <div className="skill-thinking-notice" role="status">
+              已停止生成，已收到的内容会保留在当前页面
+            </div>
+          ) : null}
           {state.error && <div className="skill-run-error">{state.error}</div>}
         </div>
       </div>
       <div className="skill-test-composer">
-        <textarea
-          value={state.draft}
-          onChange={(event) =>
-            dispatch({ type: 'draft', value: event.target.value })
-          }
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' && !event.shiftKey) {
-              event.preventDefault();
-              void send();
+        <div className="skill-composer-input-row">
+          <textarea
+            aria-label={
+              purpose === 'test'
+                ? '输入测试任务'
+                : '输入 Skill 使用任务'
             }
-          }}
-          placeholder={
-            purpose === 'test'
-              ? '输入测试任务…'
-              : '输入任务，立即使用这个 Skill…'
-          }
-        />
-        <button
-          onClick={() => void send()}
-          disabled={!state.draft.trim() || state.busy || !version}
-        >
+            value={state.draft}
+            onChange={(event) =>
+              dispatch({ type: 'draft', value: event.target.value })
+            }
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.shiftKey && !state.busy) {
+                event.preventDefault();
+                void send();
+              }
+            }}
+            placeholder={
+              purpose === 'test'
+                ? '输入测试任务…'
+                : '输入任务，立即使用这个 Skill…'
+            }
+          />
           {state.busy ? (
-            <Loader2 size={15} className="spin" />
+            <button
+              type="button"
+              className="skill-composer-stop"
+              aria-label="停止生成"
+              title="停止生成"
+              onClick={stop}
+            >
+              <Square size={13} fill="currentColor" aria-hidden="true" />
+            </button>
           ) : (
-            <ArrowUp size={15} />
+            <button
+              type="button"
+              aria-label="发送任务"
+              title="发送任务"
+              onClick={() => void send()}
+              disabled={!state.draft.trim() || !version}
+            >
+              <ArrowUp size={15} aria-hidden="true" />
+            </button>
           )}
-        </button>
+        </div>
+        <div className="skill-composer-helper-row">
+          <SkillThinkingToggle
+            enabled={thinkingPreference}
+            disabled={state.busy}
+            supported={state.thinkingSupported}
+            onChange={setThinking}
+          />
+          <span className="skill-composer-shortcut">回车发送 · Shift+回车换行</span>
+        </div>
       </div>
     </div>
   );

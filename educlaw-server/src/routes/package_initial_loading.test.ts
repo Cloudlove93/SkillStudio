@@ -56,17 +56,7 @@ describe("package initial loading workflow", () => {
         current_version_id: "version-1",
         created_at: "2026-05-21T01:00:00.000Z",
         updated_at: "2026-05-21T02:00:00.000Z",
-      }],
-    });
-    queryMock.mockResolvedValueOnce({
-      rows: [{
-        id: "version-1",
-        package_id: "package-1",
-        version_number: 3,
-        source: "generated",
-        snapshot_json: "{}",
-        note: "",
-        created_at: "2026-05-21T01:00:00.000Z",
+        current_version_number: 3,
       }],
     });
     const { server, url } = await listen(await createApp());
@@ -85,16 +75,11 @@ describe("package initial loading workflow", () => {
         versionNumber: 3,
         updatedAt: "2026-05-21T02:00:00.000Z",
       }]);
-      expect(queryMock).toHaveBeenNthCalledWith(
-        1,
-        "select * from agent_packages where user_id = $1 order by updated_at desc",
-        ["user-1"],
+      expect(queryMock).toHaveBeenCalledTimes(1);
+      expect(queryMock.mock.calls[0]?.[0]).toContain(
+        "join agent_package_versions",
       );
-      expect(queryMock).toHaveBeenNthCalledWith(
-        2,
-        "select * from agent_package_versions where id = $1",
-        ["version-1"],
-      );
+      expect(queryMock.mock.calls[0]?.[1]).toEqual(["user-1"]);
     } finally {
       await close(server);
     }

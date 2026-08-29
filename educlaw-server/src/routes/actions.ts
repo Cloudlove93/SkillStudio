@@ -17,6 +17,7 @@ import {
   getSkillVersionDetail,
   listPackageSkills,
   listSkillVersions,
+  renameSkill,
   rollbackPackageVersion,
   rollbackSkillVersion,
   SkillVersionError,
@@ -296,6 +297,22 @@ const actionMap = new Map<string, ApiHandler>([
         includeRemoved: optionalBoolean(
           parsed.payload.includeRemoved,
           'includeRemoved',
+        ),
+      });
+    },
+  ],
+  [
+    'skill.rename',
+    async ({ body, authUserId }) => {
+      const parsed = parseBase(body, ['skillId', 'displayName']);
+      return renameSkill({
+        authUserId,
+        packageId: parsed.packageId,
+        skillId: asPositiveId(parsed.payload.skillId, 'skillId'),
+        displayName: requiredString(
+          parsed.payload.displayName,
+          'displayName',
+          80,
         ),
       });
     },

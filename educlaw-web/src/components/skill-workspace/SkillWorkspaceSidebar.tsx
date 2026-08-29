@@ -31,7 +31,13 @@ import type { RepositorySkill } from './SkillRepositoryWorkspace';
 
 export type SkillCreateMode = 'conversation' | 'multimodal' | 'document' | 'manual';
 export type SkillCreateAction = SkillCreateMode | 'import';
-export type SkillMenuAction = 'open' | 'overview' | 'test' | 'versions' | 'remove';
+export type SkillMenuAction =
+  | 'open'
+  | 'overview'
+  | 'test'
+  | 'versions'
+  | 'rename'
+  | 'remove';
 
 type Props = {
   sessions: GuidedCreationSession[];
@@ -191,6 +197,7 @@ export function SkillWorkspaceSidebar({
     { id: 'overview', label: '查看详情', icon: Info },
     { id: 'test', label: '测试 Skill', icon: FlaskConical },
     { id: 'versions', label: '版本管理', icon: History },
+    { id: 'rename', label: '重命名', icon: PencilLine },
     { id: 'remove', label: '从工作区移除', icon: LogOut },
   ];
 

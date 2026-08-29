@@ -978,10 +978,21 @@
   border-left-color: var(--workspace-border);
 }
 
+/* The inspector owns its open state. Keep its layout correct even while URL and
+   workspace-shell state are settling during a navigation. */
+.workspace-inspector.is-open {
+  flex-basis: var(--workspace-inspector-width);
+  width: var(--workspace-inspector-width);
+  border-left-color: var(--workspace-border);
+}
+
 .workspace-inspector-rail {
   position: absolute;
   inset: 11px 9px auto auto;
   display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  z-index: 12;
   opacity: 1;
   visibility: visible;
   transition:
@@ -997,10 +1008,161 @@
 }
 
 .workspace-inspector-rail .skill-icon-button {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  color: var(--workspace-muted);
+}
+
+.skill-function-launcher-root {
+  position: relative;
+}
+
+.skill-function-launcher {
+  position: absolute;
+  top: 42px;
+  right: 0;
+  width: min(252px, calc(100vw - 28px));
+  overflow: hidden;
+  border: 1px solid var(--workspace-border);
+  border-radius: 14px;
+  background: color-mix(
+    in srgb,
+    var(--workspace-surface) 97%,
+    var(--workspace-canvas)
+  );
+  box-shadow: 0 18px 45px
+    color-mix(in srgb, var(--workspace-ink) 14%, transparent);
+}
+
+.skill-function-launcher > header {
+  display: flex;
+  min-height: 54px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--workspace-border);
+  padding: 9px 9px 9px 13px;
+}
+
+.skill-function-launcher > header > div {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.skill-function-launcher > header span {
+  color: var(--workspace-muted);
+  font-size: var(--workspace-text-xs);
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  line-height: 1.35;
+  text-transform: uppercase;
+}
+
+.skill-function-launcher > header strong {
+  color: var(--workspace-ink);
+  font-size: var(--workspace-text-sm);
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.skill-function-launcher > header button {
+  display: inline-grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--workspace-muted);
+  cursor: pointer;
+}
+
+.skill-function-launcher > header button:hover {
+  background: var(--workspace-hover);
+  color: var(--workspace-ink);
+}
+
+.skill-function-launcher > header button:focus-visible,
+.skill-function-launcher > div > button:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--primary) 60%, transparent);
+  outline-offset: -2px;
+}
+
+.skill-function-launcher > div {
+  display: grid;
+  gap: 2px;
+  padding: 6px;
+}
+
+.skill-function-launcher > div > button {
+  position: relative;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  min-height: 48px;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 9px;
+  padding: 6px 9px;
+  background: transparent;
+  color: var(--workspace-ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.skill-function-launcher > div > button:hover {
+  background: var(--workspace-hover);
+}
+
+.skill-function-launcher > div > button.is-current {
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+  color: var(--primary);
+}
+
+.skill-function-launcher > div > button.is-current::before {
+  position: absolute;
+  inset: 9px auto 9px 0;
+  width: 2px;
+  border-radius: 99px;
+  background: var(--primary);
+  content: '';
+}
+
+.skill-function-launcher > div > button > span:first-child {
+  display: inline-grid;
   width: 30px;
   height: 30px;
+  place-items: center;
   border-radius: 8px;
+  background: color-mix(in srgb, currentColor 7%, transparent);
+}
+
+.skill-function-launcher > div > button > span:last-child {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.skill-function-launcher > div > button strong,
+.skill-function-launcher > div > button small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.skill-function-launcher > div > button strong {
+  font-size: var(--workspace-text-sm);
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.skill-function-launcher > div > button small {
   color: var(--workspace-muted);
+  font-size: var(--workspace-text-xs);
+  line-height: 1.35;
 }
 
 .workspace-inspector-panel {
@@ -1405,6 +1567,12 @@
     border-left-color: transparent;
   }
 
+  .workspace-inspector.is-open {
+    flex-basis: var(--workspace-inspector-collapsed);
+    width: var(--workspace-inspector-collapsed);
+    border-left-color: transparent;
+  }
+
   .workspace-inspector.is-open .workspace-inspector-panel {
     position: fixed;
     z-index: 40;
@@ -1426,6 +1594,11 @@
 
 @media (max-width: 767px) {
   .skill-workspace-root.is-context-open .workspace-inspector {
+    flex-basis: 0;
+    width: 0;
+  }
+
+  .workspace-inspector.is-open {
     flex-basis: 0;
     width: 0;
   }
@@ -1472,6 +1645,7 @@
   .workspace-inspector,
   .workspace-inspector-panel,
   .workspace-inspector-rail,
+  .skill-function-launcher,
   .workspace-inspector-resize::after {
     transition: none !important;
   }

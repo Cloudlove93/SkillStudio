@@ -61,6 +61,7 @@ export interface DbRowMessage {
   side: string;
   role: string;
   content: string;
+  reasoning_content: string | null;
   created_at: string;
 }
 

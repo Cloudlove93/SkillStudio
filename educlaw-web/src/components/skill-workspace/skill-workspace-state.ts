@@ -26,9 +26,11 @@ export type SkillWorkspaceEvent =
   | { type: 'publish-update'; update: SkillPinnedUpdate }
   | { type: 'dismiss-update' };
 
-export function createSkillWorkspaceState(): SkillWorkspaceState {
+export function createSkillWorkspaceState(
+  activeView: SkillWorkspaceView = 'create',
+): SkillWorkspaceState {
   return {
-    activeView: 'create',
+    activeView,
     pinnedUpdate: null,
   };
 }

@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const queryMock = vi.fn();
 const withTransactionMock = vi.fn();
-const streamTextMock = vi.fn();
+const streamTextPartsMock = vi.fn();
 const resolveBaselineModelMock = vi.fn();
 const generateJsonMock = vi.fn();
 const getPackageMock = vi.fn();
@@ -20,7 +20,8 @@ async function loadService() {
   vi.doMock("./llm-service.js", () => ({
     generateJson: generateJsonMock,
     resolveBaselineModel: resolveBaselineModelMock,
-    streamText: streamTextMock,
+    streamTextParts: streamTextPartsMock,
+    supportsExplicitThinking: vi.fn(() => true),
   }));
 
   vi.doMock("./package-service.js", () => ({
@@ -60,7 +61,7 @@ afterEach(() => {
   vi.doUnmock("./package-service.js");
   queryMock.mockReset();
   withTransactionMock.mockReset();
-  streamTextMock.mockReset();
+  streamTextPartsMock.mockReset();
   resolveBaselineModelMock.mockReset();
   generateJsonMock.mockReset();
   getPackageMock.mockReset();
@@ -458,10 +459,10 @@ describe("skill arena runtime", () => {
       throw new Error("live package should not be loaded for skill arena");
     });
     let streamCallIndex = 0;
-    streamTextMock.mockImplementation(async function* () {
+    streamTextPartsMock.mockImplementation(async function* () {
       const answer = streamCallIndex === 0 ? "left answer" : "right answer";
       streamCallIndex += 1;
-      yield answer;
+      yield { type: "content", delta: answer };
     });
     queryMock.mockImplementation(async (sql: string) => {
       if (sql.startsWith("select * from arena_threads where id = $1 and user_id = $2")) {
@@ -487,7 +488,7 @@ describe("skill arena runtime", () => {
           rowCount: 1,
         };
       }
-      if (sql.startsWith("select * from arena_messages where thread_id = $1 and user_id = $2 order by created_at asc")) {
+      if (sql.includes("from arena_messages") && sql.includes("where thread_id = $1 and user_id = $2")) {
         return { rows: [], rowCount: 0 };
       }
       if (sql.startsWith("select * from agent_package_versions where id = $1 and package_id = $2")) {
@@ -607,13 +608,13 @@ describe("skill arena runtime", () => {
     expect(result.enhanced?.content).toBe("right answer");
     expect(getPackageMock).not.toHaveBeenCalled();
     expect(resolveBaselineModelMock).not.toHaveBeenCalled();
-    expect(streamTextMock).toHaveBeenCalledTimes(2);
+    expect(streamTextPartsMock).toHaveBeenCalledTimes(2);
     // buildSkillArenaPrompt 使用 [SKILL.md: <skillName>] 格式输出绑定的 Skill
-    expect(streamTextMock.mock.calls[0]?.[0]?.systemPrompt).toContain("[SKILL.md: Skill A]");
-    expect(streamTextMock.mock.calls[0]?.[0]?.systemPrompt).not.toContain(
+    expect(streamTextPartsMock.mock.calls[0]?.[0]?.systemPrompt).toContain("[SKILL.md: Skill A]");
+    expect(streamTextPartsMock.mock.calls[0]?.[0]?.systemPrompt).not.toContain(
       "Current Skill",
     );
-    expect(streamTextMock.mock.calls[1]?.[0]?.systemPrompt).toContain("[SKILL.md: Skill B]");
+    expect(streamTextPartsMock.mock.calls[1]?.[0]?.systemPrompt).toContain("[SKILL.md: Skill B]");
     const answerRunInsert = queryMock.mock.calls.find((call) =>
       String(call[0]).includes("insert into arena_answer_runs"),
     );
@@ -678,7 +679,7 @@ describe("skill arena runtime", () => {
           rowCount: 1,
         };
       }
-      if (sql.startsWith("select * from arena_messages where thread_id = $1 and user_id = $2 order by created_at asc")) {
+      if (sql.includes("from arena_messages") && sql.includes("where thread_id = $1 and user_id = $2")) {
         return {
           rows: [
             {

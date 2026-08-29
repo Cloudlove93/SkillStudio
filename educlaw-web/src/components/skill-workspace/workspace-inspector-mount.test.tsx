@@ -3,7 +3,7 @@
 import { act, useEffect } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter } from 'react-router';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MultimodalSkillCreationPanel } from './MultimodalSkillCreationPanel';
 import { WorkspaceInspector } from './WorkspaceInspector';
 import {
@@ -11,6 +11,8 @@ import {
   WorkspaceInspectorProvider,
 } from './WorkspaceInspectorProvider';
 import type { InspectorDescriptor } from './workspace-inspector-state';
+
+globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 let openInspector: ((descriptor: InspectorDescriptor) => void) | null = null;
 
@@ -50,6 +52,29 @@ describe('workspace inspector mount stability', () => {
   afterEach(async () => {
     await act(async () => root.unmount());
     container.remove();
+  });
+
+  it('uses the intended default inspector width when no preference is stored', async () => {
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={['/skills']}>
+          <WorkspaceInspectorProvider>
+            <WorkspaceInspector
+              defaultDescriptor={{
+                owner: 'skill',
+                view: 'summary',
+                title: '当前 Skill',
+              }}
+            />
+          </WorkspaceInspectorProvider>
+        </MemoryRouter>,
+      );
+    });
+
+    const inspector = container.querySelector<HTMLElement>('.workspace-inspector');
+    expect(inspector?.style.getPropertyValue('--workspace-inspector-width')).toBe(
+      '384px',
+    );
   });
 
   it('keeps multimodal form state mounted while inspector views change', async () => {
@@ -102,5 +127,156 @@ describe('workspace inspector mount stability', () => {
     expect(taskNameAfterSwitch).toBe(taskName);
     expect(taskNameAfterSwitch?.value).toBe('函数课程蒸馏');
     expect(taskNameAfterSwitch?.isConnected).toBe(true);
+  });
+
+  it('restores a pinned Skill launcher after the inspector closes', async () => {
+    localStorage.setItem('eduskill:skill-launcher-pinned:v1', 'true');
+    const onNavigate = vi.fn();
+    const skillNavigation = {
+      activeView: 'run',
+      onNavigate,
+    };
+
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={['/skills']}>
+          <WorkspaceInspectorProvider>
+            <WorkspaceInspector
+              defaultDescriptor={{
+                owner: 'skill',
+                view: 'summary',
+                title: '当前 Skill',
+              }}
+              {...({ skillNavigation } as Record<string, unknown>)}
+            />
+          </WorkspaceInspectorProvider>
+        </MemoryRouter>,
+      );
+    });
+
+    expect(
+      container.querySelector('[aria-label="Skill 功能切换"]'),
+    ).not.toBeNull();
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('[aria-label="展开右侧栏"]')
+        ?.click();
+    });
+    expect(
+      container.querySelector('[aria-label="Skill 功能切换"]'),
+    ).toBeNull();
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('[aria-label="收起右侧栏"]')
+        ?.click();
+    });
+    expect(
+      container.querySelector('[aria-label="Skill 功能切换"]'),
+    ).not.toBeNull();
+  });
+
+  it('keeps a pinned Skill launcher visible while switching to Arena', async () => {
+    localStorage.setItem('eduskill:skill-launcher-pinned:v1', 'true');
+    const onNavigate = vi.fn();
+    const skillNavigation = {
+      activeView: 'run',
+      onNavigate,
+    };
+
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={['/skills']}>
+          <WorkspaceInspectorProvider>
+            <WorkspaceInspector
+              defaultDescriptor={{
+                owner: 'skill',
+                view: 'summary',
+                title: '当前 Skill',
+              }}
+              {...({ skillNavigation } as Record<string, unknown>)}
+            />
+          </WorkspaceInspectorProvider>
+        </MemoryRouter>,
+      );
+    });
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('[aria-label="切换到 Arena"]')
+        ?.click();
+    });
+
+    expect(onNavigate).toHaveBeenCalledWith('arena');
+    expect(
+      container.querySelector('[aria-label="Skill 功能切换"]'),
+    ).not.toBeNull();
+  });
+
+  it('restores the pinned launcher preference after the workspace remounts', async () => {
+    localStorage.setItem('eduskill:skill-launcher-pinned:v1', 'true');
+    const renderWorkspace = () => (
+      <MemoryRouter initialEntries={['/skills']}>
+        <WorkspaceInspectorProvider>
+          <WorkspaceInspector
+            defaultDescriptor={{
+              owner: 'skill',
+              view: 'summary',
+              title: '当前 Skill',
+            }}
+            skillNavigation={{ activeView: 'optimize', onNavigate: vi.fn() }}
+          />
+        </WorkspaceInspectorProvider>
+      </MemoryRouter>
+    );
+
+    await act(async () => root.render(renderWorkspace()));
+    expect(
+      container.querySelector('[aria-label="Skill 功能切换"]'),
+    ).not.toBeNull();
+
+    await act(async () => root.unmount());
+    root = createRoot(container);
+    await act(async () => root.render(renderWorkspace()));
+
+    expect(
+      container.querySelector('[aria-label="Skill 功能切换"]'),
+    ).not.toBeNull();
+    expect(
+      container
+        .querySelector('[aria-label="切换到 优化"]')
+        ?.getAttribute('aria-current'),
+    ).toBe('page');
+  });
+
+  it('does not silently cancel the pinned launcher preference when Escape is pressed', async () => {
+    localStorage.setItem('eduskill:skill-launcher-pinned:v1', 'true');
+
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={['/skills']}>
+          <WorkspaceInspectorProvider>
+            <WorkspaceInspector
+              defaultDescriptor={{
+                owner: 'skill',
+                view: 'summary',
+                title: '当前 Skill',
+              }}
+              skillNavigation={{ activeView: 'run', onNavigate: vi.fn() }}
+            />
+          </WorkspaceInspectorProvider>
+        </MemoryRouter>,
+      );
+    });
+
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    });
+
+    expect(localStorage.getItem('eduskill:skill-launcher-pinned:v1')).toBe('true');
+    expect(
+      container.querySelector('[aria-label="Skill 功能切换"]'),
+    ).not.toBeNull();
   });
 });

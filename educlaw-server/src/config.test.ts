@@ -25,6 +25,7 @@ const CONFIG_ENV_KEYS = [
   "MULTIMODAL_SINGLE_PUT_MAX_MB",
   "MULTIMODAL_MULTIPART_PART_MB",
   "MEDIA_UPLOAD_TOKEN_SECRET",
+  "INTERNAL_WORKER_TOKENS",
   "MULTIMODAL_PIPELINE_RUNNER_ENABLED",
   "MULTIMODAL_PIPELINE_RUNNER_POLL_INTERVAL_MS",
   "MULTIMODAL_PIPELINE_RUNNER_BATCH_LIMIT",
@@ -92,7 +93,8 @@ describe("config", () => {
 
     expect(config.isProduction).toBe(false);
     expect(config.port).toBe(3001);
-    expect(config.bodyLimit).toBe("100mb");
+    expect(config.bodyLimit).toBe("2mb");
+    expect(config.internalWorkerBodyLimit).toBe("32mb");
     expect(config.llmTimeoutMs).toBe(300_000);
     expect(config.databaseUrl).toBe(DEFAULT_LOCAL_DATABASE_URL);
     expect(config.appOrigin).toBe("http://localhost:4173");
@@ -247,6 +249,32 @@ describe("config", () => {
         LLM_API_KEY: "valid-test-key",
       },
     })).rejects.toThrow("DATABASE_URL must be set to a strong production value");
+  });
+
+  it("requires a strong media upload token secret in production", async () => {
+    await expect(loadConfig({
+      env: {
+        NODE_ENV: "production",
+        DATABASE_URL: "postgres://prod-user:prod-secret-password@db.example.com:5432/educlaw",
+        LLM_API_KEY: "valid-production-llm-api-key",
+      },
+    })).rejects.toThrow(
+      "MEDIA_UPLOAD_TOKEN_SECRET must be set to a strong production value",
+    );
+  });
+
+  it("requires strong internal worker tokens in production", async () => {
+    await expect(loadConfig({
+      env: {
+        NODE_ENV: "production",
+        DATABASE_URL: "postgres://prod-user:prod-secret-password@db.example.com:5432/educlaw",
+        LLM_API_KEY: "valid-production-llm-api-key",
+        MEDIA_UPLOAD_TOKEN_SECRET: "media-upload-secret-that-is-long-enough",
+        INTERNAL_WORKER_TOKENS: "short-token",
+      },
+    })).rejects.toThrow(
+      "INTERNAL_WORKER_TOKENS must contain only strong production values",
+    );
   });
 
 });

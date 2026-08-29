@@ -1,5 +1,4 @@
-import { Link } from 'react-router';
-import { Settings, Globe, BookOpen, ArrowUpRight } from 'lucide-react';
+import { Settings, Globe } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -59,24 +58,6 @@ export default function SettingsDialog({ open, onOpenChange }: Props) {
                 <option value="zh">{zhLabel}</option>
                 <option value="en">English</option>
               </select>
-            </div>
-          </DetailSurface>
-
-          <DetailSurface className="p-4 sm:p-5">
-            <div className="space-y-3">
-              <div className="space-y-0.5">
-                <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-                  <div className="flex size-8 items-center justify-center rounded-[10px] bg-[rgba(255,180,0,0.12)] text-[color:var(--warning)]">
-                    <BookOpen className="size-4" />
-                  </div>
-                  {t('settings.workflow')}
-                </div>
-                <div className="pl-10 text-xs text-muted-foreground">{t('settings.workflowDesc')}</div>
-              </div>
-              <Link to="/workflow" onClick={() => onOpenChange(false)} className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-primary px-5 text-sm font-medium text-white shadow-[0_10px_24px_rgba(85,90,255,0.22)] transition-colors hover:bg-[var(--primary-hover)]">
-                {t('home.learnWorkflow')}
-                <ArrowUpRight className="size-4" />
-              </Link>
             </div>
           </DetailSurface>
         </div>

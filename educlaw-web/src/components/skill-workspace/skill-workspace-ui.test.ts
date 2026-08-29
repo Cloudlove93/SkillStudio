@@ -17,15 +17,16 @@ const workspaceCss = () =>
     .join('\n');
 
 describe('Skill-first workspace UI contract', () => {
-  it('uses the Skill workspace as the authenticated default and keeps a legacy fallback', () => {
+  it('uses the Skill workspace as the authenticated default and retires legacy screens', () => {
     const source = read('../../App.tsx');
 
     expect(source).toContain(
       'path="/" element={<RequireAuth><SkillFirstWorkspace /></RequireAuth>}',
     );
     expect(source).toContain(
-      'path="/legacy" element={<RequireAuth><Workspace /></RequireAuth>}',
+      'path="/legacy" element={<Navigate to="/" replace />}',
     );
+    expect(source).not.toContain("import('./pages/Workspace')");
   });
 
   it('provides one compact entry to the shared right inspector', () => {
@@ -341,12 +342,34 @@ describe('Skill-first workspace UI contract', () => {
     expect(css).not.toContain('.skill-composer.is-import-mode');
   });
 
-  it('loads the Skill repository from package Skill identities, not only creation sessions', () => {
+  it('loads the Skill repository through the paginated aggregate endpoint', () => {
     const page = read('../../pages/SkillFirstWorkspace.tsx');
 
-    expect(page).toContain('liteApi.listPackages');
-    expect(page).toContain('liteApi.listPackageSkills');
+    expect(page).toContain('liteApi.listRepositorySkills');
+    expect(page).not.toContain('Promise.all(\n      packages.map');
+    expect(page).not.toContain('liteApi.listPackageSkills');
     expect(page).toContain('repositorySkills');
+  });
+
+  it('loads heavyweight workspace surfaces only when the user opens them', () => {
+    const page = read('../../pages/SkillFirstWorkspace.tsx');
+    const detail = read('./SkillDetailWorkspace.tsx');
+    const inspector = read('./SkillInspectorContent.tsx');
+
+    for (const moduleName of [
+      'GuidedSkillCreationPanel',
+      'DocumentSkillCreationPanel',
+      'StructuredSkillCreationPanel',
+      'SkillRepositoryWorkspace',
+      'SkillDetailWorkspace',
+    ]) {
+      expect(page).toContain(`import('../components/skill-workspace/${moduleName}')`);
+    }
+    expect(detail).toContain("import('./SkillRunWorkspace')");
+    expect(detail).toContain("import('./SkillArenaWorkspace')");
+    expect(detail).toContain("import('./SkillOptimizeWorkspace')");
+    expect(detail).toContain("import('./SkillVersionWorkspace')");
+    expect(inspector).toContain("import('./SkillAnswerOptimizationPanel')");
   });
 
   it('keeps the center top bar minimal and puts panel controls on the right', () => {
@@ -408,7 +431,7 @@ describe('Skill-first workspace UI contract', () => {
     expect(sidebar).toContain('skill-conversation-list');
     expect(sidebar).toContain('新建对话');
     expect(sidebar).toContain('onConversationSelect');
-    expect(page).toContain('listThreads');
+    expect(page).toContain('listThreadPage');
     expect(page).toContain('selectedConversationId');
   });
 
@@ -548,6 +571,7 @@ describe('Skill-first workspace UI contract', () => {
 
   it('supports precise single and batch deletion from a paginated Skill repository', () => {
     const repository = read('./SkillRepositoryWorkspace.tsx');
+    const cards = read('./RepositoryCards.tsx');
     const dialog = read('./SkillDeleteConfirmDialog.tsx');
     const api = read('../../api/lite-api.ts');
 
@@ -555,8 +579,8 @@ describe('Skill-first workspace UI contract', () => {
     expect(repository).toContain('批量管理');
     expect(repository).toContain('全选当前搜索结果');
     expect(repository).toContain('repositoryPageItems');
-    expect(repository).toContain('aria-label="Skill 操作"');
-    expect(repository).toContain('data-skill-delete-return={skill.skillId}');
+    expect(cards).toContain('aria-label={`${skill.name}操作`}');
+    expect(cards).toContain('data-skill-delete-return={skill.skillId}');
     expect(repository).toContain(
       'returnFocusSkillId={deleteReturnFocusSkillId}',
     );
@@ -637,7 +661,7 @@ describe('Skill-first workspace UI contract', () => {
     );
     expect(css).toContain('.skill-repository-tabs');
     expect(css).toContain('.skill-repository-bulkbar');
-    expect(css).toContain('.skill-repository-row-menu');
+    expect(css).toContain('.skill-repository-card-menu');
     expect(css).toContain('.skill-repository-pagination');
     expect(css).toContain('.skill-delete-dialog-backdrop');
     expect(css).toContain('.skill-delete-dialog');

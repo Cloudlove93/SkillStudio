@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { useLocation, useNavigate } from 'react-router';
 import type {
   ArenaThread,
   GuidedCreationDocument,
@@ -17,10 +18,8 @@ import type {
 import { toast } from 'sonner';
 import { liteApi, type GuidedCreationSseEvent } from '../api/lite-api';
 import { useAuthStore } from '../stores/auth';
-import { GuidedSkillCreationPanel } from '../components/skill-workspace/GuidedSkillCreationPanel';
-import { DocumentSkillCreationPanel } from '../components/skill-workspace/DocumentSkillCreationPanel';
-import { StructuredSkillCreationPanel } from '../components/skill-workspace/StructuredSkillCreationPanel';
 import { SkillImportDialog } from '../components/skill-workspace/SkillImportDialog';
+import { SkillRenameDialog } from '../components/skill-workspace/SkillRenameDialog';
 import {
   isGuidedFinalizationStale,
   isGuidedRunVisible,
@@ -43,18 +42,13 @@ import {
   type SkillMenuAction,
 } from '../components/skill-workspace/SkillWorkspaceSidebar';
 import { SkillPinnedUpdate } from '../components/skill-workspace/SkillPinnedUpdate';
-import {
-  SkillDetailWorkspace,
-  type SkillDetailSelection,
-} from '../components/skill-workspace/SkillDetailWorkspace';
-import {
-  SkillRepositoryWorkspace,
-  type RepositorySkill,
-} from '../components/skill-workspace/SkillRepositoryWorkspace';
+import type { SkillDetailSelection } from '../components/skill-workspace/SkillDetailWorkspace';
+import type { RepositorySkill } from '../components/skill-workspace/SkillRepositoryWorkspace';
 import {
   createSkillWorkspaceState,
   skillWorkspaceReducer,
   type SkillPinnedUpdate as SkillPinnedUpdateValue,
+  type SkillWorkspaceView,
 } from '../components/skill-workspace/skill-workspace-state';
 import '../components/skill-workspace/skill-workspace.css';
 import type {
@@ -63,6 +57,10 @@ import type {
 } from '../components/skill-workspace/answer-optimization-selection';
 import { isSkillConversationThread } from '../components/skill-workspace/skill-conversation-list';
 import {
+  parseSkillWorkspaceSearch,
+  writeSkillWorkspaceSearch,
+} from '../components/skill-workspace/skill-workspace-url-state';
+import {
   hasMultimodalResumeState,
   MULTIMODAL_RESUME_KEY,
 } from '../components/skill-workspace/multimodal-guided-creation-state';
@@ -70,6 +68,31 @@ import {
 const MultimodalSkillCreationPanel = lazy(() =>
   import('../components/skill-workspace/MultimodalSkillCreationPanel').then(
     (module) => ({ default: module.MultimodalSkillCreationPanel }),
+  ),
+);
+const GuidedSkillCreationPanel = lazy(() =>
+  import('../components/skill-workspace/GuidedSkillCreationPanel').then(
+    (module) => ({ default: module.GuidedSkillCreationPanel }),
+  ),
+);
+const DocumentSkillCreationPanel = lazy(() =>
+  import('../components/skill-workspace/DocumentSkillCreationPanel').then(
+    (module) => ({ default: module.DocumentSkillCreationPanel }),
+  ),
+);
+const StructuredSkillCreationPanel = lazy(() =>
+  import('../components/skill-workspace/StructuredSkillCreationPanel').then(
+    (module) => ({ default: module.StructuredSkillCreationPanel }),
+  ),
+);
+const SkillRepositoryWorkspace = lazy(() =>
+  import('../components/skill-workspace/SkillRepositoryWorkspace').then(
+    (module) => ({ default: module.SkillRepositoryWorkspace }),
+  ),
+);
+const SkillDetailWorkspace = lazy(() =>
+  import('../components/skill-workspace/SkillDetailWorkspace').then(
+    (module) => ({ default: module.SkillDetailWorkspace }),
   ),
 );
 
@@ -109,6 +132,9 @@ export default function SkillFirstWorkspace() {
 }
 
 function SkillFirstWorkspaceContent() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const initialUrlState = useRef(parseSkillWorkspaceSearch(location.search));
   const token = useAuthStore((state) => state.token) || '';
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
@@ -122,6 +148,7 @@ function SkillFirstWorkspaceContent() {
   const [repositorySkills, setRepositorySkills] = useState<RepositorySkill[]>(
     [],
   );
+  const [repositoryReady, setRepositoryReady] = useState(false);
   const [workspaceSkillKeys, setWorkspaceSkillKeys] = useState<string[]>(() => {
     try {
       const stored = localStorage.getItem('educlaw:workspace-skills');
@@ -137,11 +164,15 @@ function SkillFirstWorkspaceContent() {
     useState<PendingGuidedMessage | null>(null);
   const [selectedRepositorySkill, setSelectedRepositorySkill] =
     useState<RepositorySkill | null>(null);
+  const [sidebarRenameSkill, setSidebarRenameSkill] =
+    useState<RepositorySkill | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
     null,
   );
   const [documents, setDocuments] = useState<GuidedCreationDocument[]>([]);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(
+    () => initialUrlState.current.repositoryQuery,
+  );
   const [createMode, setCreateMode] =
     useState<SkillCreateMode>(initialCreateMode);
   const [multimodalCreationKey, setMultimodalCreationKey] = useState(0);
@@ -150,7 +181,7 @@ function SkillFirstWorkspaceContent() {
   const [importBusy, setImportBusy] = useState(false);
   const [workspaceState, dispatchWorkspace] = useReducer(
     skillWorkspaceReducer,
-    undefined,
+    initialUrlState.current.view,
     createSkillWorkspaceState,
   );
   const [busy, setBusy] = useState(false);
@@ -197,10 +228,83 @@ function SkillFirstWorkspaceContent() {
           sections: session.confirmation?.sections,
         }
       : null);
+  const activeSkillKey = activeSkill
+    ? `${activeSkill.packageId}:${activeSkill.skillId}`
+    : null;
   const visiblePendingGuidedMessage =
     pendingGuidedMessage?.sessionId === selectedSessionId
       ? pendingGuidedMessage
       : null;
+
+  const replaceWorkspaceRoute = useCallback(
+    (
+      view: SkillWorkspaceView,
+      skillKey: string | null,
+      clearInspector = false,
+    ) => {
+      let baseSearch = location.search;
+      if (clearInspector) {
+        const params = new URLSearchParams(baseSearch);
+        params.delete('inspector');
+        params.delete('inspectorItem');
+        baseSearch = params.toString() ? `?${params.toString()}` : '';
+      }
+      const nextSearch = writeSkillWorkspaceSearch(baseSearch, {
+        view,
+        skillKey,
+        repositoryQuery: search,
+      });
+      if (nextSearch === location.search) return;
+      navigate(
+        {
+          pathname: location.pathname,
+          search: nextSearch,
+          hash: location.hash,
+        },
+        { replace: true },
+      );
+    },
+    [location.hash, location.pathname, location.search, navigate, search],
+  );
+
+  const navigateWorkspaceView = useCallback(
+    (
+      view: SkillWorkspaceView,
+      skillKey: string | null = activeSkillKey,
+      clearInspector = false,
+    ) => {
+      dispatchWorkspace({ type: 'navigate', view });
+      replaceWorkspaceRoute(view, skillKey, clearInspector);
+    },
+    [activeSkillKey, replaceWorkspaceRoute],
+  );
+
+  const handleWorkspaceSearch = useCallback(
+    (value: string) => {
+      setSearch(value);
+      if (workspaceState.activeView !== 'repository') return;
+      const nextSearch = writeSkillWorkspaceSearch(location.search, {
+        view: 'repository',
+        skillKey: null,
+        repositoryQuery: value,
+      });
+      navigate(
+        {
+          pathname: location.pathname,
+          search: nextSearch,
+          hash: location.hash,
+        },
+        { replace: true },
+      );
+    },
+    [
+      location.hash,
+      location.pathname,
+      location.search,
+      navigate,
+      workspaceState.activeView,
+    ],
+  );
 
   useEffect(() => {
     selectedRef.current = selectedSessionId;
@@ -267,7 +371,27 @@ function SkillFirstWorkspaceContent() {
     setCompletedConversationIds(new Set());
     setConversationLoading(true);
     try {
-      const threads = await liteApi.listThreads(token, activeSkill.packageId);
+      const threads: ArenaThread[] = [];
+      const seenCursors = new Set<string>();
+      let cursor: string | undefined;
+      for (let pageNumber = 0; pageNumber < 100; pageNumber += 1) {
+        const page = await liteApi.listThreadPage(token, {
+          packageId: activeSkill.packageId,
+          skillId: activeSkill.skillId,
+          cursor,
+          limit: 100,
+        });
+        threads.push(...page.items);
+        if (!page.nextCursor) break;
+        if (seenCursors.has(page.nextCursor)) {
+          throw new Error('对话分页游标重复，已停止加载');
+        }
+        seenCursors.add(page.nextCursor);
+        cursor = page.nextCursor;
+        if (pageNumber === 99) {
+          throw new Error('对话数量过多，请稍后缩小加载范围');
+        }
+      }
       const next = threads
         .filter((thread) =>
           isSkillConversationThread(thread, activeSkill.skillId),
@@ -302,39 +426,37 @@ function SkillFirstWorkspaceContent() {
   }, [loadConversations]);
 
   const refreshRepository = useCallback(async () => {
-    const packages = await liteApi.listPackages(token);
-    const entries = await Promise.all(
-      packages.map(async (pkg) => {
-        try {
-          const skills = await liteApi.listPackageSkills(
-            token,
-            String(pkg.id),
-            true,
-          );
-          return skills
-            .filter((skill) => skill.status === 'active')
-            .map(
-              (skill): RepositorySkill => ({
-                key: `${pkg.id}:${skill.id}`,
-                packageId: String(pkg.id),
-                skillId: skill.id,
-                name: skill.name,
-                description: skill.description || pkg.description,
-                updatedAt: skill.updatedAt || pkg.updatedAt,
-              }),
-            );
-        } catch {
-          return [];
-        }
-      }),
-    );
-    const nextSkills = entries
-      .flat()
-      .sort(
-        (a, b) =>
-          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+    const nextSkills: RepositorySkill[] = [];
+    const visitedCursors = new Set<string>();
+    let cursor: string | undefined;
+
+    for (let pageNumber = 0; pageNumber < 100; pageNumber += 1) {
+      const page = await liteApi.listRepositorySkills(token, {
+        cursor,
+        limit: 100,
+      });
+      nextSkills.push(
+        ...page.items.map((skill) => ({
+          key: `${skill.packageId}:${skill.id}`,
+          packageId: skill.packageId,
+          skillId: skill.id,
+          name: skill.name,
+          description: skill.description || skill.packageDescription,
+          updatedAt: skill.updatedAt,
+        })),
       );
+      if (!page.nextCursor) break;
+      if (visitedCursors.has(page.nextCursor)) {
+        throw new Error('Skill 仓库分页游标重复，请刷新后重试');
+      }
+      visitedCursors.add(page.nextCursor);
+      cursor = page.nextCursor;
+      if (pageNumber === 99) {
+        throw new Error('Skill 仓库数据量超出单次加载上限');
+      }
+    }
     setRepositorySkills(nextSkills);
+    setRepositoryReady(true);
     return nextSkills;
   }, [token]);
 
@@ -345,6 +467,50 @@ function SkillFirstWorkspaceContent() {
       );
     });
   }, [refreshRepository]);
+
+  useEffect(() => {
+    const route = parseSkillWorkspaceSearch(location.search);
+    setSearch((current) =>
+      current === route.repositoryQuery ? current : route.repositoryQuery,
+    );
+    if (!repositoryReady) return;
+
+    if (route.skillKey) {
+      const restoredSkill = repositorySkills.find(
+        (skill) => skill.key === route.skillKey,
+      );
+      if (restoredSkill) {
+        setSelectedRepositorySkill((current) =>
+          current?.key === restoredSkill.key ? current : restoredSkill,
+        );
+        setSession(null);
+        setSelectedSessionId(null);
+        selectedRef.current = null;
+        const restoredView = [
+          'overview',
+          'run',
+          'test',
+          'arena',
+          'optimize',
+          'versions',
+        ].includes(route.view)
+          ? route.view
+          : 'overview';
+        dispatchWorkspace({ type: 'navigate', view: restoredView });
+        return;
+      }
+    }
+
+    setSelectedRepositorySkill(null);
+    if (route.view === 'create') {
+      setSession(null);
+      setSelectedSessionId(null);
+      selectedRef.current = null;
+      dispatchWorkspace({ type: 'navigate', view: 'create' });
+      return;
+    }
+    dispatchWorkspace({ type: 'navigate', view: 'repository' });
+  }, [location.search, repositoryReady, repositorySkills]);
 
   useEffect(() => {
     let cancelled = false;
@@ -456,7 +622,12 @@ function SkillFirstWorkspaceContent() {
         setSelectedSessionId(next.id);
         setDocuments(next.documents);
         if (next.status === 'completed') {
-          dispatchWorkspace({ type: 'navigate', view: 'run' });
+          navigateWorkspaceView(
+            'run',
+            next.package_id && next.skill_id
+              ? `${next.package_id}:${next.skill_id}`
+              : null,
+          );
           publishUpdate({
             id: 'skill-created',
             title: 'Skill 已创建完成',
@@ -629,11 +800,17 @@ function SkillFirstWorkspaceContent() {
           );
       }
       if (detail.status === 'completed') {
-        dispatchWorkspace({ type: 'navigate', view: 'run' });
         closeInspector({ force: true });
+        navigateWorkspaceView(
+          'run',
+          detail.package_id && detail.skill_id
+            ? `${detail.package_id}:${detail.skill_id}`
+            : null,
+          true,
+        );
         dispatchWorkspace({ type: 'dismiss-update' });
       } else {
-        dispatchWorkspace({ type: 'navigate', view: 'create' });
+        navigateWorkspaceView('create', null);
       }
     } catch (loadError) {
       toast.error(
@@ -673,7 +850,12 @@ function SkillFirstWorkspaceContent() {
         if (detail.status === 'completed') {
           setError(null);
           void refreshRepository().catch(() => undefined);
-          dispatchWorkspace({ type: 'navigate', view: 'run' });
+          navigateWorkspaceView(
+            'run',
+            detail.package_id && detail.skill_id
+              ? `${detail.package_id}:${detail.skill_id}`
+              : null,
+          );
         } else if (detail.status === 'failed') {
           setError({
             code: String(detail.error?.code || 'FINALIZATION_FAILED'),
@@ -691,7 +873,7 @@ function SkillFirstWorkspaceContent() {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [refreshRepository, session, token]);
+  }, [navigateWorkspaceView, refreshRepository, session, token]);
 
   const newSkill = (mode: SkillCreateAction = 'conversation') => {
     if (mode === 'import') {
@@ -717,14 +899,14 @@ function SkillFirstWorkspaceContent() {
     setError(null);
     setVersions([]);
     setCurrentVersionId(null);
-    dispatchWorkspace({ type: 'navigate', view: 'create' });
     closeInspector({ force: true });
+    navigateWorkspaceView('create', null, true);
     dispatchWorkspace({ type: 'dismiss-update' });
   };
 
   const openRepository = () => {
-    dispatchWorkspace({ type: 'navigate', view: 'repository' });
     closeInspector({ force: true });
+    navigateWorkspaceView('repository', null, true);
     dispatchWorkspace({ type: 'dismiss-update' });
   };
 
@@ -809,8 +991,8 @@ function SkillFirstWorkspaceContent() {
 
   const handleConversationSelect = (id: string) => {
     setSelectedConversationId(id);
-    dispatchWorkspace({ type: 'navigate', view: 'run' });
     closeInspector({ force: true });
+    navigateWorkspaceView('run', activeSkillKey, true);
   };
 
   const handleConversationRunState = (
@@ -845,8 +1027,8 @@ function SkillFirstWorkspaceContent() {
 
   const handleNewConversation = () => {
     setSelectedConversationId(null);
-    dispatchWorkspace({ type: 'navigate', view: 'run' });
     closeInspector({ force: true });
+    navigateWorkspaceView('run', activeSkillKey, true);
   };
 
   const renameConversation = async (thread: ArenaThread, title: string) => {
@@ -903,8 +1085,8 @@ function SkillFirstWorkspaceContent() {
     setWorkspaceSkillKeys((keys) =>
       keys.includes(skill.key) ? keys : [...keys, skill.key],
     );
-    dispatchWorkspace({ type: 'navigate', view: 'run' });
     closeInspector({ force: true });
+    navigateWorkspaceView('run', skill.key, true);
     dispatchWorkspace({ type: 'dismiss-update' });
   };
 
@@ -930,8 +1112,32 @@ function SkillFirstWorkspaceContent() {
     setWorkspaceSkillKeys((keys) => keys.filter((k) => k !== skill.key));
     if (selectedRepositorySkill?.key === skill.key) {
       setSelectedRepositorySkill(null);
-      dispatchWorkspace({ type: 'navigate', view: 'overview' });
+      navigateWorkspaceView('repository', null);
     }
+  };
+
+  const renameRepositorySkill = async (
+    skill: RepositorySkill,
+    displayName: string,
+  ) => {
+    const renamed = await liteApi.renameSkill(
+      token,
+      skill.packageId,
+      skill.skillId,
+      displayName,
+    );
+    const nextSkill: RepositorySkill = {
+      ...skill,
+      name: renamed.name,
+      updatedAt: renamed.updatedAt,
+    };
+    setRepositorySkills((current) =>
+      current.map((item) => (item.key === skill.key ? nextSkill : item)),
+    );
+    setSelectedRepositorySkill((current) =>
+      current?.key === skill.key ? nextSkill : current,
+    );
+    toast.success('Skill 名称已更新');
   };
 
   const deleteRepositorySkills = async (skills: RepositorySkill[]) => {
@@ -956,7 +1162,7 @@ function SkillFirstWorkspaceContent() {
       setSelectedSessionId(null);
       setConversations([]);
       setSelectedConversationId(null);
-      dispatchWorkspace({ type: 'navigate', view: 'repository' });
+      navigateWorkspaceView('repository', null);
     }
     try {
       await refreshRepository();
@@ -974,12 +1180,16 @@ function SkillFirstWorkspaceContent() {
       removeFromWorkspace(skill);
       return;
     }
+    if (action === 'rename') {
+      setSidebarRenameSkill(skill);
+      return;
+    }
     openRepositorySkill(skill);
     if (action === 'open') return;
-    dispatchWorkspace({
-      type: 'navigate',
-      view: action === 'overview' ? 'overview' : action,
-    });
+    navigateWorkspaceView(
+      action === 'overview' ? 'overview' : action,
+      skill.key,
+    );
   };
 
   const addFiles = async (files: FileList) => {
@@ -1017,9 +1227,6 @@ function SkillFirstWorkspaceContent() {
     }
   };
 
-  const activeSkillKey = activeSkill
-    ? `${activeSkill.packageId}:${activeSkill.skillId}`
-    : null;
   const activeSkillName =
     repositorySkills.find((skill) => skill.key === activeSkillKey)?.name ||
     activeSkill?.name ||
@@ -1037,12 +1244,12 @@ function SkillFirstWorkspaceContent() {
   ) as 'overview' | 'run' | 'test' | 'arena' | 'optimize' | 'versions';
   const handlePinnedAction = (update: SkillPinnedUpdateValue) => {
     if (update.id === 'version-changed') {
-      dispatchWorkspace({ type: 'navigate', view: 'versions' });
       closeInspector({ force: true });
+      navigateWorkspaceView('versions', activeSkillKey, true);
       return;
     }
     if (update.id === 'skill-created') {
-      dispatchWorkspace({ type: 'navigate', view: 'run' });
+      navigateWorkspaceView('run');
       return;
     }
     openInspector({
@@ -1071,7 +1278,7 @@ function SkillFirstWorkspaceContent() {
         collapsed={leftCollapsed}
         search={search}
         userName={user?.username || '用户'}
-        onSearch={setSearch}
+        onSearch={handleWorkspaceSearch}
         onToggle={() => setLeftCollapsed((value) => !value)}
         onRepository={openRepository}
         onCreateMode={newSkill}
@@ -1103,6 +1310,8 @@ function SkillFirstWorkspaceContent() {
             onDismiss={() => dispatchWorkspace({ type: 'dismiss-update' })}
           />
           <div
+            id="main-content"
+            tabIndex={-1}
             className={`skill-main-stage ${workspaceState.activeView === 'repository' ? 'is-repository' : ''}`}
             key={
               workspaceState.activeView === 'repository'
@@ -1110,17 +1319,21 @@ function SkillFirstWorkspaceContent() {
                 : activeSkill
                   ? `skill-${activeSkill.packageId}-${activeSkill.skillId}`
                   : session?.id || 'new'
-            }
+              }
           >
+            <Suspense
+              fallback={<SkillWorkspaceLoadingState label="正在打开工作区" />}
+            >
             {workspaceState.activeView === 'repository' ? (
               <SkillRepositoryWorkspace
                 skills={repositorySkills}
                 sessions={sessions}
                 search={search}
-                onSearch={setSearch}
+                onSearch={handleWorkspaceSearch}
                 onSelectSkill={openRepositorySkill}
                 onSelectDraft={(item) => void openSession(item)}
                 onDeleteSkills={deleteRepositorySkills}
+                onRenameSkill={renameRepositorySkill}
                 onNew={newSkill}
               />
             ) : activeSkill ? (
@@ -1131,9 +1344,7 @@ function SkillFirstWorkspaceContent() {
                 versions={versions}
                 currentVersionId={currentVersionId}
                 versionsLoading={versionsLoading}
-                onNavigate={(view) =>
-                  dispatchWorkspace({ type: 'navigate', view })
-                }
+                onNavigate={(view) => navigateWorkspaceView(view)}
                 onRunStateChange={handleConversationRunState}
                 onPublishUpdate={publishUpdate}
                 onReloadVersions={loadVersions}
@@ -1191,8 +1402,8 @@ function SkillFirstWorkspaceContent() {
                 token={token}
                 onGenerated={async () => {
                   await refreshRepository();
-                  dispatchWorkspace({ type: 'navigate', view: 'repository' });
                   closeInspector({ force: true });
+                  navigateWorkspaceView('repository', null, true);
                 }}
               />
             ) : createMode === 'manual' ? (
@@ -1227,6 +1438,7 @@ function SkillFirstWorkspaceContent() {
                 }
               />
             )}
+            </Suspense>
           </div>
         </div>
         <InspectorPortal owner="guided">
@@ -1247,7 +1459,7 @@ function SkillFirstWorkspaceContent() {
             onAnswerOptimizationRerun={(versionNumber, selection) => {
               void (async () => {
                 await loadVersions();
-                dispatchWorkspace({ type: 'navigate', view: selection.origin });
+                navigateWorkspaceView(selection.origin);
                 setAnswerRerunRequest({
                   requestId: createRequestId('rerun'),
                   versionNumber,
@@ -1256,8 +1468,8 @@ function SkillFirstWorkspaceContent() {
               })();
             }}
             onOpenVersionManager={() => {
-              dispatchWorkspace({ type: 'navigate', view: 'versions' });
               closeInspector({ force: true });
+              navigateWorkspaceView('versions', activeSkillKey, true);
             }}
           />
         </InspectorPortal>
@@ -1277,7 +1489,7 @@ function SkillFirstWorkspaceContent() {
             onAnswerOptimizationRerun={(versionNumber, selection) => {
               void (async () => {
                 await loadVersions();
-                dispatchWorkspace({ type: 'navigate', view: selection.origin });
+                navigateWorkspaceView(selection.origin);
                 setAnswerRerunRequest({
                   requestId: createRequestId('rerun'),
                   versionNumber,
@@ -1286,12 +1498,20 @@ function SkillFirstWorkspaceContent() {
               })();
             }}
             onOpenVersionManager={() => {
-              dispatchWorkspace({ type: 'navigate', view: 'versions' });
               closeInspector({ force: true });
+              navigateWorkspaceView('versions', activeSkillKey, true);
             }}
           />
         </InspectorPortal>
         <WorkspaceInspector
+          skillNavigation={
+            activeSkill
+              ? {
+                  activeView: detailView,
+                  onNavigate: (view) => navigateWorkspaceView(view),
+                }
+              : undefined
+          }
           defaultDescriptor={
             workspaceState.activeView === 'repository'
               ? {
@@ -1333,6 +1553,13 @@ function SkillFirstWorkspaceContent() {
         onClose={() => setImportOpen(false)}
         onImport={(file) => void importSkill(file)}
       />
+      {sidebarRenameSkill ? (
+        <SkillRenameDialog
+          skill={sidebarRenameSkill}
+          onCancel={() => setSidebarRenameSkill(null)}
+          onRename={renameRepositorySkill}
+        />
+      ) : null}
     </div>
   );
 }

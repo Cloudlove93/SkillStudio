@@ -1,4 +1,5 @@
 import {
+  useState,
   useRef,
   type CSSProperties,
   type KeyboardEvent,
@@ -10,15 +11,22 @@ import {
   PanelRightClose,
   PanelRightOpen,
 } from 'lucide-react';
+import { DiscardInspectorChangesDialog } from './DiscardInspectorChangesDialog';
 import type { InspectorDescriptor } from './workspace-inspector-state';
+import {
+  SkillFunctionLauncher,
+  type SkillNavigation,
+} from './SkillFunctionLauncher';
 import { useWorkspaceInspector } from './WorkspaceInspectorProvider';
 
 type ResizeGesture = { pointerId: number; startX: number; startWidth: number };
 
 export function WorkspaceInspector({
   defaultDescriptor,
+  skillNavigation,
 }: {
   defaultDescriptor: InspectorDescriptor;
+  skillNavigation?: SkillNavigation;
 }) {
   const {
     state,
@@ -30,12 +38,11 @@ export function WorkspaceInspector({
     toggleInspectorFullscreen,
   } = useWorkspaceInspector();
   const resizeGesture = useRef<ResizeGesture | null>(null);
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
 
   const requestClose = () => {
     if (closeInspector()) return;
-    if (window.confirm('右侧栏中有未保存的修改，确定要放弃并关闭吗？')) {
-      closeInspector({ force: true });
-    }
+    setConfirmCloseOpen(true);
   };
 
   const startResize = (event: PointerEvent<HTMLDivElement>) => {
@@ -70,6 +77,7 @@ export function WorkspaceInspector({
   } as CSSProperties;
 
   return (
+    <>
     <aside
       className={`skill-context workspace-inspector ${state.open ? 'is-open' : 'is-collapsed'} ${state.fullscreen ? 'is-fullscreen' : ''}`}
       style={inspectorStyle}
@@ -78,6 +86,9 @@ export function WorkspaceInspector({
       }
     >
       <div className="workspace-inspector-rail" aria-hidden={state.open}>
+        {!state.open && skillNavigation ? (
+          <SkillFunctionLauncher navigation={skillNavigation} />
+        ) : null}
         <button
           className="skill-icon-button"
           type="button"
@@ -148,5 +159,15 @@ export function WorkspaceInspector({
         />
       </div>
     </aside>
+    {confirmCloseOpen ? (
+      <DiscardInspectorChangesDialog
+        onCancel={() => setConfirmCloseOpen(false)}
+        onConfirm={() => {
+          setConfirmCloseOpen(false);
+          closeInspector({ force: true });
+        }}
+      />
+    ) : null}
+    </>
   );
 }

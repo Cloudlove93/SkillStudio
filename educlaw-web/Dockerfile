@@ -1,4 +1,4 @@
-FROM node:20-slim AS builder
+FROM node:22-slim AS builder
 
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
@@ -25,16 +25,8 @@ RUN pnpm --filter educlaw-web build
 FROM nginx:1.27-alpine AS runner
 
 COPY --from=builder /app/educlaw-web/dist /usr/share/nginx/html
+COPY educlaw-web/nginx/default.conf.template /etc/nginx/templates/default.conf.template
 
-COPY <<EOF /etc/nginx/conf.d/default.conf
-server {
-    listen 80;
-    root /usr/share/nginx/html;
-    index index.html;
-    location / {
-        try_files \$uri \$uri/ /index.html;
-    }
-}
-EOF
+ENV NGINX_ENVSUBST_FILTER="^(API_UPSTREAM|AUTH_UPSTREAM)$"
 
 EXPOSE 80

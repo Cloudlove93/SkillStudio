@@ -39,6 +39,7 @@ def test_loads_valid_config_and_deduplicates_job_types() -> None:
     assert config.worker_identity == "worker-a"
     assert config.request_timeout_seconds == 12.5
     assert config.poll_interval_seconds == 3.0
+    assert config.max_idle_poll_interval_seconds == 30.0
     assert config.accepted_job_types == (
         "transcribe",
         "media_prepare",
@@ -101,6 +102,8 @@ def test_rejects_invalid_base_url(bad_url: str) -> None:
         ("MEDIA_WORKER_POLL_INTERVAL_SECONDS", "-1"),
         ("MEDIA_WORKER_POLL_INTERVAL_SECONDS", "nan"),
         ("MEDIA_WORKER_POLL_INTERVAL_SECONDS", "inf"),
+        ("MEDIA_WORKER_MAX_IDLE_POLL_INTERVAL_SECONDS", "0"),
+        ("MEDIA_WORKER_MAX_IDLE_POLL_INTERVAL_SECONDS", "nan"),
         ("MEDIA_WORKER_MAX_DURATION_MS", "0"),
         ("MEDIA_WORKER_MAX_DURATION_MS", "-1"),
         ("MEDIA_WORKER_MAX_DURATION_MS", "nan"),
@@ -134,6 +137,16 @@ def test_rejects_unknown_executor_mode() -> None:
     with pytest.raises(WorkerConfigError, match="MEDIA_WORKER_EXECUTOR_MODE"):
         WorkerConfig.from_env(
             {**BASE_ENV, "MEDIA_WORKER_EXECUTOR_MODE": "real_media"}
+        )
+
+
+def test_rejects_max_idle_poll_interval_below_initial_interval() -> None:
+    with pytest.raises(
+        WorkerConfigError,
+        match="MEDIA_WORKER_MAX_IDLE_POLL_INTERVAL_SECONDS",
+    ):
+        WorkerConfig.from_env(
+            {**BASE_ENV, "MEDIA_WORKER_MAX_IDLE_POLL_INTERVAL_SECONDS": "2"}
         )
 
 

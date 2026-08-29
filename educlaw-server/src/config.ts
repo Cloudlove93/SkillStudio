@@ -76,6 +76,8 @@ function assertProductionConfig(name: string, value: string, invalidValues: stri
 const isProduction = process.env.NODE_ENV === "production";
 const llmApiKey = process.env.LLM_API_KEY || "";
 const databaseUrl = process.env.DATABASE_URL || DEFAULT_LOCAL_DATABASE_URL;
+const mediaUploadTokenSecret = process.env.MEDIA_UPLOAD_TOKEN_SECRET || "";
+const internalWorkerTokens = readList("INTERNAL_WORKER_TOKENS", []);
 const multimodalUploadMaxMb = readBoundedInteger(
   "MULTIMODAL_UPLOAD_MAX_MB",
   1024,
@@ -104,11 +106,22 @@ assertProductionConfig("DATABASE_URL", databaseUrl, [
 if (isProduction && (!llmApiKey || llmApiKey === "your-llm-api-key" || llmApiKey === "replace-with-a-real-api-key")) {
   throw new Error("LLM_API_KEY must be set before starting production");
 }
+assertProductionConfig("MEDIA_UPLOAD_TOKEN_SECRET", mediaUploadTokenSecret);
+if (
+  isProduction &&
+  (internalWorkerTokens.length === 0 ||
+    internalWorkerTokens.some((token) => token.length < 32))
+) {
+  throw new Error(
+    "INTERNAL_WORKER_TOKENS must contain only strong production values",
+  );
+}
 
 export const config = {
   isProduction,
   port: readNumber("PORT", 3001),
-  bodyLimit: process.env.BODY_LIMIT || "100mb",
+  bodyLimit: process.env.BODY_LIMIT || "2mb",
+  internalWorkerBodyLimit: process.env.INTERNAL_WORKER_BODY_LIMIT || "32mb",
   llmTimeoutMs: readNumber("LLM_TIMEOUT_MS", 300_000),
   databaseUrl,
   appOrigin: process.env.APP_ORIGIN || "http://localhost:4173",
@@ -139,7 +152,7 @@ export const config = {
   multimodalUploadMaxBytes: multimodalUploadMaxMb * 1024 * 1024,
   multimodalSinglePutMaxBytes: multimodalSinglePutMaxMb * 1024 * 1024,
   multimodalMultipartPartBytes: multimodalMultipartPartMb * 1024 * 1024,
-  mediaUploadTokenSecret: process.env.MEDIA_UPLOAD_TOKEN_SECRET || "",
+  mediaUploadTokenSecret,
   multimodalPipelineRunnerEnabled: readBoolean(
     "MULTIMODAL_PIPELINE_RUNNER_ENABLED",
     false,

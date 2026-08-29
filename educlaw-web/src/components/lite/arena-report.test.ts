@@ -150,7 +150,7 @@ test('buildArenaReportSideCards keeps baseline and enhanced summaries under thei
   assert.deepEqual(cards, [
     {
       key: 'baseline',
-      label: 'Baseline',
+      label: '基础模型',
       total: 72,
       summary: 'baseline summary',
     },

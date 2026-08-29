@@ -53,7 +53,9 @@ function clampWidth(width: number) {
 
 function readStoredWidth() {
   if (typeof localStorage === 'undefined') return DEFAULT_INSPECTOR_WIDTH;
-  const parsed = Number(localStorage.getItem(INSPECTOR_WIDTH_KEY));
+  const storedWidth = localStorage.getItem(INSPECTOR_WIDTH_KEY);
+  if (storedWidth === null) return DEFAULT_INSPECTOR_WIDTH;
+  const parsed = Number(storedWidth);
   return Number.isFinite(parsed) ? clampWidth(parsed) : DEFAULT_INSPECTOR_WIDTH;
 }
 

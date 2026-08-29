@@ -8,6 +8,12 @@ export interface ChatMessage {
   content: string;
 }
 
+export type ThinkingMode = "enabled" | "disabled";
+
+export type LlmStreamPart =
+  | { type: "reasoning"; delta: string }
+  | { type: "content"; delta: string };
+
 interface ChatRequestInput {
   systemPrompt: string;
   userPrompt: string;
@@ -15,6 +21,7 @@ interface ChatRequestInput {
   temperature?: number;
   maxTokens?: number;
   hidePromptContentInLogs?: boolean;
+  thinkingMode?: ThinkingMode;
 }
 
 export interface MultimodalJsonRequestInput {
@@ -242,12 +249,18 @@ function usesKimiK26(model: string): boolean {
   return model.toLowerCase() === "kimi-k2.6";
 }
 
+export function supportsExplicitThinking(model?: string): boolean {
+  const resolvedModel = model || config.llmModel;
+  return usesKimiK25(resolvedModel) || usesKimiK26(resolvedModel);
+}
+
 function buildChatCompletionBody(
   model: string,
   messages: ChatMessage[],
   stream: boolean,
   temperature?: number,
   maxTokens?: number,
+  thinkingMode?: ThinkingMode,
 ) {
   const body: Record<string, unknown> = {
     model,
@@ -257,7 +270,7 @@ function buildChatCompletionBody(
   };
 
   if (usesKimiK25(model) || usesKimiK26(model)) {
-    body.thinking = { type: "disabled" };
+    body.thinking = { type: thinkingMode ?? "disabled" };
     return body;
   }
 
@@ -289,7 +302,14 @@ async function createChatResponse(input: ChatRequestInput, stream: boolean): Pro
         Authorization: `Bearer ${config.llmApiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(buildChatCompletionBody(model, messages, stream, input.temperature, input.maxTokens)),
+      body: JSON.stringify(buildChatCompletionBody(
+        model,
+        messages,
+        stream,
+        input.temperature,
+        input.maxTokens,
+        input.thinkingMode,
+      )),
       signal: createAbortSignal(config.llmTimeoutMs),
     },
     { kind: "prompt", model, stream },
@@ -298,8 +318,8 @@ async function createChatResponse(input: ChatRequestInput, stream: boolean): Pro
   logLlmResponseMeta("prompt", model, response);
 
   if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`LLM request failed: ${response.status} ${text}`);
+    await response.body?.cancel().catch(() => undefined);
+    throw new Error(`LLM request failed: ${response.status}`);
   }
 
   return response;
@@ -330,14 +350,18 @@ async function createChatResponseMessages(messages: ChatMessage[], model?: strin
   logLlmResponseMeta("messages", resolvedModel, response);
 
   if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`LLM request failed: ${response.status} ${text}`);
+    await response.body?.cancel().catch(() => undefined);
+    throw new Error(`LLM request failed: ${response.status}`);
   }
 
   return response;
 }
 
-async function readChatText(response: Response): Promise<string> {
+async function readChatParts(response: Response): Promise<{
+  content: string;
+  reasoningContent: string;
+  finishReason?: string;
+}> {
   const json = await response.json() as {
     choices?: Array<{
       finish_reason?: string;
@@ -345,8 +369,17 @@ async function readChatText(response: Response): Promise<string> {
     }>;
   };
   const choice = json.choices?.[0];
-  const content = choice?.message?.content?.trim() || "";
-  if (!content && choice?.finish_reason === "length") {
+  return {
+    content: choice?.message?.content?.trim() || "",
+    reasoningContent: choice?.message?.reasoning_content?.trim() || "",
+    finishReason: choice?.finish_reason,
+  };
+}
+
+async function readChatText(response: Response): Promise<string> {
+  const result = await readChatParts(response);
+  const content = result.content;
+  if (!content && result.finishReason === "length") {
     throw new LlmOutputTruncatedError();
   }
   return content;
@@ -359,16 +392,24 @@ export async function generateText(input: ChatRequestInput) {
   return text;
 }
 
-export async function* streamText(input: ChatRequestInput): AsyncGenerator<string> {
+export async function* streamTextParts(
+  input: ChatRequestInput,
+): AsyncGenerator<LlmStreamPart> {
   const response = await createChatResponse(input, true);
   const contentType = response.headers.get("content-type") || "";
   const output: string[] = [];
 
   if (!contentType.includes("text/event-stream") || !response.body) {
-    const text = await readChatText(response);
-    if (text) {
-      output.push(text);
-      yield text;
+    const result = await readChatParts(response);
+    if (!result.content && result.finishReason === "length") {
+      throw new LlmOutputTruncatedError();
+    }
+    if (result.reasoningContent) {
+      yield { type: "reasoning", delta: result.reasoningContent };
+    }
+    if (result.content) {
+      output.push(result.content);
+      yield { type: "content", delta: result.content };
     }
     logLlmTextResult(
       "prompt-stream-fallback",
@@ -398,12 +439,23 @@ export async function* streamText(input: ChatRequestInput): AsyncGenerator<strin
         if (!payload || payload === "[DONE]") continue;
         try {
           const parsed = JSON.parse(payload) as {
-            choices?: Array<{ delta?: { content?: string } }>;
+            choices?: Array<{
+              delta?: {
+                content?: unknown;
+                reasoning_content?: unknown;
+              };
+            }>;
           };
-          const delta = parsed.choices?.[0]?.delta?.content;
-          if (typeof delta === "string" && delta.length > 0) {
-            output.push(delta);
-            yield delta;
+          const delta = parsed.choices?.[0]?.delta;
+          if (
+            typeof delta?.reasoning_content === "string"
+            && delta.reasoning_content.length > 0
+          ) {
+            yield { type: "reasoning", delta: delta.reasoning_content };
+          }
+          if (typeof delta?.content === "string" && delta.content.length > 0) {
+            output.push(delta.content);
+            yield { type: "content", delta: delta.content };
           }
         } catch {
           // ignore malformed chunks
@@ -418,6 +470,12 @@ export async function* streamText(input: ChatRequestInput): AsyncGenerator<strin
     output.join(""),
     input.hidePromptContentInLogs,
   );
+}
+
+export async function* streamText(input: ChatRequestInput): AsyncGenerator<string> {
+  for await (const part of streamTextParts(input)) {
+    if (part.type === "content") yield part.delta;
+  }
 }
 
 export async function generateChat(messages: ChatMessage[], model?: string, temperature?: number): Promise<string> {

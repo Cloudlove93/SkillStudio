@@ -14,6 +14,7 @@ class MockMultimodalJobServiceError extends Error {
 }
 
 const listPackageSkillsMock = vi.fn();
+const renameSkillMock = vi.fn();
 const createArenaThreadMock = vi.fn();
 const getArenaThreadDetailMock = vi.fn();
 const deleteArenaThreadMock = vi.fn();
@@ -42,6 +43,7 @@ async function createApp() {
       }
     },
     listPackageSkills: listPackageSkillsMock,
+    renameSkill: renameSkillMock,
     listSkillVersions: vi.fn(),
     getSkillVersionDetail: vi.fn(),
     rollbackSkillVersion: vi.fn(),
@@ -120,6 +122,7 @@ afterEach(() => {
   vi.doUnmock('../services/multimodal-job-service.js');
   vi.doUnmock('../services/multimodal-guided-creation-service.js');
   listPackageSkillsMock.mockReset();
+  renameSkillMock.mockReset();
   createArenaThreadMock.mockReset();
   getArenaThreadDetailMock.mockReset();
   deleteArenaThreadMock.mockReset();
@@ -197,6 +200,72 @@ describe('POST /api action dispatcher', () => {
         packageId: '1',
         includeRemoved: false,
       });
+    } finally {
+      await close(server);
+    }
+  });
+
+  it('renames an owned Skill through POST /api with validated input', async () => {
+    renameSkillMock.mockResolvedValueOnce({
+      id: '11',
+      packageId: '7',
+      name: '函数概念辨析',
+    });
+    const { server, url } = await listen(await createApp());
+
+    try {
+      const response = await fetch(`${url}/api`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Id': 'real-user',
+        },
+        body: JSON.stringify({
+          action: 'skill.rename',
+          pkgId: '7',
+          payload: { skillId: '11', displayName: '函数概念辨析' },
+        }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(renameSkillMock).toHaveBeenCalledWith({
+        authUserId: 'real-user',
+        packageId: '7',
+        skillId: '11',
+        displayName: '函数概念辨析',
+      });
+      expect(await response.json()).toEqual({
+        success: true,
+        data: { id: '11', packageId: '7', name: '函数概念辨析' },
+      });
+    } finally {
+      await close(server);
+    }
+  });
+
+  it('rejects unknown fields in Skill rename requests', async () => {
+    const { server, url } = await listen(await createApp());
+
+    try {
+      const response = await fetch(`${url}/api`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Id': 'real-user',
+        },
+        body: JSON.stringify({
+          action: 'skill.rename',
+          pkgId: '7',
+          payload: {
+            skillId: '11',
+            displayName: '函数概念辨析',
+            userId: 'attacker',
+          },
+        }),
+      });
+
+      expect(response.status).toBe(422);
+      expect(renameSkillMock).not.toHaveBeenCalled();
     } finally {
       await close(server);
     }

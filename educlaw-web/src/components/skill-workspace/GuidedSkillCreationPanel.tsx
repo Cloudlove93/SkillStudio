@@ -417,6 +417,7 @@ export function GuidedSkillCreationPanel(props: Props) {
           )}
           <div className="skill-composer">
             <textarea
+              aria-label="共创建议与补充说明"
               name="guided-skill-message"
               autoComplete="off"
               value={input}

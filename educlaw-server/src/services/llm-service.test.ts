@@ -57,6 +57,26 @@ function mockChatResponse(content: string, init: ResponseInit = {}) {
   );
 }
 
+function mockChatResponseWithReasoning(
+  reasoningContent: string,
+  content: string,
+) {
+  return new Response(
+    JSON.stringify({
+      choices: [{
+        message: {
+          reasoning_content: reasoningContent,
+          content,
+        },
+      }],
+    }),
+    {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    },
+  );
+}
+
 function mockTruncatedThinkingResponse() {
   return new Response(
     JSON.stringify({
@@ -172,6 +192,92 @@ describe("llm-service", () => {
     }
 
     expect(chunks).toEqual(["Hel", "lo"]);
+  });
+
+  it("streamTextParts separates reasoning deltas from answer deltas", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockStreamResponse([
+      'data: {"choices":[{"delta":{"reasoning_content":"先分析","content":"答"}}]}\n\n',
+      'data: {"choices":[{"delta":{"reasoning_content":"再验证"}}]}\n\n',
+      'data: {"choices":[{"delta":{"content":"案"}}]}\n\n',
+      "data: malformed-json\n\n",
+      "data: [DONE]\n\n",
+    ])));
+    const { streamTextParts } = await loadService();
+
+    const parts = [];
+    for await (const part of streamTextParts({
+      systemPrompt: "System",
+      userPrompt: "User",
+    })) {
+      parts.push(part);
+    }
+
+    expect(parts).toEqual([
+      { type: "reasoning", delta: "先分析" },
+      { type: "content", delta: "答" },
+      { type: "reasoning", delta: "再验证" },
+      { type: "content", delta: "案" },
+    ]);
+  });
+
+  it("streamText stays content-only when the provider also streams reasoning", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockStreamResponse([
+      'data: {"choices":[{"delta":{"reasoning_content":"不可混入正文","content":"公开答案"}}]}\n\n',
+      "data: [DONE]\n\n",
+    ])));
+    const { streamText } = await loadService();
+
+    const chunks: string[] = [];
+    for await (const chunk of streamText({
+      systemPrompt: "System",
+      userPrompt: "User",
+    })) {
+      chunks.push(chunk);
+    }
+
+    expect(chunks).toEqual(["公开答案"]);
+  });
+
+  it("streamTextParts separates reasoning and content in a non-SSE fallback", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        mockChatResponseWithReasoning("回退分析", "回退答案"),
+      ),
+    );
+    const { streamTextParts } = await loadService();
+
+    const parts = [];
+    for await (const part of streamTextParts({
+      systemPrompt: "System",
+      userPrompt: "User",
+    })) {
+      parts.push(part);
+    }
+
+    expect(parts).toEqual([
+      { type: "reasoning", delta: "回退分析" },
+      { type: "content", delta: "回退答案" },
+    ]);
+  });
+
+  it("does not write streamed reasoning into LLM response logs", async () => {
+    const secret = "PRIVATE_REASONING_SENTINEL";
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockStreamResponse([
+      `data: {"choices":[{"delta":{"reasoning_content":"${secret}","content":"公开答案"}}]}\n\n`,
+      "data: [DONE]\n\n",
+    ])));
+    const { logger, service } = await loadServiceWithLogger();
+
+    for await (const part of service.streamTextParts({
+      systemPrompt: "System",
+      userPrompt: "User",
+    })) {
+      void part;
+    }
+
+    expect(JSON.stringify(logger.info.mock.calls)).not.toContain(secret);
+    expect(JSON.stringify(logger.info.mock.calls)).toContain("公开答案");
   });
 
   it("generateJson parses strict JSON returned by the model", async () => {
@@ -344,14 +450,31 @@ describe("llm-service", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("throws with response details when the provider returns a non-ok response", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("bad request", { status: 400 })));
+  it("does not expose a provider response body when the request fails", async () => {
+    const secret = "PRIVATE_PROVIDER_BODY_SENTINEL";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(`bad request ${secret} ${"x".repeat(2_000)}`, {
+          status: 400,
+        }),
+      ),
+    );
     const { generateText } = await loadService();
 
-    await expect(generateText({
-      systemPrompt: "System",
-      userPrompt: "User",
-    })).rejects.toThrow("LLM request failed: 400 bad request");
+    let error: unknown;
+    try {
+      await generateText({
+        systemPrompt: "System",
+        userPrompt: "User",
+      });
+    } catch (caught) {
+      error = caught;
+    }
+
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toBe("LLM request failed: 400");
+    expect((error as Error).message).not.toContain(secret);
   });
 
   it("resolveBaselineModel prefers explicit model, then baseline model, then default model", async () => {
@@ -387,5 +510,56 @@ describe("llm-service", () => {
     body = JSON.parse(fetchMock.mock.calls[1]![1].body as string);
     expect(body.temperature).toBeUndefined();
     expect(body.thinking).toEqual({ type: "disabled" });
+  });
+
+  it("enables explicit thinking only for supported Kimi models", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockImplementation(() => Promise.resolve(mockStreamResponse([
+        'data: {"choices":[{"delta":{"content":"完成"}}]}\n\n',
+        "data: [DONE]\n\n",
+      ])));
+    vi.stubGlobal("fetch", fetchMock);
+    const { streamTextParts, supportsExplicitThinking } = await loadService();
+
+    for await (const part of streamTextParts({
+      systemPrompt: "System",
+      userPrompt: "User",
+      model: "kimi-k2.5",
+      thinkingMode: "enabled",
+    })) {
+      void part;
+    }
+    for await (const part of streamTextParts({
+      systemPrompt: "System",
+      userPrompt: "User",
+      model: "kimi-k2.6",
+    })) {
+      void part;
+    }
+    for await (const part of streamTextParts({
+      systemPrompt: "System",
+      userPrompt: "User",
+      model: "gpt-compatible",
+      thinkingMode: "enabled",
+    })) {
+      void part;
+    }
+
+    const enabledKimiBody = JSON.parse(
+      fetchMock.mock.calls[0]![1].body as string,
+    );
+    const defaultKimiBody = JSON.parse(
+      fetchMock.mock.calls[1]![1].body as string,
+    );
+    const otherModelBody = JSON.parse(
+      fetchMock.mock.calls[2]![1].body as string,
+    );
+    expect(enabledKimiBody.thinking).toEqual({ type: "enabled" });
+    expect(defaultKimiBody.thinking).toEqual({ type: "disabled" });
+    expect(otherModelBody.thinking).toBeUndefined();
+    expect(supportsExplicitThinking("kimi-k2.5")).toBe(true);
+    expect(supportsExplicitThinking("kimi-k2.6")).toBe(true);
+    expect(supportsExplicitThinking("gpt-compatible")).toBe(false);
   });
 });

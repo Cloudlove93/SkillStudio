@@ -18,7 +18,8 @@ import {
   generateText,
   resolveBaselineModel,
   resolveEnhancedModel,
-  streamText,
+  streamTextParts,
+  supportsExplicitThinking,
 } from "./llm-service.js";
 import {
   assertRubricConfigured,
@@ -184,9 +185,23 @@ export class ArenaAnswerRunNotFoundError extends Error {
 export type ArenaChatStreamEvent =
   | { event: "phase"; data: { label: string } }
   | { event: "shared"; data: { message: ArenaMessage } }
+  | {
+      event: "thinking_status";
+      data: { requested: boolean; enabled: boolean; supported: boolean };
+    }
   | { event: "side_start"; data: { side: ArenaStreamSide } }
   | { event: "delta"; data: { side: ArenaStreamSide; delta: string } }
-  | { event: "side_done"; data: { side: ArenaStreamSide; content: string; ok: boolean; error?: string } }
+  | { event: "reasoning_delta"; data: { side: ArenaStreamSide; delta: string } }
+  | {
+      event: "side_done";
+      data: {
+        side: ArenaStreamSide;
+        content: string;
+        reasoningContent: string | null;
+        ok: boolean;
+        error?: string;
+      };
+    }
   | { event: "done"; data: { thread: ArenaThread; messages: ArenaMessage[] } };
 
 interface SkillArenaVariantSelection {
@@ -423,6 +438,7 @@ function toMessage(row: DbRowMessage): ArenaMessage {
     side: row.side as ArenaMessage["side"],
     role: row.role as ArenaMessage["role"],
     content: row.content,
+    reasoningContent: row.reasoning_content ?? null,
     createdAt: row.created_at,
   };
 }
@@ -1297,12 +1313,99 @@ async function resolveThreadRuntime(
   };
 }
 
-export async function listThreads(userId: string, packageId: string | number) {
+interface ArenaThreadCursor {
+  updatedAt: string;
+  id: number;
+}
+
+function decodeArenaThreadCursor(cursor: string): ArenaThreadCursor {
+  try {
+    const parsed = JSON.parse(
+      Buffer.from(cursor, 'base64url').toString('utf8'),
+    ) as Partial<ArenaThreadCursor>;
+    if (
+      typeof parsed.updatedAt !== 'string'
+      || !Number.isFinite(Date.parse(parsed.updatedAt))
+      || !Number.isSafeInteger(parsed.id)
+      || Number(parsed.id) < 1
+    ) {
+      throw new Error('invalid cursor');
+    }
+    return { updatedAt: parsed.updatedAt, id: Number(parsed.id) };
+  } catch {
+    throw new ArenaServiceError('Invalid Arena thread cursor', 422, 'INVALID_ARGUMENT');
+  }
+}
+
+function encodeArenaThreadCursor(row: DbRowThread) {
+  return Buffer.from(JSON.stringify({
+    updatedAt: row.updated_at,
+    id: Number(row.id),
+  })).toString('base64url');
+}
+
+export async function listThreadsPage(input: {
+  userId: string;
+  packageId: string | number;
+  skillId?: string;
+  cursor?: string;
+  limit?: number;
+}) {
+  const packageId = positiveId(input.packageId, 'packageId');
+  const skillId = input.skillId === undefined
+    ? null
+    : String(positiveId(input.skillId, 'skillId'));
+  const limit = input.limit ?? 100;
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+    throw new ArenaServiceError(
+      'limit must be an integer between 1 and 100',
+      422,
+      'INVALID_ARGUMENT',
+    );
+  }
+  const cursor = input.cursor ? decodeArenaThreadCursor(input.cursor) : null;
   const result = await query<DbRowThread>(
-    "select * from arena_threads where user_id = $1 and package_id = $2 order by updated_at desc",
-    [userId, packageId],
+    `select *
+       from arena_threads
+      where user_id = $1
+        and package_id = $2
+        and (
+          $3::text is null
+          or (
+            arena_kind = 'skill_arena'
+            and arena_config_jsonb->'left'->>'skillId' = $3
+            and arena_config_jsonb->'right'->>'skillId' = $3
+          )
+        )
+        and (
+          $4::timestamptz is null
+          or (updated_at, id) < ($5::timestamptz, $6::bigint)
+        )
+      order by updated_at desc, id desc
+      limit $7`,
+    [
+      input.userId,
+      String(packageId),
+      skillId,
+      cursor?.updatedAt ?? null,
+      cursor?.updatedAt ?? null,
+      cursor?.id ?? null,
+      limit + 1,
+    ],
   );
-  return result.rows.map(toThread);
+  const hasMore = result.rows.length > limit;
+  const rows = result.rows.slice(0, limit);
+  return {
+    items: rows.map(toThread),
+    nextCursor: hasMore && rows.length > 0
+      ? encodeArenaThreadCursor(rows[rows.length - 1]!)
+      : null,
+  };
+}
+
+export async function listThreads(userId: string, packageId: string | number) {
+  const page = await listThreadsPage({ userId, packageId, limit: 100 });
+  return page.items;
 }
 
 export async function renameArenaThread(input: {
@@ -1568,8 +1671,16 @@ export async function getThreadDetail(
   if (!thread) throw new Error("Arena thread not found");
 
   const messages = await query<DbRowMessage>(
-    "select * from arena_messages where thread_id = $1 and user_id = $2 order by created_at asc, id asc",
-    [threadId, userId],
+    `select *
+       from (
+         select *
+           from arena_messages
+          where thread_id = $1 and user_id = $2
+          order by created_at desc, id desc
+          limit $3
+       ) recent_messages
+      order by created_at asc, id asc`,
+    [threadId, userId, 200],
   );
 
   const detail: Omit<ArenaThreadDetail, "answerOptimizations"> = {
@@ -1685,6 +1796,7 @@ export async function* streamMessage(
   content: string,
   model?: string,
   mode: ArenaMode = "compare",
+  thinkingEnabled = false,
 ): AsyncGenerator<ArenaChatStreamEvent> {
   const prompt = content.trim();
   if (!prompt) throw new Error("Message content is required");
@@ -1741,10 +1853,34 @@ export async function* streamMessage(
   const skillArenaModel = runtime.arenaKind === "skill_arena"
     ? model || detail.thread.model || resolveEnhancedModel(undefined)
     : null;
+  const thinkingRequested = thinkingEnabled === true;
+  const surface = detail.thread.skillArenaConfig?.surface;
+  const thinkingAllowed =
+    mode === "agent" && (surface === "run" || surface === "test");
+  const thinkingModel = runtime.arenaKind === "skill_arena"
+    ? skillArenaModel || undefined
+    : enhancedModel || undefined;
+  const thinkingSupported = supportsExplicitThinking(thinkingModel);
+  const thinkingActive =
+    thinkingRequested && thinkingAllowed && thinkingSupported;
+
+  yield {
+    event: "thinking_status",
+    data: {
+      requested: thinkingRequested,
+      enabled: thinkingActive,
+      supported: thinkingSupported,
+    },
+  };
+
   const queue: Array<Exclude<ArenaChatStreamEvent, { event: "done" }>> = [];
   let pending = sides.length;
   let wake: (() => void) | null = null;
   const sideContents: Record<ArenaStreamSide, string> = { baseline: "", enhanced: "" };
+  const sideReasoningContents: Record<ArenaStreamSide, string> = {
+    baseline: "",
+    enhanced: "",
+  };
 
   const signal = () => {
     const current = wake;
@@ -1761,23 +1897,55 @@ export async function* streamMessage(
     let sideContent = "";
     try {
       push({ event: "side_start", data: { side } });
-      for await (const chunk of streamText({
+      for await (const part of streamTextParts({
         model: sideModel,
         systemPrompt,
         userPrompt,
         temperature: 0.3,
+        thinkingMode:
+          side === "enhanced" && thinkingActive ? "enabled" : "disabled",
       })) {
-        sideContent += chunk;
-        push({ event: "delta", data: { side, delta: chunk } });
+        if (part.type === "reasoning") {
+          if (side === "enhanced" && thinkingActive) {
+            sideReasoningContents[side] += part.delta;
+            push({
+              event: "reasoning_delta",
+              data: { side, delta: part.delta },
+            });
+          }
+          continue;
+        }
+        sideContent += part.delta;
+        push({ event: "delta", data: { side, delta: part.delta } });
       }
       sideContent = sideContent.trim();
       sideContents[side] = sideContent;
-      push({ event: "side_done", data: { side, content: sideContent, ok: true } });
+      const reasoningContent =
+        side === "enhanced" && thinkingActive
+          ? sideReasoningContents[side].trim() || null
+          : null;
+      push({
+        event: "side_done",
+        data: { side, content: sideContent, reasoningContent, ok: true },
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Generation failed";
       const fallback = `Generation failed: ${message}`;
       sideContents[side] = fallback;
-      push({ event: "side_done", data: { side, content: fallback, ok: false, error: message } });
+      const reasoningContent =
+        side === "enhanced" && thinkingActive
+          ? sideReasoningContents[side].trim() || null
+          : null;
+      push({
+        event: "side_done",
+        data: {
+          side,
+          content: fallback,
+          reasoningContent,
+          ok: false,
+          error: message,
+        },
+      });
     } finally {
       pending -= 1;
       signal();
@@ -1838,9 +2006,21 @@ export async function* streamMessage(
     let enhancedAnswerMessageId: number | null = null;
 
     for (const side of sides) {
+      const reasoningContent =
+        side === "enhanced" && thinkingActive
+          ? sideReasoningContents[side].trim() || null
+          : null;
       const result = await client.query<{ id: number | string }>(
-        "insert into arena_messages (thread_id, user_id, side, role, content, created_at) values ($1, $2, $3, $4, $5, $6) returning id",
-        [threadId, userId, side, "assistant", sideContents[side], savedAt],
+        "insert into arena_messages (thread_id, user_id, side, role, content, reasoning_content, created_at) values ($1, $2, $3, $4, $5, $6, $7) returning id",
+        [
+          threadId,
+          userId,
+          side,
+          "assistant",
+          sideContents[side],
+          reasoningContent,
+          savedAt,
+        ],
       );
       const messageId = toPositiveSafeInteger(
         result.rows[0].id,
@@ -1854,6 +2034,7 @@ export async function* streamMessage(
         side,
         role: "assistant",
         content: sideContents[side],
+        reasoningContent,
         createdAt: savedAt,
         ...(runtime.skillVersions && runtime.skillVersions[side]
           ? {
@@ -1937,9 +2118,17 @@ export async function sendMessage(
   content: string,
   model?: string,
   mode: ArenaMode = "compare",
+  thinkingEnabled = false,
 ): Promise<ArenaChatResult> {
   let finalResult: { thread: ArenaThread; messages: ArenaMessage[] } | null = null;
-  for await (const event of streamMessage(userId, threadId, content, model, mode)) {
+  for await (const event of streamMessage(
+    userId,
+    threadId,
+    content,
+    model,
+    mode,
+    thinkingEnabled,
+  )) {
     if (event.event === "done") finalResult = event.data;
   }
   if (!finalResult) {

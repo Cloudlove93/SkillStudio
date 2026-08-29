@@ -255,6 +255,28 @@ export interface MediaSessionSummary {
   updatedAt: string;
 }
 
+export interface RepositorySkillRecord {
+  id: string;
+  packageId: string;
+  skillUid: string;
+  dirName: string;
+  name: string;
+  description: string;
+  updatedAt: string;
+  packageName: string;
+  packageDescription: string;
+}
+
+export interface RepositorySkillPage {
+  items: RepositorySkillRecord[];
+  nextCursor: string | null;
+}
+
+export interface ArenaThreadPage {
+  items: ArenaThread[];
+  nextCursor: string | null;
+}
+
 export interface MediaSessionDetail extends MediaSessionSummary {
   mediaState: PublicMultimodalSessionState;
   error: {
@@ -479,13 +501,22 @@ export type MediaProgressSseEvent =
 export type ArenaMessageStreamEvent =
   | { event: 'phase'; data: { label: string } }
   | { event: 'shared'; data: { message: ArenaMessage } }
+  | {
+      event: 'thinking_status';
+      data: { requested: boolean; enabled: boolean; supported: boolean };
+    }
   | { event: 'side_start'; data: { side: 'baseline' | 'enhanced' } }
   | { event: 'delta'; data: { side: 'baseline' | 'enhanced'; delta: string } }
+  | {
+      event: 'reasoning_delta';
+      data: { side: 'baseline' | 'enhanced'; delta: string };
+    }
   | {
       event: 'side_done';
       data: {
         side: 'baseline' | 'enhanced';
         content: string;
+        reasoningContent: string | null;
         ok: boolean;
         error?: string;
       };
@@ -1194,6 +1225,16 @@ export const liteApi = {
     actionRequest<PackageSkillRecord[]>(token, 'skill.list', packageId, {
       includeRemoved,
     }),
+  renameSkill: (
+    token: string,
+    packageId: string,
+    skillId: string,
+    displayName: string,
+  ) =>
+    actionRequest<PackageSkillRecord>(token, 'skill.rename', packageId, {
+      skillId,
+      displayName,
+    }),
   listSkillVersions: (
     token: string,
     packageId: string,
@@ -1298,12 +1339,47 @@ export const liteApi = {
       { method: 'POST', body: JSON.stringify({ skillIds }) },
       token,
     ),
+  listRepositorySkills: (
+    token: string,
+    options?: { cursor?: string; limit?: number },
+  ) => {
+    const query = new URLSearchParams();
+    if (options?.cursor) query.set('cursor', options.cursor);
+    if (options?.limit !== undefined) {
+      query.set('limit', String(options.limit));
+    }
+    const suffix = query.size > 0 ? `?${query.toString()}` : '';
+    return request<RepositorySkillPage>(
+      `/skills/repository${suffix}`,
+      {},
+      token,
+    );
+  },
   listThreads: (token: string, packageId: string) =>
     request<ArenaThread[]>(
       `${ARENA_ROUTES.THREADS}?packageId=${encodeURIComponent(packageId)}`,
       {},
       token,
     ),
+  listThreadPage: (
+    token: string,
+    options: {
+      packageId: string;
+      skillId?: string;
+      cursor?: string;
+      limit?: number;
+    },
+  ) => {
+    const query = new URLSearchParams({ packageId: options.packageId });
+    if (options.skillId) query.set('skillId', options.skillId);
+    if (options.cursor) query.set('cursor', options.cursor);
+    if (options.limit !== undefined) query.set('limit', String(options.limit));
+    return request<ArenaThreadPage>(
+      `/arena/threads/page?${query.toString()}`,
+      {},
+      token,
+    );
+  },
   createThread: (token: string, packageId: string, model?: string) =>
     request<ArenaThread>(
       ARENA_ROUTES.CREATE_THREAD,
@@ -1356,14 +1432,17 @@ export const liteApi = {
     content: string,
     model: string | undefined,
     mode: ArenaMode,
+    thinkingEnabled: boolean,
     onEvent: (event: ArenaMessageStreamEvent) => void,
+    signal?: AbortSignal,
   ) =>
     streamRequest<ArenaMessageStreamEvent>(
       `${ARENA_ROUTES.MESSAGE_STREAM}?threadId=${encodeURIComponent(threadId)}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content, model, mode }),
+        body: JSON.stringify({ content, model, mode, thinkingEnabled }),
+        signal,
       },
       token,
       onEvent,

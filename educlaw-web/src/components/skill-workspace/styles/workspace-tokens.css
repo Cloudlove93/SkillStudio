@@ -1,6 +1,6 @@
 .skill-workspace-root {
   --workspace-font-ui:
-    'Noto Sans SC Variable', 'PingFang SC', 'Microsoft YaHei UI', sans-serif;
+    'PingFang SC', 'Microsoft YaHei UI', 'Hiragino Sans GB', sans-serif;
   --workspace-font-mono: 'SFMono-Regular', 'Cascadia Code', Consolas, monospace;
   --workspace-canvas: #f4f6f5;
   --workspace-surface: #ffffff;

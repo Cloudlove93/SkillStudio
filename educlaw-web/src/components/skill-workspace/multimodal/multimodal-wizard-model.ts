@@ -4,7 +4,73 @@ import type {
   MultimodalClaimType,
   MultimodalEvidenceKind,
 } from '@educlaw/shared';
-import type { MediaSessionDetail } from '../../../api/lite-api';
+import type {
+  MediaSessionDetail,
+  MediaSessionProgress,
+} from '../../../api/lite-api';
+
+type PublicMediaJob = NonNullable<MediaSessionProgress['currentJob']>;
+
+const MEDIA_JOB_PROGRESS_LABELS: Record<
+  PublicMediaJob['jobType'],
+  { active: string; completed: string }
+> = {
+  media_quality_check: {
+    active: '正在进行安全校验',
+    completed: '安全校验完成',
+  },
+  media_prepare: {
+    active: '正在预处理媒体',
+    completed: '媒体预处理完成',
+  },
+  transcribe: {
+    active: '正在进行语音转录',
+    completed: '语音转录完成',
+  },
+  frame_materialize: {
+    active: '正在生成关键帧与证据',
+    completed: '关键帧与证据生成完成',
+  },
+};
+
+const INTERNAL_WORKER_PHASE_LABELS: Record<string, string> = {
+  claimed: '任务已进入处理队列',
+  ready_to_complete: '正在提交处理结果',
+  downloading_source: '正在读取素材',
+  probing_media: '正在分析媒体信息',
+  normalizing_audio: '正在标准化音轨',
+  detecting_visual_signals: '正在识别画面变化',
+  uploading_result_manifest: '正在保存处理结果',
+  downloading_audio: '正在读取音轨',
+  transcribing: '正在识别语音内容',
+  transcribing_audio: '正在识别语音内容',
+  uploading_transcript: '正在保存转录结果',
+  downloading_video: '正在读取视频画面',
+  materializing_frames: '正在生成候选关键帧',
+  uploading_frames: '正在保存关键帧',
+};
+
+const TRUSTED_LOCALIZED_PROGRESS_LABELS = new Set([
+  ...Object.values(INTERNAL_WORKER_PHASE_LABELS),
+  ...Object.values(MEDIA_JOB_PROGRESS_LABELS).flatMap((labels) => [
+    labels.active,
+    labels.completed,
+  ]),
+]);
+
+export function mediaJobProgressLabel(job: PublicMediaJob) {
+  const labels = MEDIA_JOB_PROGRESS_LABELS[job.jobType];
+  if (job.status === 'succeeded') return labels.completed;
+  if (job.status === 'failed') return '处理失败';
+  if (job.status === 'cancelled') return '处理已取消';
+  const hint = job.hint?.trim();
+  if (hint && TRUSTED_LOCALIZED_PROGRESS_LABELS.has(hint)) return hint;
+  return (hint && INTERNAL_WORKER_PHASE_LABELS[hint]) || labels.active;
+}
+
+export function mediaJobProgressPercent(job: PublicMediaJob) {
+  return job.status === 'succeeded' ? 100 : job.percent;
+}
 
 export type MultimodalWizardStep =
   | 'processing'

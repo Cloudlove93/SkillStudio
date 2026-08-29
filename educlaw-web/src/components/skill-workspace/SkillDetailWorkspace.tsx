@@ -1,11 +1,28 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import type { ArenaThread, SkillVersionDetail } from '@educlaw/shared';
 import type { SkillPinnedUpdate, SkillWorkspaceView } from './skill-workspace-state';
-import { SkillArenaWorkspace } from './SkillArenaWorkspace';
-import { SkillOptimizeWorkspace } from './SkillOptimizeWorkspace';
-import { SkillRunWorkspace } from './SkillRunWorkspace';
-import { SkillVersionWorkspace } from './SkillVersionWorkspace';
 import type { AnswerOptimizationRerunRequest, AnswerOptimizationSelection } from './answer-optimization-selection';
+
+const SkillArenaWorkspace = lazy(() =>
+  import('./SkillArenaWorkspace').then((module) => ({
+    default: module.SkillArenaWorkspace,
+  })),
+);
+const SkillOptimizeWorkspace = lazy(() =>
+  import('./SkillOptimizeWorkspace').then((module) => ({
+    default: module.SkillOptimizeWorkspace,
+  })),
+);
+const SkillRunWorkspace = lazy(() =>
+  import('./SkillRunWorkspace').then((module) => ({
+    default: module.SkillRunWorkspace,
+  })),
+);
+const SkillVersionWorkspace = lazy(() =>
+  import('./SkillVersionWorkspace').then((module) => ({
+    default: module.SkillVersionWorkspace,
+  })),
+);
 
 type DetailView = Extract<SkillWorkspaceView, 'overview' | 'run' | 'test' | 'arena' | 'optimize' | 'versions'>;
 
@@ -66,6 +83,13 @@ export function SkillDetailWorkspace(props: Props) {
       )}
 
       <div className="skill-detail-content">
+        <Suspense
+          fallback={
+            <div className="skill-workspace-loading" role="status">
+              正在打开功能…
+            </div>
+          }
+        >
         {props.view === 'overview' && <Overview skill={props.skill} />}
         {props.view === 'run' && (
           <SkillRunWorkspace
@@ -134,6 +158,7 @@ export function SkillDetailWorkspace(props: Props) {
             onVersionChanged={(message) => props.onPublishUpdate({ id: 'version-changed', title: '版本状态已更新', message, actionLabel: '查看版本' })}
           />
         )}
+        </Suspense>
       </div>
     </main>
   );

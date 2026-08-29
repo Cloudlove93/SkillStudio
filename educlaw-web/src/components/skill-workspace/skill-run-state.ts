@@ -1,6 +1,7 @@
 export type SkillRunMessage = {
   role: 'user' | 'assistant';
   content: string;
+  reasoningContent?: string | null;
   messageId?: number;
   questionMessageId?: number;
   threadId?: number;
@@ -13,15 +14,32 @@ export type SkillRunState = {
   messages: SkillRunMessage[];
   draft: string;
   streaming: string;
+  streamingReasoning: string;
   busy: boolean;
   error: string | null;
+  thinkingRequested: boolean;
+  thinkingEnabled: boolean;
+  thinkingSupported: boolean | null;
+  thinkingNotice: string | null;
+  stopped: boolean;
 };
 
 export type SkillRunEvent =
   | { type: 'draft'; value: string }
-  | { type: 'submit'; content: string }
+  | { type: 'submit'; content: string; thinkingRequested?: boolean }
   | { type: 'delta'; side: 'baseline' | 'enhanced'; delta: string }
-  | { type: 'done'; content: string }
+  | {
+      type: 'reasoning_delta';
+      side: 'baseline' | 'enhanced';
+      delta: string;
+    }
+  | {
+      type: 'thinking_status';
+      requested: boolean;
+      enabled: boolean;
+      supported: boolean;
+    }
+  | { type: 'done'; content: string; reasoningContent?: string | null }
   | {
       type: 'attach-provenance';
       questionMessageId: number;
@@ -31,6 +49,7 @@ export type SkillRunEvent =
       skillVersionNumber: number;
     }
   | { type: 'error'; message: string }
+  | { type: 'stop' }
   | { type: 'hydrate'; messages: SkillRunMessage[] }
   | { type: 'reset' };
 
@@ -39,15 +58,21 @@ export function createSkillRunState(): SkillRunState {
     messages: [],
     draft: '',
     streaming: '',
+    streamingReasoning: '',
     busy: false,
     error: null,
+    thinkingRequested: false,
+    thinkingEnabled: false,
+    thinkingSupported: null,
+    thinkingNotice: null,
+    stopped: false,
   };
 }
 
 export function skillRunReducer(state: SkillRunState, event: SkillRunEvent): SkillRunState {
   if (event.type === 'reset') return createSkillRunState();
   if (event.type === 'hydrate') {
-    return { messages: event.messages, draft: '', streaming: '', busy: false, error: null };
+    return { ...createSkillRunState(), messages: event.messages };
   }
   if (event.type === 'draft') return { ...state, draft: event.value };
   if (event.type === 'submit') {
@@ -56,8 +81,33 @@ export function skillRunReducer(state: SkillRunState, event: SkillRunEvent): Ski
       messages: [...state.messages, { role: 'user', content: event.content }],
       draft: '',
       streaming: '',
+      streamingReasoning: '',
       busy: true,
       error: null,
+      thinkingRequested: event.thinkingRequested === true,
+      thinkingEnabled: false,
+      thinkingSupported: null,
+      thinkingNotice: null,
+      stopped: false,
+    };
+  }
+  if (event.type === 'thinking_status') {
+    return {
+      ...state,
+      thinkingRequested: event.requested,
+      thinkingEnabled: event.enabled,
+      thinkingSupported: event.supported,
+      thinkingNotice:
+        event.requested && !event.supported
+          ? '当前模型不支持深度思考，将正常生成回答'
+          : null,
+    };
+  }
+  if (event.type === 'reasoning_delta') {
+    if (event.side !== 'enhanced') return state;
+    return {
+      ...state,
+      streamingReasoning: `${state.streamingReasoning}${event.delta}`,
     };
   }
   if (event.type === 'delta') {
@@ -65,12 +115,29 @@ export function skillRunReducer(state: SkillRunState, event: SkillRunEvent): Ski
     return { ...state, streaming: `${state.streaming}${event.delta}` };
   }
   if (event.type === 'done') {
+    const hasServerReasoning = event.reasoningContent !== undefined;
+    const reasoningContent = hasServerReasoning
+      ? event.reasoningContent
+      : state.streamingReasoning || undefined;
+    const assistant: SkillRunMessage = {
+      role: 'assistant',
+      content: event.content,
+      ...(hasServerReasoning || reasoningContent
+        ? { reasoningContent: reasoningContent ?? null }
+        : {}),
+    };
     return {
       ...state,
-      messages: [...state.messages, { role: 'assistant', content: event.content }],
+      messages: [...state.messages, assistant],
       streaming: '',
+      streamingReasoning: '',
       busy: false,
       error: null,
+      thinkingNotice:
+        state.thinkingEnabled && !reasoningContent
+          ? '当前模型未返回可显示的思考过程'
+          : state.thinkingNotice,
+      stopped: false,
     };
   }
   if (event.type === 'attach-provenance') {
@@ -97,5 +164,8 @@ export function skillRunReducer(state: SkillRunState, event: SkillRunEvent): Ski
     }).reverse();
     return { ...state, messages };
   }
-  return { ...state, busy: false, streaming: '', error: event.message };
+  if (event.type === 'stop') {
+    return { ...state, busy: false, error: null, stopped: true };
+  }
+  return { ...state, busy: false, error: event.message, stopped: false };
 }

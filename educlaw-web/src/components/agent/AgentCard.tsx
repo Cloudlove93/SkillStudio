@@ -70,7 +70,20 @@ export default function AgentCard({
   const currentGroup = groups?.find((g) => g.items.some((i) => i.itemId === agent.id && i.itemType === 'agent'));
 
   return (
-    <div onClick={onOpen} className={`group relative mb-2 flex cursor-pointer items-start gap-3 rounded-[16px] border px-3.5 py-3 transition-colors ${active ? 'border-primary/16 bg-primary-soft shadow-[var(--shadow-sm)]' : 'border-border bg-card hover:bg-muted'}`}>
+    <div
+      role="button"
+      tabIndex={0}
+      aria-label={`打开 ${agent.name}`}
+      onClick={onOpen}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return;
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onOpen();
+        }
+      }}
+      className={`group relative mb-2 flex cursor-pointer items-start gap-3 rounded-[16px] border px-3.5 py-3 transition-colors ${active ? 'border-primary/16 bg-primary-soft shadow-[var(--shadow-sm)]' : 'border-border bg-card hover:bg-muted'}`}
+    >
       <div className={`flex size-10 shrink-0 items-center justify-center rounded-[12px] bg-muted ${iconColor}`}>
         <SubjectIcon className="size-4" />
       </div>
@@ -88,23 +101,23 @@ export default function AgentCard({
       </div>
 
       {isOwner && (
-        <div className="absolute right-2 top-2 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+        <div className="absolute right-2 top-2 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
           {groups && groups.length > 0 && onMoveToGroup && (
             <div className="relative">
-              <button ref={btnRef} onClick={(e) => { e.stopPropagation(); openMenu(); }} className="rounded-[8px] border border-border bg-card p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" title="????">
+              <button type="button" ref={btnRef} onClick={(e) => { e.stopPropagation(); openMenu(); }} className="rounded-[8px] border border-border bg-card p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" title="移动到分组" aria-label="移动到分组" aria-haspopup="menu" aria-expanded={showGroupMenu}>
                 <FolderInput className="size-3" />
               </button>
               {showGroupMenu && createPortal(
-                <div ref={menuRef} className="fixed z-[120] min-w-[160px] rounded-[12px] border border-border bg-popover p-1.5 shadow-[var(--shadow-md)]" style={{ top: menuPos.top, left: menuPos.left }}>
+                <div ref={menuRef} role="menu" className="fixed z-[120] min-w-[160px] rounded-[12px] border border-border bg-popover p-1.5 shadow-[var(--shadow-md)]" style={{ top: menuPos.top, left: menuPos.left }}>
                   {groups.map((g) => {
                     const Icon = getGroupIcon(g.icon);
                     const isCurrent = g.id === currentGroup?.id;
-                    return <button key={g.id} onClick={(e) => { e.stopPropagation(); onMoveToGroup(g.id); setShowGroupMenu(false); }} className={`flex w-full items-center gap-2 rounded-[8px] px-3 py-2 text-[12px] transition-colors ${isCurrent ? 'bg-primary-soft text-primary' : 'text-foreground hover:bg-muted'}`}><Icon className="size-3.5" /><span className="truncate">{g.name}</span></button>;
+                    return <button type="button" role="menuitem" key={g.id} onClick={(e) => { e.stopPropagation(); onMoveToGroup(g.id); setShowGroupMenu(false); }} className={`flex w-full items-center gap-2 rounded-[8px] px-3 py-2 text-[12px] transition-colors ${isCurrent ? 'bg-primary-soft text-primary' : 'text-foreground hover:bg-muted'}`}><Icon className="size-3.5" /><span className="truncate">{g.name}</span></button>;
                   })}
                   {currentGroup && onRemoveFromGroup && (
                     <>
                       <div className="my-1 h-px bg-border" />
-                      <button onClick={(e) => { e.stopPropagation(); onRemoveFromGroup(); setShowGroupMenu(false); }} className="flex w-full items-center gap-2 rounded-[8px] px-3 py-2 text-[12px] text-muted-foreground hover:bg-muted"><X className="size-3.5" /><span>????</span></button>
+                      <button type="button" role="menuitem" onClick={(e) => { e.stopPropagation(); onRemoveFromGroup(); setShowGroupMenu(false); }} className="flex w-full items-center gap-2 rounded-[8px] px-3 py-2 text-[12px] text-muted-foreground hover:bg-muted"><X className="size-3.5" /><span>移出分组</span></button>
                     </>
                   )}
                 </div>,

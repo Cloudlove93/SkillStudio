@@ -14,6 +14,7 @@ import {
   generateReport,
   getThreadDetail,
   listThreads,
+  listThreadsPage,
   sendMessage,
   streamMessage,
   type ArenaMode,
@@ -25,6 +26,44 @@ const router: import("express").Router = Router();
 function parseArenaMode(value: unknown): ArenaMode {
   return value === "agent" || value === "baseline" ? value : "compare";
 }
+
+function optionalSingleQuery(value: unknown, field: string) {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new Error(`${field} must be a single non-empty string`);
+  }
+  return value.trim();
+}
+
+router.get('/arena/threads/page', requireAuth, async (req, res) => {
+  try {
+    const packageId = optionalSingleQuery(req.query.packageId, 'packageId');
+    if (!packageId) throw new Error('packageId is required');
+    const rawLimit = optionalSingleQuery(req.query.limit, 'limit');
+    if (rawLimit && !/^[1-9]\d*$/.test(rawLimit)) {
+      throw new Error('limit must be a positive integer');
+    }
+    res.json(await listThreadsPage({
+      userId: (req as AuthedRequest).userId || '',
+      packageId,
+      skillId: optionalSingleQuery(req.query.skillId, 'skillId'),
+      cursor: optionalSingleQuery(req.query.cursor, 'cursor'),
+      limit: rawLimit ? Number(rawLimit) : 100,
+    }));
+  } catch (error) {
+    const status = error instanceof Error
+      && typeof (error as Error & { status?: unknown }).status === 'number'
+      ? (error as Error & { status: number }).status
+      : 422;
+    res.status(status).json({
+      code: error instanceof Error
+        && typeof (error as Error & { code?: unknown }).code === 'string'
+        ? (error as Error & { code: string }).code
+        : 'INVALID_ARGUMENT',
+      error: error instanceof Error ? error.message : 'Arena 对话加载失败',
+    });
+  }
+});
 
 router.get(ARENA_ROUTES.THREADS, requireAuth, async (req, res) => {
   const packageId = String(req.query.packageId || "");
@@ -82,6 +121,7 @@ router.post("/arena/threads/:threadId/messages", requireAuth, async (req, res) =
         content,
         typeof req.body?.model === "string" ? req.body.model : undefined,
         parseArenaMode(req.body?.mode),
+        req.body?.thinkingEnabled === true,
       ),
     );
   } catch (error) {
@@ -108,6 +148,7 @@ router.post(ARENA_ROUTES.MESSAGE_STREAM, requireAuth, async (req: Request, res: 
       content,
       typeof req.body?.model === "string" ? req.body.model : undefined,
       parseArenaMode(req.body?.mode),
+      req.body?.thinkingEnabled === true,
     )) {
       writeSseEvent(res, event.event, event.data);
     }

@@ -57,4 +57,103 @@ describe('Skill run stream state', () => {
       skillVersionNumber: 3,
     });
   });
+
+  it('keeps reasoning separate from the final answer and commits both on completion', () => {
+    let state = createSkillRunState();
+    state = skillRunReducer(state, {
+      type: 'submit',
+      content: '问题',
+      thinkingRequested: true,
+    });
+    state = skillRunReducer(state, {
+      type: 'thinking_status',
+      requested: true,
+      enabled: true,
+      supported: true,
+    });
+    state = skillRunReducer(state, {
+      type: 'reasoning_delta',
+      side: 'enhanced',
+      delta: '分析',
+    });
+    state = skillRunReducer(state, {
+      type: 'delta',
+      side: 'enhanced',
+      delta: '答案',
+    });
+    state = skillRunReducer(state, {
+      type: 'done',
+      content: '最终答案',
+      reasoningContent: '完整分析',
+    });
+
+    expect(state.messages.at(-1)).toEqual({
+      role: 'assistant',
+      content: '最终答案',
+      reasoningContent: '完整分析',
+    });
+    expect(state.streaming).toBe('');
+    expect(state.streamingReasoning).toBe('');
+  });
+
+  it('ignores baseline reasoning and preserves partial output on failure or stop', () => {
+    const baselineIgnored = skillRunReducer(createSkillRunState(), {
+      type: 'reasoning_delta',
+      side: 'baseline',
+      delta: '旧侧分析',
+    });
+    expect(baselineIgnored.streamingReasoning).toBe('');
+
+    let state = skillRunReducer(createSkillRunState(), {
+      type: 'submit',
+      content: '问题',
+      thinkingRequested: true,
+    });
+    state = skillRunReducer(state, {
+      type: 'reasoning_delta',
+      side: 'enhanced',
+      delta: '已收到分析',
+    });
+    state = skillRunReducer(state, { type: 'error', message: '网络中断' });
+    expect(state).toMatchObject({
+      busy: false,
+      streamingReasoning: '已收到分析',
+      error: '网络中断',
+    });
+
+    state = skillRunReducer(state, { type: 'stop' });
+    expect(state).toMatchObject({
+      busy: false,
+      streamingReasoning: '已收到分析',
+      error: null,
+      stopped: true,
+    });
+  });
+
+  it('reports thinking capability fallbacks and clears temporary state on hydrate', () => {
+    let state = skillRunReducer(createSkillRunState(), {
+      type: 'submit',
+      content: '问题',
+      thinkingRequested: true,
+    });
+    state = skillRunReducer(state, {
+      type: 'thinking_status',
+      requested: true,
+      enabled: false,
+      supported: false,
+    });
+    expect(state.thinkingNotice).toBe(
+      '当前模型不支持深度思考，将正常生成回答',
+    );
+
+    state = skillRunReducer(state, {
+      type: 'hydrate',
+      messages: [
+        { role: 'assistant', content: '旧答案', reasoningContent: null },
+      ],
+    });
+    expect(state.streamingReasoning).toBe('');
+    expect(state.messages[0]?.reasoningContent).toBeNull();
+    expect(state.thinkingNotice).toBeNull();
+  });
 });

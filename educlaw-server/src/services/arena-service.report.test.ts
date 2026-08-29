@@ -62,7 +62,7 @@ describe("generateReport", () => {
           rowCount: 1,
         };
       }
-      if (sql.startsWith("select * from arena_messages where thread_id = $1 and user_id = $2 order by created_at asc")) {
+      if (sql.includes("from arena_messages") && sql.includes("where thread_id = $1 and user_id = $2")) {
         return { rows: [], rowCount: 0 };
       }
       throw new Error(`Unexpected query: ${sql}`);
@@ -103,7 +103,7 @@ describe("generateReport", () => {
         };
       }
 
-      if (sql.startsWith("select * from arena_messages where thread_id = $1 and user_id = $2 order by created_at asc")) {
+      if (sql.includes("from arena_messages") && sql.includes("where thread_id = $1 and user_id = $2")) {
         return {
           rows: [
             {

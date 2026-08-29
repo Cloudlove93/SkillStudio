@@ -214,6 +214,7 @@ export interface ArenaMessage {
   side: ArenaSide;
   role: ArenaRole;
   content: string;
+  reasoningContent?: string | null;
   createdAt: string;
   skillVersionId?: string;
   skillVersionNumber?: number;
