@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EduSkill QA</title>
+    <script>
+      const params = new URLSearchParams(location.search);
+      const scenario = params.get('scenario') || 'new';
+      localStorage.setItem('educlaw-theme', params.get('theme') || 'light');
+      localStorage.setItem('access_token', 'qa-token');
+      localStorage.setItem('educlaw-token', 'qa-token');
+
+      const now = new Date().toISOString();
+      const draft = {
+        roles: '面向初中语文教师的课堂活动设计助手',
+        goal: '课堂活动设计 Skill',
+        usage_scenario: '教师完成备课框架后，希望快速补充一段可直接执行的课堂活动。',
+        input_contract: '年级、课文主题、课时目标和可用时间。',
+        output_contract: '活动目标、步骤、教师提示语、学生任务和完成标准。',
+        core_capabilities: '识别教学目标，生成分层活动，检查课堂可执行性。',
+        workflow: '理解目标 → 补齐约束 → 设计活动 → 自检 → 输出。',
+        knowledge_evidence: '优先使用教师提供的教材与课程标准，不补造来源。',
+        boundaries_permissions: '不替代教师评价，不处理学生敏感个人信息。',
+        exception_recovery: '信息不足时只追问一个最关键问题。',
+        completion_evidence: '输出包含完整步骤、时间安排和可检查的学生成果。',
+      };
+      const fieldStates = Object.fromEntries(Object.keys(draft).map((key) => [key, 'explicit']));
+      const sections = [
+        ['positioning', '定位与目标', `${draft.roles}\n${draft.goal}`],
+        ['scenario', '使用场景', draft.usage_scenario],
+        ['input_output', '输入与输出', `${draft.input_contract}\n${draft.output_contract}`],
+        ['capability_flow', '能力与流程', `${draft.core_capabilities}\n${draft.workflow}`],
+        ['knowledge_boundary', '依据与边界', `${draft.knowledge_evidence}\n${draft.boundaries_permissions}`],
+        ['recovery_completion', '异常与完成标准', `${draft.exception_recovery}\n${draft.completion_evidence}`],
+      ].map(([key, title, content]) => ({ key, title, content }));
+      const messages = [
+        { id: 'm1', session_id: 'draft-1', message_no: 1, client_message_id: 'c1', role: 'user', content: '帮初中语文老师根据课文目标设计一段课堂活动。', metadata: {}, created_at: now },
+        { id: 'm2', session_id: 'draft-1', message_no: 2, client_message_id: null, role: 'assistant', content: '这段活动通常安排在课堂的哪个环节？', metadata: { suggested_options: ['导入环节', '核心探究', '课堂总结'] }, created_at: now },
+      ];
+      const makeSession = (status, id = status === 'completed' ? 'skill-1' : 'draft-1') => ({
+        id, status, model: 'gpt-5', documents: [], draft, field_states: fieldStates,
+        confirmation: { title: '课堂活动设计 Skill', sections }, revision_no: 7,
+        package_id: status === 'completed' ? 'pkg-1' : null,
+        skill_id: status === 'completed' ? 'skill-id-1' : null,
+        skill_version_id: status === 'completed' ? 'version-3' : null,
+        error: null, created_at: now, updated_at: now,
+        completed_at: status === 'completed' ? now : null,
+        messages,
+      });
+      const ready = makeSession('ready_for_confirmation');
+      const completed = makeSession('completed');
+      const collecting = {
+        ...makeSession('collecting', 'draft-2'),
+        draft: { ...draft, goal: '个性化作业反馈 Skill' },
+        confirmation: null,
+      };
+      const skill = {
+        id: 'skill-id-1', dirName: 'classroom-activity', name: '课堂活动设计 Skill',
+        description: '根据教学目标生成可直接执行的课堂活动',
+        skillMd: '# 课堂活动设计 Skill\n\n根据教学目标生成可执行的课堂活动。\n\n## 工作流程\n1. 理解目标\n2. 补齐约束\n3. 生成活动\n4. 检查可执行性',
+      };
+      const versions = [3, 2, 1].map((number) => ({
+        id: `version-${number}`, skillId: 'skill-id-1', packageId: 'pkg-1',
+        createdInPackageVersionId: `package-version-${number}`, versionNumber: number,
+        source: number === 3 ? 'optimized' : 'generated', basedOnVersionId: number > 1 ? `version-${number - 1}` : null,
+        skill: { ...skill, skillMd: `${skill.skillMd}\n\n版本 ${number}` }, contentHash: `hash-${number}`,
+        status: 'active', note: number === 3 ? '优化课堂适配与异常处理' : '历史版本',
+        createdAt: new Date(Date.now() - (3 - number) * 86400000).toISOString(),
+        discardedAt: null, discardedBy: null, discardReason: null, restoredAt: null, restoredBy: null,
+      }));
+
+      const json = (body) => new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const originalFetch = window.fetch.bind(window);
+      window.fetch = async (input, init = {}) => {
+        const url = typeof input === 'string' ? input : input.url;
+        if (url.includes('/auth/me')) return json({ id: 'qa-user', username: '演示用户', roles: [] });
+        if (url.endsWith('/api/packages')) {
+          return json([{ id: 1, userId: 'qa-user', name: '课堂活动设计', description: skill.description, versionNumber: 3, updatedAt: now }]);
+        }
+        if (url.endsWith('/api') || url.includes('/api?')) {
+          const body = JSON.parse(init.body || '{}');
+          if (body.action === 'SkillGuidedCreationList') {
+            return json({ data: { items: [ready, collecting, completed], next_cursor: null } });
+          }
+          if (body.action === 'SkillGuidedCreationDetail') {
+            const id = body.payload.session_id;
+            return json({ data: id === completed.id ? completed : id === collecting.id ? collecting : ready });
+          }
+          if (body.action === 'skill.version.list') {
+            return json({ data: { items: versions, nextCursor: null, currentVersionId: 'version-3' } });
+          }
+          if (body.action === 'skill.list') {
+            return json({ data: [{ id: 'skill-id-1', packageId: '1', skillUid: 'classroom-activity', dirName: 'classroom-activity', name: skill.name, description: skill.description, status: 'active', updatedAt: now }] });
+          }
+          if (body.action === 'skill.version.detail') {
+            return json({ data: versions.find((item) => item.id === body.payload.versionId) || versions[0] });
+          }
+          return json({ data: ready });
+        }
+        return originalFetch(input, init);
+      };
+
+      history.replaceState({}, '', `/skills?qa=${scenario}`);
+      const waitFor = (selector, callback) => {
+        const timer = setInterval(() => {
+          const element = document.querySelector(selector);
+          if (element) { clearInterval(timer); callback(element); }
+        }, 60);
+      };
+      if (scenario === 'completed' || scenario === 'versions' || scenario === 'optimize') {
+        waitFor('.skill-session-item[title="课堂活动设计 Skill"], .skill-session-item:last-child', (button) => {
+          button.click();
+          if (scenario !== 'completed') {
+            const label = scenario === 'versions' ? '版本管理' : '交互式优化';
+            const actionTimer = setInterval(() => {
+              const target = [...document.querySelectorAll('.skill-sidebar-subnav button')].find((item) => item.textContent.includes(label));
+              if (target) { clearInterval(actionTimer); target.click(); }
+            }, 100);
+          }
+        });
+      }
+      if (scenario === 'repository') {
+        waitFor('.skill-sidebar-commands button:nth-child(2)', (button) => button.click());
+      }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

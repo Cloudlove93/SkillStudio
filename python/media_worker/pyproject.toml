@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "educlaw-media-worker"
+version = "0.1.0"
+description = "Contract-test fake worker for EduClaw multimodal media jobs"
+requires-python = ">=3.11"
+dependencies = [
+  "httpx>=0.28,<0.29",
+  "Pillow>=12.3,<13",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3,<9",
+  "pytest-httpx>=0.35,<0.36",
+]
+asr-local = [
+  "faster-whisper>=1.2.1,<1.3",
+  # 25.12.19 is currently served inconsistently by the configured container
+  # package path. Pin the last verified compatible pure-Python wheel so image
+  # builds keep pip's hash verification enabled and remain reproducible.
+  "flatbuffers==25.9.23",
+]
+
+[project.scripts]
+educlaw-media-worker = "media_worker.worker_main:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

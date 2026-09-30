@@ -1,0 +1,213 @@
+name: educlaw
+
+services:
+  educlaw-db:
+    image: m.daocloud.io/docker.io/library/postgres:17
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  educlaw-db-init:
+    image: educlaw-server:latest
+    command: node dist/educlaw-server/src/scripts/init-db.js
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - LLM_BASE_URL=${LLM_BASE_URL}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_MODEL=${LLM_MODEL}
+      - LLM_BASELINE_MODEL=${LLM_BASELINE_MODEL}
+      - MEDIA_UPLOAD_TOKEN_SECRET=${MEDIA_UPLOAD_TOKEN_SECRET}
+      - INTERNAL_WORKER_TOKENS=${INTERNAL_WORKER_TOKENS}
+    depends_on:
+      educlaw-db:
+        condition: service_healthy
+    restart: "no"
+
+  educlaw-server:
+    build:
+      context: .
+      dockerfile: educlaw-server/Dockerfile
+    image: educlaw-server:latest
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - LLM_BASE_URL=${LLM_BASE_URL}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_MODEL=${LLM_MODEL}
+      - LLM_BASELINE_MODEL=${LLM_BASELINE_MODEL}
+      - MULTIMODAL_ADLER_MODEL=${MULTIMODAL_ADLER_MODEL:-kimi-k2.6}
+      - MULTIMODAL_CANDIDATE_MODEL=${MULTIMODAL_CANDIDATE_MODEL:-kimi-k2.6}
+      - MULTIMODAL_VALIDATION_MODEL=${MULTIMODAL_VALIDATION_MODEL:-kimi-k2.6}
+      - MULTIMODAL_RIA_MODEL=${MULTIMODAL_RIA_MODEL:-kimi-k2.6}
+      - MULTIMODAL_VISION_MODEL=${MULTIMODAL_VISION_MODEL:-kimi-k2.6}
+      - MULTIMODAL_MODEL_MAX_TOKENS=${MULTIMODAL_MODEL_MAX_TOKENS:-8192}
+      - MULTIMODAL_ASR_CHUNK_DURATION_MS=${MULTIMODAL_ASR_CHUNK_DURATION_MS:-1200000}
+      - MULTIMODAL_UPLOAD_MAX_MB=${MULTIMODAL_UPLOAD_MAX_MB:-1024}
+      - MULTIMODAL_SINGLE_PUT_MAX_MB=${MULTIMODAL_SINGLE_PUT_MAX_MB:-256}
+      - MULTIMODAL_MULTIPART_PART_MB=${MULTIMODAL_MULTIPART_PART_MB:-64}
+      - MEDIA_UPLOAD_TOKEN_SECRET=${MEDIA_UPLOAD_TOKEN_SECRET}
+      - MULTIMODAL_PIPELINE_RUNNER_ENABLED=${MULTIMODAL_PIPELINE_RUNNER_ENABLED:-true}
+      - MULTIMODAL_PIPELINE_RUNNER_POLL_INTERVAL_MS=${MULTIMODAL_PIPELINE_RUNNER_POLL_INTERVAL_MS:-3000}
+      - MULTIMODAL_PIPELINE_RUNNER_BATCH_LIMIT=${MULTIMODAL_PIPELINE_RUNNER_BATCH_LIMIT:-8}
+      - MULTIMODAL_PIPELINE_RUNNER_CONCURRENCY=${MULTIMODAL_PIPELINE_RUNNER_CONCURRENCY:-2}
+      - INTERNAL_WORKER_TOKENS=${INTERNAL_WORKER_TOKENS}
+      - OBJECT_STORAGE_ENDPOINT=${OBJECT_STORAGE_ENDPOINT:-http://eduskill.localhost:9000}
+      - OBJECT_STORAGE_REGION=${OBJECT_STORAGE_REGION:-us-east-1}
+      - OBJECT_STORAGE_BUCKET=${OBJECT_STORAGE_BUCKET:-educlaw-media}
+      - OBJECT_STORAGE_ACCESS_KEY_ID=${MINIO_ROOT_USER:-educlawlocal}
+      - OBJECT_STORAGE_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD:-educlaw-local-minio-password}
+      - OBJECT_STORAGE_FORCE_PATH_STYLE=true
+      - OBJECT_STORAGE_SIGNED_URL_TTL_SECONDS=${OBJECT_STORAGE_SIGNED_URL_TTL_SECONDS:-300}
+      - APP_ORIGIN=${APP_ORIGIN:-http://eduskill.localhost}
+      - PORT=3000
+    depends_on:
+      educlaw-db-init:
+        condition: service_completed_successfully
+      educlaw-minio-init:
+        condition: service_completed_successfully
+    extra_hosts:
+      - "eduskill.localhost:host-gateway"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/readyz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+    networks:
+      default: {}
+      auth-net:
+        aliases:
+          - educlaw-server
+
+  educlaw-web:
+    build:
+      context: .
+      dockerfile: educlaw-web/Dockerfile
+    image: educlaw-web:latest
+    environment:
+      - API_UPSTREAM=http://educlaw-server:3000
+      - AUTH_UPSTREAM=${AUTH_UPSTREAM:-http://auth-backend:3000}
+    depends_on:
+      educlaw-server:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      default: {}
+      auth-net:
+        aliases:
+          - educlaw-web
+
+  educlaw-minio:
+    image: quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-educlawlocal}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-educlaw-local-minio-password}
+      - MINIO_API_CORS_ALLOW_ORIGIN=${APP_ORIGIN:-http://eduskill.localhost}
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  educlaw-minio-init:
+    image: quay.io/minio/mc:RELEASE.2025-04-16T18-13-26Z
+    depends_on:
+      educlaw-minio:
+        condition: service_healthy
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        mc alias set local http://educlaw-minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}"
+        mc mb --ignore-existing "local/$${OBJECT_STORAGE_BUCKET}"
+        mc anonymous set none "local/$${OBJECT_STORAGE_BUCKET}"
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-educlawlocal}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-educlaw-local-minio-password}
+      - OBJECT_STORAGE_BUCKET=${OBJECT_STORAGE_BUCKET:-educlaw-media}
+    restart: "no"
+
+  educlaw-media-quality-worker:
+    build:
+      context: .
+      dockerfile: python/media_worker/Dockerfile
+    image: educlaw-media-worker:latest
+    entrypoint: ["/bin/sh", "-ec"]
+    command: ["export MEDIA_WORKER_IDENTITY=quality-$${HOSTNAME}; exec educlaw-media-worker"]
+    environment:
+      - MEDIA_WORKER_BASE_URL=http://educlaw-server:3000/api
+      - MEDIA_WORKER_SERVICE_TOKEN=${MEDIA_WORKER_SERVICE_TOKEN}
+      - MEDIA_WORKER_EXECUTOR_MODE=media_quality_check
+      - MEDIA_WORKER_MAX_DURATION_MS=${MEDIA_WORKER_MAX_DURATION_MS:-43200000}
+      - MEDIA_WORKER_HEARTBEAT_INTERVAL_SECONDS=${MEDIA_WORKER_HEARTBEAT_INTERVAL_SECONDS:-15}
+      - MEDIA_WORKER_POLL_INTERVAL_SECONDS=${MEDIA_WORKER_POLL_INTERVAL_SECONDS:-2}
+      - MEDIA_WORKER_MAX_IDLE_POLL_INTERVAL_SECONDS=${MEDIA_WORKER_MAX_IDLE_POLL_INTERVAL_SECONDS:-30}
+      - MEDIA_WORKER_REQUEST_TIMEOUT_SECONDS=${MEDIA_WORKER_REQUEST_TIMEOUT_SECONDS:-15}
+    depends_on:
+      educlaw-server:
+        condition: service_healthy
+      educlaw-minio-init:
+        condition: service_completed_successfully
+    extra_hosts:
+      - "eduskill.localhost:host-gateway"
+    deploy:
+      replicas: 2
+    restart: unless-stopped
+
+  educlaw-media-distillation-worker:
+    build:
+      context: .
+      dockerfile: python/media_worker/Dockerfile
+    image: educlaw-media-worker:latest
+    entrypoint: ["/bin/sh", "-ec"]
+    command: ["export MEDIA_WORKER_IDENTITY=distillation-$${HOSTNAME}; exec educlaw-media-worker"]
+    environment:
+      - MEDIA_WORKER_BASE_URL=http://educlaw-server:3000/api
+      - MEDIA_WORKER_SERVICE_TOKEN=${MEDIA_WORKER_SERVICE_TOKEN}
+      - MEDIA_WORKER_EXECUTOR_MODE=distillation
+      - MEDIA_WORKER_MAX_DURATION_MS=${MEDIA_WORKER_MAX_DURATION_MS:-43200000}
+      - MEDIA_WORKER_HEARTBEAT_INTERVAL_SECONDS=${MEDIA_WORKER_HEARTBEAT_INTERVAL_SECONDS:-15}
+      - MEDIA_WORKER_POLL_INTERVAL_SECONDS=${MEDIA_WORKER_POLL_INTERVAL_SECONDS:-2}
+      - MEDIA_WORKER_MAX_IDLE_POLL_INTERVAL_SECONDS=${MEDIA_WORKER_MAX_IDLE_POLL_INTERVAL_SECONDS:-30}
+      - MEDIA_WORKER_REQUEST_TIMEOUT_SECONDS=${MEDIA_WORKER_REQUEST_TIMEOUT_SECONDS:-15}
+      - MEDIA_WORKER_ASR_MODEL=${MEDIA_WORKER_ASR_MODEL:-small}
+      - MEDIA_WORKER_ASR_MANIFEST_MODEL_ID=${MEDIA_WORKER_ASR_MANIFEST_MODEL_ID:-faster-whisper-small}
+      - MEDIA_WORKER_ASR_DEVICE=${MEDIA_WORKER_ASR_DEVICE:-cpu}
+      - MEDIA_WORKER_ASR_COMPUTE_TYPE=${MEDIA_WORKER_ASR_COMPUTE_TYPE:-int8}
+      - MEDIA_WORKER_ASR_BEAM_SIZE=${MEDIA_WORKER_ASR_BEAM_SIZE:-3}
+    depends_on:
+      educlaw-server:
+        condition: service_healthy
+      educlaw-minio-init:
+        condition: service_completed_successfully
+    extra_hosts:
+      - "eduskill.localhost:host-gateway"
+    deploy:
+      replicas: 2
+    restart: unless-stopped
+
+networks:
+  auth-net:
+    name: ${AUTH_NETWORK_NAME:-auth-service_internal-net}
+    external: true
+
+volumes:
+  postgres-data:
+  minio-data:

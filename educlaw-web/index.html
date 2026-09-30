@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-CN" class="light">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/logo.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EduSkill</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      try {
+        const savedTheme = localStorage.getItem('educlaw-theme');
+        const useDark = savedTheme === 'dark'
+          || (savedTheme === 'system'
+            && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.classList.toggle('dark', useDark);
+        document.documentElement.classList.toggle('light', !useDark);
+      } catch {
+        document.documentElement.classList.add('light');
+      }
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

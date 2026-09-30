@@ -1,0 +1,662 @@
+.skill-main-stage.is-repository {
+  container-name: skill-repository-stage;
+  container-type: inline-size;
+  overflow-y: auto;
+}
+.skill-repository {
+  width: min(1080px, 100%);
+  min-height: 100%;
+  margin: 0 auto;
+  padding: 36px 44px 52px;
+}
+.skill-repository-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 22px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 25px;
+}
+.skill-repository-header h1 {
+  margin: 6px 0 5px;
+  font-size: 23px;
+  font-weight: 620;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+.skill-repository-header p {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: var(--workspace-text-xs);
+}
+.skill-repository-tabs {
+  display: flex;
+  gap: 20px;
+  margin-top: 20px;
+  border-bottom: 1px solid var(--border);
+}
+.skill-repository-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  padding: 10px 1px 9px;
+  color: var(--muted-foreground);
+  font-size: var(--workspace-text-xs);
+  cursor: pointer;
+}
+.skill-repository-tabs button:hover {
+  color: var(--foreground);
+}
+.skill-repository-tabs button.is-active {
+  border-bottom-color: var(--primary);
+  color: var(--foreground);
+  font-weight: 620;
+}
+.skill-repository-tabs span {
+  display: inline-grid;
+  min-width: 18px;
+  height: 18px;
+  place-items: center;
+  border-radius: 99px;
+  background: var(--muted);
+  padding: 0 5px;
+  color: var(--muted-foreground);
+  font-size: var(--workspace-text-xs);
+}
+.skill-repository-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 18px 0 14px;
+}
+.skill-repository-search {
+  display: flex;
+  width: min(440px, 100%);
+  height: 40px;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--input);
+  border-radius: 9px;
+  background: var(--card);
+  padding: 0 10px;
+  color: var(--muted-foreground);
+}
+.skill-repository-search:focus-within {
+  border-color: color-mix(in srgb, var(--primary) 34%, var(--border));
+  box-shadow: 0 0 0 3px var(--ring);
+}
+.skill-repository-search input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--workspace-text-xs);
+}
+.skill-repository-manage {
+  display: inline-flex;
+  height: 40px;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  padding: 0 10px;
+  color: var(--muted-foreground);
+  font-size: var(--workspace-text-xs);
+  cursor: pointer;
+}
+.skill-repository-manage:hover {
+  border-color: color-mix(in srgb, var(--primary) 25%, var(--border));
+  background: var(--skill-hover);
+  color: var(--primary);
+}
+.skill-repository-bulkbar {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  border: 1px solid color-mix(in srgb, var(--primary) 20%, var(--border));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--primary-soft) 40%, var(--card));
+  padding: 6px 8px 6px 11px;
+}
+.skill-repository-bulkbar > span {
+  flex: 1;
+  color: var(--muted-foreground);
+  font-size: var(--workspace-text-xs);
+}
+.skill-repository-bulkbar button {
+  display: inline-flex;
+  height: 28px;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  padding: 0 8px;
+  color: var(--foreground);
+  font-size: var(--workspace-text-xs);
+  cursor: pointer;
+}
+.skill-repository-bulkbar button:hover {
+  background: var(--skill-hover);
+}
+.skill-repository-bulkbar button.is-destructive {
+  background: color-mix(in srgb, var(--destructive) 10%, transparent);
+  color: var(--destructive);
+}
+.skill-repository-bulkbar button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.skill-repository-section {
+  margin-top: 6px;
+}
+.skill-repository-section-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  color: var(--muted-foreground);
+}
+.skill-repository-section-title h2 {
+  margin: 0;
+  color: var(--foreground);
+  font-size: var(--workspace-text-xs);
+  font-weight: 590;
+}
+.skill-repository-section-title span {
+  font-size: var(--workspace-text-xs);
+}
+.skill-repository-empty {
+  display: flex;
+  min-height: 156px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px dashed var(--border);
+  border-radius: var(--workspace-radius-lg);
+  background: color-mix(in srgb, var(--workspace-surface) 72%, transparent);
+  color: var(--muted-foreground);
+  font-size: var(--workspace-text-xs);
+}
+.skill-repository-card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  padding-top: 6px;
+}
+.skill-repository-card {
+  position: relative;
+  min-width: 0;
+  border: 1px solid var(--workspace-border);
+  border-radius: var(--workspace-radius-lg);
+  background: var(--workspace-surface);
+  box-shadow: 0 1px 2px rgb(24 33 45 / 4%);
+  isolation: isolate;
+  transition:
+    border-color var(--workspace-motion-base) ease,
+    box-shadow var(--workspace-motion-base) ease,
+    transform var(--workspace-motion-base) ease;
+}
+.skill-repository-card::before {
+  position: absolute;
+  z-index: 1;
+  top: -1px;
+  right: 20px;
+  left: 20px;
+  height: 2px;
+  border-radius: 0 0 2px 2px;
+  background: color-mix(in srgb, var(--workspace-primary) 22%, transparent);
+  content: '';
+  transition:
+    right var(--workspace-motion-base) ease,
+    left var(--workspace-motion-base) ease,
+    background var(--workspace-motion-base) ease;
+}
+.skill-repository-card:hover,
+.skill-repository-card:focus-within {
+  border-color: color-mix(
+    in srgb,
+    var(--workspace-primary) 30%,
+    var(--workspace-border)
+  );
+  box-shadow: 0 12px 30px rgb(24 33 45 / 8%);
+  transform: translateY(-2px);
+}
+.skill-repository-card:hover::before,
+.skill-repository-card:focus-within::before {
+  right: 0;
+  left: 0;
+  background: var(--workspace-primary);
+}
+.skill-repository-card.is-selected {
+  border-color: color-mix(
+    in srgb,
+    var(--workspace-primary) 58%,
+    var(--workspace-border)
+  );
+  background: color-mix(
+    in srgb,
+    var(--workspace-primary) 5%,
+    var(--workspace-surface)
+  );
+  box-shadow: 0 0 0 2px
+    color-mix(in srgb, var(--workspace-primary) 13%, transparent);
+}
+.skill-repository-card.is-selected::before {
+  right: 0;
+  left: 0;
+  background: var(--workspace-primary);
+}
+.skill-repository-card-main {
+  display: flex;
+  width: 100%;
+  min-height: 196px;
+  flex-direction: column;
+  border: 0;
+  background: transparent;
+  color: var(--foreground);
+  padding: 18px;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.skill-repository-card-main:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--workspace-focus) 28%, transparent);
+  outline-offset: -3px;
+  border-radius: calc(var(--workspace-radius-lg) - 1px);
+}
+.skill-repository-card-heading {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 10px;
+  padding-right: 38px;
+}
+.skill-repository-card-icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--workspace-primary) 16%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--workspace-primary) 8%, transparent);
+  color: var(--workspace-primary);
+}
+.skill-repository-card-status {
+  color: var(--workspace-muted);
+  font-size: var(--workspace-text-xs);
+  font-weight: 560;
+  letter-spacing: 0.02em;
+}
+.skill-repository-card-main > strong {
+  display: -webkit-box;
+  overflow: hidden;
+  margin-top: 15px;
+  color: var(--workspace-ink);
+  font-size: var(--workspace-text-md);
+  font-weight: 650;
+  letter-spacing: -0.012em;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.skill-repository-card-description {
+  display: -webkit-box;
+  min-height: 40px;
+  overflow: hidden;
+  margin-top: 7px;
+  color: var(--workspace-muted);
+  font-size: var(--workspace-text-sm);
+  line-height: 1.65;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.skill-repository-card-footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 17px;
+  border-top: 1px solid color-mix(in srgb, var(--workspace-border) 72%, transparent);
+}
+.skill-repository-card-footer time {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  color: var(--workspace-muted);
+  font-size: var(--workspace-text-xs);
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.skill-repository-card-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--workspace-primary);
+  font-size: var(--workspace-text-xs);
+  font-weight: 590;
+  white-space: nowrap;
+}
+.skill-repository-card-open svg {
+  transition: transform var(--workspace-motion-fast) ease;
+}
+.skill-repository-card:hover .skill-repository-card-open svg,
+.skill-repository-card-main:focus-visible .skill-repository-card-open svg {
+  transform: translate(1px, -1px);
+}
+.skill-repository-card-menu,
+.skill-repository-card-checkbox {
+  position: absolute;
+  z-index: 3;
+  top: 13px;
+  right: 13px;
+}
+.skill-repository-card-menu > button,
+.skill-repository-card-checkbox {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--workspace-muted);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.skill-repository-card-menu > button:hover,
+.skill-repository-card-menu > button:focus-visible,
+.skill-repository-card-checkbox:hover {
+  background: color-mix(in srgb, var(--workspace-primary) 8%, transparent);
+  color: var(--workspace-primary);
+}
+.skill-repository-card-menu > button:focus-visible {
+  outline: 2px solid var(--workspace-focus);
+  outline-offset: 1px;
+}
+.skill-repository-card-checkbox input {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--workspace-primary);
+  cursor: pointer;
+}
+.skill-repository-card-menu > div {
+  position: absolute;
+  z-index: 12;
+  top: 43px;
+  right: 0;
+  width: 144px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--workspace-surface);
+  padding: 4px;
+  box-shadow: var(--shadow-lg);
+}
+.skill-repository-card-menu > div button {
+  display: flex;
+  width: 100%;
+  min-height: 36px;
+  align-items: center;
+  gap: 7px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  padding: 0 8px;
+  color: var(--destructive);
+  font-size: var(--workspace-text-xs);
+  cursor: pointer;
+}
+.skill-repository-card-menu > div button:hover,
+.skill-repository-card-menu > div button:focus-visible {
+  background: color-mix(in srgb, var(--destructive) 9%, transparent);
+}
+.skill-repository-card.is-draft::before {
+  background: color-mix(in srgb, var(--workspace-evidence) 22%, transparent);
+}
+.skill-repository-card.is-draft:hover::before,
+.skill-repository-card.is-draft:focus-within::before {
+  background: var(--workspace-evidence);
+}
+.skill-repository-card.is-draft .skill-repository-card-icon {
+  border-color: color-mix(in srgb, var(--workspace-evidence) 16%, transparent);
+  background: color-mix(in srgb, var(--workspace-evidence) 8%, transparent);
+  color: var(--workspace-evidence);
+}
+.skill-repository-card.is-draft .skill-repository-card-open {
+  color: var(--workspace-evidence);
+}
+.skill-repository-pagination {
+  display: flex;
+  min-height: 46px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.skill-repository-pagination button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--card);
+  color: var(--foreground);
+  cursor: pointer;
+}
+.skill-repository-pagination button:hover:not(:disabled) {
+  background: var(--skill-hover);
+  color: var(--primary);
+}
+.skill-repository-pagination button:disabled {
+  color: var(--muted-foreground);
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.skill-repository-pagination span {
+  color: var(--muted-foreground);
+  font-size: var(--workspace-text-xs);
+  font-variant-numeric: tabular-nums;
+}
+.skill-delete-dialog-backdrop {
+  position: fixed;
+  z-index: 90;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, #000 30%, transparent);
+  padding: 20px;
+  backdrop-filter: blur(3px);
+}
+.skill-delete-dialog {
+  width: min(430px, 100%);
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  background: var(--card);
+  padding: 18px;
+  box-shadow: var(--shadow-lg);
+}
+.skill-delete-dialog > header {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+}
+.skill-delete-dialog-icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  place-items: center;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--destructive) 10%, transparent);
+  color: var(--destructive);
+}
+.skill-delete-dialog header > div {
+  min-width: 0;
+  flex: 1;
+}
+.skill-delete-dialog h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 620;
+}
+.skill-delete-dialog header p {
+  margin: 5px 0 0;
+  color: var(--muted-foreground);
+  font-size: var(--workspace-text-xs);
+  line-height: 1.6;
+}
+.skill-delete-dialog header > button {
+  display: grid;
+  width: 27px;
+  height: 27px;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+.skill-delete-dialog-summary {
+  margin-top: 16px;
+  border-radius: 10px;
+  background: var(--muted);
+  padding: 11px 12px;
+}
+.skill-delete-dialog-summary strong {
+  font-size: var(--workspace-text-xs);
+}
+.skill-delete-dialog-summary ul {
+  margin: 8px 0 0;
+  padding-left: 17px;
+  color: var(--muted-foreground);
+  font-size: var(--workspace-text-xs);
+  line-height: 1.7;
+}
+.skill-delete-dialog-summary small {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted-foreground);
+  font-size: var(--workspace-text-xs);
+}
+.skill-delete-dialog-error {
+  margin: 10px 0 0;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--destructive) 9%, transparent);
+  padding: 8px 10px;
+  color: var(--destructive);
+  font-size: var(--workspace-text-xs);
+}
+.skill-delete-dialog > footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 17px;
+}
+.skill-delete-dialog > footer button {
+  display: inline-flex;
+  min-width: 72px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--foreground);
+  font-size: var(--workspace-text-xs);
+  cursor: pointer;
+}
+.skill-delete-dialog > footer button.is-destructive {
+  border-color: var(--destructive);
+  background: var(--destructive);
+  color: var(--destructive-foreground);
+}
+.skill-delete-dialog button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.skill-delete-dialog .is-spinning {
+  animation: spin 900ms linear infinite;
+}
+
+@container skill-repository-stage (max-width: 900px) {
+  .skill-repository-card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container skill-repository-stage (max-width: 590px) {
+  .skill-repository-card-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 620px) {
+  .skill-repository {
+    padding: 24px 10px 38px;
+  }
+  .skill-repository-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .skill-repository-header .skill-primary-button {
+    align-self: flex-start;
+  }
+  .skill-repository-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .skill-repository-search {
+    width: 100%;
+  }
+  .skill-repository-manage {
+    align-self: flex-end;
+    margin-left: 0;
+  }
+  .skill-repository-bulkbar {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .skill-repository-bulkbar > span {
+    flex-basis: 100%;
+    order: -1;
+  }
+  .skill-repository-card-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+  .skill-repository-card-main {
+    min-height: 184px;
+    padding: 14px;
+  }
+  .skill-delete-dialog-backdrop {
+    align-items: end;
+    padding: 10px;
+  }
+  .skill-delete-dialog {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skill-repository-card,
+  .skill-repository-card::before,
+  .skill-repository-card-open svg {
+    transition-duration: 0s;
+  }
+  .skill-repository-card:hover,
+  .skill-repository-card:focus-within {
+    transform: none;
+  }
+}

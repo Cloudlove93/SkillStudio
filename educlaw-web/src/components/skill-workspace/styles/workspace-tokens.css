@@ -1,0 +1,46 @@
+.skill-workspace-root {
+  --workspace-font-ui:
+    'PingFang SC', 'Microsoft YaHei UI', 'Hiragino Sans GB', sans-serif;
+  --workspace-font-mono: 'SFMono-Regular', 'Cascadia Code', Consolas, monospace;
+  --workspace-canvas: #f4f6f5;
+  --workspace-surface: #ffffff;
+  --workspace-ink: #18212d;
+  --workspace-muted: #66727e;
+  --workspace-primary: #4658c9;
+  --workspace-focus: #4658c9;
+  --workspace-evidence: #28766f;
+  --workspace-warning: #b7652e;
+  --workspace-danger: #c24141;
+  --workspace-border: #dde2e1;
+  --workspace-text-xs: 12px;
+  --workspace-text-sm: 13px;
+  --workspace-text-md: 15px;
+  --workspace-text-lg: 18px;
+  --workspace-text-xl: 24px;
+  --workspace-space-1: 4px;
+  --workspace-space-2: 8px;
+  --workspace-space-3: 12px;
+  --workspace-space-4: 16px;
+  --workspace-space-6: 24px;
+  --workspace-space-8: 32px;
+  --workspace-radius-sm: 6px;
+  --workspace-radius-md: 8px;
+  --workspace-radius-lg: 12px;
+  --workspace-motion-fast: 120ms;
+  --workspace-motion-base: 180ms;
+  font-family: var(--workspace-font-ui);
+  font-synthesis: none;
+}
+
+.dark .skill-workspace-root {
+  --workspace-canvas: #111717;
+  --workspace-surface: #171e20;
+  --workspace-ink: #edf2f1;
+  --workspace-muted: #a9b4b4;
+  --workspace-primary: #9ba8ff;
+  --workspace-focus: #b7c0ff;
+  --workspace-evidence: #67bdb4;
+  --workspace-warning: #e2a070;
+  --workspace-danger: #f08181;
+  --workspace-border: #2d3839;
+}

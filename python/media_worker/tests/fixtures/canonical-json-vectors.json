@@ -1,0 +1,48 @@
+[
+  {
+    "name": "mixed_unicode",
+    "input": {
+      "message": "无音轨",
+      "emoji": "🎓",
+      "nested": {
+        "z": null,
+        "a": ["ASCII", "中文", 1, true]
+      },
+      "ascii": "plain"
+    },
+    "canonical": "{\"ascii\":\"plain\",\"emoji\":\"🎓\",\"message\":\"无音轨\",\"nested\":{\"a\":[\"ASCII\",\"中文\",1,true],\"z\":null}}",
+    "sha256": "6285e88321bd8e2bf0b0a8632b0c75dbe2173e286fe054140b0bf991864d4fe1"
+  },
+  {
+    "name": "array_objects",
+    "input": {
+      "items": [
+        {
+          "name": "🙂",
+          "value": 1
+        },
+        {
+          "name": "β",
+          "value": null
+        }
+      ],
+      "label": "课程",
+      "empty": []
+    },
+    "canonical": "{\"empty\":[],\"items\":[{\"name\":\"🙂\",\"value\":1},{\"name\":\"β\",\"value\":null}],\"label\":\"课程\"}",
+    "sha256": "960231e1b710685f33775b7d8b0b8f48f19c14e683f94972690cff31e38534fe"
+  },
+  {
+    "name": "ecmascript_numbers",
+    "input": {
+      "zero": 0.0,
+      "tiny": 9.658823375806408e-05,
+      "micro": 1e-7,
+      "threshold": 1e-6,
+      "large": 1e21,
+      "negativeZero": -0.0
+    },
+    "canonical": "{\"large\":1e+21,\"micro\":1e-7,\"negativeZero\":0,\"threshold\":0.000001,\"tiny\":0.00009658823375806408,\"zero\":0}",
+    "sha256": "98444a037e735a1b294d25aa9f83f7174687991ec252c76c2276e78a88b146fb"
+  }
+]

@@ -1,0 +1,10 @@
+packages:
+  - educlaw-shared
+  - educlaw-server
+  - educlaw-web
+  - openagent
+allowBuilds:
+  esbuild: true
+overrides:
+  nanoid: 3.3.18
+  postcss: 8.5.18

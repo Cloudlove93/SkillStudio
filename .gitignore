@@ -1,0 +1,57 @@
+./educlaw-server/data/agents.json
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+educlaw-server/dist/
+educlaw-server/public/
+
+# Environment
+.env
+.env.local
+.env.*.local
+.env.development
+.env.test
+.env.docker
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+*.tsbuildinfo
+
+# Claude
+.claude/
+CLAUDE.md
+
+# Local agent and diagnostic artifacts
+.codex_tmp/
+.runlogs/
+.superpowers/
+educlaw-web/.codex_tmp/
+_q.sql
+-version
+
+# Python worker local environment
+python/media_worker/.venv/
+python/media_worker/-version
+
+# Local planning artifacts
+docs/superpowers/*
+!docs/superpowers/specs/
+docs/superpowers/specs/*
+!docs/superpowers/specs/2026-08-14-multimodal-skill-pack-design.md
+!docs/superpowers/plans/
+docs/superpowers/plans/*
+!docs/superpowers/plans/2026-08-14-multimodal-skill-pack.md

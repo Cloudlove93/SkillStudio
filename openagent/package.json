@@ -1,0 +1,60 @@
+{
+  "name": "@openagent/core",
+  "version": "1.0.0",
+  "description": "Framework-agnostic runtime primitives for OpenAgent chat transports and message handling.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./messages": {
+      "types": "./dist/messages.d.ts",
+      "default": "./dist/messages.js"
+    },
+    "./runtime": {
+      "types": "./dist/runtime.d.ts",
+      "default": "./dist/runtime.js"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "default": "./dist/types.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "keywords": [
+    "agent",
+    "runtime",
+    "ai-sdk",
+    "chat"
+  ],
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "peerDependencies": {
+    "ai": "^6.0.116"
+  },
+  "peerDependenciesMeta": {
+    "ai": {
+      "optional": false
+    }
+  },
+  "scripts": {
+    "build": "node -e \"const fs=require('node:fs'); fs.rmSync('dist',{recursive:true,force:true}); fs.rmSync('node_modules/.tmp/tsconfig.tsbuildinfo',{force:true}); fs.mkdirSync('node_modules/.tmp',{recursive:true})\" && tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "ai": "^6.0.116",
+    "typescript": "^5.9.3"
+  }
+}
