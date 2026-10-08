@@ -4,6 +4,19 @@
 
 当前产品定义、功能地图、核心流程、架构与实现状态边界，见 [SkillStudio 平台说明与功能地图](docs/EDUSKILL_PLATFORM_OVERVIEW.md) 与 [问题定义（5W1H）](docs/requirements/problem_definition.md)。
 
+## 第 2 周课程提交材料
+
+- [功能需求规格说明书](docs/requirements/functional_spec.md)：用户角色、功能范围、业务规则、验收场景及代码与测试追踪。
+- [非功能需求规格说明书](docs/requirements/nonfunctional_spec.md)：安全、可靠性、性能、易用性、部署与质量验证要求。
+
+两份材料依据现有成果整理，状态为待教师评审的提交稿；“已有实现”和历史测试记录不代表当前版本已经通过验收。
+
+## 第 3 周课程材料
+
+- [用户故事与验收条件](docs/requirements/user_stories.md)：20 个用户故事、优先级、需求关联、验收条件及建议演示顺序。
+
+当前仅补充用户故事材料；原型展示、技术方案调研汇总和教师确认需另行完成。
+
 ## 目录结构（课程作业规范映射）
 
 | 课程规范目录 | 仓库内实现 | 说明 |
