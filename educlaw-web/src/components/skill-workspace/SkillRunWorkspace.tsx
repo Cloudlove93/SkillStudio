@@ -81,11 +81,13 @@ export function SkillRunWorkspace({
   const [thinkingPreference, setThinkingPreference] = useState(() =>
     readThinkingPreference(),
   );
+  const [historyLoading, setHistoryLoading] = useState(false);
   const threadIdRef = useRef<string | null>(null);
   const messageListRef = useRef<HTMLDivElement>(null);
   const hydrateRequestRef = useRef(0);
   const handledRerunRef = useRef<string | null>(null);
   const activeRequestRef = useRef(0);
+  const sendingRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const streamBufferRef = useRef<
     ReturnType<typeof createSkillStreamBuffer> | null
@@ -103,22 +105,24 @@ export function SkillRunWorkspace({
   );
 
   useEffect(() => {
+    const previousThreadId = threadIdRef.current;
+    if (previousThreadId === selectedThreadId) return;
     const requestNo = hydrateRequestRef.current + 1;
     hydrateRequestRef.current = requestNo;
     activeRequestRef.current += 1;
+    sendingRef.current = false;
     streamBufferRef.current?.dispose();
     streamBufferRef.current = null;
     abortControllerRef.current?.abort();
     abortControllerRef.current = null;
-    const previousThreadId = threadIdRef.current;
     threadIdRef.current = selectedThreadId;
     if (!selectedThreadId) {
+      setHistoryLoading(false);
       dispatch({ type: 'reset' });
       return;
     }
-    if (previousThreadId === selectedThreadId) {
-      return;
-    }
+    setHistoryLoading(true);
+    dispatch({ type: 'reset' });
     void liteApi
       .getArenaThreadDetail(token, packageId, selectedThreadId)
       .then((detail) => {
@@ -168,16 +172,24 @@ export function SkillRunWorkspace({
           }
         }
         dispatch({ type: 'hydrate', messages });
+        setHistoryLoading(false);
       })
       .catch(() => {
-        if (hydrateRequestRef.current === requestNo)
+        if (
+          hydrateRequestRef.current === requestNo &&
+          threadIdRef.current === selectedThreadId
+        ) {
+          setHistoryLoading(false);
           dispatch({ type: 'error', message: '对话加载失败，请重试' });
+        }
       });
   }, [packageId, selectedThreadId, token, version?.versionNumber]);
 
   useEffect(
     () => () => {
+      hydrateRequestRef.current += 1;
       activeRequestRef.current += 1;
+      sendingRef.current = false;
       streamBufferRef.current?.dispose();
       abortControllerRef.current?.abort();
     },
@@ -187,7 +199,8 @@ export function SkillRunWorkspace({
   const sendContent = useCallback(
     async (rawContent: string) => {
       const content = rawContent.trim();
-      if (!content || state.busy || !version) return;
+      if (!content || state.busy || sendingRef.current || !version) return;
+      sendingRef.current = true;
       const requestNo = activeRequestRef.current + 1;
       activeRequestRef.current = requestNo;
       const controller = new AbortController();
@@ -282,22 +295,16 @@ export function SkillRunWorkspace({
             }
             if (event.event === 'side_done' && event.data.side === 'enhanced') {
               buffer?.flushNow();
-              finished = true;
-              if (event.data.ok) {
-                dispatch({
-                  type: 'done',
-                  content: event.data.content,
-                  reasoningContent: event.data.reasoningContent,
-                });
-                onCompleted?.();
-              } else {
+              if (!event.data.ok && !finished) {
+                finished = true;
                 dispatch({
                   type: 'error',
                   message: event.data.error || 'Skill 执行失败',
                 });
               }
             }
-            if (event.event === 'done') {
+            if (event.event === 'done' && !finished) {
+              buffer?.flushNow();
               onThreadUpdated?.(event.data.thread);
               const question = event.data.messages.find(
                 (message) => message.side === 'shared',
@@ -309,6 +316,12 @@ export function SkillRunWorkspace({
                 (message) => message.side === 'baseline',
               );
               if (question && answer) {
+                finished = true;
+                dispatch({
+                  type: 'done',
+                  content: answer.content,
+                  reasoningContent: answer.reasoningContent,
+                });
                 dispatch({
                   type: 'attach-provenance',
                   questionMessageId: question.id,
@@ -318,23 +331,49 @@ export function SkillRunWorkspace({
                   skillVersionNumber:
                     answer.skillVersionNumber ?? version.versionNumber,
                 });
+                onCompleted?.();
+              } else {
+                finished = true;
+                dispatch({
+                  type: 'error',
+                  message: '回答已结束，但服务端没有返回已保存的消息，请重试',
+                });
               }
             }
-            if (event.event === 'error') {
+            if (event.event === 'error' && !finished) {
               buffer?.flushNow();
               finished = true;
               dispatch({ type: 'error', message: event.data.error });
             }
-            if (event.event === 'stream_end' && !event.data.ok && !finished) {
+            if (event.event === 'stream_end' && !finished) {
               buffer?.flushNow();
-              dispatch({ type: 'error', message: 'Skill 执行中断，请重试' });
+              finished = true;
+              dispatch({
+                type: 'error',
+                message: event.data.ok
+                  ? '连接提前结束，回答未确认保存，请重试'
+                  : 'Skill 执行中断，请重试',
+              });
             }
           },
           controller.signal,
         );
+        if (
+          activeRequestRef.current === requestNo &&
+          !controller.signal.aborted &&
+          !finished
+        ) {
+          buffer?.flushNow();
+          finished = true;
+          dispatch({
+            type: 'error',
+            message: '连接提前结束，回答未确认保存，请重试',
+          });
+        }
       } catch (error) {
         buffer?.flushNow();
         if (activeRequestRef.current === requestNo) {
+          sendingRef.current = false;
           if (
             controller.signal.aborted ||
             (error instanceof Error && error.name === 'AbortError')
@@ -350,6 +389,7 @@ export function SkillRunWorkspace({
         }
       } finally {
         if (activeRequestRef.current === requestNo) {
+          sendingRef.current = false;
           if (streamBufferRef.current === buffer) {
             buffer?.dispose();
             streamBufferRef.current = null;
@@ -378,6 +418,7 @@ export function SkillRunWorkspace({
   const stop = useCallback(() => {
     streamBufferRef.current?.flushNow();
     activeRequestRef.current += 1;
+    sendingRef.current = false;
     abortControllerRef.current?.abort();
     abortControllerRef.current = null;
     streamBufferRef.current?.dispose();
@@ -412,7 +453,13 @@ export function SkillRunWorkspace({
           turns={conversationTurns}
         />
         <div ref={messageListRef} className="skill-flat-messages">
-          {state.messages.length === 0 &&
+          {historyLoading ? (
+            <div className="skill-flat-empty" role="status">
+              <Play size={24} />
+              <h2>正在加载历史对话</h2>
+              <p>正在读取已保存的消息，请稍候。</p>
+            </div>
+          ) : state.messages.length === 0 &&
           !state.streaming &&
           !state.streamingReasoning ? (
             <div className="skill-flat-empty">
