@@ -57,8 +57,8 @@ async function postMessage(thinkingEnabled: unknown) {
         }),
       },
     );
-    await response.text();
-    return response;
+    const body = await response.text();
+    return { response, body };
   } finally {
     await close(server);
   }
@@ -76,7 +76,7 @@ describe("POST /arena/threads/messages/stream", () => {
       yield { event: "stream_end", data: { ok: true } };
     });
 
-    const response = await postMessage(true);
+    const { response } = await postMessage(true);
 
     expect(response.status).toBe(200);
     expect(streamMessageMock).toHaveBeenCalledWith(
@@ -86,7 +86,9 @@ describe("POST /arena/threads/messages/stream", () => {
       undefined,
       "agent",
       true,
+      expect.any(AbortSignal),
     );
+    expect(streamMessageMock.mock.calls[0]?.[6].aborted).toBe(false);
   });
 
   it("does not coerce string values into an enabled thinking request", async () => {
@@ -97,5 +99,53 @@ describe("POST /arena/threads/messages/stream", () => {
     await postMessage("true");
 
     expect(streamMessageMock.mock.calls[0]?.[5]).toBe(false);
+  });
+
+  it("emits an unsuccessful stream_end after a service failure", async () => {
+    streamMessageMock.mockImplementation(async function* () {
+      yield { event: "phase", data: { label: "started" } };
+      throw new Error("controlled generation failure");
+    });
+
+    const { body } = await postMessage(false);
+
+    expect(body).toContain('event: error');
+    expect(body).toContain('data: {"ok":false}');
+    expect(body).not.toContain('data: {"ok":true}');
+  });
+
+  it("aborts the service signal when the streaming response is disconnected", async () => {
+    let serviceSignal: AbortSignal | undefined;
+    streamMessageMock.mockImplementation(async function* (...args: unknown[]) {
+      serviceSignal = args[6] as AbortSignal;
+      yield { event: "phase", data: { label: "started" } };
+      await new Promise<void>((resolve) => {
+        if (serviceSignal?.aborted) resolve();
+        else serviceSignal?.addEventListener("abort", () => resolve(), { once: true });
+      });
+      throw new Error("cancelled");
+    });
+    const { server, url } = await listen(await createApp());
+    const controller = new AbortController();
+    try {
+      const response = await fetch(
+        `${url}/arena/threads/messages/stream?threadId=thread-1`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content: "请回答", mode: "agent" }),
+          signal: controller.signal,
+        },
+      );
+      const reader = response.body?.getReader();
+      expect(reader).toBeDefined();
+      await reader!.read();
+      controller.abort();
+      await expect(reader!.read()).rejects.toMatchObject({ name: "AbortError" });
+      await vi.waitFor(() => expect(serviceSignal?.aborted).toBe(true));
+    } finally {
+      controller.abort();
+      await close(server);
+    }
   });
 });

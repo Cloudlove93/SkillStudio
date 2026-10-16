@@ -23,6 +23,10 @@ import { listAnswerOptimizationSummariesForThread } from "../services/answer-ski
 
 const router: import("express").Router = Router();
 
+function canWriteSse(res: Response): boolean {
+  return !res.destroyed && !res.writableEnded;
+}
+
 function parseArenaMode(value: unknown): ArenaMode {
   return value === "agent" || value === "baseline" ? value : "compare";
 }
@@ -141,6 +145,13 @@ router.post(ARENA_ROUTES.MESSAGE_STREAM, requireAuth, async (req: Request, res: 
     res,
     Number(process.env.ARENA_STREAM_HEARTBEAT_MS || "15000"),
   );
+  const abortController = new AbortController();
+  let streamFinished = false;
+  const abortDisconnectedClient = () => {
+    if (!streamFinished) abortController.abort();
+  };
+  req.once("aborted", abortDisconnectedClient);
+  res.once("close", abortDisconnectedClient);
   try {
     for await (const event of streamMessage(
       (req as AuthedRequest).userId || "",
@@ -149,17 +160,28 @@ router.post(ARENA_ROUTES.MESSAGE_STREAM, requireAuth, async (req: Request, res: 
       typeof req.body?.model === "string" ? req.body.model : undefined,
       parseArenaMode(req.body?.mode),
       req.body?.thinkingEnabled === true,
+      abortController.signal,
     )) {
-      writeSseEvent(res, event.event, event.data);
+      if (canWriteSse(res)) writeSseEvent(res, event.event, event.data);
     }
-    writeSseEvent(res, "stream_end", { ok: true });
+    if (canWriteSse(res)) writeSseEvent(res, "stream_end", { ok: true });
+    streamFinished = true;
   } catch (error) {
-    writeSseEvent(res, "error", {
-      error: error instanceof Error ? error.message : "发送消息失败",
-    });
+    if (canWriteSse(res)) {
+      writeSseEvent(res, "error", {
+        error: abortController.signal.aborted
+          ? "运行已取消"
+          : error instanceof Error ? error.message : "发送消息失败",
+      });
+      writeSseEvent(res, "stream_end", { ok: false });
+    }
+    streamFinished = true;
   } finally {
+    streamFinished = true;
+    req.removeListener("aborted", abortDisconnectedClient);
+    res.removeListener("close", abortDisconnectedClient);
     stopSseHeartbeat(heartbeat);
-    res.end();
+    if (canWriteSse(res)) res.end();
   }
 });
 

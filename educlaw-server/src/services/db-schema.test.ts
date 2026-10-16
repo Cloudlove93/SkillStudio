@@ -99,6 +99,22 @@ describe('db schema initialization', () => {
     );
   });
 
+  it('installs legacy composite keys before tables that reference them', async () => {
+    const { schemaStatements } = await import('./db-schema.js');
+    const normalized = schemaStatements.map((statement) => statement.toLowerCase());
+    const statementIndex = (needle: string) =>
+      normalized.findIndex((statement) => statement.includes(needle));
+
+    expect(statementIndex("conname = 'uq_agent_package_versions_id_package'"))
+      .toBeLessThan(statementIndex('create table if not exists agent_skill_versions'));
+    expect(statementIndex("conname = 'uq_agent_package_skills_id_package'"))
+      .toBeLessThan(statementIndex('create table if not exists agent_package_version_skills'));
+    expect(statementIndex("conname = 'uq_agent_skill_versions_id_skill_package'"))
+      .toBeLessThan(statementIndex('create table if not exists agent_package_version_skills'));
+    expect(statementIndex("conname = 'uq_arena_threads_id_package'"))
+      .toBeLessThan(statementIndex('create table if not exists arena_thread_variants'));
+  });
+
   it('defines API idempotency storage for action based writes', async () => {
     const { schemaStatements } = await import('./db-schema.js');
     const schemaSql = schemaStatements.join('\n').toLowerCase();

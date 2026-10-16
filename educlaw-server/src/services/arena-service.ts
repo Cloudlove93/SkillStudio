@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type {
   AgentPackageSnapshot,
   ArenaAnswerOptimizationUnavailableReason,
@@ -34,9 +34,20 @@ import type {
   DbRowThread,
 } from "../types.js";
 import { parseDbJson } from "../utils/json.js";
+import { config } from "../config.js";
+import { getLogger } from "../lib/request-context.js";
+import type { HarnessHistoryMessage, HarnessRunRequest } from "../harness/contracts.js";
+import { runPiAgent } from "../harness/pi-core-adapter.js";
+import {
+  PiRunBusyError,
+  PiRunCoordinator,
+  type PiRunLease,
+} from "../harness/pi-run-coordinator.js";
 
 export type ArenaStreamSide = "baseline" | "enhanced";
 export type ArenaMode = "compare" | "agent" | "baseline";
+
+const piRunCoordinator = new PiRunCoordinator(config.piHarnessMaxConcurrentRuns);
 
 export const MULTIMODAL_ARENA_CONFIG_VERSION = 'multimodal-arena-v1';
 export const MULTIMODAL_ARENA_CASE_VERSION = '2026-08-23';
@@ -967,6 +978,36 @@ function buildSkillArenaPrompt(snapshot: AgentPackageSnapshot) {
   ].join("\n");
 }
 
+function buildPiSkillArenaAgentInstructions(snapshot: AgentPackageSnapshot): string {
+  return [
+    "你是一个基于可复用 Markdown 技能工作的助手。",
+    "请严格遵循本轮固定 SkillVersion 中的 SKILL.md，不要自行扩展技能未描述的内容。",
+    "如果技能内容不足以支撑完整回复，请明确说明限制，不要编造流程。",
+    ...(snapshot.agentMd.trim() ? ["", "[agent.md]", snapshot.agentMd.trim()] : []),
+  ].join("\n");
+}
+
+function toPiHarnessHistory(context: ArenaSidePromptContext): HarnessHistoryMessage[] {
+  return context.historyMessages.map((message) => ({
+    role: message.role,
+    content: message.content,
+    createdAt: message.createdAt,
+  }));
+}
+
+function shouldUsePiHarness(input: {
+  arenaKind: ArenaKind;
+  surface: SkillArenaConfig["surface"] | undefined;
+  mode: ArenaMode;
+  side: ArenaStreamSide;
+}): boolean {
+  return config.piHarnessSkillRunEnabled
+    && input.arenaKind === "skill_arena"
+    && (input.surface === "run" || input.surface === "test")
+    && input.mode === "agent"
+    && input.side === "enhanced";
+}
+
 const BASELINE_SYSTEM_PROMPT = [
   "你是一个有帮助的助手。",
   "除非用户明确要求使用其他语言，否则请用中文回答。",
@@ -1797,6 +1838,7 @@ export async function* streamMessage(
   model?: string,
   mode: ArenaMode = "compare",
   thinkingEnabled = false,
+  signal?: AbortSignal,
 ): AsyncGenerator<ArenaChatStreamEvent> {
   const prompt = content.trim();
   if (!prompt) throw new Error("Message content is required");
@@ -1809,6 +1851,57 @@ export async function* streamMessage(
   yield { event: "phase", data: { label: "Loading conversation context" } };
   const detail = await getThreadDetail(userId, threadId);
   const runtime = await resolveThreadRuntime(userId, detail.thread);
+  const surface = detail.thread.skillArenaConfig?.surface;
+  const fixedPiSkillVersion = runtime.skillVersions?.enhanced ?? null;
+  const fixedPiSkill = runtime.enhancedSnapshot?.skills[0] ?? null;
+  const usePiHarnessForRequest = shouldUsePiHarness({
+    arenaKind: runtime.arenaKind,
+    surface,
+    mode,
+    side: "enhanced",
+  }) && fixedPiSkillVersion !== null
+    && fixedPiSkill !== null
+    && fixedPiSkill.skillMd.trim().length > 0;
+  const piHarnessRunId = usePiHarnessForRequest
+    ? `arena-${threadId}-${randomUUID()}`
+    : null;
+  const piHarnessLogger = piHarnessRunId && fixedPiSkillVersion
+    ? getLogger({
+        component: "arena-pi-harness",
+        runId: piHarnessRunId,
+        threadId: Number(threadId),
+        skillVersionId: fixedPiSkillVersion.id,
+      })
+    : null;
+  let piRunLease: PiRunLease | null = null;
+  if (piHarnessRunId && piHarnessLogger) {
+    piHarnessLogger.info({
+      event: "arena.pi_harness.path_selected",
+      surface,
+      mode,
+      maxConcurrentRuns: config.piHarnessMaxConcurrentRuns,
+    });
+    try {
+      piRunLease = piRunCoordinator.acquire({
+        runId: piHarnessRunId,
+        threadKey: `${userId}:${threadId}`,
+      });
+    } catch (error) {
+      if (error instanceof PiRunBusyError) {
+        piHarnessLogger.warn({
+          event: "arena.pi_harness.admission_rejected",
+          errorCode: error.code,
+          reason: error.reason,
+        });
+        throw new ArenaServiceError(error.message, 409, error.code, {
+          reason: error.reason,
+        });
+      }
+      throw error;
+    }
+  }
+
+  try {
   const now = new Date().toISOString();
 
   const sharedResult = await query<{ id: number }>(
@@ -1854,7 +1947,6 @@ export async function* streamMessage(
     ? model || detail.thread.model || resolveEnhancedModel(undefined)
     : null;
   const thinkingRequested = thinkingEnabled === true;
-  const surface = detail.thread.skillArenaConfig?.surface;
   const thinkingAllowed =
     mode === "agent" && (surface === "run" || surface === "test");
   const thinkingModel = runtime.arenaKind === "skill_arena"
@@ -1881,8 +1973,11 @@ export async function* streamMessage(
     baseline: "",
     enhanced: "",
   };
+  const sideResponseModels: Partial<Record<ArenaStreamSide, string>> = {};
+  let piHarnessFailure: Error | null = null;
+  let piSideCompleted = false;
 
-  const signal = () => {
+  const notifyQueue = () => {
     const current = wake;
     wake = null;
     current?.();
@@ -1890,33 +1985,94 @@ export async function* streamMessage(
 
   const push = (event: Exclude<ArenaChatStreamEvent, { event: "done" }>) => {
     queue.push(event);
-    signal();
+    notifyQueue();
   };
 
   const runSide = async (side: ArenaStreamSide, systemPrompt: string, userPrompt: string, sideModel?: string) => {
     let sideContent = "";
+    const usePiHarness = usePiHarnessForRequest && side === "enhanced";
     try {
       push({ event: "side_start", data: { side } });
-      for await (const part of streamTextParts({
-        model: sideModel,
-        systemPrompt,
-        userPrompt,
-        temperature: 0.3,
-        thinkingMode:
-          side === "enhanced" && thinkingActive ? "enabled" : "disabled",
-      })) {
-        if (part.type === "reasoning") {
-          if (side === "enhanced" && thinkingActive) {
-            sideReasoningContents[side] += part.delta;
-            push({
-              event: "reasoning_delta",
-              data: { side, delta: part.delta },
-            });
-          }
-          continue;
+      if (usePiHarness) {
+        const skillVersion = fixedPiSkillVersion;
+        const skill = fixedPiSkill;
+        const promptContext = skillArenaPromptContexts?.enhanced;
+        if (
+          !skillVersion
+          || !skill
+          || !promptContext
+          || !sideModel
+          || !piHarnessRunId
+          || !piHarnessLogger
+        ) {
+          throw new Error("Pi Skill Run context is incomplete");
         }
-        sideContent += part.delta;
-        push({ event: "delta", data: { side, delta: part.delta } });
+        const harnessRequest: HarnessRunRequest = {
+          runId: piHarnessRunId,
+          selectedSkill: {
+            versionId: skillVersion.id,
+            skillMd: skill.skillMd,
+          },
+          agentInstructions: buildPiSkillArenaAgentInstructions(
+            runtime.enhancedSnapshot || runtime.packageSnapshot,
+          ),
+          history: toPiHarnessHistory(promptContext),
+          currentInput: promptContext.question.content,
+          model: {
+            modelId: sideModel,
+            temperature: 0.3,
+            thinkingLevel: thinkingActive ? "medium" : "off",
+          },
+          signal,
+        };
+        piHarnessLogger.info({
+          event: "arena.pi_harness.dispatched",
+          surface,
+          historyMessageCount: harnessRequest.history.length,
+          requestedModelId: harnessRequest.model.modelId,
+        });
+        const result = await runPiAgent(harnessRequest, (event) => {
+          if (event.type === "text_delta") {
+            sideContent += event.delta;
+            push({ event: "delta", data: { side, delta: event.delta } });
+          }
+        });
+        piHarnessLogger[result.status === "completed" ? "info" : "warn"]({
+          event: "arena.pi_harness.finished",
+          status: result.status,
+          errorCode: result.error?.code ?? null,
+          responseModelId: result.responseModelId,
+          outputChars: result.evidence.outputChars,
+          cleanupCompleted: result.evidence.cleanupCompleted,
+        });
+        if (result.status !== "completed") {
+          throw new Error(result.error?.userMessage || "Pi Skill Run failed");
+        }
+        sideContent = result.text;
+        sideResponseModels[side] = result.responseModelId || result.requestedModelId;
+        piSideCompleted = true;
+      } else {
+        for await (const part of streamTextParts({
+          model: sideModel,
+          systemPrompt,
+          userPrompt,
+          temperature: 0.3,
+          thinkingMode:
+            side === "enhanced" && thinkingActive ? "enabled" : "disabled",
+        })) {
+          if (part.type === "reasoning") {
+            if (side === "enhanced" && thinkingActive) {
+              sideReasoningContents[side] += part.delta;
+              push({
+                event: "reasoning_delta",
+                data: { side, delta: part.delta },
+              });
+            }
+            continue;
+          }
+          sideContent += part.delta;
+          push({ event: "delta", data: { side, delta: part.delta } });
+        }
       }
       sideContent = sideContent.trim();
       sideContents[side] = sideContent;
@@ -1924,12 +2080,29 @@ export async function* streamMessage(
         side === "enhanced" && thinkingActive
           ? sideReasoningContents[side].trim() || null
           : null;
-      push({
-        event: "side_done",
-        data: { side, content: sideContent, reasoningContent, ok: true },
-      });
+      if (!usePiHarness) {
+        push({
+          event: "side_done",
+          data: { side, content: sideContent, reasoningContent, ok: true },
+        });
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Generation failed";
+      if (usePiHarness) {
+        piHarnessFailure = error instanceof Error ? error : new Error(message);
+        sideContents[side] = "";
+        push({
+          event: "side_done",
+          data: {
+            side,
+            content: "",
+            reasoningContent: null,
+            ok: false,
+            error: message,
+          },
+        });
+        return;
+      }
       const fallback = `Generation failed: ${message}`;
       sideContents[side] = fallback;
       const reasoningContent =
@@ -1948,7 +2121,7 @@ export async function* streamMessage(
       });
     } finally {
       pending -= 1;
-      signal();
+      notifyQueue();
     }
   };
 
@@ -1999,8 +2172,19 @@ export async function* streamMessage(
     yield queue.shift()!;
   }
 
+  if (piHarnessFailure) throw piHarnessFailure;
+  if (usePiHarnessForRequest && signal?.aborted) {
+    piHarnessLogger?.warn({
+      event: "arena.pi_harness.cancelled_before_persistence",
+      errorCode: "RUN_CANCELLED",
+    });
+    throw new ArenaServiceError("本次运行已取消。", 499, "RUN_CANCELLED");
+  }
+
   const savedAt = new Date().toISOString();
-  const assistantMessages = await withTransaction(async (client) => {
+  let assistantMessages: ArenaMessage[];
+  try {
+    assistantMessages = await withTransaction(async (client) => {
     const messages: ArenaMessage[] = [];
     let baselineAnswerMessageId: number | null = null;
     let enhancedAnswerMessageId: number | null = null;
@@ -2051,7 +2235,9 @@ export async function* streamMessage(
       }
       const recordedEnhancedContext = enhancedPromptContext
         || skillArenaPromptContexts?.enhanced;
-      const recordedEnhancedModel = enhancedModel || skillArenaModel;
+      const recordedEnhancedModel = sideResponseModels.enhanced
+        || enhancedModel
+        || skillArenaModel;
       if (!recordedEnhancedContext || !recordedEnhancedModel) {
         throw new Error("Enhanced answer provenance is unavailable");
       }
@@ -2101,7 +2287,41 @@ export async function* streamMessage(
       [savedAt, threadId, userId],
     );
     return messages;
-  });
+    });
+  } catch (error) {
+    if (usePiHarnessForRequest) {
+      piHarnessLogger?.error({
+        event: "arena.pi_harness.persistence_failed",
+        errorCode: "SAVE_FAILED",
+        errorName: error instanceof Error ? error.name : "UnknownError",
+      });
+      throw new ArenaServiceError(
+        "回答已生成，但保存失败，请重试。",
+        500,
+        "SAVE_FAILED",
+      );
+    }
+    throw error;
+  }
+
+  if (usePiHarnessForRequest) {
+    piHarnessLogger?.info({
+      event: "arena.pi_harness.persisted",
+      responseModelId: sideResponseModels.enhanced ?? null,
+      assistantMessageCount: assistantMessages.length,
+    });
+    if (piSideCompleted) {
+      yield {
+        event: "side_done",
+        data: {
+          side: "enhanced",
+          content: sideContents.enhanced,
+          reasoningContent: null,
+          ok: true,
+        },
+      };
+    }
+  }
 
   yield {
     event: "done",
@@ -2110,6 +2330,15 @@ export async function* streamMessage(
       messages: [shared, ...assistantMessages],
     },
   };
+  } finally {
+    if (piRunLease) {
+      piRunLease.release();
+      piHarnessLogger?.info({
+        event: "arena.pi_harness.lease_released",
+        activeRunCount: piRunCoordinator.snapshot().activeRunCount,
+      });
+    }
+  }
 }
 
 export async function sendMessage(

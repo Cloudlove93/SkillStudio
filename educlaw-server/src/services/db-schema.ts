@@ -25,7 +25,7 @@ const historicalSchemaStatements = [
       note text not null default '',
       created_at timestamptz not null,
       unique (package_id, version_number),
-      unique (id, package_id)
+      constraint uq_agent_package_versions_id_package unique (id, package_id)
     )
   `,
   `
@@ -33,6 +33,19 @@ const historicalSchemaStatements = [
   `,
   `
     alter table agent_package_versions add column if not exists note text not null default ''
+  `,
+  `
+    do $$ begin
+      if not exists (
+        select 1 from pg_constraint
+         where conname = 'uq_agent_package_versions_id_package'
+           and conrelid = 'agent_package_versions'::regclass
+      ) then
+        alter table agent_package_versions
+          add constraint uq_agent_package_versions_id_package
+          unique (id, package_id);
+      end if;
+    end $$
   `,
   `
     create table if not exists agent_package_skills (
@@ -51,13 +64,26 @@ const historicalSchemaStatements = [
       removed_by text,
       remove_reason text,
       unique (package_id, skill_uid),
-      unique (id, package_id),
+      constraint uq_agent_package_skills_id_package unique (id, package_id),
       check (
         (status = 'active' and removed_at is null and remove_reason is null)
         or
         (status = 'removed' and removed_at is not null and remove_reason is not null)
       )
     )
+  `,
+  `
+    do $$ begin
+      if not exists (
+        select 1 from pg_constraint
+         where conname = 'uq_agent_package_skills_id_package'
+           and conrelid = 'agent_package_skills'::regclass
+      ) then
+        alter table agent_package_skills
+          add constraint uq_agent_package_skills_id_package
+          unique (id, package_id);
+      end if;
+    end $$
   `,
   `
     create index if not exists idx_agent_package_skills_package_status
@@ -83,8 +109,8 @@ const historicalSchemaStatements = [
       restored_at timestamptz,
       restored_by text,
       unique (skill_id, version_number),
-      unique (id, skill_id),
-      unique (id, skill_id, package_id),
+      constraint uq_agent_skill_versions_id_skill unique (id, skill_id),
+      constraint uq_agent_skill_versions_id_skill_package unique (id, skill_id, package_id),
       foreign key (created_in_package_version_id, package_id)
         references agent_package_versions(id, package_id) on delete cascade,
       foreign key (based_on_version_id, skill_id)
@@ -95,6 +121,28 @@ const historicalSchemaStatements = [
         (status = 'discarded' and discarded_at is not null and discard_reason is not null)
       )
     )
+  `,
+  `
+    do $$ begin
+      if not exists (
+        select 1 from pg_constraint
+         where conname = 'uq_agent_skill_versions_id_skill'
+           and conrelid = 'agent_skill_versions'::regclass
+      ) then
+        alter table agent_skill_versions
+          add constraint uq_agent_skill_versions_id_skill
+          unique (id, skill_id);
+      end if;
+      if not exists (
+        select 1 from pg_constraint
+         where conname = 'uq_agent_skill_versions_id_skill_package'
+           and conrelid = 'agent_skill_versions'::regclass
+      ) then
+        alter table agent_skill_versions
+          add constraint uq_agent_skill_versions_id_skill_package
+          unique (id, skill_id, package_id);
+      end if;
+    end $$
   `,
   `
     create index if not exists idx_agent_skill_versions_skill_status_number
@@ -268,10 +316,23 @@ const historicalSchemaStatements = [
       arena_config_jsonb jsonb not null default '{}'::jsonb,
       created_at timestamptz not null,
       updated_at timestamptz not null,
-      unique (id, package_id),
+      constraint uq_arena_threads_id_package unique (id, package_id),
       foreign key (base_package_version_id, package_id)
         references agent_package_versions(id, package_id)
     )
+  `,
+  `
+    do $$ begin
+      if not exists (
+        select 1 from pg_constraint
+         where conname = 'uq_arena_threads_id_package'
+           and conrelid = 'arena_threads'::regclass
+      ) then
+        alter table arena_threads
+          add constraint uq_arena_threads_id_package
+          unique (id, package_id);
+      end if;
+    end $$
   `,
   `
     create index if not exists idx_arena_threads_user_id on arena_threads (user_id)

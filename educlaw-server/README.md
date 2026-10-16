@@ -41,6 +41,8 @@ pnpm format
 | `LLM_BASELINE_MODEL` | Arena baseline 模型 | 可选 |
 | `LLM_TIMEOUT_MS` | 模型调用超时 | `300000` |
 | `LLM_NETWORK_RETRIES` | 模型网络重试次数 | `2` |
+| `PI_HARNESS_SKILL_RUN_ENABLED` | Skill Run/Test 是否启用进程内 Pi Core Adapter | `false` |
+| `PI_HARNESS_MAX_CONCURRENT_RUNS` | 单个 Server 进程允许的并发 Pi Run/Test 数 | `4` |
 | `APP_ORIGIN` | 前端来源白名单 | `http://localhost:4173` |
 | `BODY_LIMIT` | 请求体大小限制 | `100mb` |
 | `UPLOAD_LIMIT_MB` | 上传文件大小限制 | `25` |

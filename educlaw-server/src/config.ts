@@ -131,6 +131,13 @@ export const config = {
   llmApiKey,
   llmModel: process.env.LLM_MODEL || "gpt-4.1-mini",
   llmNetworkRetries: readNumber("LLM_NETWORK_RETRIES", 2),
+  piHarnessSkillRunEnabled: readBoolean("PI_HARNESS_SKILL_RUN_ENABLED", false),
+  piHarnessMaxConcurrentRuns: readBoundedInteger(
+    "PI_HARNESS_MAX_CONCURRENT_RUNS",
+    4,
+    1,
+    32,
+  ),
   llmBaselineModel: process.env.LLM_BASELINE_MODEL || "",
   multimodalAdlerModel: process.env.MULTIMODAL_ADLER_MODEL || "",
   multimodalCandidateModel: process.env.MULTIMODAL_CANDIDATE_MODEL || "",

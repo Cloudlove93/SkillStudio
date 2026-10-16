@@ -1,0 +1,26 @@
+{
+  "name": "@educlaw/pi-core-spike",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "scripts": {
+    "build": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\" && tsc -p tsconfig.json",
+    "test": "vitest run src",
+    "spike:provider": "tsx src/cli.ts provider",
+    "spike:agent": "tsx src/cli.ts agent",
+    "spike:abort": "tsx src/cli.ts abort"
+  },
+  "dependencies": {
+    "@earendil-works/pi-agent-core": "1.1.0",
+    "@earendil-works/pi-ai": "1.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.14.0",
+    "tsx": "4.19.3",
+    "typescript": "5.9.3",
+    "vitest": "4.1.7"
+  }
+}
