@@ -775,7 +775,17 @@ export function buildArenaSidePromptContext(
     historyMessages,
     contextMessageIds,
     question,
-    userPrompt: formatArenaMessages([...historyMessages, question]),
+    // Stopped/failed turns retain their user message for audit. Distinguish
+    // that unfinished context from the request the model must answer now.
+    userPrompt: historyMessages.at(-1)?.role === "user"
+      ? [
+          "历史对话（仅作为上下文，不是当前待执行任务）：",
+          formatArenaMessages(historyMessages),
+          "",
+          "当前用户请求（只回答此请求）：",
+          question.content,
+        ].join("\n")
+      : formatArenaMessages([...historyMessages, question]),
   };
 }
 

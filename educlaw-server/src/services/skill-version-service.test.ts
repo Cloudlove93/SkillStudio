@@ -38,6 +38,19 @@ afterEach(() => {
 });
 
 describe('skill version service', () => {
+  it('returns the current package head independently of Skill creation history', async () => {
+    queryMock.mockImplementation(async (sql: string) => {
+      if (sql.includes('select * from agent_packages')) return { rows: [{ id: '7', current_version_id: '99' }] };
+      if (sql.includes('select * from agent_package_versions')) return { rows: [] };
+      if (sql.includes('select s.*')) return { rows: [{ id: '11', package_id: '7' }] };
+      if (sql.includes('select sv.*')) return { rows: [] };
+      if (sql.includes('select skill_version_id')) return { rows: [{ skill_version_id: '21' }] };
+      throw new Error(`Unexpected query: ${sql}`);
+    });
+    const service = await loadService();
+    const result = await service.listSkillVersions({ authUserId: 'u', packageId: '7', skillId: '11' });
+    expect(result).toMatchObject({ currentPackageVersionId: '99', currentVersionId: '21' });
+  });
   it('stores a user-facing Skill name without creating a new version', async () => {
     queryMock.mockImplementation(async (sql: string, params?: unknown[]) => {
       if (sql.startsWith('update agent_package_skills')) {

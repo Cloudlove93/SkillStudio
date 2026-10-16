@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPatch } from 'diff';
 import type { SkillVersionDetail } from '@educlaw/shared';
 import {
@@ -24,6 +24,10 @@ type Props = {
   packageId: string;
   versions: SkillVersionDetail[];
   currentVersionId: string | null;
+  currentPackageVersionId: string | null;
+  hasMore?: boolean;
+  loadingMore?: boolean;
+  onLoadMore?: () => Promise<void>;
   loading: boolean;
   onReload: () => Promise<void>;
   onVersionChanged: (message: string) => void;
@@ -32,6 +36,8 @@ type Props = {
 type PendingAction = {
   kind: 'rollback' | 'discard' | 'restore';
   version: SkillVersionDetail;
+  idempotencyKey?: string;
+  expectedPackageVersionId?: string | null;
 };
 
 const sourceLabels: Record<SkillVersionDetail['source'], string> = {
@@ -41,6 +47,7 @@ const sourceLabels: Record<SkillVersionDetail['source'], string> = {
   manual: '手动修改',
   interactive: '交互式优化',
   rollback: '版本回退',
+  distilled: '提炼生成',
 };
 
 const versionDateFormatter = new Intl.DateTimeFormat('zh-CN', {
@@ -54,6 +61,17 @@ export function SkillVersionWorkspace(props: Props) {
   const [compare, setCompare] = useState<SkillVersionDetail | null>(null);
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [mutating, setMutating] = useState(false);
+  const mutationLock = useRef(false);
+  const mounted = useRef(false);
+  const identity = JSON.stringify([props.token, props.packageId]);
+  const identityRef = useRef(identity);
+  identityRef.current = identity;
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const visible = useMemo(
     () => visibleSkillVersions(props.versions, includeDiscarded),
     [props.versions, includeDiscarded],
@@ -63,18 +81,23 @@ export function SkillVersionWorkspace(props: Props) {
     null;
 
   const mutate = async () => {
-    if (!pending) return;
+    if (!pending || mutationLock.current) return;
+    mutationLock.current = true;
     setMutating(true);
+    const currentRequest = () =>
+      mounted.current && identityRef.current === identity;
     try {
       if (pending.kind === 'rollback') {
-        if (!current) throw new Error('无法确认当前 Skill 版本，请刷新后重试');
+        if (!current || !pending.expectedPackageVersionId)
+          throw new Error('无法确认当前 Skill 版本，请刷新后重试');
         await liteApi.rollbackSkillVersion(props.token, props.packageId, {
           skillId: pending.version.skillId,
           versionId: pending.version.id,
-          expectedPackageVersionId: current.createdInPackageVersionId,
-          idempotencyKey: createRequestId('skill-rollback'),
+          expectedPackageVersionId: pending.expectedPackageVersionId,
+          idempotencyKey: pending.idempotencyKey!,
           note: `从 Skill v${pending.version.versionNumber} 创建回退版本`,
         });
+        if (!currentRequest()) return;
         props.onVersionChanged(
           `已基于 v${pending.version.versionNumber} 创建新的回退版本`,
         );
@@ -85,6 +108,7 @@ export function SkillVersionWorkspace(props: Props) {
           pending.version.id,
           '用户在版本管理中废弃',
         );
+        if (!currentRequest()) return;
         props.onVersionChanged(
           `Skill v${pending.version.versionNumber} 已废弃`,
         );
@@ -94,16 +118,28 @@ export function SkillVersionWorkspace(props: Props) {
           props.packageId,
           pending.version.id,
         );
+        if (!currentRequest()) return;
         props.onVersionChanged(
           `Skill v${pending.version.versionNumber} 已恢复`,
         );
       }
       await props.onReload();
+      if (!currentRequest()) return;
       setPending(null);
     } catch (error) {
+      if (!currentRequest()) return;
       toast.error(error instanceof Error ? error.message : '版本操作失败');
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        error.code === 'PACKAGE_VERSION_CONFLICT'
+      ) {
+        setPending(null);
+        await props.onReload();
+      }
     } finally {
-      setMutating(false);
+      mutationLock.current = false;
+      if (currentRequest()) setMutating(false);
     }
   };
 
@@ -156,6 +192,13 @@ export function SkillVersionWorkspace(props: Props) {
           />
           显示已废弃版本
         </label>
+        <button
+          className="skill-text-button"
+          disabled={props.loading || mutating}
+          onClick={() => void props.onReload()}
+        >
+          刷新版本
+        </button>
       </header>
       {props.loading ? (
         <div className="skill-version-loading">
@@ -211,7 +254,15 @@ export function SkillVersionWorkspace(props: Props) {
                   )}
                   {canRollbackSkillVersion(version, props.currentVersionId) && (
                     <button
-                      onClick={() => setPending({ kind: 'rollback', version })}
+                      onClick={() =>
+                        setPending({
+                          kind: 'rollback',
+                          version,
+                          idempotencyKey: createRequestId('skill-rollback'),
+                          expectedPackageVersionId:
+                            props.currentPackageVersionId,
+                        })
+                      }
                     >
                       <RotateCcw size={13} />
                       回退
@@ -237,6 +288,15 @@ export function SkillVersionWorkspace(props: Props) {
             );
           })}
         </div>
+      )}
+      {props.hasMore && !props.loading && (
+        <button
+          className="skill-secondary-button"
+          disabled={props.loadingMore}
+          onClick={() => void props.onLoadMore?.()}
+        >
+          {props.loadingMore ? '正在加载…' : '加载更多版本'}
+        </button>
       )}
       {preview && (
         <div className="skill-version-preview" role="dialog" aria-modal="true">

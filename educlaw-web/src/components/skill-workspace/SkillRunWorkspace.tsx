@@ -37,6 +37,7 @@ type Props = {
   onThreadCreated?: (thread: ArenaThread) => void;
   onThreadUpdated?: (thread: ArenaThread) => void;
   rerunRequest?: AnswerOptimizationRerunRequest | null;
+  onRerunHandled?: (requestId: string) => void;
 };
 
 export function SkillRunWorkspace({
@@ -52,6 +53,7 @@ export function SkillRunWorkspace({
   onThreadCreated,
   onThreadUpdated,
   rerunRequest,
+  onRerunHandled,
 }: Props) {
   const { state, dispatch, historyLoading, sendContent, stop, canSend } =
     useSkillRun({
@@ -70,6 +72,8 @@ export function SkillRunWorkspace({
   );
   const messageListRef = useRef<HTMLDivElement>(null);
   const handledRerunRef = useRef<string | null>(null);
+  const packageHeadId = Number(currentPackageVersionId);
+  const canOptimize = Number.isSafeInteger(packageHeadId) && packageHeadId > 0;
   const conversationTurns = useMemo(
     () =>
       collectConversationTurns(
@@ -107,6 +111,7 @@ export function SkillRunWorkspace({
       if (!current || !canSend()) return;
       handledRerunRef.current = rerunRequest.requestId;
       void sendContent(rerunRequest.selection.question, thinkingPreference);
+      onRerunHandled?.(rerunRequest.requestId);
     });
     return () => {
       current = false;
@@ -116,6 +121,7 @@ export function SkillRunWorkspace({
     historyLoading,
     purpose,
     rerunRequest,
+    onRerunHandled,
     sendContent,
     state.busy,
     thinkingPreference,
@@ -188,6 +194,7 @@ export function SkillRunWorkspace({
                           生成
                         </span>
                         <button
+                          disabled={!canOptimize}
                           onClick={() => {
                             const question = [...state.messages.slice(0, index)]
                               .reverse()
@@ -196,6 +203,7 @@ export function SkillRunWorkspace({
                               !message.questionMessageId ||
                               !message.threadId ||
                               !version ||
+                              !canOptimize ||
                               !question
                             )
                               return;
@@ -213,10 +221,7 @@ export function SkillRunWorkspace({
                               answerVersionNumber:
                                 message.skillVersionNumber ??
                                 version.versionNumber,
-                              currentPackageVersionId: Number(
-                                currentPackageVersionId ??
-                                  version.createdInPackageVersionId,
-                              ),
+                              currentPackageVersionId: packageHeadId,
                               question: question.content,
                               answer: message.content,
                               feedback: '',

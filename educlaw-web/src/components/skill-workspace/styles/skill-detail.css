@@ -560,12 +560,13 @@
 }
 .skill-workspace-topbar {
   display: flex;
+  flex-wrap: wrap;
   min-height: 48px;
-  flex: 0 0 48px;
+  flex: 0 0 auto;
   align-items: center;
   gap: 18px;
   border-bottom: 1px solid var(--border);
-  padding: 0 20px;
+  padding: 8px 20px;
 }
 .skill-pill-tabs {
   display: flex;

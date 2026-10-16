@@ -20,5 +20,5 @@ export function canRollbackSkillVersion(
   version: SkillVersionDetail,
   currentVersionId: string | null,
 ): boolean {
-  return version.id !== currentVersionId;
+  return version.id !== currentVersionId && version.status === 'active';
 }

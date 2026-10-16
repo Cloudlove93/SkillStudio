@@ -24,7 +24,9 @@ vi.mock('../lite/lite-rendering', () => ({
 }));
 import { SkillRunWorkspace } from './SkillRunWorkspace';
 import type { AnswerOptimizationRerunRequest } from './answer-optimization-selection';
-(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(
+  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 const thread = {
   id: 91,
   title: 'A',
@@ -569,6 +571,37 @@ describe('resumable Skill run lifecycle', () => {
         questionMessageId: 10,
         enhancedAnswerMessageId: 11,
       }),
+    );
+  });
+  it.each([undefined, '0', 'invalid'])(
+    'blocks answer optimization without a valid current package head (%s)',
+    async (head) => {
+      api.recoverArenaRun.mockResolvedValue({
+        detail: { thread, messages: [question, answer] },
+        run: null,
+      });
+      await render('91', false, { currentPackageVersionId: head });
+      const button = Array.from(container.querySelectorAll('button')).find(
+        (b) => b.textContent?.includes('改进这条回答'),
+      )!;
+      expect(button.disabled).toBe(true);
+      await act(async () => button.click());
+      expect(onOptimize).not.toHaveBeenCalled();
+    },
+  );
+  it('uses the actual package head for answer optimization instead of the Skill creation package', async () => {
+    api.recoverArenaRun.mockResolvedValue({
+      detail: { thread, messages: [question, answer] },
+      run: null,
+    });
+    await render('91', false, { currentPackageVersionId: '99' });
+    await act(async () =>
+      Array.from(container.querySelectorAll('button'))
+        .find((b) => b.textContent?.includes('改进这条回答'))!
+        .click(),
+    );
+    expect(onOptimize).toHaveBeenCalledWith(
+      expect.objectContaining({ currentPackageVersionId: 99 }),
     );
   });
   it('does not publish partial text as a saved assistant answer before terminal persistence', async () => {

@@ -190,6 +190,7 @@ export interface SkillVersionListResult {
   items: SkillVersionDetail[];
   nextCursor: string | null;
   currentVersionId: string | null;
+  currentPackageVersionId: string | null;
 }
 
 export type ArenaSide = "shared" | "baseline" | "enhanced";

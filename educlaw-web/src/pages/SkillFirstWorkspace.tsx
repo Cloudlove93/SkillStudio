@@ -14,7 +14,6 @@ import type {
   GuidedCreationDocument,
   GuidedCreationSession,
   GuidedCreationSessionDetail,
-  SkillVersionDetail,
 } from '@educlaw/shared';
 import { toast } from 'sonner';
 import { liteApi, type GuidedCreationSseEvent } from '../api/lite-api';
@@ -56,8 +55,13 @@ import type {
   AnswerOptimizationRerunRequest,
   AnswerOptimizationSelection,
 } from '../components/skill-workspace/answer-optimization-selection';
-import { isSkillConversationThread } from '../components/skill-workspace/skill-conversation-list';
+import {
+  getConversationSurface,
+  isSkillConversationThread,
+} from '../components/skill-workspace/skill-conversation-list';
 import { discoverActiveSkillRuns } from '../components/skill-workspace/discover-skill-runs';
+import { useSkillVersions } from '../components/skill-workspace/use-skill-versions';
+import { useSkillAnswerRerun } from '../components/skill-workspace/use-skill-answer-rerun';
 import {
   readSkillConversationId,
   writeSkillConversationSearch,
@@ -197,9 +201,6 @@ function SkillFirstWorkspaceContent() {
     Array<{ path: string; content: string }>
   >([]);
   const [error, setError] = useState<StreamError | null>(null);
-  const [versions, setVersions] = useState<SkillVersionDetail[]>([]);
-  const [currentVersionId, setCurrentVersionId] = useState<string | null>(null);
-  const [versionsLoading, setVersionsLoading] = useState(false);
   const [answerOptimization, setAnswerOptimization] =
     useState<AnswerOptimizationSelection | null>(null);
   const [answerRerunRequest, setAnswerRerunRequest] =
@@ -239,6 +240,16 @@ function SkillFirstWorkspaceContent() {
   const activeSkillKey = activeSkill
     ? `${activeSkill.packageId}:${activeSkill.skillId}`
     : null;
+  const {
+    versions,
+    currentVersionId,
+    currentPackageVersionId,
+    loading: versionsLoading,
+    loadingMore: versionsLoadingMore,
+    hasMore: versionsHasMore,
+    reload: loadVersions,
+    loadMore: loadMoreVersions,
+  } = useSkillVersions(token, activeSkill?.packageId, activeSkill?.skillId);
   const visiblePendingGuidedMessage =
     pendingGuidedMessage?.sessionId === selectedSessionId
       ? pendingGuidedMessage
@@ -285,6 +296,21 @@ function SkillFirstWorkspaceContent() {
       replaceWorkspaceRoute(view, skillKey, clearInspector);
     },
     [activeSkillKey, replaceWorkspaceRoute],
+  );
+
+  const handleAnswerRerun = useSkillAnswerRerun(
+    token,
+    activeSkillKey,
+    loadVersions,
+    (versionNumber, selection) => {
+      navigateWorkspaceView(selection.origin);
+      if (selection.origin !== 'arena') setSelectedConversationId(null);
+      setAnswerRerunRequest({
+        requestId: createRequestId('rerun'),
+        versionNumber,
+        selection,
+      });
+    },
   );
 
   const handleWorkspaceSearch = useCallback(
@@ -338,34 +364,6 @@ function SkillFirstWorkspaceContent() {
     },
     [openInspector],
   );
-
-  const loadVersions = useCallback(async () => {
-    if (!activeSkill?.packageId || !activeSkill.skillId) {
-      setVersions([]);
-      setCurrentVersionId(null);
-      return;
-    }
-    setVersionsLoading(true);
-    try {
-      const result = await liteApi.listSkillVersions(
-        token,
-        activeSkill.packageId,
-        activeSkill.skillId,
-        {
-          includeDiscarded: true,
-          limit: 100,
-        },
-      );
-      setVersions(result.items);
-      setCurrentVersionId(result.currentVersionId);
-    } catch (loadError) {
-      toast.error(
-        loadError instanceof Error ? loadError.message : '版本加载失败',
-      );
-    } finally {
-      setVersionsLoading(false);
-    }
-  }, [activeSkill?.packageId, activeSkill?.skillId, token]);
 
   const loadConversations = useCallback(async () => {
     const requestNo = ++conversationLoadRef.current;
@@ -442,10 +440,6 @@ function SkillFirstWorkspaceContent() {
         setConversationLoading(false);
     }
   }, [activeSkill?.packageId, activeSkill?.skillId, token]);
-
-  useEffect(() => {
-    void loadVersions();
-  }, [loadVersions]);
 
   useEffect(() => {
     void loadConversations();
@@ -926,8 +920,6 @@ function SkillFirstWorkspaceContent() {
     setPhase(null);
     setPreviews([]);
     setError(null);
-    setVersions([]);
-    setCurrentVersionId(null);
     closeInspector({ force: true });
     navigateWorkspaceView('create', null, true);
     dispatchWorkspace({ type: 'dismiss-update' });
@@ -982,8 +974,6 @@ function SkillFirstWorkspaceContent() {
         setPhase(null);
         setPreviews([]);
         setError(null);
-        setVersions([]);
-        setCurrentVersionId(null);
         if (item.status === 'completed') openRepository();
         else newSkill();
       }
@@ -1019,9 +1009,12 @@ function SkillFirstWorkspaceContent() {
   };
 
   const handleConversationSelect = (id: string) => {
+    const thread = conversations.find((item) => String(item.id) === id);
+    const view =
+      thread && getConversationSurface(thread) === 'test' ? 'test' : 'run';
     setSelectedConversationId(id);
     closeInspector({ force: true });
-    navigateWorkspaceView('run', activeSkillKey, true);
+    navigateWorkspaceView(view, activeSkillKey, true);
   };
 
   const handleConversationRunState = (
@@ -1047,6 +1040,12 @@ function SkillFirstWorkspaceContent() {
 
   useEffect(() => {
     if (initialConversationId.current) return;
+    // Let explicit view navigation commit before synchronizing its conversation.
+    if (
+      parseSkillWorkspaceSearch(location.search).view !==
+      workspaceState.activeView
+    )
+      return;
     const next = writeSkillConversationSearch(
       location.search,
       selectedConversationId,
@@ -1057,6 +1056,7 @@ function SkillFirstWorkspaceContent() {
         { replace: true },
       );
   }, [
+    workspaceState.activeView,
     selectedConversationId,
     location.search,
     location.pathname,
@@ -1416,6 +1416,14 @@ function SkillFirstWorkspaceContent() {
                   view={detailView}
                   versions={versions}
                   currentVersionId={currentVersionId}
+                  currentPackageVersionId={currentPackageVersionId}
+                  versionsHasMore={versionsHasMore}
+                  versionsLoadingMore={versionsLoadingMore}
+                  onLoadMoreVersions={loadMoreVersions}
+                  onNewConversation={() => {
+                    setSelectedConversationId(null);
+                    closeInspector({ force: true });
+                  }}
                   versionsLoading={versionsLoading}
                   onNavigate={(view) => navigateWorkspaceView(view)}
                   onRunStateChange={handleConversationRunState}
@@ -1436,6 +1444,11 @@ function SkillFirstWorkspaceContent() {
                   onConversationCreated={handleConversationCreated}
                   onConversationUpdated={handleConversationUpdated}
                   answerRerunRequest={answerRerunRequest}
+                  onRerunHandled={(id) =>
+                    setAnswerRerunRequest((current) =>
+                      current?.requestId === id ? null : current,
+                    )
+                  }
                 />
               ) : session ? (
                 <GuidedSkillCreationPanel
@@ -1529,17 +1542,7 @@ function SkillFirstWorkspaceContent() {
             onAnswerOptimizationSaved={() => {
               void loadVersions();
             }}
-            onAnswerOptimizationRerun={(versionNumber, selection) => {
-              void (async () => {
-                await loadVersions();
-                navigateWorkspaceView(selection.origin);
-                setAnswerRerunRequest({
-                  requestId: createRequestId('rerun'),
-                  versionNumber,
-                  selection,
-                });
-              })();
-            }}
+            onAnswerOptimizationRerun={handleAnswerRerun}
             onOpenVersionManager={() => {
               closeInspector({ force: true });
               navigateWorkspaceView('versions', activeSkillKey, true);
@@ -1559,17 +1562,7 @@ function SkillFirstWorkspaceContent() {
             onAnswerOptimizationSaved={() => {
               void loadVersions();
             }}
-            onAnswerOptimizationRerun={(versionNumber, selection) => {
-              void (async () => {
-                await loadVersions();
-                navigateWorkspaceView(selection.origin);
-                setAnswerRerunRequest({
-                  requestId: createRequestId('rerun'),
-                  versionNumber,
-                  selection,
-                });
-              })();
-            }}
+            onAnswerOptimizationRerun={handleAnswerRerun}
             onOpenVersionManager={() => {
               closeInspector({ force: true });
               navigateWorkspaceView('versions', activeSkillKey, true);

@@ -22,9 +22,11 @@ type Props = {
   packageId: string;
   versions: SkillVersionDetail[];
   currentVersionId: string | null;
+  currentPackageVersionId?: string | null;
   onCompleted: () => void;
   onOptimizeAnswer: (selection: AnswerOptimizationSelection) => void;
   rerunRequest?: AnswerOptimizationRerunRequest | null;
+  onRerunHandled?: (requestId: string) => void;
 };
 
 function requestId() {
@@ -40,10 +42,14 @@ export function SkillArenaWorkspace({
   packageId,
   versions,
   currentVersionId,
+  currentPackageVersionId,
   onCompleted,
   onOptimizeAnswer,
   rerunRequest,
+  onRerunHandled,
 }: Props) {
+  const packageHeadId = Number(currentPackageVersionId);
+  const canOptimize = Number.isSafeInteger(packageHeadId) && packageHeadId > 0;
   const available = useMemo(
     () => versions.filter((version) => version.status !== 'discarded'),
     [versions],
@@ -210,10 +216,12 @@ export function SkillArenaWorkspace({
       return;
     handledRerunRef.current = rerunRequest.requestId;
     void sendContent(rerunRequest.selection.question);
+    onRerunHandled?.(rerunRequest.requestId);
   }, [
     available,
     leftVersionId,
     rerunRequest,
+    onRerunHandled,
     rightVersionId,
     sendContent,
     state.busy,
@@ -222,11 +230,8 @@ export function SkillArenaWorkspace({
   const openOptimization = (side: 'baseline' | 'enhanced') => {
     const selected = side === 'baseline' ? leftVersion : rightVersion;
     const answer = side === 'baseline' ? state.baseline : state.enhanced;
-    if (!provenance || !selected || !answer || !state.question) return;
-    const current =
-      versions.find((item) => item.id === currentVersionId) ??
-      rightVersion ??
-      selected;
+    if (!provenance || !selected || !answer || !state.question || !canOptimize)
+      return;
     onOptimizeAnswer({
       origin: 'arena',
       packageId: Number(packageId),
@@ -240,7 +245,7 @@ export function SkillArenaWorkspace({
           : provenance.enhancedAnswerMessageId,
       answerSide: side,
       answerVersionNumber: selected.versionNumber,
-      currentPackageVersionId: Number(current.createdInPackageVersionId),
+      currentPackageVersionId: packageHeadId,
       question: state.question,
       answer,
       feedback: '',
@@ -351,7 +356,7 @@ export function SkillArenaWorkspace({
                   answer={state.baseline}
                   busy={state.busy}
                   onBegin={() => openOptimization('baseline')}
-                  ready={Boolean(provenance)}
+                  ready={Boolean(provenance) && canOptimize}
                 />
                 <ArenaSide
                   side="B"
@@ -359,7 +364,7 @@ export function SkillArenaWorkspace({
                   answer={state.enhanced}
                   busy={state.busy}
                   onBegin={() => openOptimization('enhanced')}
-                  ready={Boolean(provenance)}
+                  ready={Boolean(provenance) && canOptimize}
                 />
               </div>
             </>

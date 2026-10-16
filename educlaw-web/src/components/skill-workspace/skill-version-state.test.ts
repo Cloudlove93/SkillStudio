@@ -44,18 +44,19 @@ describe('Skill version presentation state', () => {
   const discarded = version('v1', 1, 'discarded');
 
   it('sorts newest first and hides discarded versions by default', () => {
-    expect(visibleSkillVersions([history, discarded, current], false).map((item) => item.id)).toEqual([
-      'v3',
-      'v2',
-    ]);
+    expect(
+      visibleSkillVersions([history, discarded, current], false).map(
+        (item) => item.id,
+      ),
+    ).toEqual(['v3', 'v2']);
   });
 
   it('includes discarded versions when requested', () => {
-    expect(visibleSkillVersions([history, discarded, current], true).map((item) => item.id)).toEqual([
-      'v3',
-      'v2',
-      'v1',
-    ]);
+    expect(
+      visibleSkillVersions([history, discarded, current], true).map(
+        (item) => item.id,
+      ),
+    ).toEqual(['v3', 'v2', 'v1']);
   });
 
   it('protects the current version from discard and rollback', () => {
@@ -65,7 +66,7 @@ describe('Skill version presentation state', () => {
 
   it('allows rollback for history but only active history can be discarded', () => {
     expect(canRollbackSkillVersion(history, 'v3')).toBe(true);
-    expect(canRollbackSkillVersion(discarded, 'v3')).toBe(true);
+    expect(canRollbackSkillVersion(discarded, 'v3')).toBe(false);
     expect(canDiscardSkillVersion(history, 'v3')).toBe(true);
     expect(canDiscardSkillVersion(discarded, 'v3')).toBe(false);
   });

@@ -1043,6 +1043,7 @@ export async function listSkillVersions(input: {
     return {
       items,
       nextCursor,
+      currentPackageVersionId: pkg.current_version_id ? String(pkg.current_version_id) : null,
       currentVersionId: currentVersion.rows[0]
         ? String(currentVersion.rows[0].skill_version_id)
         : null,

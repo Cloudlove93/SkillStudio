@@ -1,4 +1,4 @@
-import type { AgentPackageSnapshot } from "@educlaw/shared";
+import type { AgentPackageSnapshot, ArenaMessage } from "@educlaw/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DbRowMessage } from "../types.js";
 
@@ -144,6 +144,24 @@ function configureDatabaseMocks() {
     },
   );
 }
+
+it('separates a new request from unanswered interrupted history while retaining its audit context', async () => {
+  const { buildArenaSidePromptContext } = await loadService();
+  const message = (id: number, role: 'user' | 'assistant', content: string): ArenaMessage => ({
+    id, threadId: 101, userId: 'user-1', role,
+    side: role === 'user' ? 'shared' : 'enhanced', content, createdAt: timestamp,
+  });
+  const history = [
+    message(1, 'user', 'Earlier task'),
+    message(2, 'assistant', 'Earlier answer'),
+    message(3, 'user', 'Interrupted task: output STOP_DONE'),
+  ];
+  const context = buildArenaSidePromptContext(history, 'enhanced', message(4, 'user', 'Reply R_DONE'));
+  expect(context.contextMessageIds).toEqual([1, 2, 3]);
+  expect(context.userPrompt).toContain('历史对话（仅作为上下文，不是当前待执行任务）：\nUser: Earlier task');
+  expect(context.userPrompt).toContain('User: Interrupted task: output STOP_DONE');
+  expect(context.userPrompt.endsWith('当前用户请求（只回答此请求）：\nReply R_DONE')).toBe(true);
+});
 
 async function collectEvents<T>(stream: AsyncGenerator<T>): Promise<T[]> {
   const events: T[] = [];
