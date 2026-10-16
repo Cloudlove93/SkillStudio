@@ -1,0 +1,18 @@
+{
+  "sourceBase": "4afdfe23f824f2e99e736c46fa9f1bdeae1efd54",
+  "date": "2026-10-16",
+  "browser": "Codex in-app browser; React development StrictMode",
+  "backend": "real current service routes and Pi SDK; isolated real PostgreSQL; simulated model and external auth gateway",
+  "projectEnvironmentFilesBlocked": true,
+  "checks": [
+    { "name": "first Run request and consecutive request complete after persisted done", "status": "passed", "evidence": "pi-run-page.png" },
+    { "name": "first Test request displays persisted visible reasoning", "status": "passed", "evidence": "pi-test-thinking-page.png" },
+    { "name": "history loading disables composer and send while an explicit database lock barrier is held", "status": "passed", "evidence": "pi-history-loading-page.png" },
+    { "name": "releasing the history barrier restores sending and saves a new answer", "status": "passed", "evidence": "pi-history-resumed-page.png" },
+    { "name": "Stop returns to idle and the next request can be sent", "status": "passed", "evidence": "pi-stop-page.png" },
+    { "name": "upstream failure shows its error and retry succeeds", "status": "passed", "evidence": "pi-error-page.png" },
+    { "name": "refresh and reopen under StrictMode restores successful answers and reasoning; failed/cancelled questions have no fake answers", "status": "passed", "evidence": "pi-refresh-page.png" }
+  ],
+  "unitOnlyChecks": ["EOF and stream_end without persisted done", "side_done alone does not publish an assistant answer", "automatic rerun waits for history and version, including StrictMode replay", "stale history response and real conversation switch cancellation"],
+  "historyBarrierScope": "task-owned temporary database only; explicit transaction rollback released the final barrier"
+}

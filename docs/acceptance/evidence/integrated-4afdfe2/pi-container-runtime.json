@@ -1,0 +1,19 @@
+{
+  "sourceBase": "4afdfe23f824f2e99e736c46fa9f1bdeae1efd54",
+  "node": "v22.23.2",
+  "readyStatus": 200,
+  "provider": "local HTTP fixture",
+  "database": "isolated real PostgreSQL",
+  "checks": [
+    {
+      "threadId": "9",
+      "thinkingEnabled": false,
+      "persistedDone": true
+    },
+    {
+      "threadId": "10",
+      "thinkingEnabled": true,
+      "persistedDone": true
+    }
+  ]
+}

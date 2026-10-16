@@ -13,6 +13,7 @@ export interface ProviderProbeResult {
   providerId: string;
   modelId: string;
   outputChars: number;
+  httpStatus: number | null;
 }
 
 export interface AgentSpikeResult {
@@ -24,6 +25,9 @@ export interface AgentSpikeResult {
   markerObserved: boolean;
   toolCallCount: number;
   toolResultCount: number;
+  modelRequestCount: number;
+  toolResultInModelRequest: boolean;
+  toolResultInProviderPayload: boolean;
   toolNames: string[];
   eventTypes: string[];
   resourceCleaned: boolean;

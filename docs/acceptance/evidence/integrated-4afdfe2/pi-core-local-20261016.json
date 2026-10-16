@@ -1,0 +1,104 @@
+{
+  "cohort": "integrated-4afdfe2",
+  "environment": "real disposable PostgreSQL + HTTP/SSE + real Pi SDK + simulated provider/gateway",
+  "projectEnvironmentFilesBlocked": true,
+  "node": "v24.14.0",
+  "platform": "win32",
+  "packageId": "1",
+  "runThreadId": "1",
+  "testThreadId": "2",
+  "checks": [
+    {
+      "name": "Run thinking off: HTTP/SSE/DB",
+      "status": "passed",
+      "evidence": {
+        "threadId": "1",
+        "messageCount": 2
+      }
+    },
+    {
+      "name": "Test thinking on: HTTP/SSE/DB",
+      "status": "passed",
+      "evidence": {
+        "threadId": "2",
+        "reasoningSaved": true
+      }
+    },
+    {
+      "name": "Fixed historical version and multi-turn provenance",
+      "status": "passed",
+      "evidence": {
+        "historicalSkillVersionId": "1",
+        "contextCount": 2
+      }
+    },
+    {
+      "name": "Other user ownership is denied",
+      "status": "passed",
+      "evidence": {
+        "providerCalls": 0
+      }
+    },
+    {
+      "name": "Same-thread busy and different-thread global capacity",
+      "status": "passed",
+      "evidence": {
+        "maxConcurrentRuns": 2,
+        "sameThreadRejected": true,
+        "excessRejected": true,
+        "retrySucceeded": true
+      }
+    },
+    {
+      "name": "Disconnected client cancels and saves only its question",
+      "status": "passed",
+      "evidence": {
+        "threadId": "5",
+        "questionRetained": true,
+        "cancelledAnswerNotSaved": true,
+        "retrySucceeded": true
+      }
+    },
+    {
+      "name": "Upstream error is not persisted; retry succeeds",
+      "status": "passed",
+      "evidence": {
+        "threadId": "6"
+      }
+    },
+    {
+      "name": "Save failure rolls back assistant and provenance; retry succeeds",
+      "status": "passed",
+      "evidence": {
+        "threadId": "7",
+        "rollbackVerified": true
+      }
+    },
+    {
+      "name": "Pi disabled continues the same conversation through Legacy",
+      "status": "passed",
+      "evidence": {
+        "threadId": "1",
+        "historyPreserved": true
+      }
+    },
+    {
+      "name": "Pi answer enters the existing answer optimization flow",
+      "status": "passed",
+      "evidence": {
+        "optimizationId": 1,
+        "status": "processing",
+        "provenanceAccepted": true,
+        "modelAnalysisNotInvoked": true
+      }
+    },
+    {
+      "name": "Upstream stall reaches the real Adapter timeout and leaves only user input",
+      "status": "passed",
+      "evidence": {
+        "threadId": "8",
+        "timeoutMs": 180000
+      }
+    }
+  ]
+}

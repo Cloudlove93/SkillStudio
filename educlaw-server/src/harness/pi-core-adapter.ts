@@ -7,6 +7,7 @@ import {
 import type { AssistantMessage, Message, Usage } from "@earendil-works/pi-ai";
 import type { Logger } from "pino";
 import { getLogger } from "../lib/request-context.js";
+import { supportsModelExplicitThinking } from "../lib/llm-model-capabilities.js";
 import type {
   HarnessErrorCode,
   HarnessEvent,
@@ -272,6 +273,20 @@ async function handleAgentEvent(
   logger: Logger,
 ): Promise<void> {
   recordAgentEvent(state, event);
+  if (state.abortCause !== null || request.signal?.aborted || state.terminalOutcome) return;
+  if (
+    event.type === "message_update"
+    && event.assistantMessageEvent.type === "thinking_delta"
+    && supportsModelExplicitThinking(request.model.modelId)
+    && request.model.thinkingLevel !== undefined
+    && request.model.thinkingLevel !== "off"
+  ) {
+    await emitRequiredEvent({
+      type: "reasoning_delta",
+      runId: request.runId,
+      delta: event.assistantMessageEvent.delta,
+    }, state, emit, logger);
+  }
   if (event.type === "tool_execution_start") {
     logger.warn({ event: "pi_harness.tool.started", toolName: event.toolName });
     await emitRequiredEvent(

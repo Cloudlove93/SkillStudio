@@ -1,0 +1,28 @@
+{
+  "date": "2026-10-16",
+  "sourcesChecked": ["process", ".env.local", ".env", ".env.docker", "educlaw-educlaw-server-1"],
+  "processOverridesPresent": false,
+  "projectConfigAndExistingContainerUseSameKey": true,
+  "projectConfigAndExistingContainerUseSameEndpoint": true,
+  "configuredEndpoint": "https://api.moonshot.cn/v1",
+  "configuredModel": "kimi-k2.6",
+  "placeholderDetected": false,
+  "leadingOrTrailingWhitespaceDetected": false,
+  "configuredEndpointReadOnlyAuthCheck": {
+    "method": "GET /v1/models",
+    "httpStatus": 401,
+    "errorType": "incorrect_api_key_error"
+  },
+  "documentedSameProviderAlternative": {
+    "endpoint": "https://api.moonshot.ai/v1",
+    "sources": ["docs/DEPLOY.md", ".env.example", "https://platform.kimi.ai/docs/overview"],
+    "method": "GET /v1/models",
+    "httpStatus": 401,
+    "errorType": "invalid_authentication_error"
+  },
+  "noOtherTrustedCredentialFoundInCheckedProjectSources": true,
+  "existingProjectEnvironmentFilesChanged": false,
+  "existingBusinessContainersRebuiltOrRestartedByAgent": false,
+  "realModelRetriesAfterReadOnlyRejection": 0,
+  "testIsolationIncident": "An initial configuration test inadvertently read the real root env and exposed the key in its failed assertion tool output. The filesystem is now mocked in that test and key assertions report booleans only. Acceptance evidence contains no key."
+}

@@ -1,0 +1,9 @@
+{
+  "check": "documented-same-provider-region-auth",
+  "host": "api.moonshot.ai",
+  "method": "GET /v1/models",
+  "httpStatus": 401,
+  "errorType": "invalid_authentication_error",
+  "requestedModelListed": null,
+  "modelCount": null
+}

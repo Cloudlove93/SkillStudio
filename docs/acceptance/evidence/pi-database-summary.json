@@ -1,0 +1,93 @@
+{
+  "database": "disposable pi_acceptance_test",
+  "postgres": "18.4",
+  "threads": [
+    {
+      "id": "1",
+      "surface": "run",
+      "title": "Skill 使用：不使用 Skill",
+      "users": "4",
+      "assistants": "4",
+      "reasoning_answers": "0"
+    },
+    {
+      "id": "2",
+      "surface": "test",
+      "title": "Skill 测试：不使用 Skill",
+      "users": "1",
+      "assistants": "1",
+      "reasoning_answers": "1"
+    },
+    {
+      "id": "3",
+      "surface": "run",
+      "title": "Skill 使用：不使用 Skill",
+      "users": "1",
+      "assistants": "1",
+      "reasoning_answers": "0"
+    },
+    {
+      "id": "4",
+      "surface": "run",
+      "title": "Skill 使用：不使用 Skill",
+      "users": "1",
+      "assistants": "1",
+      "reasoning_answers": "0"
+    },
+    {
+      "id": "5",
+      "surface": "run",
+      "title": "Skill 使用：不使用 Skill",
+      "users": "2",
+      "assistants": "1",
+      "reasoning_answers": "0"
+    },
+    {
+      "id": "6",
+      "surface": "run",
+      "title": "Skill 使用：不使用 Skill",
+      "users": "2",
+      "assistants": "1",
+      "reasoning_answers": "0"
+    },
+    {
+      "id": "7",
+      "surface": "run",
+      "title": "Skill 使用：不使用 Skill",
+      "users": "2",
+      "assistants": "1",
+      "reasoning_answers": "0"
+    },
+    {
+      "id": "8",
+      "surface": "run",
+      "title": "Skill 使用：不使用 Skill",
+      "users": "2",
+      "assistants": "1",
+      "reasoning_answers": "0"
+    },
+    {
+      "id": "9",
+      "surface": "run",
+      "title": "页面验收：设计一句教学目标。",
+      "users": "1",
+      "assistants": "1",
+      "reasoning_answers": "0"
+    },
+    {
+      "id": "10",
+      "surface": "test",
+      "title": "Test页面验收：开启思考并给出目标。",
+      "users": "4",
+      "assistants": "2",
+      "reasoning_answers": "2"
+    }
+  ],
+  "optimizations": [
+    {
+      "id": "1",
+      "status": "processing",
+      "answer_skill_version_id": "1"
+    }
+  ]
+}

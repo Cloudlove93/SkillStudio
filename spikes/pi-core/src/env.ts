@@ -35,11 +35,19 @@ function repoRoot(): string {
 }
 
 export async function loadEduclawLlmEnvironment(): Promise<void> {
-  const text = await readFile(resolve(repoRoot(), ".env"), "utf8");
-  const selected = parseSelectedEnv(text);
-  for (const name of ROOT_ENV_NAMES) {
-    if (!process.env[name] && selected.get(name)) {
-      process.env[name] = selected.get(name);
+  for (const fileName of [".env.local", ".env"]) {
+    let text: string;
+    try {
+      text = await readFile(resolve(repoRoot(), fileName), "utf8");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") continue;
+      throw new Error("SPIKE_PROVIDER_ENV_UNREADABLE");
+    }
+    const selected = parseSelectedEnv(text);
+    for (const name of ROOT_ENV_NAMES) {
+      if (!(name in process.env) && selected.has(name)) {
+        process.env[name] = selected.get(name);
+      }
     }
   }
 }

@@ -1,0 +1,16 @@
+{
+  "sourceBase": "4afdfe23f824f2e99e736c46fa9f1bdeae1efd54",
+  "backupBranch": "codex/pi-core-backup-20261016-before-upstream",
+  "backupCommit": "2baad6b7296440466fee711766a99f25b3a44b05",
+  "date": "2026-10-16",
+  "server": { "passed": 1064, "skipped": 3, "failed": 0 },
+  "web": { "unitPassed": 250, "contractPassed": 116, "integrationFilePassed": 18, "failed": 0 },
+  "spike": { "passed": 22, "failed": 0 },
+  "builds": { "shared": "passed", "server": "passed", "web": "passed with existing >500kB chunk warning", "spike": "passed", "container": "passed" },
+  "container": { "sdkPassed": 67, "chainPassed": 10, "compiledRuntimeThinkingOffAndOn": "passed" },
+  "localChain": { "passed": 11, "timeoutMs": 180000, "model": "simulated" },
+  "lint": "changed server and web source/test files passed",
+  "realProvider": "not invoked again; previous authentication 401 remains a blocker for real Tool Loop/cancel acceptance",
+  "environmentIsolation": "SDK regression config is mocked; Spike env tests mock filesystem; disposable acceptance process blocks project env-file reads",
+  "push": "not performed; independent review required"
+}

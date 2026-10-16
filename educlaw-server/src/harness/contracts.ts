@@ -117,6 +117,11 @@ export type HarnessEvent =
       delta: string;
     }
   | {
+      type: "reasoning_delta";
+      runId: string;
+      delta: string;
+    }
+  | {
       type: "run_finished";
       runId: string;
       status: HarnessRunStatus;

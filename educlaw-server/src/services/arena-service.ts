@@ -1902,6 +1902,17 @@ export async function* streamMessage(
   }
 
   try {
+  if (usePiHarnessForRequest) {
+    if (signal?.aborted) {
+      throw new ArenaServiceError("本次运行已取消。", 499, "RUN_CANCELLED");
+    }
+    // Admission can be delayed by runtime queries. Only history read while
+    // holding the lease may be used for execution and answer provenance.
+    detail.messages = (await getThreadDetail(userId, threadId)).messages;
+    if (signal?.aborted) {
+      throw new ArenaServiceError("本次运行已取消。", 499, "RUN_CANCELLED");
+    }
+  }
   const now = new Date().toISOString();
 
   const sharedResult = await query<{ id: number }>(
@@ -2032,9 +2043,13 @@ export async function* streamMessage(
           requestedModelId: harnessRequest.model.modelId,
         });
         const result = await runPiAgent(harnessRequest, (event) => {
+          if (signal?.aborted) return;
           if (event.type === "text_delta") {
             sideContent += event.delta;
             push({ event: "delta", data: { side, delta: event.delta } });
+          } else if (event.type === "reasoning_delta" && thinkingActive) {
+            sideReasoningContents[side] += event.delta;
+            push({ event: "reasoning_delta", data: { side, delta: event.delta } });
           }
         });
         piHarnessLogger[result.status === "completed" ? "info" : "warn"]({
@@ -2185,6 +2200,9 @@ export async function* streamMessage(
   let assistantMessages: ArenaMessage[];
   try {
     assistantMessages = await withTransaction(async (client) => {
+    if (usePiHarnessForRequest && signal?.aborted) {
+      throw new ArenaServiceError("本次运行已取消。", 499, "RUN_CANCELLED");
+    }
     const messages: ArenaMessage[] = [];
     let baselineAnswerMessageId: number | null = null;
     let enhancedAnswerMessageId: number | null = null;
@@ -2289,6 +2307,7 @@ export async function* streamMessage(
     return messages;
     });
   } catch (error) {
+    if (error instanceof ArenaServiceError && error.code === "RUN_CANCELLED") throw error;
     if (usePiHarnessForRequest) {
       piHarnessLogger?.error({
         event: "arena.pi_harness.persistence_failed",
@@ -2316,7 +2335,7 @@ export async function* streamMessage(
         data: {
           side: "enhanced",
           content: sideContents.enhanced,
-          reasoningContent: null,
+          reasoningContent: thinkingActive ? sideReasoningContents.enhanced.trim() || null : null,
           ok: true,
         },
       };

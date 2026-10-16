@@ -1,0 +1,18 @@
+{
+  "date": "2026-10-16",
+  "url": "http://127.0.0.1:5189",
+  "browser": "Codex in-app browser",
+  "externalAuthenticationGateway": "simulated local-only gateway",
+  "provider": "simulated local HTTP SSE provider; real Pi Agent/provider SDK",
+  "database": "real disposable PostgreSQL 18.4",
+  "runThreadId": "9",
+  "testThreadId": "10",
+  "checks": [
+    { "name": "new Run conversation sends SSE and displays a saved answer with thinking off", "status": "passed", "evidence": "pi-run-page.png" },
+    { "name": "new Test conversation enables thinking and displays expandable persisted reasoning", "status": "passed", "evidence": "pi-test-thinking-page.png" },
+    { "name": "Stop terminates generation and returns the composer to an idle state", "status": "passed", "evidence": "pi-stop-page.png" },
+    { "name": "upstream error is visible and another task succeeds", "status": "passed", "evidence": "pi-error-page.png" },
+    { "name": "refresh and reopen restores successful answers and reasoning; cancelled/error turns retain only questions", "status": "passed", "evidence": "pi-refresh-page.png", "testThreadUsers": 4, "testThreadAssistants": 2 }
+  ],
+  "discoveredAndFixed": "parent acknowledgement of the newly created thread previously aborted the first request before SSE dispatch"
+}

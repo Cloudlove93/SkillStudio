@@ -1,7 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+vi.mock("../config.js", () => ({ config: { llmApiKey: "fixture-only-key", llmBaseUrl: "https://provider.invalid/v1" } }));
 import { createPiProviderRuntime } from "./pi-provider-runtime.js";
 
 describe("Pi provider runtime", () => {
+  it.each(["off", "medium"] as const)("keeps Kimi capability independent of the requested %s mode", (thinkingLevel) => {
+    const runtime = createPiProviderRuntime({ modelId: "kimi-k2.6", thinkingLevel }, {
+      apiKey: "test-key", baseUrl: "https://api.moonshot.ai/v1",
+    });
+    expect(runtime.model.reasoning).toBe(true);
+  });
   it("uses the trusted server settings and requested generation parameters", () => {
     const runtime = createPiProviderRuntime(
       {

@@ -82,6 +82,8 @@ export function SkillRunWorkspace({
     readThinkingPreference(),
   );
   const [historyLoading, setHistoryLoading] = useState(false);
+  // Rerun effects must see admission close before the loading render commits.
+  const historyLoadingRef = useRef(false);
   const threadIdRef = useRef<string | null>(null);
   const messageListRef = useRef<HTMLDivElement>(null);
   const hydrateRequestRef = useRef(0);
@@ -117,10 +119,12 @@ export function SkillRunWorkspace({
     abortControllerRef.current = null;
     threadIdRef.current = selectedThreadId;
     if (!selectedThreadId) {
+      historyLoadingRef.current = false;
       setHistoryLoading(false);
       dispatch({ type: 'reset' });
       return;
     }
+    historyLoadingRef.current = true;
     setHistoryLoading(true);
     dispatch({ type: 'reset' });
     void liteApi
@@ -171,6 +175,7 @@ export function SkillRunWorkspace({
             });
           }
         }
+        historyLoadingRef.current = false;
         dispatch({ type: 'hydrate', messages });
         setHistoryLoading(false);
       })
@@ -179,6 +184,7 @@ export function SkillRunWorkspace({
           hydrateRequestRef.current === requestNo &&
           threadIdRef.current === selectedThreadId
         ) {
+          historyLoadingRef.current = false;
           setHistoryLoading(false);
           dispatch({ type: 'error', message: '对话加载失败，请重试' });
         }
@@ -189,6 +195,8 @@ export function SkillRunWorkspace({
     () => () => {
       hydrateRequestRef.current += 1;
       activeRequestRef.current += 1;
+      // A replayed mount must initialize history again after invalidation.
+      threadIdRef.current = null;
       sendingRef.current = false;
       streamBufferRef.current?.dispose();
       abortControllerRef.current?.abort();
@@ -199,7 +207,7 @@ export function SkillRunWorkspace({
   const sendContent = useCallback(
     async (rawContent: string) => {
       const content = rawContent.trim();
-      if (!content || state.busy || sendingRef.current || !version) return;
+      if (!content || state.busy || sendingRef.current || historyLoadingRef.current || !version) return;
       sendingRef.current = true;
       const requestNo = activeRequestRef.current + 1;
       activeRequestRef.current = requestNo;
@@ -438,12 +446,23 @@ export function SkillRunWorkspace({
       rerunRequest.selection.origin !== purpose ||
       rerunRequest.versionNumber !== version?.versionNumber ||
       handledRerunRef.current === rerunRequest.requestId ||
-      state.busy
+      state.busy ||
+      sendingRef.current ||
+      historyLoading ||
+      historyLoadingRef.current ||
+      !version ||
+      !rerunRequest.selection.question.trim()
     )
       return;
-    handledRerunRef.current = rerunRequest.requestId;
-    void sendContent(rerunRequest.selection.question);
-  }, [purpose, rerunRequest, sendContent, state.busy, version?.versionNumber]);
+    // Effect replay must cancel admission before it marks a rerun as handled.
+    let current = true;
+    queueMicrotask(() => {
+      if (!current || historyLoadingRef.current || sendingRef.current) return;
+      handledRerunRef.current = rerunRequest.requestId;
+      void sendContent(rerunRequest.selection.question);
+    });
+    return () => { current = false; };
+  }, [historyLoading, purpose, rerunRequest, sendContent, state.busy, version]);
 
   return (
     <div className="skill-flat-conversation skill-run-workspace skill-view-enter">
@@ -601,7 +620,7 @@ export function SkillRunWorkspace({
               dispatch({ type: 'draft', value: event.target.value })
             }
             onKeyDown={(event) => {
-              if (event.key === 'Enter' && !event.shiftKey && !state.busy) {
+              if (event.key === 'Enter' && !event.shiftKey && !state.busy && !historyLoading) {
                 event.preventDefault();
                 void send();
               }
@@ -611,6 +630,7 @@ export function SkillRunWorkspace({
                 ? '输入测试任务…'
                 : '输入任务，立即使用这个 Skill…'
             }
+            disabled={historyLoading}
           />
           {state.busy ? (
             <button
@@ -628,7 +648,7 @@ export function SkillRunWorkspace({
               aria-label="发送任务"
               title="发送任务"
               onClick={() => void send()}
-              disabled={!state.draft.trim() || !version}
+              disabled={historyLoading || !state.draft.trim() || !version}
             >
               <ArrowUp size={15} aria-hidden="true" />
             </button>

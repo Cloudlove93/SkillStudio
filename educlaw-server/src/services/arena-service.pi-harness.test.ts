@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { ArenaChatStreamEvent } from "./arena-service.js";
 import type {
   HarnessEventEmitter,
   HarnessResult,
@@ -9,15 +10,16 @@ const queryMock = vi.fn();
 const withTransactionMock = vi.fn();
 const streamTextPartsMock = vi.fn();
 const runPiAgentMock = vi.fn();
+const supportsThinkingMock = vi.fn(() => false);
 const configMock = {
   piHarnessSkillRunEnabled: true,
   piHarnessMaxConcurrentRuns: 4,
 };
 
 async function collectEvents(
-  stream: AsyncGenerator<unknown>,
-): Promise<unknown[]> {
-  const events: unknown[] = [];
+  stream: AsyncGenerator<ArenaChatStreamEvent>,
+): Promise<ArenaChatStreamEvent[]> {
+  const events: ArenaChatStreamEvent[] = [];
   for await (const event of stream) events.push(event);
   return events;
 }
@@ -82,7 +84,7 @@ async function loadService(enabled = true) {
     resolveBaselineModel: vi.fn((model?: string) => model || "baseline-model"),
     resolveEnhancedModel: vi.fn((model?: string) => model || "enhanced-model"),
     streamTextParts: streamTextPartsMock,
-    supportsExplicitThinking: vi.fn(() => false),
+    supportsExplicitThinking: supportsThinkingMock,
   }));
   vi.doMock("./package-service.js", () => ({
     assertRubricConfigured: vi.fn(),
@@ -90,7 +92,10 @@ async function loadService(enabled = true) {
     getPackageWithVersionId: vi.fn(),
   }));
   vi.doMock("../config.js", () => ({ config: configMock }));
-  vi.doMock("../harness/pi-core-adapter.js", () => ({ runPiAgent: runPiAgentMock }));
+  vi.doMock("../harness/pi-core-adapter.js", async () => ({
+    ...await vi.importActual("../harness/pi-core-adapter.js"),
+    runPiAgent: runPiAgentMock,
+  }));
   vi.doMock("../lib/request-context.js", () => ({
     getLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
   }));
@@ -238,6 +243,7 @@ function installQueryFixture(surface: "run" | "test" | "arena" = "run") {
 afterEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
+  supportsThinkingMock.mockReturnValue(false);
   vi.doUnmock("./db.js");
   vi.doUnmock("./llm-service.js");
   vi.doUnmock("./package-service.js");
@@ -247,6 +253,176 @@ afterEach(() => {
 });
 
 describe("Arena Pi Harness integration", () => {
+  it.each([[false, true], [true, false]])("discards unexpected reasoning when requested=%s and supported=%s", async (requested, supported) => {
+    installQueryFixture();
+    supportsThinkingMock.mockReturnValue(supported);
+    runPiAgentMock.mockImplementation(async (request: HarnessRunRequest, emit: HarnessEventEmitter) => {
+      await emit({ type: "reasoning_delta", runId: request.runId, delta: "must stay hidden" });
+      return completedHarnessResult(request);
+    });
+    const { streamMessage } = await loadService();
+    const events = await collectEvents(streamMessage("user-1", "91", "Question", "kimi-k2.6", "agent", requested));
+    expect(events.some((event) => event.event === "reasoning_delta")).toBe(false);
+    expect(events).toContainEqual(expect.objectContaining({ event: "side_done", data: expect.objectContaining({ reasoningContent: null }) }));
+    const assistant = queryMock.mock.calls.find(([sql, args]) => sql.startsWith("insert into arena_messages") && args[3] === "assistant");
+    expect(assistant?.[1][5]).toBeNull();
+  });
+
+  it.each([false, true])("gates native SDK reasoning in SSE and persistence when enabled=%s", async (enabled) => {
+    installQueryFixture();
+    supportsThinkingMock.mockReturnValue(true);
+    const { streamMessage } = await loadService();
+    const { sdkFixture } = await import("../../test-utils/pi-sdk-fixture.js");
+    const fixture = sdkFixture();
+    runPiAgentMock.mockImplementation(fixture.run);
+    const events = await collectEvents(streamMessage("user-1", "91", "Question", "kimi-k2.6", "agent", enabled));
+    expect(fixture.nativeEvents).toContain("thinking_delta");
+    expect(events.filter((event) => event.event === "reasoning_delta")).toEqual(enabled ? [{
+      event: "reasoning_delta", data: { side: "enhanced", delta: "Visible reasoning." },
+    }] : []);
+    expect(events).toContainEqual({ event: "side_done", data: {
+      side: "enhanced", content: "SDK final answer", reasoningContent: enabled ? "Visible reasoning." : null, ok: true,
+    } });
+    const assistant = queryMock.mock.calls.find(([sql, args]) => sql.startsWith("insert into arena_messages") && args[3] === "assistant");
+    expect(assistant?.[1][5]).toBe(enabled ? "Visible reasoning." : null);
+  });
+
+  it.each(["error", "cancel"] as const)("does not save reasoning or answers after native SDK %s", async (outcome) => {
+    installQueryFixture();
+    supportsThinkingMock.mockReturnValue(true);
+    const { streamMessage } = await loadService();
+    const { sdkFixture } = await import("../../test-utils/pi-sdk-fixture.js");
+    const fixture = sdkFixture({ failAfterReasoning: outcome === "error" });
+    const controller = new AbortController();
+    runPiAgentMock.mockImplementation((request, emit) => fixture.run(request, async (event) => {
+      await emit(event);
+      if (outcome === "cancel" && event.type === "reasoning_delta") controller.abort();
+    }));
+    const events: ArenaChatStreamEvent[] = [];
+    const stream = streamMessage("user-1", "91", "Question", "kimi-k2.6", "agent", true, controller.signal);
+    await expect(async () => { for await (const event of stream) events.push(event); }).rejects.toThrow();
+    expect(fixture.nativeEvents).toContain("thinking_delta");
+    expect(events).toContainEqual({ event: "reasoning_delta", data: { side: "enhanced", delta: "Visible reasoning." } });
+    expect(events).toContainEqual(expect.objectContaining({ event: "side_done", data: expect.objectContaining({ ok: false, reasoningContent: null }) }));
+    expect(withTransactionMock).not.toHaveBeenCalled();
+    expect(queryMock.mock.calls.some(([sql, args]) => sql.startsWith("insert into arena_messages") && args[3] === "assistant")).toBe(false);
+    expect(queryMock.mock.calls.some(([sql]) => sql.includes("insert into arena_answer_runs"))).toBe(false);
+    // A subsequent request proves the lease was released on both terminal paths.
+    runPiAgentMock.mockImplementation(async (request) => completedHarnessResult(request));
+    await collectEvents(streamMessage("user-1", "91", "Retry", "kimi-k2.6", "agent"));
+  });
+
+  it("releases the lease after the authoritative history reload fails", async () => {
+    installQueryFixture();
+    const fixtureQuery = queryMock.getMockImplementation()!;
+    let historyReads = 0;
+    queryMock.mockImplementation(async (sql: string, args: unknown[]) => {
+      if (sql.includes("from arena_messages") && ++historyReads === 2) throw new Error("controlled reload failure");
+      return fixtureQuery(sql, args);
+    });
+    const { streamMessage } = await loadService();
+    await expect(collectEvents(streamMessage("user-1", "91", "Question", undefined, "agent"))).rejects.toThrow("controlled reload failure");
+    expect(runPiAgentMock).not.toHaveBeenCalled();
+    expect(queryMock.mock.calls.some(([sql]) => sql.startsWith("insert into arena_messages"))).toBe(false);
+    runPiAgentMock.mockImplementation(async (request) => completedHarnessResult(request));
+    await collectEvents(streamMessage("user-1", "91", "Retry", undefined, "agent"));
+  });
+
+  it("checks cancellation after waiting for a transaction connection and releases the lease", async () => {
+    installQueryFixture();
+    runPiAgentMock.mockImplementation(async (request) => completedHarnessResult(request));
+    const transactionEntered = Promise.withResolvers<void>();
+    const transactionGate = Promise.withResolvers<void>();
+    withTransactionMock.mockImplementationOnce(async (work) => {
+      transactionEntered.resolve();
+      await transactionGate.promise;
+      return work({ query: queryMock });
+    });
+    const { streamMessage } = await loadService();
+    const controller = new AbortController();
+    const pending = collectEvents(streamMessage("user-1", "91", "Question", undefined, "agent", false, controller.signal));
+    const rejected = expect(pending).rejects.toMatchObject({ code: "RUN_CANCELLED" });
+    await transactionEntered.promise;
+    controller.abort();
+    transactionGate.resolve();
+    await rejected;
+    expect(queryMock.mock.calls.some(([sql, args]) => sql.startsWith("insert into arena_messages") && args[3] === "assistant")).toBe(false);
+    await collectEvents(streamMessage("user-1", "91", "Retry", undefined, "agent"));
+  });
+
+  it("checks cancellation after the locked history read and releases the lease", async () => {
+    installQueryFixture();
+    const fixtureQuery = queryMock.getMockImplementation()!;
+    const historyEntered = Promise.withResolvers<void>();
+    const historyGate = Promise.withResolvers<void>();
+    let historyReads = 0;
+    queryMock.mockImplementation(async (sql: string, args: unknown[]) => {
+      if (sql.includes("from arena_messages") && ++historyReads === 2) {
+        historyEntered.resolve();
+        await historyGate.promise;
+      }
+      return fixtureQuery(sql, args);
+    });
+    const { streamMessage } = await loadService();
+    const controller = new AbortController();
+    const pending = collectEvents(streamMessage("user-1", "91", "Question", undefined, "agent", false, controller.signal));
+    const rejected = expect(pending).rejects.toMatchObject({ code: "RUN_CANCELLED" });
+    await historyEntered.promise;
+    controller.abort();
+    historyGate.resolve();
+    await rejected;
+    expect(runPiAgentMock).not.toHaveBeenCalled();
+    expect(queryMock.mock.calls.some(([sql]) => sql.startsWith("insert into arena_messages"))).toBe(false);
+    runPiAgentMock.mockImplementation(async (request) => completedHarnessResult(request));
+    await collectEvents(streamMessage("user-1", "91", "Retry", undefined, "agent"));
+  });
+
+  it("reloads authoritative history after a delayed request acquires the lease", async () => {
+    installQueryFixture();
+    const fixtureQuery = queryMock.getMockImplementation()!;
+    const runtimeEntered = Promise.withResolvers<void>();
+    const runtimeGate = Promise.withResolvers<void>();
+    const firstEntered = Promise.withResolvers<void>();
+    const firstGate = Promise.withResolvers<void>();
+    const savedRows: unknown[] = [];
+    let packageReads = 0;
+    queryMock.mockImplementation(async (sql: string, args: unknown[]) => {
+      const result = await fixtureQuery(sql, args);
+      if (sql.startsWith("select * from agent_package_versions") && ++packageReads === 2) {
+        runtimeEntered.resolve();
+        await runtimeGate.promise;
+      }
+      if (sql.startsWith("insert into arena_messages")) {
+        savedRows.push({ id: result.rows[0].id, thread_id: 91, user_id: "user-1", side: args[2], role: args[3], content: args[4], created_at: args.at(-1) });
+      }
+      if (sql.includes("from arena_messages") && sql.includes("where thread_id = $1 and user_id = $2")) {
+        result.rows = [...result.rows, ...savedRows];
+      }
+      return result;
+    });
+    runPiAgentMock.mockImplementation(async (request: HarnessRunRequest) => completedHarnessResult(request));
+    runPiAgentMock.mockImplementationOnce(async (request: HarnessRunRequest) => {
+      firstEntered.resolve();
+      await firstGate.promise;
+      return completedHarnessResult(request);
+    });
+    const { streamMessage } = await loadService();
+    const first = collectEvents(streamMessage("user-1", "91", "First question", undefined, "agent"));
+    await firstEntered.promise;
+    const second = collectEvents(streamMessage("user-1", "91", "Second question", undefined, "agent"));
+    await runtimeEntered.promise;
+    firstGate.resolve();
+    await first;
+    runtimeGate.resolve();
+    await second;
+    const request = runPiAgentMock.mock.calls[1][0] as HarnessRunRequest;
+    expect(request.history.map((message) => message.content)).toEqual([
+      "Earlier question", "Earlier enhanced answer", "First question", "Pi final answer",
+    ]);
+    const answerRuns = queryMock.mock.calls.filter(([sql]) => sql.includes("insert into arena_answer_runs"));
+    expect(JSON.parse(answerRuns[1][1][8])).toEqual([10, 12, 100, 101]);
+  });
+
   it("routes an eligible Skill Run through Pi with the bound SkillVersion and enhanced history", async () => {
     installQueryFixture("run");
     runPiAgentMock.mockImplementation(async (

@@ -7,6 +7,7 @@ import {
 import type { StreamFn } from "@earendil-works/pi-agent-core";
 import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
 import { config } from "../config.js";
+import { supportsModelExplicitThinking } from "../lib/llm-model-capabilities.js";
 import type { HarnessModelRequest } from "./contracts.js";
 
 const PROVIDER_ID = "educlaw-configured";
@@ -54,12 +55,13 @@ function createModel(
     api: "openai-completions",
     provider: PROVIDER_ID,
     baseUrl,
-    reasoning: request.thinkingLevel !== undefined && request.thinkingLevel !== "off",
+    reasoning: supportsModelExplicitThinking(request.modelId),
+    compat: { supportsReasoningEffort: false },
     input: ["text"],
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     contextWindow: DEFAULT_CONTEXT_WINDOW,
     maxTokens: request.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
-    samplingParams: request.temperature === undefined
+    samplingParams: supportsModelExplicitThinking(request.modelId) || request.temperature === undefined
       ? undefined
       : { temperature: request.temperature },
   };
@@ -90,7 +92,23 @@ export function createPiProviderRuntime(
   const streamFn: StreamFn = (selectedModel, context, options) => streamSimple(
     selectedModel,
     context,
-    { ...options, maxRetries: PROVIDER_MAX_RETRIES },
+    {
+      ...options,
+      maxRetries: PROVIDER_MAX_RETRIES,
+      onPayload: async (payload, model) => {
+        const transformed = await options?.onPayload?.(payload, model) ?? payload;
+        if (!supportsModelExplicitThinking(model.id)) return transformed;
+        // Kimi defaults to thinking and rejects the shared temperature. Apply
+        // compatibility after SDK serialization and any upstream payload hook.
+        const body = { ...(transformed as Record<string, unknown>) };
+        delete body.temperature;
+        delete body.reasoning_effort;
+        body.thinking = {
+          type: request.thinkingLevel && request.thinkingLevel !== "off" ? "enabled" : "disabled",
+        };
+        return body;
+      },
+    },
   );
   return {
     model,

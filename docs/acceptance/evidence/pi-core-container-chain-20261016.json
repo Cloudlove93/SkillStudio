@@ -1,0 +1,94 @@
+{
+  "environment": "real disposable PostgreSQL + HTTP/SSE + real Pi SDK + simulated provider/gateway",
+  "node": "v22.23.2",
+  "platform": "linux",
+  "packageId": "3",
+  "runThreadId": "15",
+  "testThreadId": "16",
+  "checks": [
+    {
+      "name": "Run thinking off: HTTP/SSE/DB",
+      "status": "passed",
+      "evidence": {
+        "threadId": "15",
+        "messageCount": 2
+      }
+    },
+    {
+      "name": "Test thinking on: HTTP/SSE/DB",
+      "status": "passed",
+      "evidence": {
+        "threadId": "16",
+        "reasoningSaved": true
+      }
+    },
+    {
+      "name": "Fixed historical version and multi-turn provenance",
+      "status": "passed",
+      "evidence": {
+        "historicalSkillVersionId": "5",
+        "contextCount": 2
+      }
+    },
+    {
+      "name": "Other user ownership is denied",
+      "status": "passed",
+      "evidence": {
+        "providerCalls": 0
+      }
+    },
+    {
+      "name": "Same-thread busy and different-thread global capacity",
+      "status": "passed",
+      "evidence": {
+        "maxConcurrentRuns": 2,
+        "sameThreadRejected": true,
+        "excessRejected": true,
+        "retrySucceeded": true
+      }
+    },
+    {
+      "name": "Disconnected client cancels and saves only its question",
+      "status": "passed",
+      "evidence": {
+        "threadId": "19",
+        "questionRetained": true,
+        "cancelledAnswerNotSaved": true,
+        "retrySucceeded": true
+      }
+    },
+    {
+      "name": "Upstream error is not persisted; retry succeeds",
+      "status": "passed",
+      "evidence": {
+        "threadId": "20"
+      }
+    },
+    {
+      "name": "Save failure rolls back assistant and provenance; retry succeeds",
+      "status": "passed",
+      "evidence": {
+        "threadId": "21",
+        "rollbackVerified": true
+      }
+    },
+    {
+      "name": "Pi disabled continues the same conversation through Legacy",
+      "status": "passed",
+      "evidence": {
+        "threadId": "15",
+        "historyPreserved": true
+      }
+    },
+    {
+      "name": "Pi answer enters the existing answer optimization flow",
+      "status": "passed",
+      "evidence": {
+        "optimizationId": 3,
+        "status": "processing",
+        "provenanceAccepted": true,
+        "modelAnalysisNotInvoked": true
+      }
+    }
+  ]
+}

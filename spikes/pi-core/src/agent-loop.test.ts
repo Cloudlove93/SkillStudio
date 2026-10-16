@@ -26,6 +26,28 @@ function fauxRuntime(responses: ReturnType<typeof fauxAssistantMessage>[]): Spik
 }
 
 describe("Pi Core Agent spike", () => {
+  it("does not start a model request for an already cancelled run", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const runtime = fauxRuntime([fauxAssistantMessage("should not execute")]);
+    const result = await runAgentSpike({ runtime, skillRoot: fixtureSkillRoot(), signal: controller.signal });
+    expect(result).toMatchObject({ status: "cancelled", modelRequestCount: 0, finalText: "", resourceCleaned: true });
+  });
+
+  it.each(["length", "error", "stop"] as const)("rejects incomplete verification with stopReason=%s", async (stopReason) => {
+    const runtime = fauxRuntime([fauxAssistantMessage(stopReason === "stop" ? "" : "partial", { stopReason })]);
+    const result = await runAgentSpike({ runtime, skillRoot: fixtureSkillRoot() });
+    expect(result.status).toBe("failed");
+    expect(result.resourceCleaned).toBe(true);
+  });
+
+  it("enforces the model-call budget on a repeating tool loop", async () => {
+    const runtime = fauxRuntime(Array.from({ length: 4 }, () => fauxAssistantMessage(
+      fauxToolCall("read_skill_file", { path: "references/fact.md" }), { stopReason: "toolUse" },
+    )));
+    const result = await runAgentSpike({ runtime, skillRoot: fixtureSkillRoot(), maxModelCalls: 2 });
+    expect(result).toMatchObject({ status: "failed", errorCode: "RUN_LIMIT_EXCEEDED", modelRequestCount: 2, resourceCleaned: true });
+  });
   it("does not preload the reference marker into Agent instructions", async () => {
     const marker = (await readFile(join(fixtureSkillRoot(), "references/fact.md"), "utf8")).trim();
     const instructions = await buildAgentInstructions(fixtureSkillRoot());

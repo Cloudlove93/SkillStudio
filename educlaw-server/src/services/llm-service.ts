@@ -1,4 +1,5 @@
 import { config } from "../config.js";
+import { supportsModelExplicitThinking } from "../lib/llm-model-capabilities.js";
 import { safeError, truncateForLog } from "../lib/logger.js";
 import { getLogger } from "../lib/request-context.js";
 import { parseJsonObject } from "../utils/json.js";
@@ -241,17 +242,8 @@ async function fetchWithNetworkRetry(
   throw new Error(`LLM network request failed: ${describeFetchFailure(lastError)}. Please verify LLM_BASE_URL, LLM_MODEL, and network connectivity.`);
 }
 
-function usesKimiK25(model: string): boolean {
-  return model.toLowerCase() === "kimi-k2.5";
-}
-
-function usesKimiK26(model: string): boolean {
-  return model.toLowerCase() === "kimi-k2.6";
-}
-
 export function supportsExplicitThinking(model?: string): boolean {
-  const resolvedModel = model || config.llmModel;
-  return usesKimiK25(resolvedModel) || usesKimiK26(resolvedModel);
+  return supportsModelExplicitThinking(model || config.llmModel);
 }
 
 function buildChatCompletionBody(
@@ -269,7 +261,7 @@ function buildChatCompletionBody(
     ...(maxTokens ? { max_tokens: maxTokens } : {}),
   };
 
-  if (usesKimiK25(model) || usesKimiK26(model)) {
+  if (supportsModelExplicitThinking(model)) {
     body.thinking = { type: thinkingMode ?? "disabled" };
     return body;
   }
@@ -638,7 +630,7 @@ export async function generateMultimodalJson<T>(
     stream: false,
     ...(input.maxTokens ? { max_tokens: input.maxTokens } : {}),
   };
-  if (usesKimiK25(model) || usesKimiK26(model)) {
+  if (supportsModelExplicitThinking(model)) {
     body.thinking = { type: "disabled" };
   } else {
     body.temperature = 0;

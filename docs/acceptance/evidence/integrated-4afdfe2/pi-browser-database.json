@@ -1,0 +1,22 @@
+{
+  "sourceBase": "4afdfe2",
+  "database": "isolated PostgreSQL container",
+  "uiThreads": [
+    {
+      "id": "16",
+      "surface": "run",
+      "title": "整合版Run首轮验收。",
+      "users": "3",
+      "assistants": "3",
+      "reasoning_answers": "1"
+    },
+    {
+      "id": "17",
+      "surface": "test",
+      "title": "整合版Test首轮思考验收。",
+      "users": "5",
+      "assistants": "3",
+      "reasoning_answers": "3"
+    }
+  ]
+}

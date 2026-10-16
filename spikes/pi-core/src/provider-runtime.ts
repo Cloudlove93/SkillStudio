@@ -5,6 +5,7 @@ import {
   envApiKeyAuth,
   type Model,
   type MutableModels,
+  type SimpleStreamOptions,
 } from "@earendil-works/pi-ai";
 import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
 import type { SpikeLlmConfig } from "./env.js";
@@ -17,21 +18,25 @@ export interface SpikeProviderRuntime {
   model: Model<"openai-completions">;
   providerId: string;
   modelId: string;
+  requestOptions?: SimpleStreamOptions;
 }
 
 export function createProviderRuntime(config: SpikeLlmConfig): SpikeProviderRuntime {
+  // Match the formal Adapter's verified model set; this package stays isolated.
+  const kimi = ["kimi-k2.5", "kimi-k2.6"].includes(config.modelId.toLowerCase());
   const model: Model<"openai-completions"> = {
     id: config.modelId,
     name: config.modelId,
     api: "openai-completions",
     provider: PROVIDER_ID,
     baseUrl: config.baseUrl,
-    reasoning: false,
+    reasoning: kimi,
+    compat: { supportsReasoningEffort: false },
     input: ["text"],
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     contextWindow: 128_000,
     maxTokens: 8_192,
-    samplingParams: { temperature: 0 },
+    samplingParams: kimi ? undefined : { temperature: 0 },
   };
   const provider = createProvider({
     id: PROVIDER_ID,
@@ -45,7 +50,17 @@ export function createProviderRuntime(config: SpikeLlmConfig): SpikeProviderRunt
   });
   const models = createModels();
   models.setProvider(provider);
-  return { models, model, providerId: PROVIDER_ID, modelId: model.id };
+  return { models, model, providerId: PROVIDER_ID, modelId: model.id, requestOptions: {
+    maxRetries: 0,
+    onPayload: (payload) => {
+      if (!kimi) return payload;
+      const body = { ...(payload as Record<string, unknown>) };
+      delete body.temperature;
+      delete body.reasoning_effort;
+      body.thinking = { type: "disabled" };
+      return body;
+    },
+  } };
 }
 
 export async function probeProviderText(
@@ -53,6 +68,7 @@ export async function probeProviderText(
   runId: string,
   signal?: AbortSignal,
 ): Promise<ProviderProbeResult> {
+  let httpStatus: number | null = null;
   const response = await runtime.models.completeSimple(
     runtime.model,
     {
@@ -64,12 +80,21 @@ export async function probeProviderText(
         },
       ],
     },
-    { signal },
+    {
+      ...runtime.requestOptions,
+      signal: AbortSignal.any([signal ?? new AbortController().signal, AbortSignal.timeout(15_000)]),
+      samplingParams: { max_tokens: 64 },
+      fetch: async (input, init) => {
+        const response = await fetch(input, init);
+        httpStatus = response.status;
+        return response;
+      },
+    },
   );
   const text = contentText(response.content);
   const status = response.stopReason === "aborted"
     ? "cancelled"
-    : response.stopReason === "error" || text.trim().length === 0
+    : response.stopReason !== "stop" || text.trim().length === 0
       ? "failed"
       : "completed";
   return {
@@ -78,5 +103,6 @@ export async function probeProviderText(
     providerId: response.provider,
     modelId: response.responseModel ?? response.model,
     outputChars: text.length,
+    httpStatus,
   };
 }

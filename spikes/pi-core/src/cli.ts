@@ -25,6 +25,7 @@ async function main(): Promise<void> {
       outputChars: result.outputChars,
       providerId: result.providerId,
       status: result.status,
+      httpStatus: result.httpStatus,
     });
     if (result.status !== "completed") process.exitCode = 1;
     return;
@@ -43,12 +44,16 @@ async function main(): Promise<void> {
     runtime,
     skillRoot: fixtureSkillRoot(),
     logEvents: true,
+    timeoutMs: 45_000,
+    maxModelCalls: 3,
   });
   if (
     result.status !== "completed" ||
     !result.markerObserved ||
     result.toolCallCount < 1 ||
     result.toolResultCount < 1 ||
+    !result.toolResultInModelRequest ||
+    !result.toolResultInProviderPayload ||
     !result.resourceCleaned
   ) {
     process.exitCode = 1;

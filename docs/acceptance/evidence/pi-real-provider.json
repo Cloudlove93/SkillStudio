@@ -1,0 +1,26 @@
+{
+  "date": "2026-10-16",
+  "providerHost": "api.moonshot.cn",
+  "model": "kimi-k2.6",
+  "configuration": "existing trusted local configuration; no credentials copied into evidence",
+  "attempts": [
+    {
+      "check": "formal Adapter minimal smoke",
+      "runId": "pi-adapter-smoke-bbc35268-8043-4acb-aed8-14e8d3df35be",
+      "status": "failed",
+      "errorCode": "MODEL_UNAVAILABLE",
+      "modelRequestCount": 1,
+      "cleanupCompleted": true
+    },
+    {
+      "check": "Spike minimal probe with HTTP status observation",
+      "runId": "2abd29b5-5d1b-45d7-a524-e7ece8b333a1",
+      "status": "failed",
+      "httpStatus": 401,
+      "outputChars": 0
+    }
+  ],
+  "realToolLoop": "blocked by HTTP 401; not attempted",
+  "realCancellation": "blocked by HTTP 401; not attempted",
+  "automaticRetries": 0
+}

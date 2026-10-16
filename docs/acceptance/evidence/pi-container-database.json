@@ -1,0 +1,17 @@
+{
+  "database": "disposable container PostgreSQL",
+  "rows": [
+    {
+      "thread_id": 15,
+      "user_messages": 5,
+      "assistant_messages": 5,
+      "reasoning_answers": 0
+    },
+    {
+      "thread_id": 16,
+      "user_messages": 2,
+      "assistant_messages": 2,
+      "reasoning_answers": 2
+    }
+  ]
+}

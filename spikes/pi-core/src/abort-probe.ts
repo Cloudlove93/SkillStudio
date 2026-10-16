@@ -16,23 +16,33 @@ export async function runAbortProbe(
 ): Promise<AgentSpikeResult> {
   const runId = randomUUID();
   const events: string[] = [];
+  let modelRequestCount = 0;
   const agent = new Agent({
     initialState: {
       systemPrompt: "Answer normally without tools.",
       model: runtime.model,
       thinkingLevel: "off",
     },
-    streamFn: runtime.models.streamSimple.bind(runtime.models),
+    streamFn: (model, context, options) => {
+      modelRequestCount += 1;
+      return runtime.models.streamSimple(model, context, {
+        ...options, ...runtime.requestOptions, maxRetries: 0,
+      });
+    },
     sessionId: runId,
   });
   const unsubscribe = agent.subscribe((event) => {
     events.push(event.type);
   });
   const timer = setTimeout(() => agent.abort(), abortAfterMs);
+  const deadline = setTimeout(() => agent.abort(), 15_000);
   try {
     await agent.prompt("Produce a detailed response with many numbered paragraphs.");
     await agent.waitForIdle();
   } finally {
+    agent.abort();
+    await agent.waitForIdle().catch(() => undefined);
+    clearTimeout(deadline);
     clearTimeout(timer);
     unsubscribe();
   }
@@ -46,6 +56,9 @@ export async function runAbortProbe(
     markerObserved: false,
     toolCallCount: 0,
     toolResultCount: 0,
+    modelRequestCount,
+    toolResultInModelRequest: false,
+    toolResultInProviderPayload: false,
     toolNames: [],
     eventTypes: events,
     resourceCleaned: !agent.state.isStreaming && agent.signal === undefined,

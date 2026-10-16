@@ -11,6 +11,7 @@ import type {
 } from "@earendil-works/pi-ai";
 import type { Logger } from "pino";
 import { describe, expect, it, vi } from "vitest";
+vi.mock("../config.js", () => ({ config: { llmApiKey: "fixture-only-key", llmBaseUrl: "https://provider.invalid/v1" } }));
 import type {
   HarnessEvent,
   HarnessRunRequest,
@@ -223,6 +224,29 @@ function testAdapter(
 }
 
 describe("Pi Core adapter", () => {
+  it("drops late thinking deltas after cancellation even if the Agent still emits them", async () => {
+    const partial = assistant("");
+    const thinking = (delta: string): AgentEvent => ({
+      type: "message_update", message: partial,
+      assistantMessageEvent: { type: "thinking_delta", contentIndex: 0, delta, partial },
+    });
+    const harness = testAdapter({ extraEvents: [thinking("visible before stop"), thinking("late after stop")] });
+    const controller = new AbortController();
+    const events: HarnessEvent[] = [];
+    const result = await harness.run(request({
+      model: { modelId: "kimi-k2.6", thinkingLevel: "medium" }, signal: controller.signal,
+    }), (event) => {
+      events.push(event);
+      if (event.type === "reasoning_delta") controller.abort();
+    });
+    expect(events.filter((event) => event.type === "reasoning_delta")).toEqual([{
+      type: "reasoning_delta", runId: "run-001", delta: "visible before stop",
+    }]);
+    expect(result.status).toBe("cancelled");
+    expect(events.filter((event) => event.type === "run_finished")).toHaveLength(1);
+    expect(events.some((event) => event.type === "text_delta")).toBe(false);
+  });
+
   it("injects the fixed Skill, keeps history separate, and adds the current question once", async () => {
     const harness = testAdapter();
     const events: HarnessEvent[] = [];

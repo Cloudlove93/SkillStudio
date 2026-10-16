@@ -1,0 +1,21 @@
+{
+  "sourceBase": "4afdfe23f824f2e99e736c46fa9f1bdeae1efd54",
+  "image": "educlaw-pi-acceptance:integrated-4afdfe2",
+  "imageId": "sha256:4b882da3a75346f91de00ef26874b2c100cfb73f07879b3adebdd2b485f9c749",
+  "node": "v22.23.2",
+  "sdk": {
+    "piAi": "1.1.0",
+    "piAgentCore": "1.1.0"
+  },
+  "build": "passed, actual project Dockerfile with environment files excluded",
+  "runtimeMode": "test; production index.js entrypoint; worker runner disabled",
+  "containerSdkTests": 67,
+  "containerChainTests": 10,
+  "provider": "local HTTP fixture",
+  "database": "isolated PostgreSQL tmpfs",
+  "realProvider": "not repeated; historical 401 remains unverified",
+  "network": "edu-pi-integrated-20261016",
+  "taskOwnedContainersStopped": true,
+  "hostAcceptanceProcessStopped": true,
+  "sharedServicesNotStoppedOrRestarted": true
+}

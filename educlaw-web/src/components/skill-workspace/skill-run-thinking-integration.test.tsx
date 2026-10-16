@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, useState } from 'react';
+import { act, StrictMode, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import type { ArenaThread, SkillVersionDetail } from '@educlaw/shared';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -31,6 +31,7 @@ vi.mock('../lite/lite-rendering', () => ({
 }));
 
 import { SkillRunWorkspace } from './SkillRunWorkspace';
+import type { AnswerOptimizationRerunRequest } from './answer-optimization-selection';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -135,6 +136,110 @@ describe('Skill run thinking integration', () => {
       );
     });
   }
+
+  function emitSavedAnswer(onEvent: (event: unknown) => void, question: string, answer = 'saved-after-load') {
+    onEvent({ event: 'done', data: { thread, messages: [
+      { id: 10, threadId: 91, side: 'shared', role: 'user', content: question, createdAt: thread.createdAt },
+      { id: 11, threadId: 91, side: 'enhanced', role: 'assistant', content: answer, createdAt: thread.createdAt },
+    ] } });
+  }
+
+  it.each(['button', 'Enter'])('blocks %s sends until history settles and preserves the next saved answer', async (entry) => {
+    const history = deferred<{ thread: ArenaThread; messages: [] }>();
+    getArenaThreadDetailMock.mockReturnValueOnce(history.promise);
+    sendMessageStreamMock.mockImplementation(async (...args) => emitSavedAnswer(args[6], args[2]));
+    await render('91');
+    const textarea = container.querySelector('textarea')!;
+    await act(async () => setTextareaValue(textarea, 'question-during-load'));
+    await act(async () => {
+      if (entry === 'button') clickSend(container);
+      else textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    });
+    expect(sendMessageStreamMock).not.toHaveBeenCalled();
+    await act(async () => history.resolve({ thread, messages: [] }));
+    await act(async () => setTextareaValue(textarea, 'question-after-load'));
+    await act(async () => clickSend(container));
+    expect(sendMessageStreamMock).toHaveBeenCalledTimes(1);
+    expect(container.textContent).toContain('saved-after-load');
+    expect(container.querySelector('[aria-label="停止生成"]')).toBeNull();
+  });
+
+  it.each([false, true])('defers an automatic rerun until history and version are ready, initially ready=%s', async (initiallyReady) => {
+    const history = deferred<{ thread: ArenaThread; messages: [] }>();
+    getArenaThreadDetailMock.mockReturnValueOnce(history.promise);
+    sendMessageStreamMock.mockImplementation(async (...args) => emitSavedAnswer(args[6], args[2], 'rerun-saved-answer'));
+    const rerun = { requestId: 'history-rerun', versionNumber: 3, selection: {
+      origin: 'run', question: 'rerun-question',
+    } } as AnswerOptimizationRerunRequest;
+    const renderRerun = (ready: boolean) => act(async () => root.render(
+      <SkillRunWorkspace token="token" packageId="7" version={ready ? version : undefined}
+        currentPackageVersionId="33" onOptimizeAnswer={onOptimizeAnswer} selectedThreadId="91" rerunRequest={rerun} />,
+    ));
+    await renderRerun(initiallyReady);
+    await renderRerun(true);
+    expect(sendMessageStreamMock).not.toHaveBeenCalled();
+    await act(async () => history.resolve({ thread, messages: [] }));
+    expect(sendMessageStreamMock).toHaveBeenCalledTimes(1);
+    expect(container.textContent).toContain('rerun-saved-answer');
+    await renderRerun(true);
+    expect(sendMessageStreamMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('allows an explicit request after history loading fails', async () => {
+    getArenaThreadDetailMock.mockRejectedValueOnce(new Error('controlled history load failure'));
+    sendMessageStreamMock.mockImplementation(async (...args) => emitSavedAnswer(args[6], args[2]));
+    await render('91');
+    expect(container.textContent).toContain('对话加载失败，请重试');
+    await act(async () => setTextareaValue(container.querySelector('textarea')!, 'retry-after-load-error'));
+    await act(async () => clickSend(container));
+    expect(sendMessageStreamMock).toHaveBeenCalledTimes(1);
+    expect(container.textContent).toContain('saved-after-load');
+  });
+
+  it('still aborts the active request when navigating to a different thread', async () => {
+    let activeSignal: AbortSignal | undefined;
+    sendMessageStreamMock.mockImplementation(async (...args) => {
+      activeSignal = args[7];
+      return new Promise<void>((_resolve, reject) => {
+        activeSignal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true });
+      });
+    });
+    await render('91');
+    await act(async () => setTextareaValue(container.querySelector('textarea')!, 'active task'));
+    await act(async () => clickSend(container));
+    expect(activeSignal?.aborted).toBe(false);
+    await render('92');
+    expect(activeSignal?.aborted).toBe(true);
+    expect(getArenaThreadDetailMock).toHaveBeenLastCalledWith('token', '7', '92');
+  });
+
+  it('finishes history hydration when StrictMode replays mount effects', async () => {
+    getArenaThreadDetailMock.mockResolvedValue({ thread, messages: [
+      { id: 1, threadId: 91, side: 'shared', role: 'user', content: 'strict-history-question', createdAt: thread.createdAt },
+      { id: 2, threadId: 91, side: 'enhanced', role: 'assistant', content: 'strict-history-answer', createdAt: thread.createdAt },
+    ] });
+    await act(async () => root.render(<StrictMode>
+      <SkillRunWorkspace token="token" packageId="7" version={version} currentPackageVersionId="33"
+        onOptimizeAnswer={onOptimizeAnswer} selectedThreadId="91" />
+    </StrictMode>));
+    expect(container.textContent).toContain('strict-history-answer');
+    expect(container.textContent).not.toContain('正在加载历史对话');
+    expect(container.querySelector('textarea')?.disabled).toBe(false);
+  });
+
+  it('admits a ready new-thread rerun exactly once through StrictMode effect replay', async () => {
+    sendMessageStreamMock.mockImplementation(async (...args) => emitSavedAnswer(args[6], args[2], 'strict-rerun-answer'));
+    const rerun = { requestId: 'strict-rerun', versionNumber: 3, selection: {
+      origin: 'run', question: 'strict-rerun-question',
+    } } as AnswerOptimizationRerunRequest;
+    await act(async () => root.render(<StrictMode>
+      <SkillRunWorkspace token="token" packageId="7" version={version} currentPackageVersionId="33"
+        onOptimizeAnswer={onOptimizeAnswer} rerunRequest={rerun} />
+    </StrictMode>));
+    expect(sendMessageStreamMock).toHaveBeenCalledTimes(1);
+    expect(container.textContent).toContain('strict-rerun-answer');
+    expect(container.querySelector('[aria-label="停止生成"]')).toBeNull();
+  });
 
   it('requests thinking, renders it separately, and optimizes only the final answer', async () => {
     localStorage.setItem('educlaw.skill-chat.thinking.v1', '1');

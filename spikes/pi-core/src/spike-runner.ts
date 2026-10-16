@@ -13,6 +13,7 @@ export interface AgentSpikeOptions {
   skillRoot: string;
   signal?: AbortSignal;
   timeoutMs?: number;
+  maxModelCalls?: number;
   logEvents?: boolean;
 }
 
@@ -44,7 +45,7 @@ export async function buildAgentInstructions(skillRoot: string): Promise<string>
 
 function classifyStatus(message: AssistantMessage | undefined): SpikeStatus {
   if (message?.stopReason === "aborted") return "cancelled";
-  if (!message || message.stopReason === "error") return "failed";
+  if (!message || message.stopReason !== "stop" || !assistantText(message).trim()) return "failed";
   return "completed";
 }
 
@@ -67,6 +68,12 @@ export async function runAgentSpike(options: AgentSpikeOptions): Promise<AgentSp
   const instructions = await buildAgentInstructions(options.skillRoot);
   const expectedMarker = (await readFile(join(options.skillRoot, "references/fact.md"), "utf8")).trim();
   const toolHandle = createReadSkillFileTool(options.skillRoot);
+  const cancellation: { cause: "external" | "timeout" | null } = { cause: options.signal?.aborted ? "external" : null };
+  let limitExceeded = false;
+  let modelRequestCount = 0;
+  let toolResultInModelRequest = false;
+  let toolResultInProviderPayload = false;
+  let unexpectedFailure = false;
   const evidence = { events: [] as string[], toolCalls: 0, toolResults: 0, tools: new Set<string>() };
   const agent = new Agent({
     initialState: {
@@ -75,7 +82,28 @@ export async function runAgentSpike(options: AgentSpikeOptions): Promise<AgentSp
       thinkingLevel: "off",
       tools: [toolHandle.tool],
     },
-    streamFn: options.runtime.models.streamSimple.bind(options.runtime.models),
+    streamFn: (model, context, requestOptions) => {
+      if (cancellation.cause || options.signal?.aborted) throw new Error("RUN_CANCELLED");
+      if (modelRequestCount >= (options.maxModelCalls ?? 8)) {
+        limitExceeded = true;
+        throw new Error("RUN_LIMIT_EXCEEDED");
+      }
+      modelRequestCount += 1;
+      toolResultInModelRequest ||= context.messages.some((message) => message.role === "toolResult"
+        && !message.isError && message.content.some((item) => item.type === "text" && item.text.includes(expectedMarker)));
+      return options.runtime.models.streamSimple(model, context, {
+        ...requestOptions,
+        ...options.runtime.requestOptions,
+        maxRetries: 0,
+        onPayload: async (payload, selectedModel) => {
+          const body = await options.runtime.requestOptions?.onPayload?.(payload, selectedModel) ?? payload;
+          const messages = (body as { messages?: { role: string; content?: unknown }[] }).messages ?? [];
+          toolResultInProviderPayload ||= messages.some((message) => message.role === "tool"
+            && typeof message.content === "string" && message.content.includes(expectedMarker));
+          return body;
+        },
+      });
+    },
     toolExecution: "sequential",
     sessionId: runId,
   });
@@ -85,42 +113,59 @@ export async function runAgentSpike(options: AgentSpikeOptions): Promise<AgentSp
       logSafeEvent(`agent.${event.type}`, runId);
     }
   });
-  const abort = () => agent.abort();
-  options.signal?.addEventListener("abort", abort, { once: true });
-  const timer = setTimeout(abort, options.timeoutMs ?? 180_000);
+  const abort = (cause: "external" | "timeout") => {
+    cancellation.cause ??= cause;
+    agent.abort();
+  };
+  const externalAbort = () => abort("external");
+  options.signal?.addEventListener("abort", externalAbort, { once: true });
+  const timer = setTimeout(() => abort("timeout"), options.timeoutMs ?? 180_000);
   try {
     logSafeEvent("agent.run.start", runId, {
       modelId: options.runtime.modelId,
       providerId: options.runtime.providerId,
     });
-    await agent.prompt("Follow the loaded Skill and complete its verification task.");
+    if (options.signal?.aborted) cancellation.cause ??= "external";
+    if (!cancellation.cause) await agent.prompt("Follow the loaded Skill and complete its verification task.");
     await agent.waitForIdle();
+  } catch {
+    unexpectedFailure = true;
+    agent.abort();
+    await agent.waitForIdle().catch(() => undefined);
   } finally {
     clearTimeout(timer);
-    options.signal?.removeEventListener("abort", abort);
+    options.signal?.removeEventListener("abort", externalAbort);
     unsubscribe();
   }
   const message = finalAssistant(agent.state.messages);
   const finalText = assistantText(message);
   const audit = toolHandle.getAudit();
-  const status = classifyStatus(message);
+  const status = cancellation.cause === "external" ? "cancelled"
+    : cancellation.cause === "timeout" || limitExceeded || unexpectedFailure ? "failed" : classifyStatus(message);
   const result: AgentSpikeResult = {
     runId,
     status,
     providerId: message?.provider ?? options.runtime.providerId,
     modelId: message?.responseModel ?? message?.model ?? options.runtime.modelId,
-    finalText,
+    finalText: status === "completed" ? finalText : "",
     markerObserved: finalText.includes(expectedMarker),
     toolCallCount: evidence.toolCalls,
     toolResultCount: evidence.toolResults,
+    modelRequestCount,
+    toolResultInModelRequest,
+    toolResultInProviderPayload,
     toolNames: [...evidence.tools],
     eventTypes: evidence.events,
     resourceCleaned: !agent.state.isStreaming && agent.signal === undefined,
-    errorCode: message?.stopReason === "error"
+    errorCode: cancellation.cause === "timeout" ? "RUN_TIMEOUT"
+      : cancellation.cause === "external" ? "RUN_CANCELLED"
+      : limitExceeded ? "RUN_LIMIT_EXCEEDED"
+      : unexpectedFailure ? "RUN_FAILED"
+      : message?.stopReason === "error"
       ? "MODEL_ERROR"
       : message?.stopReason === "aborted"
         ? "RUN_CANCELLED"
-        : null,
+        : status === "failed" ? "RUN_FAILED" : null,
   };
   logSafeEvent("agent.run.end", runId, {
     markerObserved: result.markerObserved,
@@ -130,8 +175,12 @@ export async function runAgentSpike(options: AgentSpikeOptions): Promise<AgentSp
     readBytes: audit.totalBytes,
     resourceCleaned: result.resourceCleaned,
     status: result.status,
+    errorCode: result.errorCode,
     toolCallCount: result.toolCallCount,
     toolResultCount: result.toolResultCount,
+    modelRequestCount,
+    toolResultInModelRequest,
+    toolResultInProviderPayload,
   });
   return result;
 }

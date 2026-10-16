@@ -1,0 +1,19 @@
+{
+  "runtime": "compiled final image, real index.js and DB, mocked provider",
+  "node": "v22.23.2",
+  "readyStatus": 200,
+  "checks": [
+    {
+      "threadId": "15",
+      "thinkingEnabled": false,
+      "done": true,
+      "reasoningEvent": false
+    },
+    {
+      "threadId": "16",
+      "thinkingEnabled": true,
+      "done": true,
+      "reasoningEvent": true
+    }
+  ]
+}

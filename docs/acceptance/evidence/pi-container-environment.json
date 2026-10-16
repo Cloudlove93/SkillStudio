@@ -1,0 +1,45 @@
+{
+  "date": "2026-10-16",
+  "dockerContext": "desktop-linux",
+  "dockerEngine": "29.8.2",
+  "action": "Started the existing Docker Desktop installation in the background; no reinstall, factory reset, context switch, or volume deletion",
+  "platform": "linux/x86_64",
+  "node": "v22.23.2",
+  "nodeMinimumSatisfied": true,
+  "sdk": {
+    "pi-agent-core": "1.1.0",
+    "pi-ai": "1.1.0"
+  },
+  "finalImage": "educlaw-pi-acceptance:20261016",
+  "finalImageId": "sha256:e34815ff9d05f2a11b098dbafd1f2fbc8f9dd81fb1eb91268fc182aad79ab679",
+  "builderImage": "educlaw-pi-acceptance-builder:20261016",
+  "dockerfile": "educlaw-server/Dockerfile",
+  "buildContext": "isolated source/manifests copy; no environment files or credentials",
+  "install": "pnpm frozen-lockfile in builder; production dependencies installed offline in final image",
+  "build": "shared and server TypeScript builds passed inside image",
+  "testMode": "NODE_ENV=test; multimodal background runner disabled; simulated provider and external identity gateway",
+  "network": "dedicated internal edu-pi-acceptance-20261016",
+  "database": "dedicated PostgreSQL container with tmpfs; no existing database or persistent volume used",
+  "readiness": {
+    "httpStatus": 200,
+    "database": "ok",
+    "objectStorage": "disabled"
+  },
+  "containerPiRegressionTests": {
+    "passed": 67,
+    "failed": 0
+  },
+  "containerDatabaseHttpSdkChecks": {
+    "passed": 10,
+    "failed": 0
+  },
+  "compiledFinalImageSseChecks": {
+    "thinkingOff": "passed",
+    "thinkingOn": "passed",
+    "persisted": true
+  },
+  "existingBusinessContainers": "Automatically resumed by normal Docker Desktop startup. None were rebuilt, stopped, or restarted by the agent.",
+  "taskOwnedContainersStopped": true,
+  "existingBusinessContainersStillRunning": true,
+  "databaseDataMount": "tmpfs:/var/lib/postgresql/data"
+}
