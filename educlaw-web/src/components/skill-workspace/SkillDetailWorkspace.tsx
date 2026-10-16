@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import type { ArenaThread, SkillVersionDetail } from '@educlaw/shared';
+import type { ArenaRunSnapshot, ArenaThread, SkillVersionDetail } from '@educlaw/shared';
 import type { SkillPinnedUpdate, SkillWorkspaceView } from './skill-workspace-state';
 import type { AnswerOptimizationRerunRequest, AnswerOptimizationSelection } from './answer-optimization-selection';
 
@@ -44,7 +44,7 @@ type Props = {
   onPublishUpdate: (update: SkillPinnedUpdate, autoOpen?: boolean) => void;
   onReloadVersions: () => Promise<void>;
   onNavigate: (view: DetailView) => void;
-  onRunStateChange?: (running: boolean, threadId?: string | null) => void;
+  onRunStateChange?: (running: boolean, threadId?: string | null, status?: ArenaRunSnapshot['status']) => void;
   onOptimizeAnswer: (selection: AnswerOptimizationSelection) => void;
   conversations: ArenaThread[];
   selectedConversationId: string | null;

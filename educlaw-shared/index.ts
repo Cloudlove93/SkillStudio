@@ -275,6 +275,38 @@ export interface ArenaChatResult {
   shared: ArenaMessage;
 }
 
+export type ArenaRunStatus = "running" | "stopping" | "succeeded" | "cancelled" | "failed";
+export interface ArenaRunSnapshot {
+  /** A large persisted result must be read through recovery/history. */
+  historyRequired?: boolean;
+  runId: string;
+  threadId: number;
+  requestId: string;
+  revision: number;
+  status: ArenaRunStatus;
+  content: string;
+  reasoningContent: string;
+  thinkingRequested: boolean;
+  thinkingEnabled: boolean;
+  thinkingSupported: boolean | null;
+  shared: ArenaMessage | null;
+  messages: ArenaMessage[];
+  error: string | null;
+  createdAt: number;
+  updatedAt: number;
+}
+export interface ArenaRunStartRequest {
+  requestId: string;
+  content: string;
+  model?: string;
+  mode: "agent";
+  thinkingEnabled?: boolean;
+}
+export interface ArenaRunRecovery {
+  detail: ArenaThreadDetail;
+  run: ArenaRunSnapshot | null;
+}
+
 export interface ArenaDimensionScore {
   key: string;
   name: string;

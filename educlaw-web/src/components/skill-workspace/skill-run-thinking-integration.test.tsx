@@ -1,793 +1,729 @@
 // @vitest-environment jsdom
-
-import { act, StrictMode, useState } from 'react';
+import { act, StrictMode, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import type { ArenaThread, SkillVersionDetail } from '@educlaw/shared';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type {
+  ArenaMessage,
+  ArenaRunSnapshot,
+  ArenaThread,
+  SkillVersionDetail,
+} from '@educlaw/shared';
 
-const {
-  createArenaThreadMock,
-  getArenaThreadDetailMock,
-  renameArenaThreadMock,
-  sendMessageStreamMock,
-} = vi.hoisted(() => ({
-  createArenaThreadMock: vi.fn(),
-  getArenaThreadDetailMock: vi.fn(),
-  renameArenaThreadMock: vi.fn(),
-  sendMessageStreamMock: vi.fn(),
+const api = vi.hoisted(() => ({
+  createArenaThread: vi.fn(),
+  renameArenaThread: vi.fn(),
+  recoverArenaRun: vi.fn(),
+  startArenaRun: vi.fn(),
+  getArenaRun: vi.fn(),
+  subscribeArenaRun: vi.fn(),
+  stopArenaRun: vi.fn(),
 }));
-
-vi.mock('../../api/lite-api', () => ({
-  liteApi: {
-    createArenaThread: createArenaThreadMock,
-    getArenaThreadDetail: getArenaThreadDetailMock,
-    renameArenaThread: renameArenaThreadMock,
-    sendMessageStream: sendMessageStreamMock,
-  },
-}));
-
+vi.mock('../../api/lite-api', () => ({ liteApi: api }));
 vi.mock('../lite/lite-rendering', () => ({
   MarkdownContent: ({ content }: { content: string }) => <div>{content}</div>,
 }));
-
 import { SkillRunWorkspace } from './SkillRunWorkspace';
 import type { AnswerOptimizationRerunRequest } from './answer-optimization-selection';
-
-globalThis.IS_REACT_ACT_ENVIRONMENT = true;
-
-const version = {
-  id: 'version-3',
-  skillId: 'skill-1',
-  packageId: '7',
-  createdInPackageVersionId: '33',
-  versionNumber: 3,
-  source: 'manual',
-  basedOnVersionId: null,
-  skill: {
-    id: 'skill-1',
-    dirName: 'skill-1',
-    name: '函数教学',
-    description: '',
-    skillMd: '# 函数教学',
-  },
-  contentHash: 'hash',
-  status: 'active',
-  note: '',
-  createdAt: '2026-08-27T00:00:00.000Z',
-  discardedAt: null,
-  discardedBy: null,
-  discardReason: null,
-  restoredAt: null,
-  restoredBy: null,
-} as SkillVersionDetail;
-
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 const thread = {
   id: 91,
-  packageId: 7,
-  title: 'Skill 对话',
-  model: 'kimi-k2.5',
-  arenaKind: 'skill_arena',
-  basePackageVersionId: '33',
-  skillArenaConfig: {
-    mode: 'skill_arena',
-    compositionMode: 'skill_only',
-    basePackageVersionId: '33',
-    surface: 'run',
-  },
-  createdAt: '2026-08-27T00:00:00.000Z',
-  updatedAt: '2026-08-27T00:00:00.000Z',
+  title: 'A',
+  createdAt: '2026-10-16',
+  updatedAt: '2026-10-16',
 } as ArenaThread;
-
-function setTextareaValue(textarea: HTMLTextAreaElement, value: string) {
-  const setter = Object.getOwnPropertyDescriptor(
-    HTMLTextAreaElement.prototype,
-    'value',
-  )?.set;
-  setter?.call(textarea, value);
-  textarea.dispatchEvent(new Event('input', { bubbles: true }));
+const version = {
+  id: 'v1',
+  skillId: 's1',
+  versionNumber: 3,
+  createdInPackageVersionId: '33',
+} as SkillVersionDetail;
+const question = {
+  id: 10,
+  threadId: 91,
+  role: 'user',
+  side: 'shared',
+  content: 'question',
+  createdAt: '2026-10-16',
+} as ArenaMessage;
+const answer = {
+  ...question,
+  id: 11,
+  role: 'assistant',
+  side: 'enhanced',
+  content: 'saved-answer',
+  reasoningContent: 'saved-reason',
+} as ArenaMessage;
+function run(extra: Partial<ArenaRunSnapshot> = {}): ArenaRunSnapshot {
+  return {
+    runId: 'r1',
+    threadId: 91,
+    requestId: 'q1',
+    revision: 1,
+    status: 'running',
+    content: 'partial-answer',
+    reasoningContent: 'partial-reason',
+    shared: question,
+    messages: [],
+    error: null,
+    thinkingRequested: true,
+    thinkingEnabled: true,
+    thinkingSupported: true,
+    createdAt: 1,
+    updatedAt: 1,
+    ...extra,
+  };
 }
-
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((nextResolve) => {
-    resolve = nextResolve;
+  const promise = new Promise<T>((r) => {
+    resolve = r;
   });
   return { promise, resolve };
 }
 
-function clickSend(container: HTMLDivElement) {
-  container
-    .querySelector<HTMLButtonElement>('.skill-composer-input-row > button')
-    ?.click();
-}
-
-describe('Skill run thinking integration', () => {
-  let container: HTMLDivElement;
+describe('resumable Skill run lifecycle', () => {
+  it.each(['unavailable', 'missing'])(
+    'keeps a %s pending stop recovery from changing the newly selected conversation',
+    async (failure) => {
+      const start = deferred<ArenaRunSnapshot>();
+      api.startArenaRun.mockImplementation(async () => {
+        await start.promise;
+        throw new Error('old start failed');
+      });
+      await render();
+      await send();
+      await act(async () =>
+        container
+          .querySelector<HTMLButtonElement>('[aria-label="停止生成"]')!
+          .click(),
+      );
+      api.recoverArenaRun.mockResolvedValueOnce({
+        detail: {
+          thread,
+          messages: [{ ...question, id: 22, content: 'B-current-question' }],
+        },
+        run: null,
+      });
+      if (failure === 'unavailable')
+        api.recoverArenaRun.mockRejectedValue(new Error('old recovery failed'));
+      else
+        api.recoverArenaRun.mockResolvedValue({
+          detail: { thread, messages: [] },
+          run: null,
+        });
+      await render('92');
+      await act(async () =>
+        start.resolve(run({ status: 'failed', error: 'old failure' })),
+      );
+      expect(container.textContent).toContain('B-current-question');
+      expect(container.textContent).not.toContain('old failure');
+      expect(container.textContent).not.toContain('无法确认运行状态');
+      expect(api.stopArenaRun).not.toHaveBeenCalled();
+    },
+  );
+  it('honors explicit stop while the accepted start response is still pending', async () => {
+    const start = deferred<ArenaRunSnapshot>();
+    api.startArenaRun.mockReturnValue(start.promise);
+    await render();
+    await send();
+    await act(async () =>
+      container
+        .querySelector<HTMLButtonElement>('[aria-label="停止生成"]')!
+        .click(),
+    );
+    expect(api.stopArenaRun).not.toHaveBeenCalled();
+    expect(container.textContent).not.toContain('已停止生成');
+    await act(async () => start.resolve(run()));
+    expect(api.stopArenaRun).toHaveBeenCalledWith('token', '91', 'r1');
+    expect(container.textContent).toContain('已停止生成');
+  });
   let root: Root;
-  const onOptimizeAnswer = vi.fn();
-
+  let container: HTMLDivElement;
+  let receive: (snapshot: ArenaRunSnapshot) => void;
+  const onState = vi.fn();
+  const onCreated = vi.fn();
+  const onCompleted = vi.fn();
+  const onOptimize = vi.fn();
   beforeEach(() => {
+    vi.resetAllMocks();
     localStorage.clear();
     container = document.createElement('div');
     document.body.append(container);
     root = createRoot(container);
-    createArenaThreadMock.mockResolvedValue(thread);
-    renameArenaThreadMock.mockResolvedValue(thread);
-    getArenaThreadDetailMock.mockResolvedValue({ thread, messages: [] });
+    api.recoverArenaRun.mockResolvedValue({
+      detail: { thread, messages: [] },
+      run: null,
+    });
+    api.createArenaThread.mockResolvedValue(thread);
+    api.renameArenaThread.mockResolvedValue(thread);
+    api.startArenaRun.mockResolvedValue(run());
+    api.subscribeArenaRun.mockImplementation(
+      (_token, _thread, _run, callback, signal: AbortSignal) => {
+        receive = callback;
+        return new Promise<void>((resolve) =>
+          signal.addEventListener('abort', () => resolve(), { once: true }),
+        );
+      },
+    );
+    api.stopArenaRun.mockResolvedValue(
+      run({ status: 'cancelled', revision: 3 }),
+    );
   });
-
   afterEach(async () => {
     await act(async () => root.unmount());
     container.remove();
-    vi.clearAllMocks();
+    vi.useRealTimers();
   });
-
-  function render(selectedThreadId: string | null = null) {
-    return act(async () => {
-      root.render(
+  async function render(
+    id: string | null = '91',
+    strict = false,
+    props: Partial<ComponentProps<typeof SkillRunWorkspace>> = {},
+  ) {
+    await act(async () => {
+      const child = (
         <SkillRunWorkspace
           token="token"
           packageId="7"
           version={version}
           currentPackageVersionId="33"
-          onOptimizeAnswer={onOptimizeAnswer}
-          selectedThreadId={selectedThreadId}
-        />,
-      );
-    });
-  }
-
-  function emitSavedAnswer(onEvent: (event: unknown) => void, question: string, answer = 'saved-after-load') {
-    onEvent({ event: 'done', data: { thread, messages: [
-      { id: 10, threadId: 91, side: 'shared', role: 'user', content: question, createdAt: thread.createdAt },
-      { id: 11, threadId: 91, side: 'enhanced', role: 'assistant', content: answer, createdAt: thread.createdAt },
-    ] } });
-  }
-
-  it.each(['button', 'Enter'])('blocks %s sends until history settles and preserves the next saved answer', async (entry) => {
-    const history = deferred<{ thread: ArenaThread; messages: [] }>();
-    getArenaThreadDetailMock.mockReturnValueOnce(history.promise);
-    sendMessageStreamMock.mockImplementation(async (...args) => emitSavedAnswer(args[6], args[2]));
-    await render('91');
-    const textarea = container.querySelector('textarea')!;
-    await act(async () => setTextareaValue(textarea, 'question-during-load'));
-    await act(async () => {
-      if (entry === 'button') clickSend(container);
-      else textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-    });
-    expect(sendMessageStreamMock).not.toHaveBeenCalled();
-    await act(async () => history.resolve({ thread, messages: [] }));
-    await act(async () => setTextareaValue(textarea, 'question-after-load'));
-    await act(async () => clickSend(container));
-    expect(sendMessageStreamMock).toHaveBeenCalledTimes(1);
-    expect(container.textContent).toContain('saved-after-load');
-    expect(container.querySelector('[aria-label="停止生成"]')).toBeNull();
-  });
-
-  it.each([false, true])('defers an automatic rerun until history and version are ready, initially ready=%s', async (initiallyReady) => {
-    const history = deferred<{ thread: ArenaThread; messages: [] }>();
-    getArenaThreadDetailMock.mockReturnValueOnce(history.promise);
-    sendMessageStreamMock.mockImplementation(async (...args) => emitSavedAnswer(args[6], args[2], 'rerun-saved-answer'));
-    const rerun = { requestId: 'history-rerun', versionNumber: 3, selection: {
-      origin: 'run', question: 'rerun-question',
-    } } as AnswerOptimizationRerunRequest;
-    const renderRerun = (ready: boolean) => act(async () => root.render(
-      <SkillRunWorkspace token="token" packageId="7" version={ready ? version : undefined}
-        currentPackageVersionId="33" onOptimizeAnswer={onOptimizeAnswer} selectedThreadId="91" rerunRequest={rerun} />,
-    ));
-    await renderRerun(initiallyReady);
-    await renderRerun(true);
-    expect(sendMessageStreamMock).not.toHaveBeenCalled();
-    await act(async () => history.resolve({ thread, messages: [] }));
-    expect(sendMessageStreamMock).toHaveBeenCalledTimes(1);
-    expect(container.textContent).toContain('rerun-saved-answer');
-    await renderRerun(true);
-    expect(sendMessageStreamMock).toHaveBeenCalledTimes(1);
-  });
-
-  it('allows an explicit request after history loading fails', async () => {
-    getArenaThreadDetailMock.mockRejectedValueOnce(new Error('controlled history load failure'));
-    sendMessageStreamMock.mockImplementation(async (...args) => emitSavedAnswer(args[6], args[2]));
-    await render('91');
-    expect(container.textContent).toContain('对话加载失败，请重试');
-    await act(async () => setTextareaValue(container.querySelector('textarea')!, 'retry-after-load-error'));
-    await act(async () => clickSend(container));
-    expect(sendMessageStreamMock).toHaveBeenCalledTimes(1);
-    expect(container.textContent).toContain('saved-after-load');
-  });
-
-  it('still aborts the active request when navigating to a different thread', async () => {
-    let activeSignal: AbortSignal | undefined;
-    sendMessageStreamMock.mockImplementation(async (...args) => {
-      activeSignal = args[7];
-      return new Promise<void>((_resolve, reject) => {
-        activeSignal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true });
-      });
-    });
-    await render('91');
-    await act(async () => setTextareaValue(container.querySelector('textarea')!, 'active task'));
-    await act(async () => clickSend(container));
-    expect(activeSignal?.aborted).toBe(false);
-    await render('92');
-    expect(activeSignal?.aborted).toBe(true);
-    expect(getArenaThreadDetailMock).toHaveBeenLastCalledWith('token', '7', '92');
-  });
-
-  it('finishes history hydration when StrictMode replays mount effects', async () => {
-    getArenaThreadDetailMock.mockResolvedValue({ thread, messages: [
-      { id: 1, threadId: 91, side: 'shared', role: 'user', content: 'strict-history-question', createdAt: thread.createdAt },
-      { id: 2, threadId: 91, side: 'enhanced', role: 'assistant', content: 'strict-history-answer', createdAt: thread.createdAt },
-    ] });
-    await act(async () => root.render(<StrictMode>
-      <SkillRunWorkspace token="token" packageId="7" version={version} currentPackageVersionId="33"
-        onOptimizeAnswer={onOptimizeAnswer} selectedThreadId="91" />
-    </StrictMode>));
-    expect(container.textContent).toContain('strict-history-answer');
-    expect(container.textContent).not.toContain('正在加载历史对话');
-    expect(container.querySelector('textarea')?.disabled).toBe(false);
-  });
-
-  it('admits a ready new-thread rerun exactly once through StrictMode effect replay', async () => {
-    sendMessageStreamMock.mockImplementation(async (...args) => emitSavedAnswer(args[6], args[2], 'strict-rerun-answer'));
-    const rerun = { requestId: 'strict-rerun', versionNumber: 3, selection: {
-      origin: 'run', question: 'strict-rerun-question',
-    } } as AnswerOptimizationRerunRequest;
-    await act(async () => root.render(<StrictMode>
-      <SkillRunWorkspace token="token" packageId="7" version={version} currentPackageVersionId="33"
-        onOptimizeAnswer={onOptimizeAnswer} rerunRequest={rerun} />
-    </StrictMode>));
-    expect(sendMessageStreamMock).toHaveBeenCalledTimes(1);
-    expect(container.textContent).toContain('strict-rerun-answer');
-    expect(container.querySelector('[aria-label="停止生成"]')).toBeNull();
-  });
-
-  it('requests thinking, renders it separately, and optimizes only the final answer', async () => {
-    localStorage.setItem('educlaw.skill-chat.thinking.v1', '1');
-    sendMessageStreamMock.mockImplementation(
-      async (
-        _token,
-        _threadId,
-        _content,
-        _model,
-        _mode,
-        _thinkingEnabled,
-        onEvent,
-      ) => {
-        onEvent({
-          event: 'thinking_status',
-          data: { requested: true, enabled: true, supported: true },
-        });
-        onEvent({
-          event: 'reasoning_delta',
-          data: { side: 'enhanced', delta: '内部分析' },
-        });
-        onEvent({
-          event: 'delta',
-          data: { side: 'enhanced', delta: '最终答案' },
-        });
-        onEvent({
-          event: 'side_done',
-          data: {
-            side: 'enhanced',
-            content: '最终答案',
-            reasoningContent: '内部分析',
-            ok: true,
-          },
-        });
-        onEvent({
-          event: 'done',
-          data: {
-            thread,
-            messages: [
-              {
-                id: 1,
-                threadId: 91,
-                side: 'shared',
-                role: 'user',
-                content: '问题',
-                createdAt: thread.createdAt,
-              },
-              {
-                id: 2,
-                threadId: 91,
-                side: 'enhanced',
-                role: 'assistant',
-                content: '最终答案',
-                reasoningContent: '内部分析',
-                createdAt: thread.createdAt,
-              },
-            ],
-          },
-        });
-        onEvent({ event: 'stream_end', data: { ok: true } });
-      },
-    );
-
-    await render();
-    const textarea = container.querySelector('textarea')!;
-    await act(async () => setTextareaValue(textarea, '问题'));
-    await act(async () => {
-      container.querySelector<HTMLButtonElement>('[aria-label="发送任务"]')?.click();
-    });
-
-    expect(sendMessageStreamMock.mock.calls[0]?.[5]).toBe(true);
-    expect(container.textContent).toContain('最终答案');
-    expect(container.textContent).toContain('已完成思考');
-    expect(container.textContent).not.toContain('内部分析');
-
-    await act(async () => {
-      container
-        .querySelector<HTMLButtonElement>('button[aria-expanded="false"]')
-        ?.click();
-    });
-    expect(container.textContent).toContain('内部分析');
-
-    const optimize = [...container.querySelectorAll('button')].find((button) =>
-      button.textContent?.includes('改进这条回答'),
-    );
-    await act(async () => optimize?.click());
-    expect(onOptimizeAnswer.mock.calls[0]?.[0].answer).toBe('最终答案');
-    expect(JSON.stringify(onOptimizeAnswer.mock.calls)).not.toContain(
-      '内部分析',
-    );
-  });
-
-  it('aborts generation without turning a user stop into an error', async () => {
-    localStorage.setItem('educlaw.skill-chat.thinking.v1', '1');
-    let capturedEvent: ((event: unknown) => void) | undefined;
-    let capturedSignal: AbortSignal | undefined;
-    sendMessageStreamMock.mockImplementation(
-      async (
-        _token,
-        _threadId,
-        _content,
-        _model,
-        _mode,
-        _thinkingEnabled,
-        onEvent,
-        signal,
-      ) => {
-        capturedEvent = onEvent;
-        capturedSignal = signal;
-        return new Promise<void>((_resolve, reject) => {
-          signal.addEventListener('abort', () =>
-            reject(new DOMException('Aborted', 'AbortError')),
-          );
-        });
-      },
-    );
-
-    await render();
-    await act(async () =>
-      setTextareaValue(container.querySelector('textarea')!, '长任务'),
-    );
-    await act(async () => {
-      container.querySelector<HTMLButtonElement>('[aria-label="发送任务"]')?.click();
-      await Promise.resolve();
-    });
-    await act(async () => {
-      capturedEvent?.({
-        event: 'reasoning_delta',
-        data: { side: 'enhanced', delta: '已收到分析' },
-      });
-      container
-        .querySelector<HTMLButtonElement>('[aria-label="停止生成"]')
-        ?.click();
-      await Promise.resolve();
-    });
-
-    expect(capturedSignal?.aborted).toBe(true);
-    expect(container.textContent).toContain('已收到分析');
-    expect(container.textContent).toContain('已停止生成');
-    expect(container.textContent).not.toContain('Skill 执行失败');
-  });
-
-  it('restores persisted reasoning when an existing thread is opened', async () => {
-    getArenaThreadDetailMock.mockResolvedValue({
-      thread,
-      messages: [
-        {
-          id: 1,
-          threadId: 91,
-          side: 'shared',
-          role: 'user',
-          content: '历史问题',
-          reasoningContent: null,
-          createdAt: thread.createdAt,
-        },
-        {
-          id: 2,
-          threadId: 91,
-          side: 'enhanced',
-          role: 'assistant',
-          content: '历史答案',
-          reasoningContent: '历史分析',
-          createdAt: thread.createdAt,
-        },
-      ],
-    });
-
-    await render('91');
-    await act(async () => Promise.resolve());
-    expect(container.textContent).toContain('历史答案');
-    expect(container.textContent).not.toContain('历史分析');
-    await act(async () => {
-      container
-        .querySelector<HTMLButtonElement>('button[aria-expanded="false"]')
-        ?.click();
-    });
-    expect(container.textContent).toContain('历史分析');
-  });
-
-  it('keeps a new-thread send alive when the parent echoes the created thread id', async () => {
-    const rename = deferred<ArenaThread>();
-    renameArenaThreadMock.mockReturnValue(rename.promise);
-    sendMessageStreamMock.mockImplementation(
-      async (
-        _token,
-        _threadId,
-        _content,
-        _model,
-        _mode,
-        _thinkingEnabled,
-        onEvent,
-      ) => {
-        onEvent({
-          event: 'side_done',
-          data: {
-            side: 'enhanced',
-            content: 'new-thread-answer',
-            reasoningContent: null,
-            ok: true,
-          },
-        });
-        onEvent({
-          event: 'done',
-          data: {
-            thread,
-            messages: [
-              {
-                id: 10,
-                threadId: 91,
-                side: 'shared',
-                role: 'user',
-                content: 'new-thread-question',
-                createdAt: thread.createdAt,
-              },
-              {
-                id: 11,
-                threadId: 91,
-                side: 'enhanced',
-                role: 'assistant',
-                content: 'new-thread-answer',
-                createdAt: thread.createdAt,
-              },
-            ],
-          },
-        });
-        onEvent({ event: 'stream_end', data: { ok: true } });
-      },
-    );
-
-    function Harness() {
-      const [selectedThreadId, setSelectedThreadId] = useState<string | null>(
-        null,
-      );
-      return (
-        <SkillRunWorkspace
-          token="token"
-          packageId="7"
-          version={version}
-          currentPackageVersionId="33"
-          onOptimizeAnswer={onOptimizeAnswer}
-          selectedThreadId={selectedThreadId}
-          onThreadCreated={(nextThread) =>
-            setSelectedThreadId(String(nextThread.id))
-          }
+          selectedThreadId={id}
+          onRunStateChange={onState}
+          onThreadCreated={onCreated}
+          onCompleted={onCompleted}
+          onOptimizeAnswer={onOptimize}
+          {...props}
         />
       );
-    }
-
-    await act(async () => root.render(<Harness />));
-    await act(async () =>
-      setTextareaValue(container.querySelector('textarea')!, 'new-thread-question'),
-    );
-    await act(async () => {
-      clickSend(container);
-      await Promise.resolve();
+      root.render(strict ? <StrictMode>{child}</StrictMode> : child);
     });
+  }
+  async function send(content = 'question') {
+    await act(async () => {
+      const textarea = container.querySelector('textarea')!;
+      Object.getOwnPropertyDescriptor(
+        HTMLTextAreaElement.prototype,
+        'value',
+      )!.set!.call(textarea, content);
+      textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await act(async () =>
+      container
+        .querySelector<HTMLButtonElement>('[aria-label="发送任务"]')
+        ?.click(),
+    );
+  }
+  it('recovers active snapshots without starting another model execution', async () => {
+    api.recoverArenaRun.mockResolvedValue({
+      detail: { thread, messages: [question] },
+      run: run(),
+    });
+    await render();
+    expect(container.textContent).toContain('partial-answer');
+    expect(container.textContent).toContain('partial-reason');
+    expect(api.startArenaRun).not.toHaveBeenCalled();
+    expect(container.querySelector('[aria-label="停止生成"]')).not.toBeNull();
+  });
+  it('detaches A, displays B, and restores A without cancelling or resending', async () => {
+    api.recoverArenaRun.mockImplementation((_t, id) =>
+      Promise.resolve({
+        detail: { thread, messages: [] },
+        run: id === '91' ? run() : null,
+      }),
+    );
+    await render();
+    const signal = api.subscribeArenaRun.mock.calls[0][4];
+    await render('92');
+    expect(signal.aborted).toBe(true);
+    expect(api.stopArenaRun).not.toHaveBeenCalled();
+    expect(onState).not.toHaveBeenCalledWith(false, '91');
+    await render('91');
+    expect(container.textContent).toContain('partial-answer');
+    expect(api.startArenaRun).not.toHaveBeenCalled();
+  });
+  it('StrictMode mount restores the run after effect replay', async () => {
+    api.recoverArenaRun.mockResolvedValue({
+      detail: { thread, messages: [question] },
+      run: run(),
+    });
+    await render('91', true);
+    expect(container.textContent).toContain('partial-answer');
+    expect(api.startArenaRun).not.toHaveBeenCalled();
+  });
+  it('completion racing with history is merged once with provenance', async () => {
+    api.recoverArenaRun.mockResolvedValue({
+      detail: { thread, messages: [question, answer] },
+      run: run({ status: 'succeeded', messages: [question, answer] }),
+    });
+    await render();
+    expect(container.querySelectorAll('.skill-user-message')).toHaveLength(1);
+    expect(container.querySelectorAll('.skill-assistant-block')).toHaveLength(
+      1,
+    );
+    expect(container.textContent).toContain('saved-answer');
+    await act(async () =>
+      container
+        .querySelector<HTMLButtonElement>('.skill-reasoning-toggle')!
+        .click(),
+    );
+    expect(container.textContent).toContain('saved-reason');
+  });
+  it('stops the exact recovered run and waits for actual cancellation', async () => {
+    api.recoverArenaRun.mockResolvedValue({
+      detail: { thread, messages: [question] },
+      run: run(),
+    });
+    const stop = deferred<ArenaRunSnapshot>();
+    api.stopArenaRun.mockReturnValue(stop.promise);
+    await render();
+    await act(async () =>
+      container
+        .querySelector<HTMLButtonElement>('[aria-label="停止生成"]')!
+        .click(),
+    );
+    expect(api.stopArenaRun).toHaveBeenCalledWith('token', '91', 'r1');
+    expect(container.querySelector('[aria-label="停止生成"]')).not.toBeNull();
+    await act(async () =>
+      stop.resolve(run({ status: 'cancelled', revision: 3 })),
+    );
+    expect(container.textContent).toContain('已停止生成');
+  });
+  it('a failed stop preserves active status', async () => {
+    api.recoverArenaRun.mockResolvedValue({
+      detail: { thread, messages: [] },
+      run: run(),
+    });
+    api.stopArenaRun.mockRejectedValue(new Error('stop unavailable'));
+    await render();
+    await act(async () =>
+      container
+        .querySelector<HTMLButtonElement>('[aria-label="停止生成"]')!
+        .click(),
+    );
+    expect(container.textContent).toContain('stop unavailable');
+    expect(container.querySelector('[aria-label="停止生成"]')).not.toBeNull();
+    expect(onState).not.toHaveBeenCalledWith(false, '91');
+  });
+  it('retries a lost start response with the same request identity', async () => {
+    api.startArenaRun
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce(run());
+    await render();
+    await send();
+    expect(api.startArenaRun).toHaveBeenCalledTimes(2);
+    expect(api.startArenaRun.mock.calls[0][2]).toEqual(
+      api.startArenaRun.mock.calls[1][2],
+    );
+  });
+  it('ignores stale and repeated snapshot revisions', async () => {
+    api.recoverArenaRun.mockResolvedValue({
+      detail: { thread, messages: [question] },
+      run: run(),
+    });
+    await render();
+    await act(async () => {
+      receive(run({ revision: 3, content: 'newest' }));
+      receive(run({ revision: 2, content: 'stale' }));
+    });
+    expect(container.textContent).toContain('newest');
+    expect(container.textContent).not.toContain('stale');
+  });
+  it('does not let a late thread create switch the current conversation back', async () => {
+    const creation = deferred<ArenaThread>();
+    api.createArenaThread.mockReturnValue(creation.promise);
+    await render(null);
+    await send();
+    await render('92');
+    await act(async () => creation.resolve(thread));
+    expect(onCreated).not.toHaveBeenCalled();
+    expect(api.startArenaRun).not.toHaveBeenCalled();
+  });
+  it('does not let a late rename emit stale presentation side effects', async () => {
+    const rename = deferred<ArenaThread>();
+    api.renameArenaThread.mockReturnValue(rename.promise);
+    await render(null);
+    await send();
+    onCreated.mockClear();
+    await render('92');
     await act(async () => rename.resolve(thread));
-
-    expect(sendMessageStreamMock).toHaveBeenCalledTimes(1);
-    expect(container.textContent).toContain('new-thread-answer');
+    expect(onCreated).not.toHaveBeenCalled();
   });
-
-  it('exits loading with an error when the SSE stream ends without a terminal event', async () => {
-    sendMessageStreamMock.mockResolvedValue(undefined);
-
-    await render('91');
-    await act(async () => Promise.resolve());
-    await act(async () =>
-      setTextareaValue(container.querySelector('textarea')!, 'abrupt-eof'),
-    );
-    await act(async () => clickSend(container));
-
-    expect(container.querySelector('.skill-composer-stop')).toBeNull();
-    expect(container.textContent).toContain('连接提前结束');
+  it('blocks sends while recovery is pending', async () => {
+    const recovery = deferred<unknown>();
+    api.recoverArenaRun.mockReturnValue(recovery.promise);
+    await render();
+    expect(container.querySelector('textarea')!.disabled).toBe(true);
+    expect(api.startArenaRun).not.toHaveBeenCalled();
   });
-
-  it('does not publish an assistant answer before the persisted done event', async () => {
-    sendMessageStreamMock.mockImplementation(
-      async (
-        _token,
-        _threadId,
-        _content,
-        _model,
-        _mode,
-        _thinkingEnabled,
-        onEvent,
-      ) => {
-        onEvent({
-          event: 'side_done',
-          data: {
-            side: 'enhanced',
-            content: 'not-persisted-answer',
-            reasoningContent: null,
-            ok: true,
-          },
-        });
-        onEvent({ event: 'stream_end', data: { ok: true } });
-      },
-    );
-
-    await render('91');
-    await act(async () => Promise.resolve());
+  it('accepts a subsequent round after confirmed completion without duplicate history', async () => {
+    await render();
+    await send();
     await act(async () =>
-      setTextareaValue(container.querySelector('textarea')!, 'persist-me'),
+      receive(
+        run({ revision: 3, status: 'succeeded', messages: [question, answer] }),
+      ),
     );
-    await act(async () => clickSend(container));
-
-    expect(container.textContent).not.toContain('not-persisted-answer');
-    expect(container.textContent).toContain('连接提前结束');
+    await send('second');
+    expect(api.startArenaRun).toHaveBeenCalledTimes(2);
+    expect(onCompleted).toHaveBeenCalledTimes(1);
   });
-
-  it('suppresses a synchronous double submit', async () => {
-    const stream = deferred<void>();
-    sendMessageStreamMock.mockReturnValue(stream.promise);
-
-    await render('91');
-    await act(async () => Promise.resolve());
-    await act(async () =>
-      setTextareaValue(container.querySelector('textarea')!, 'double-submit'),
-    );
-    await act(async () => {
-      clickSend(container);
-      clickSend(container);
-      await Promise.resolve();
+  it('detaches unmount without reporting a terminal state', async () => {
+    api.recoverArenaRun.mockResolvedValue({
+      detail: { thread, messages: [] },
+      run: run(),
     });
-
-    expect(sendMessageStreamMock).toHaveBeenCalledTimes(1);
-    await act(async () => {
-      container
-        .querySelector<HTMLButtonElement>('.skill-composer-stop')
-        ?.click();
+    await render();
+    await act(async () => root.render(null));
+    expect(api.stopArenaRun).not.toHaveBeenCalled();
+    expect(onState).not.toHaveBeenCalledWith(false, '91');
+  });
+  it('recovers persisted history after an expired run or process restart without reprompting', async () => {
+    vi.useFakeTimers();
+    api.recoverArenaRun
+      .mockResolvedValueOnce({
+        detail: { thread, messages: [question] },
+        run: run(),
+      })
+      .mockResolvedValue({
+        detail: { thread, messages: [question, answer] },
+        run: null,
+      });
+    api.subscribeArenaRun.mockResolvedValueOnce(undefined);
+    api.getArenaRun.mockRejectedValue(
+      Object.assign(new Error('expired'), { status: 404 }),
+    );
+    await render();
+    await act(async () => vi.advanceTimersByTimeAsync(750));
+    expect(container.textContent).toContain('saved-answer');
+    expect(container.querySelector('[aria-label="停止生成"]')).toBeNull();
+    expect(api.startArenaRun).not.toHaveBeenCalled();
+  });
+  it('honors a completed same-request run after both start responses were lost', async () => {
+    api.startArenaRun.mockRejectedValue(new TypeError('Failed to fetch'));
+    api.recoverArenaRun
+      .mockResolvedValueOnce({ detail: { thread, messages: [] }, run: null })
+      .mockImplementation(async () => ({
+        detail: { thread, messages: [question, answer] },
+        run: run({
+          requestId: api.startArenaRun.mock.calls[0][2].requestId,
+          status: 'succeeded',
+          messages: [question, answer],
+        }),
+      }));
+    await render();
+    await send();
+    expect(container.textContent).toContain('saved-answer');
+    expect(container.textContent).not.toContain('Failed to fetch');
+    expect(container.querySelectorAll('.skill-user-message')).toHaveLength(1);
+  });
+  it('refetches persisted history before accepting an oversized terminal snapshot', async () => {
+    api.recoverArenaRun
+      .mockResolvedValueOnce({
+        detail: { thread, messages: [question] },
+        run: run(),
+      })
+      .mockResolvedValue({
+        detail: { thread, messages: [question, answer] },
+        run: run({ status: 'succeeded', messages: [] }),
+      });
+    await render();
+    await act(async () =>
+      receive(
+        run({
+          status: 'succeeded',
+          revision: 4,
+          shared: null,
+          messages: [],
+          content: '',
+          reasoningContent: '',
+        }),
+      ),
+    );
+    expect(container.textContent).toContain('saved-answer');
+    expect(onCompleted).toHaveBeenCalledTimes(1);
+  });
+  it('detaches old credentials and clears old history when identity changes on the same thread', async () => {
+    api.recoverArenaRun.mockResolvedValueOnce({
+      detail: { thread, messages: [question] },
+      run: run(),
     });
+    await render();
+    const signal = api.subscribeArenaRun.mock.calls[0][4];
+    await render('91', false, { token: 'other-token' });
+    expect(signal.aborted).toBe(true);
+    expect(api.recoverArenaRun).toHaveBeenLastCalledWith('other-token', '91');
+    expect(container.textContent).not.toContain('partial-answer');
   });
-
-  it('allows another send after a successful persisted response', async () => {
-    let nextMessageId = 40;
-    sendMessageStreamMock.mockImplementation(
-      async (
-        _token,
-        _threadId,
-        content,
-        _model,
-        _mode,
-        _thinkingEnabled,
-        onEvent,
-      ) => {
-        const questionId = nextMessageId++;
-        const answerId = nextMessageId++;
-        onEvent({
-          event: 'side_done',
-          data: {
-            side: 'enhanced',
-            content: `${content}-answer`,
-            reasoningContent: null,
-            ok: true,
-          },
-        });
-        onEvent({
-          event: 'done',
-          data: {
-            thread,
-            messages: [
-              {
-                id: questionId,
-                threadId: 91,
-                side: 'shared',
-                role: 'user',
-                content,
-                createdAt: thread.createdAt,
-              },
-              {
-                id: answerId,
-                threadId: 91,
-                side: 'enhanced',
-                role: 'assistant',
-                content: `${content}-answer`,
-                createdAt: thread.createdAt,
-              },
-            ],
-          },
-        });
-        onEvent({ event: 'stream_end', data: { ok: true } });
-      },
+  it('stops retrying an unauthorized run and never resends its prompt', async () => {
+    vi.useFakeTimers();
+    api.recoverArenaRun.mockResolvedValue({
+      detail: { thread, messages: [question] },
+      run: run(),
+    });
+    api.subscribeArenaRun.mockResolvedValueOnce(undefined);
+    api.getArenaRun.mockRejectedValue(
+      Object.assign(new Error('forbidden'), { status: 403 }),
     );
-
+    await render();
+    await act(async () => vi.advanceTimersByTimeAsync(3000));
+    expect(api.getArenaRun).toHaveBeenCalledTimes(1);
+    expect(container.textContent).toContain('无权访问');
+    expect(api.startArenaRun).not.toHaveBeenCalled();
+  });
+  it('does not confuse an earlier terminal run with a lost new start response', async () => {
+    api.startArenaRun.mockRejectedValue(new TypeError('Failed to fetch'));
+    api.recoverArenaRun.mockResolvedValue({
+      detail: { thread, messages: [question, answer] },
+      run: run({
+        requestId: 'old-request',
+        status: 'succeeded',
+        messages: [question, answer],
+      }),
+    });
+    await render();
+    onCompleted.mockClear();
+    await send('new-question');
+    expect(container.textContent).toContain('Failed to fetch');
+    expect(onCompleted).not.toHaveBeenCalled();
+  });
+  it('suppresses a synchronous double submission', async () => {
+    await render();
+    await act(async () => {
+      const textarea = container.querySelector('textarea')!;
+      Object.getOwnPropertyDescriptor(
+        HTMLTextAreaElement.prototype,
+        'value',
+      )!.set!.call(textarea, 'question');
+      textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await act(async () => {
+      const button = container.querySelector<HTMLButtonElement>(
+        '[aria-label="发送任务"]',
+      )!;
+      button.click();
+      button.click();
+    });
+    expect(api.startArenaRun).toHaveBeenCalledTimes(1);
+  });
+  it('a new-thread acknowledgement preserves its existing subscription', async () => {
+    await render(null);
+    await send();
+    const signal = api.subscribeArenaRun.mock.calls[0][4];
     await render('91');
-    await act(async () => Promise.resolve());
-    await act(async () =>
-      setTextareaValue(container.querySelector('textarea')!, 'first-question'),
-    );
-    await act(async () => clickSend(container));
-    await act(async () =>
-      setTextareaValue(container.querySelector('textarea')!, 'second-question'),
-    );
-    await act(async () => clickSend(container));
-
-    expect(sendMessageStreamMock).toHaveBeenCalledTimes(2);
-    expect(container.textContent).toContain('first-question-answer');
-    expect(container.textContent).toContain('second-question-answer');
+    expect(signal.aborted).toBe(false);
+    expect(api.startArenaRun).toHaveBeenCalledTimes(1);
+    expect(api.recoverArenaRun).not.toHaveBeenCalled();
   });
-
-  it('can send again after cancelling the previous request', async () => {
-    sendMessageStreamMock
-      .mockImplementationOnce(
-        async (
-          _token,
-          _threadId,
-          _content,
-          _model,
-          _mode,
-          _thinkingEnabled,
-          _onEvent,
-          signal,
-        ) =>
-          new Promise<void>((_resolve, reject) => {
-            signal.addEventListener('abort', () =>
-              reject(new DOMException('Aborted', 'AbortError')),
-            );
-          }),
-      )
-      .mockImplementationOnce(
-        async (
-          _token,
-          _threadId,
-          _content,
-          _model,
-          _mode,
-          _thinkingEnabled,
-          onEvent,
-        ) => {
-          onEvent({
-            event: 'side_done',
-            data: {
-              side: 'enhanced',
-              content: 'retry-answer',
-              reasoningContent: null,
-              ok: true,
-            },
-          });
-          onEvent({
-            event: 'done',
-            data: {
-              thread,
-              messages: [
-                {
-                  id: 30,
-                  threadId: 91,
-                  side: 'shared',
-                  role: 'user',
-                  content: 'retry-question',
-                  createdAt: thread.createdAt,
-                },
-                {
-                  id: 31,
-                  threadId: 91,
-                  side: 'enhanced',
-                  role: 'assistant',
-                  content: 'retry-answer',
-                  createdAt: thread.createdAt,
-                },
-              ],
-            },
-          });
-          onEvent({ event: 'stream_end', data: { ok: true } });
-        },
+  it.each([false, true])(
+    'admits a rerun once after version and recovery become ready, strict=%s',
+    async (strict) => {
+      const pending = deferred<unknown>();
+      api.recoverArenaRun.mockReturnValue(pending.promise);
+      const rerun = {
+        requestId: 'rerun-1',
+        versionNumber: 3,
+        selection: { origin: 'run', question: 'rerun-question' },
+      } as AnswerOptimizationRerunRequest;
+      await render('91', strict, { version: undefined, rerunRequest: rerun });
+      expect(api.startArenaRun).not.toHaveBeenCalled();
+      await act(async () =>
+        pending.resolve({ detail: { thread, messages: [] }, run: null }),
       );
-
-    await render('91');
-    await act(async () => Promise.resolve());
-    await act(async () =>
-      setTextareaValue(container.querySelector('textarea')!, 'cancel-first'),
-    );
-    await act(async () => {
-      clickSend(container);
-      await Promise.resolve();
+      await render('91', strict, { rerunRequest: rerun });
+      expect(api.startArenaRun).toHaveBeenCalledTimes(1);
+      expect(api.startArenaRun.mock.calls[0][2].content).toBe('rerun-question');
+      await render('91', strict, { rerunRequest: rerun });
+      expect(api.startArenaRun).toHaveBeenCalledTimes(1);
+    },
+  );
+  it('keeps recovered history stable when a stale A recovery resolves on B', async () => {
+    const pending = deferred<unknown>();
+    api.recoverArenaRun.mockReturnValueOnce(pending.promise).mockResolvedValue({
+      detail: {
+        thread,
+        messages: [{ ...question, id: 20, content: 'B-question' }],
+      },
+      run: null,
     });
-    await act(async () => {
-      container
-        .querySelector<HTMLButtonElement>('.skill-composer-stop')
-        ?.click();
-      await Promise.resolve();
-    });
-    await act(async () =>
-      setTextareaValue(container.querySelector('textarea')!, 'retry-question'),
-    );
-    await act(async () => clickSend(container));
-
-    expect(sendMessageStreamMock).toHaveBeenCalledTimes(2);
-    expect(container.textContent).toContain('retry-answer');
-  });
-
-  it('shows history loading and ignores a stale thread response after a rapid switch', async () => {
-    const first = deferred<{
-      thread: ArenaThread;
-      messages: Array<Record<string, unknown>>;
-    }>();
-    const second = deferred<{
-      thread: ArenaThread;
-      messages: Array<Record<string, unknown>>;
-    }>();
-    getArenaThreadDetailMock.mockImplementation(
-      (_token, _packageId, selectedThreadId) =>
-        selectedThreadId === '91' ? first.promise : second.promise,
-    );
-
     await render('91');
-    expect(container.textContent).toContain('正在加载历史对话');
     await render('92');
     await act(async () =>
-      second.resolve({
-        thread: { ...thread, id: 92 },
-        messages: [
-          {
-            id: 20,
-            threadId: 92,
-            side: 'shared',
-            role: 'user',
-            content: 'thread-b-question',
-            createdAt: thread.createdAt,
-          },
-          {
-            id: 21,
-            threadId: 92,
-            side: 'enhanced',
-            role: 'assistant',
-            content: 'thread-b-answer',
-            createdAt: thread.createdAt,
-          },
-        ],
+      pending.resolve({ detail: { thread, messages: [question] }, run: run() }),
+    );
+    expect(container.textContent).toContain('B-question');
+    expect(container.textContent).not.toContain('partial-answer');
+  });
+  it('uses persisted answer provenance for optimization and keeps reasoning separate', async () => {
+    api.recoverArenaRun.mockResolvedValue({
+      detail: { thread, messages: [question, answer] },
+      run: null,
+    });
+    await render();
+    const optimize = Array.from(container.querySelectorAll('button')).find(
+      (button) => button.textContent?.includes('改进这条回答'),
+    );
+    await act(async () => optimize!.click());
+    expect(onOptimize).toHaveBeenCalledWith(
+      expect.objectContaining({
+        question: 'question',
+        answer: 'saved-answer',
+        questionMessageId: 10,
+        enhancedAnswerMessageId: 11,
       }),
     );
+  });
+  it('does not publish partial text as a saved assistant answer before terminal persistence', async () => {
+    api.recoverArenaRun.mockResolvedValue({
+      detail: { thread, messages: [question] },
+      run: run(),
+    });
+    await render();
+    expect(container.textContent).not.toContain('改进这条回答');
+    expect(container.textContent).toContain('partial-answer');
+    expect(onCompleted).not.toHaveBeenCalled();
+  });
+  it('permits another round after a recovered failure', async () => {
+    api.recoverArenaRun.mockResolvedValue({
+      detail: { thread, messages: [question] },
+      run: run({ status: 'failed', error: 'model failed' }),
+    });
+    await render();
+    expect(container.textContent).toContain('model failed');
+    await send('retry-question');
+    expect(api.startArenaRun).toHaveBeenCalledTimes(1);
+  });
+  it('requests thinking and optimizes only the final saved answer', async () => {
+    localStorage.setItem('educlaw.skill-chat.thinking.v1', '1');
+    api.startArenaRun.mockResolvedValue(
+      run({ status: 'succeeded', messages: [question, answer] }),
+    );
+    await render();
+    await send();
+    expect(api.startArenaRun.mock.calls[0][2].thinkingEnabled).toBe(true);
+    expect(container.textContent).not.toContain('saved-reason');
     await act(async () =>
-      first.resolve({
-        thread,
-        messages: [
-          {
-            id: 1,
-            threadId: 91,
-            side: 'shared',
-            role: 'user',
-            content: 'stale-thread-a-question',
-            createdAt: thread.createdAt,
-          },
-        ],
-      }),
+      container
+        .querySelector<HTMLButtonElement>('.skill-reasoning-toggle')!
+        .click(),
     );
-
-    expect(container.textContent).toContain('thread-b-answer');
-    expect(container.textContent).not.toContain('stale-thread-a-question');
+    expect(container.textContent).toContain('saved-reason');
+    await act(async () =>
+      Array.from(container.querySelectorAll('button'))
+        .find((button) => button.textContent?.includes('改进这条回答'))!
+        .click(),
+    );
+    expect(onOptimize.mock.calls[0][0].answer).toBe('saved-answer');
+    expect(JSON.stringify(onOptimize.mock.calls)).not.toContain('saved-reason');
+  });
+  it('retains an active run when SSE ends and reconnects to the same run without prompting', async () => {
+    vi.useFakeTimers();
+    api.recoverArenaRun.mockResolvedValue({
+      detail: { thread, messages: [question] },
+      run: run(),
+    });
+    api.subscribeArenaRun.mockResolvedValueOnce(undefined);
+    api.getArenaRun.mockResolvedValue(
+      run({ revision: 3, content: 'reconnected-text' }),
+    );
+    await render();
+    expect(container.querySelector('[aria-label="停止生成"]')).not.toBeNull();
+    await act(async () => vi.advanceTimersByTimeAsync(750));
+    expect(container.textContent).toContain('reconnected-text');
+    expect(api.subscribeArenaRun).toHaveBeenCalledTimes(2);
+    expect(api.startArenaRun).not.toHaveBeenCalled();
+  });
+  it('blocks duplicate admission after history fails until a fresh recovery confirms state', async () => {
+    api.recoverArenaRun.mockRejectedValueOnce(new Error('unavailable'));
+    await render();
+    expect(container.textContent).toContain('对话加载失败');
+    await send();
+    expect(api.startArenaRun).not.toHaveBeenCalled();
+    await render('92');
+    await send();
+    expect(api.startArenaRun).toHaveBeenCalledTimes(1);
+  });
+  it('does not mark completion until a terminal history read includes the committed answer', async () => {
+    vi.useFakeTimers();
+    api.recoverArenaRun
+      .mockResolvedValueOnce({
+        detail: { thread, messages: [question] },
+        run: run(),
+      })
+      .mockResolvedValueOnce({
+        detail: { thread, messages: [question] },
+        run: run({ status: 'succeeded', messages: [] }),
+      })
+      .mockResolvedValue({
+        detail: { thread, messages: [question, answer] },
+        run: run({ status: 'succeeded', messages: [] }),
+      });
+    await render();
+    await act(async () =>
+      receive(
+        run({
+          revision: 3,
+          status: 'succeeded',
+          messages: [],
+          shared: null,
+          content: '',
+          historyRequired: true,
+        }),
+      ),
+    );
+    expect(onCompleted).not.toHaveBeenCalled();
+    await act(async () => vi.advanceTimersByTimeAsync(750));
+    expect(container.textContent).toContain('saved-answer');
+    expect(onCompleted).toHaveBeenCalledTimes(1);
+  });
+  it('keeps one question through send, authoritative shared message and compacted terminal history', async () => {
+    api.recoverArenaRun
+      .mockResolvedValueOnce({ detail: { thread, messages: [] }, run: null })
+      .mockResolvedValue({
+        detail: { thread, messages: [question, answer] },
+        run: run({ status: 'succeeded', historyRequired: true, messages: [] }),
+      });
+    await render();
+    await send();
+    await act(async () => receive(run({ revision: 2, shared: question })));
+    await act(async () =>
+      receive(
+        run({
+          revision: 3,
+          status: 'succeeded',
+          shared: null,
+          messages: [],
+          content: '',
+          reasoningContent: '',
+          historyRequired: true,
+        }),
+      ),
+    );
+    expect(container.querySelectorAll('.skill-user-message')).toHaveLength(1);
+    expect(container.textContent).toContain('saved-answer');
+  });
+  it('subscribes to a newer active run discovered after the old cache expires', async () => {
+    vi.useFakeTimers();
+    api.recoverArenaRun
+      .mockResolvedValueOnce({
+        detail: { thread, messages: [question] },
+        run: run(),
+      })
+      .mockResolvedValue({
+        detail: { thread, messages: [question] },
+        run: run({ runId: 'r2', revision: 1, content: 'new-run' }),
+      });
+    api.subscribeArenaRun.mockResolvedValueOnce(undefined);
+    api.getArenaRun.mockRejectedValue(
+      Object.assign(new Error('expired'), { status: 404 }),
+    );
+    await render();
+    await act(async () => vi.advanceTimersByTimeAsync(750));
+    expect(api.subscribeArenaRun).toHaveBeenLastCalledWith(
+      'token',
+      '91',
+      'r2',
+      expect.any(Function),
+      expect.any(AbortSignal),
+    );
+    expect(container.textContent).toContain('new-run');
   });
 });

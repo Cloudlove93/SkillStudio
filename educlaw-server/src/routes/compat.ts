@@ -7,6 +7,7 @@ import { listThreads, createThread, getThreadDetail, sendMessage, streamMessage,
 import { optimizePackage } from "../services/optimization-service.js";
 import { config } from "../config.js";
 import { parseDbJson } from "../utils/json.js";
+import { reserveArenaThread } from "../services/arena-thread-lifecycle.js";
 import {
   initSse,
   startSseHeartbeat,
@@ -461,12 +462,18 @@ router.post("/arena/chat/sessions/:sessionId/report", requireAuth, async (req, r
 });
 
 router.post("/arena/chat/sessions/:sessionId/delete", requireAuth, async (req, res) => {
+  let release: (() => void) | undefined;
   try {
     const userId = pickUserId(req);
+    release = reserveArenaThread(userId, String(req.params.sessionId));
+    await getThreadDetail(userId, String(req.params.sessionId));
     await query("delete from arena_messages where thread_id = $1 and user_id = $2", [String(req.params.sessionId), userId]);
     await query("delete from arena_threads where id = $1 and user_id = $2", [String(req.params.sessionId), userId]);
     ok(res, { ok: true });
-  } catch (e) { bad(res, e instanceof Error ? e.message : "Failed"); }
+  } catch (e) {
+    const error = e as { status?: number; code?: string };
+    res.status(error.status ?? 400).json({ error: e instanceof Error ? e.message : "Failed", code: error.code });
+  } finally { release?.(); }
 });
 
 /* ─── Optimize ─── */

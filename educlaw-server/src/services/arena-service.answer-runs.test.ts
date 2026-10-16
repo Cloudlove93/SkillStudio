@@ -230,7 +230,7 @@ describe("Arena answer run provenance", () => {
       101,
       "301",
       501,
-      "1001",
+      1001,
       2002,
       2001,
       JSON.stringify(["skill-bullying"]),

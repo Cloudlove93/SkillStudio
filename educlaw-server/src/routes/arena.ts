@@ -1,14 +1,14 @@
-import { Router, type Request, type Response } from "express";
-import { ARENA_ROUTES } from "@educlaw/shared";
-import type { AuthedRequest } from "../types.js";
-import { requireAuth } from "../middleware/auth.js";
-import { one } from "../utils/http.js";
+import { Router, type Request, type Response } from 'express';
+import { ARENA_ROUTES } from '@educlaw/shared';
+import type { AuthedRequest } from '../types.js';
+import { requireAuth } from '../middleware/auth.js';
+import { one } from '../utils/http.js';
 import {
   initSse,
   startSseHeartbeat,
   stopSseHeartbeat,
   writeSseEvent,
-} from "../utils/sse.js";
+} from '../utils/sse.js';
 import {
   createThread,
   generateReport,
@@ -18,10 +18,127 @@ import {
   sendMessage,
   streamMessage,
   type ArenaMode,
-} from "../services/arena-service.js";
-import { listAnswerOptimizationSummariesForThread } from "../services/answer-skill-optimization-service.js";
+} from '../services/arena-service.js';
+import { listAnswerOptimizationSummariesForThread } from '../services/answer-skill-optimization-service.js';
+import { arenaRunService } from '../services/arena-run-service.js';
+import { writeArenaRunSnapshot } from '../utils/arena-run-sse.js';
 
-const router: import("express").Router = Router();
+const router: import('express').Router = Router();
+
+function runError(res: Response, error: unknown) {
+  const structured = error as { status?: number; code?: string };
+  res
+    .status(structured?.status ?? 500)
+    .json({
+      code: structured?.code ?? 'RUN_ERROR',
+      error: error instanceof Error ? error.message : 'Run request failed',
+    });
+}
+function runThread(req: Request) {
+  const value = one(req.params.threadId);
+  if (!/^[1-9]\d*$/.test(value) || !Number.isSafeInteger(Number(value)))
+    throw Object.assign(new Error('Invalid threadId'), { status: 422 });
+  return Number(value);
+}
+
+router.post('/arena/threads/:threadId/runs', requireAuth, async (req, res) => {
+  try {
+    res.json(
+      await arenaRunService.start({
+        ...req.body,
+        userId: (req as AuthedRequest).userId || '',
+        threadId: runThread(req),
+      }),
+    );
+  } catch (error) {
+    runError(res, error);
+  }
+});
+router.get('/arena/threads/:threadId/runs', requireAuth, async (req, res) => {
+  try {
+    res.json(
+      await arenaRunService.recover(
+        (req as AuthedRequest).userId || '',
+        runThread(req),
+      ),
+    );
+  } catch (error) {
+    runError(res, error);
+  }
+});
+router.get(
+  '/arena/threads/:threadId/runs/:runId',
+  requireAuth,
+  async (req, res) => {
+    try {
+      res.json(
+        await arenaRunService.get(
+          (req as AuthedRequest).userId || '',
+          runThread(req),
+          one(req.params.runId),
+        ),
+      );
+    } catch (error) {
+      runError(res, error);
+    }
+  },
+);
+router.post(
+  '/arena/threads/:threadId/runs/:runId/stop',
+  requireAuth,
+  async (req, res) => {
+    try {
+      res.json(
+        await arenaRunService.stop(
+          (req as AuthedRequest).userId || '',
+          runThread(req),
+          one(req.params.runId),
+        ),
+      );
+    } catch (error) {
+      runError(res, error);
+    }
+  },
+);
+router.get(
+  '/arena/threads/:threadId/runs/:runId/events',
+  requireAuth,
+  async (req, res) => {
+    let subscription: Awaited<ReturnType<typeof arenaRunService.subscribe>>;
+    try {
+      subscription = await arenaRunService.subscribe(
+        (req as AuthedRequest).userId || '',
+        runThread(req),
+        one(req.params.runId),
+      );
+    } catch (error) {
+      runError(res, error);
+      return;
+    }
+    const detach = () => {
+      void subscription.return?.();
+    };
+    res.once('close', detach);
+    // A disconnect can occur during the asynchronous ownership check.
+    if (res.destroyed || req.aborted) {
+      detach();
+      return;
+    }
+    initSse(res);
+    try {
+      for await (const snapshot of subscription) {
+        if (res.destroyed || res.writableEnded) break;
+        // One bounded frame at a time. A slow socket detaches and recovers using
+        // the same runId; it cannot accumulate queued full snapshots in Node.
+        await writeArenaRunSnapshot(res, snapshot);
+      }
+    } finally {
+      detach();
+      res.removeListener('close', detach);
+      if (!res.destroyed && !res.writableEnded) res.end();
+    }
+  },
+);
 
 function canWriteSse(res: Response): boolean {
   return !res.destroyed && !res.writableEnded;

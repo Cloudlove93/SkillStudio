@@ -1,0 +1,185 @@
+{
+  "baseline": "09fd0f48c0ceb76a76ec0085f9458f754a6f72e2",
+  "branch": "codex/pi-core-review-fixes",
+  "environmentFilesRead": false,
+  "realProviderCalled": false,
+  "server": {
+    "passed": 1089,
+    "skipped": 3,
+    "filesPassed": 95,
+    "exitCode": 0
+  },
+  "web": {
+    "unitPassed": 277,
+    "contractPassed": 116,
+    "unitFilesPassed": 42,
+    "exitCode": 0
+  },
+  "serverFocused": {
+    "passed": 82,
+    "files": 9
+  },
+  "node22Supplement": {
+    "passed": 76,
+    "files": 6,
+    "dependencyImage": "educlaw-pi-acceptance-builder:integrated-4afdfe2",
+    "currentSourceReadOnlyMounted": true
+  },
+  "httpDatabaseChecks": 8,
+  "builds": {
+    "shared": 0,
+    "server": 0,
+    "web": 0
+  },
+  "relatedLint": {
+    "server": 0,
+    "web": 0
+  },
+  "diffCheck": 0,
+  "independentReview": "parent reports scoped review and whole server/web reruns passed",
+  "cleanup": {
+    "httpAndViteStopped": true,
+    "browserClosed": true,
+    "ports3219And5189NoListener": true,
+    "node22ContainerAutoRemoved": true,
+    "databaseContainer": "edu-resumable-db-20261016",
+    "databaseData": "tmpfs",
+    "databaseStop": "attempt failed: Docker engine pipe unavailable; no engine restart attempted",
+    "sharedContainersModified": false
+  },
+  "productionChangesAfterReview": [
+    "lite-api.ts: shared ArenaRunStartRequest type",
+    "SkillDetailWorkspace.tsx: optional terminal status callback type",
+    "use-skill-run.ts: context-bound credentials and notify on status transitions"
+  ],
+  "sourceHashes": [
+    {
+      "path": "educlaw-server/src/routes/arena.runs.test.ts",
+      "sha256": "095669a13f85c5a341af64a872ef2073b1b5f8a5599571f480b7ae6b72e8c6e2"
+    },
+    {
+      "path": "educlaw-server/src/routes/arena.ts",
+      "sha256": "6b245f7b304fd262b8c435a39dcb2a1e9167ea3ba6ee2da75f2456e35c4f4994"
+    },
+    {
+      "path": "educlaw-server/src/routes/compat.run-delete.test.ts",
+      "sha256": "000cc02aca9c858e949f6c847433fe7983905cfb7bdd6bdcf03fb29b98d43e38"
+    },
+    {
+      "path": "educlaw-server/src/routes/compat.ts",
+      "sha256": "ec3ed35f39fbf6b33a9bc0aae4c8eb8e9d28034ba9d7dfcf64fd0e96796428a6"
+    },
+    {
+      "path": "educlaw-server/src/services/arena-run-service.test.ts",
+      "sha256": "22da37fe5522d5e7b23e3f7ae5fc16e559d5794764871c7092dd2a702946e474"
+    },
+    {
+      "path": "educlaw-server/src/services/arena-run-service.ts",
+      "sha256": "5c1c066e76a66d128cfe03b91a442dccd3fa8fb08aed59a7589b2d9ac879939b"
+    },
+    {
+      "path": "educlaw-server/src/services/arena-service.answer-runs.test.ts",
+      "sha256": "3c7d449d004ecd25a013b5527dc22593ebb31ef5440a42ee46ef8d2620e55caa"
+    },
+    {
+      "path": "educlaw-server/src/services/arena-service.pi-harness.test.ts",
+      "sha256": "d02a6b66686b785c88cff8ff9f3e72b3cea4130a5504697bcc7012c75fdfdf74"
+    },
+    {
+      "path": "educlaw-server/src/services/arena-service.ts",
+      "sha256": "0e8b66f4a144c35516ad97836bb2516e5756da6b531f05fddf6c020d26b0f2b7"
+    },
+    {
+      "path": "educlaw-server/src/services/arena-thread-lifecycle.ts",
+      "sha256": "703175a367d5c6fe5ac06fb5ef8457968bcf00a83858ec4a843c4c6306d0a13b"
+    },
+    {
+      "path": "educlaw-server/src/services/llm-service.test.ts",
+      "sha256": "531db2289ea5ed6521635214abd2c3ee0206f8011f94577554468d6bfeb3d181"
+    },
+    {
+      "path": "educlaw-server/src/services/llm-service.ts",
+      "sha256": "8dac472f065ca61a889b4ce9a7d45dfab83b90765abf8ee429cced9f1f26a0d8"
+    },
+    {
+      "path": "educlaw-server/src/utils/arena-run-sse.test.ts",
+      "sha256": "05c20a0e8bb59fc29a77cf65686d91d86d5c24d07cc32365a48292aa12ab4219"
+    },
+    {
+      "path": "educlaw-server/src/utils/arena-run-sse.ts",
+      "sha256": "1a04b1c8397b212545b5930a8187515ca0eacddbe65b963c3daf63b928db6fff"
+    },
+    {
+      "path": "educlaw-server/test-utils/resumable-local-acceptance.ts",
+      "sha256": "75b5207079414cd27bdd706d485ce9229e3f8c8362ca87dca340f055ddf8439c"
+    },
+    {
+      "path": "educlaw-shared/index.ts",
+      "sha256": "f64f2ad1ddb7cabbdb3c3c8e8e5d67d0e8c16f18f0f5037ae3bb822201a230fe"
+    },
+    {
+      "path": "educlaw-web/src/api/lite-api.test.ts",
+      "sha256": "5430a514c7bdeac7e45d92df4ff5b9694f42ee0f867a2bb753dbb472523a11b4"
+    },
+    {
+      "path": "educlaw-web/src/api/lite-api.ts",
+      "sha256": "bd34b55c7fcd0e35014a9cfab02bdaa7778265f9806bc69baf43bd9becb0d03c"
+    },
+    {
+      "path": "educlaw-web/src/components/skill-workspace/discover-skill-runs.test.ts",
+      "sha256": "22a0acd94ddb22dd585df568fa5e99ff78a0b337cbef56c556e69ae2e3855021"
+    },
+    {
+      "path": "educlaw-web/src/components/skill-workspace/discover-skill-runs.ts",
+      "sha256": "e482363a038c1906e6e62b7fdfa9468ff04c2da21d983dba504c1e9c0f1b8799"
+    },
+    {
+      "path": "educlaw-web/src/components/skill-workspace/skill-run-recovery.test.ts",
+      "sha256": "3576251ec336badaee6265baeeb07e2c4988448b543664c7f0102c843ee99128"
+    },
+    {
+      "path": "educlaw-web/src/components/skill-workspace/skill-run-recovery.ts",
+      "sha256": "451908bc753955b7bb6d37cabe3c757f875011b94c6539366004ae62b66d9fe7"
+    },
+    {
+      "path": "educlaw-web/src/components/skill-workspace/skill-run-state.ts",
+      "sha256": "6c95436dda361a5aaf361d8b6a787554679cbfff42407a56d34c629f74b2702c"
+    },
+    {
+      "path": "educlaw-web/src/components/skill-workspace/skill-run-thinking-integration.test.tsx",
+      "sha256": "dd587f1ba439e401bd0100e7e4d1a5deb6d40b910f43476458f93d2460445d93"
+    },
+    {
+      "path": "educlaw-web/src/components/skill-workspace/skill-workspace-url-state.test.ts",
+      "sha256": "596e0366ec5e1924d9906710d6a2d8a3644f77faf1cfbd2353c9cbeff5e697b5"
+    },
+    {
+      "path": "educlaw-web/src/components/skill-workspace/skill-workspace-url-state.ts",
+      "sha256": "d332603333a4055fef121cbe4137fdaa857c4832ac22d353f04b20592077c4b8"
+    },
+    {
+      "path": "educlaw-web/src/components/skill-workspace/SkillConversationList.tsx",
+      "sha256": "183d98cbc0e7cdc10ed7adcbbb853613549d32e520cf573c695fe264f2dfe45a"
+    },
+    {
+      "path": "educlaw-web/src/components/skill-workspace/SkillDetailWorkspace.tsx",
+      "sha256": "700d6950a3c0c923691e31e866616fa56d00a083be25adf23c8ea53cd8cd5897"
+    },
+    {
+      "path": "educlaw-web/src/components/skill-workspace/SkillRunWorkspace.tsx",
+      "sha256": "73de361a7545744bab6a6e92d794d7e90545bde4b8113725ebc4402b2cc8e299"
+    },
+    {
+      "path": "educlaw-web/src/components/skill-workspace/SkillWorkspaceSidebar.tsx",
+      "sha256": "a146f6cb8b0741c31e5f94c3b1e18fecf653a49e05989cd154b3f6e45ede5e49"
+    },
+    {
+      "path": "educlaw-web/src/components/skill-workspace/use-skill-run.ts",
+      "sha256": "ccca4e25212f7f2c566cd97d5ea3ba4cbed2d1f923ca291c4aff23a9baaffc07"
+    },
+    {
+      "path": "educlaw-web/src/pages/SkillFirstWorkspace.tsx",
+      "sha256": "feacc24ca9a4620c5391bdcf3b3524ffd28e169942fad07f2d5fef910c91d7a2"
+    }
+  ]
+}

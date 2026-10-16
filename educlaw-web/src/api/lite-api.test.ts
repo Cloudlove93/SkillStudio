@@ -3,6 +3,63 @@ import type { ArenaMessageStreamEvent } from './lite-api';
 import { LiteApiError, liteApi } from './lite-api';
 
 const encoder = new TextEncoder();
+
+describe('resumable Arena run API', () => {
+  afterEach(() => vi.restoreAllMocks());
+  it('starts and recovers a run with authenticated, scoped paths', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async () => createJsonResponse({ runId: 'r1' }));
+    const input = {
+      requestId: 'request-1',
+      content: 'question',
+      mode: 'agent' as const,
+      thinkingEnabled: true,
+    };
+    await liteApi.startArenaRun('token', '91', input);
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      '/api/arena/threads/91/runs',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify(input) }),
+    );
+    expect(
+      new Headers(fetchMock.mock.calls[0][1]?.headers).get('Authorization'),
+    ).toBe('Bearer token');
+    await liteApi.recoverArenaRun('token', '91');
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      '/api/arena/threads/91/runs',
+      expect.anything(),
+    );
+    await liteApi.stopArenaRun('token', '91', 'r1');
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      '/api/arena/threads/91/runs/r1/stop',
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+  it('subscribes to cumulative snapshots and passes detach signal', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        createSseResponse([
+          'event: snapshot\ndata: {"runId":"r1","revision":2}\n\n',
+        ]),
+      );
+    const controller = new AbortController();
+    const receive = vi.fn();
+    await liteApi.subscribeArenaRun(
+      'token',
+      '91',
+      'r1',
+      receive,
+      controller.signal,
+    );
+    expect(receive).toHaveBeenCalledWith({ runId: 'r1', revision: 2 });
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/arena/threads/91/runs/r1/events',
+      expect.objectContaining({ signal: controller.signal }),
+    );
+  });
+});
+
 const localStorageMock = {
   getItem: vi.fn(() => null),
   setItem: vi.fn(),

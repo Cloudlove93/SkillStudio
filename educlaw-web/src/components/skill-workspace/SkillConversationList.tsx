@@ -10,6 +10,7 @@ type Props = {
   conversations: ArenaThread[];
   selectedConversationId: string | null;
   runningConversationId?: string | null;
+  runningConversationIds?: ReadonlySet<string>;
   completedConversationIds?: ReadonlySet<string>;
   loading?: boolean;
   onConversationSelect: (id: string) => void;
@@ -22,6 +23,7 @@ export function SkillConversationList({
   conversations,
   selectedConversationId,
   runningConversationId = null,
+  runningConversationIds,
   completedConversationIds,
   loading = false,
   onConversationSelect,
@@ -56,7 +58,7 @@ export function SkillConversationList({
           const id = String(thread.id);
           const selected = id === selectedConversationId;
           const editing = editingId === id;
-          const isRunning = id === runningConversationId;
+          const isRunning = runningConversationIds?.has(id) || id === runningConversationId;
           const isComplete = completedConversationIds?.has(id) ?? false;
           const status = isRunning ? 'running' : isComplete ? 'complete' : null;
           const surface = getConversationSurface(thread);

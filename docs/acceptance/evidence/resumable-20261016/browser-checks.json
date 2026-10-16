@@ -1,0 +1,36 @@
+{
+  "environment": "isolated PostgreSQL + simulated provider/gateway; actual browser UI",
+  "switchAndRefresh": {
+    "threadId": 31,
+    "beforeRunId": "5cad464a-f29f-4450-8cef-390039736a67",
+    "afterRunId": "5cad464a-f29f-4450-8cef-390039736a67",
+    "providerCalls": 1,
+    "urlPreservedConversation": 31,
+    "thinkingRestored": true,
+    "statusAfterExplicitStop": "cancelled",
+    "cancelledAnswerSaved": false
+  },
+  "completedWhileAway": {
+    "threadId": 32,
+    "runId": "1afe06bb-0892-4537-87e5-700a81d7f2e1",
+    "status": "succeeded",
+    "providerCalls": 1,
+    "dbQuestions": 1,
+    "dbAnswers": 1,
+    "browserAnswerCount": 1,
+    "browserOptimizationButtons": 1
+  },
+  "afterStopRetry": {
+    "threadId": 31,
+    "newRunId": "f4e9da50-f5e1-4247-81b5-7abf0b899fda",
+    "status": "succeeded",
+    "providerCalls": 1,
+    "dbMessages": 3
+  },
+  "screenshots": [
+    "browser-refresh-active.jpg",
+    "browser-recovered-stop.jpg",
+    "browser-completed-while-away.jpg",
+    "browser-after-stop-retry.jpg"
+  ]
+}

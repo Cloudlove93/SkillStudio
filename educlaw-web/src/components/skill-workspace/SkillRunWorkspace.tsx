@@ -1,22 +1,17 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useReducer,
-  useRef,
-  useState,
-} from 'react';
-import type { ArenaThread, SkillVersionDetail } from '@educlaw/shared';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type {
+  ArenaRunSnapshot,
+  ArenaThread,
+  SkillVersionDetail,
+} from '@educlaw/shared';
 import { ArrowUp, Play, Sparkles, Square, WandSparkles } from 'lucide-react';
-import { liteApi } from '../../api/lite-api';
-import { createSkillRunState, skillRunReducer } from './skill-run-state';
+import { useSkillRun } from './use-skill-run';
 import type {
   AnswerOptimizationRerunRequest,
   AnswerOptimizationSelection,
 } from './answer-optimization-selection';
 import { ConversationTurnNavigation } from './ConversationTurnNavigation';
 import { collectConversationTurns } from './conversation-turn-navigation';
-import { getConversationTitle } from './skill-conversation-list';
 import { MarkdownContent } from '../lite/lite-rendering';
 import { SkillReasoningBlock } from './SkillReasoningBlock';
 import { SkillThinkingToggle } from './SkillThinkingToggle';
@@ -24,7 +19,6 @@ import {
   readThinkingPreference,
   writeThinkingPreference,
 } from './skill-thinking-preference';
-import { createSkillStreamBuffer } from './skill-stream-buffer';
 
 type Props = {
   token: string;
@@ -33,31 +27,17 @@ type Props = {
   currentPackageVersionId: string | undefined;
   purpose?: 'run' | 'test';
   onCompleted?: () => void;
-  onRunStateChange?: (running: boolean, threadId?: string | null) => void;
+  onRunStateChange?: (
+    running: boolean,
+    threadId?: string | null,
+    status?: ArenaRunSnapshot['status'],
+  ) => void;
   onOptimizeAnswer: (selection: AnswerOptimizationSelection) => void;
   selectedThreadId?: string | null;
   onThreadCreated?: (thread: ArenaThread) => void;
   onThreadUpdated?: (thread: ArenaThread) => void;
   rerunRequest?: AnswerOptimizationRerunRequest | null;
 };
-
-function requestId() {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID)
-    return crypto.randomUUID();
-  return `skill-run-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
-function scheduleStreamFlush(callback: () => void): number {
-  return typeof window.requestAnimationFrame === 'function'
-    ? window.requestAnimationFrame(callback)
-    : window.setTimeout(callback, 16);
-}
-
-function cancelStreamFlush(handle: number) {
-  if (typeof window.cancelAnimationFrame === 'function')
-    window.cancelAnimationFrame(handle);
-  else window.clearTimeout(handle);
-}
 
 export function SkillRunWorkspace({
   token,
@@ -73,27 +53,23 @@ export function SkillRunWorkspace({
   onThreadUpdated,
   rerunRequest,
 }: Props) {
-  const [state, dispatch] = useReducer(
-    skillRunReducer,
-    undefined,
-    createSkillRunState,
-  );
+  const { state, dispatch, historyLoading, sendContent, stop, canSend } =
+    useSkillRun({
+      token,
+      packageId,
+      version,
+      purpose,
+      selectedThreadId,
+      onCompleted,
+      onRunStateChange,
+      onThreadCreated,
+      onThreadUpdated,
+    });
   const [thinkingPreference, setThinkingPreference] = useState(() =>
     readThinkingPreference(),
   );
-  const [historyLoading, setHistoryLoading] = useState(false);
-  // Rerun effects must see admission close before the loading render commits.
-  const historyLoadingRef = useRef(false);
-  const threadIdRef = useRef<string | null>(null);
   const messageListRef = useRef<HTMLDivElement>(null);
-  const hydrateRequestRef = useRef(0);
   const handledRerunRef = useRef<string | null>(null);
-  const activeRequestRef = useRef(0);
-  const sendingRef = useRef(false);
-  const abortControllerRef = useRef<AbortController | null>(null);
-  const streamBufferRef = useRef<
-    ReturnType<typeof createSkillStreamBuffer> | null
-  >(null);
   const conversationTurns = useMemo(
     () =>
       collectConversationTurns(
@@ -106,334 +82,7 @@ export function SkillRunWorkspace({
     [purpose, state.messages],
   );
 
-  useEffect(() => {
-    const previousThreadId = threadIdRef.current;
-    if (previousThreadId === selectedThreadId) return;
-    const requestNo = hydrateRequestRef.current + 1;
-    hydrateRequestRef.current = requestNo;
-    activeRequestRef.current += 1;
-    sendingRef.current = false;
-    streamBufferRef.current?.dispose();
-    streamBufferRef.current = null;
-    abortControllerRef.current?.abort();
-    abortControllerRef.current = null;
-    threadIdRef.current = selectedThreadId;
-    if (!selectedThreadId) {
-      historyLoadingRef.current = false;
-      setHistoryLoading(false);
-      dispatch({ type: 'reset' });
-      return;
-    }
-    historyLoadingRef.current = true;
-    setHistoryLoading(true);
-    dispatch({ type: 'reset' });
-    void liteApi
-      .getArenaThreadDetail(token, packageId, selectedThreadId)
-      .then((detail) => {
-        if (
-          hydrateRequestRef.current !== requestNo ||
-          threadIdRef.current !== selectedThreadId
-        )
-          return;
-        const messages: import('./skill-run-state').SkillRunMessage[] = [];
-        const sorted = [...detail.messages].sort((a, b) => {
-          const time =
-            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-          return time || a.id - b.id;
-        });
-        let currentQuestionId: number | undefined;
-        let currentBaselineId: number | null = null;
-        for (const message of sorted) {
-          if (message.side === 'shared' && message.role === 'user') {
-            currentQuestionId = message.id;
-            currentBaselineId = null;
-            messages.push({
-              role: 'user',
-              content: message.content,
-              messageId: message.id,
-            });
-          } else if (
-            message.side === 'baseline' &&
-            message.role === 'assistant'
-          ) {
-            currentBaselineId = message.id;
-          } else if (
-            message.side === 'enhanced' &&
-            message.role === 'assistant'
-          ) {
-            messages.push({
-              role: 'assistant',
-              content: message.content,
-              reasoningContent: message.reasoningContent ?? null,
-              messageId: message.id,
-              questionMessageId: currentQuestionId,
-              threadId: message.threadId,
-              enhancedAnswerMessageId: message.id,
-              baselineAnswerMessageId: currentBaselineId,
-              skillVersionNumber:
-                message.skillVersionNumber ?? version?.versionNumber,
-            });
-          }
-        }
-        historyLoadingRef.current = false;
-        dispatch({ type: 'hydrate', messages });
-        setHistoryLoading(false);
-      })
-      .catch(() => {
-        if (
-          hydrateRequestRef.current === requestNo &&
-          threadIdRef.current === selectedThreadId
-        ) {
-          historyLoadingRef.current = false;
-          setHistoryLoading(false);
-          dispatch({ type: 'error', message: '对话加载失败，请重试' });
-        }
-      });
-  }, [packageId, selectedThreadId, token, version?.versionNumber]);
-
-  useEffect(
-    () => () => {
-      hydrateRequestRef.current += 1;
-      activeRequestRef.current += 1;
-      // A replayed mount must initialize history again after invalidation.
-      threadIdRef.current = null;
-      sendingRef.current = false;
-      streamBufferRef.current?.dispose();
-      abortControllerRef.current?.abort();
-    },
-    [],
-  );
-
-  const sendContent = useCallback(
-    async (rawContent: string) => {
-      const content = rawContent.trim();
-      if (!content || state.busy || sendingRef.current || historyLoadingRef.current || !version) return;
-      sendingRef.current = true;
-      const requestNo = activeRequestRef.current + 1;
-      activeRequestRef.current = requestNo;
-      const controller = new AbortController();
-      abortControllerRef.current = controller;
-      const requestedThinking = thinkingPreference;
-      onRunStateChange?.(true, threadIdRef.current);
-      dispatch({
-        type: 'submit',
-        content,
-        thinkingRequested: requestedThinking,
-      });
-      let buffer: ReturnType<typeof createSkillStreamBuffer> | null = null;
-      try {
-        if (!threadIdRef.current) {
-          const thread = await liteApi.createArenaThread(token, packageId, {
-            idempotencyKey: requestId(),
-            basePackageVersionId: version.createdInPackageVersionId,
-            left: { skillId: version.skillId, skillVersionId: version.id },
-            right: { skillId: version.skillId, skillVersionId: version.id },
-            surface: purpose,
-          });
-          threadIdRef.current = String(thread.id);
-          onRunStateChange?.(true, threadIdRef.current);
-          onThreadCreated?.(thread);
-          try {
-            const renamed = await liteApi.renameArenaThread(
-              token,
-              packageId,
-              String(thread.id),
-              getConversationTitle(content),
-            );
-            onThreadCreated?.(renamed);
-          } catch {
-            // A title is convenience metadata; a failed rename must not fail the run.
-          }
-        }
-        if (
-          activeRequestRef.current !== requestNo ||
-          controller.signal.aborted
-        )
-          return;
-        const streamThreadId = threadIdRef.current;
-        if (!streamThreadId) return;
-        let finished = false;
-        buffer = createSkillStreamBuffer(
-          ({ reasoning, content: contentDelta }) => {
-            if (
-              activeRequestRef.current !== requestNo ||
-              threadIdRef.current !== streamThreadId
-            )
-              return;
-            if (reasoning)
-              dispatch({
-                type: 'reasoning_delta',
-                side: 'enhanced',
-                delta: reasoning,
-              });
-            if (contentDelta)
-              dispatch({
-                type: 'delta',
-                side: 'enhanced',
-                delta: contentDelta,
-              });
-          },
-          scheduleStreamFlush,
-          cancelStreamFlush,
-        );
-        streamBufferRef.current = buffer;
-        await liteApi.sendMessageStream(
-          token,
-          streamThreadId,
-          content,
-          undefined,
-          'agent',
-          requestedThinking,
-          (event) => {
-            if (
-              activeRequestRef.current !== requestNo ||
-              threadIdRef.current !== streamThreadId
-            )
-              return;
-            if (event.event === 'thinking_status') {
-              dispatch({ type: 'thinking_status', ...event.data });
-            }
-            if (event.event === 'reasoning_delta') {
-              if (event.data.side === 'enhanced')
-                buffer?.append('reasoning', event.data.delta);
-            }
-            if (event.event === 'delta') {
-              if (event.data.side === 'enhanced')
-                buffer?.append('content', event.data.delta);
-            }
-            if (event.event === 'side_done' && event.data.side === 'enhanced') {
-              buffer?.flushNow();
-              if (!event.data.ok && !finished) {
-                finished = true;
-                dispatch({
-                  type: 'error',
-                  message: event.data.error || 'Skill 执行失败',
-                });
-              }
-            }
-            if (event.event === 'done' && !finished) {
-              buffer?.flushNow();
-              onThreadUpdated?.(event.data.thread);
-              const question = event.data.messages.find(
-                (message) => message.side === 'shared',
-              );
-              const answer = event.data.messages.find(
-                (message) => message.side === 'enhanced',
-              );
-              const baseline = event.data.messages.find(
-                (message) => message.side === 'baseline',
-              );
-              if (question && answer) {
-                finished = true;
-                dispatch({
-                  type: 'done',
-                  content: answer.content,
-                  reasoningContent: answer.reasoningContent,
-                });
-                dispatch({
-                  type: 'attach-provenance',
-                  questionMessageId: question.id,
-                  answerMessageId: answer.id,
-                  threadId: answer.threadId,
-                  baselineAnswerMessageId: baseline?.id ?? null,
-                  skillVersionNumber:
-                    answer.skillVersionNumber ?? version.versionNumber,
-                });
-                onCompleted?.();
-              } else {
-                finished = true;
-                dispatch({
-                  type: 'error',
-                  message: '回答已结束，但服务端没有返回已保存的消息，请重试',
-                });
-              }
-            }
-            if (event.event === 'error' && !finished) {
-              buffer?.flushNow();
-              finished = true;
-              dispatch({ type: 'error', message: event.data.error });
-            }
-            if (event.event === 'stream_end' && !finished) {
-              buffer?.flushNow();
-              finished = true;
-              dispatch({
-                type: 'error',
-                message: event.data.ok
-                  ? '连接提前结束，回答未确认保存，请重试'
-                  : 'Skill 执行中断，请重试',
-              });
-            }
-          },
-          controller.signal,
-        );
-        if (
-          activeRequestRef.current === requestNo &&
-          !controller.signal.aborted &&
-          !finished
-        ) {
-          buffer?.flushNow();
-          finished = true;
-          dispatch({
-            type: 'error',
-            message: '连接提前结束，回答未确认保存，请重试',
-          });
-        }
-      } catch (error) {
-        buffer?.flushNow();
-        if (activeRequestRef.current === requestNo) {
-          sendingRef.current = false;
-          if (
-            controller.signal.aborted ||
-            (error instanceof Error && error.name === 'AbortError')
-          ) {
-            dispatch({ type: 'stop' });
-          } else {
-            dispatch({
-              type: 'error',
-              message:
-                error instanceof Error ? error.message : 'Skill 执行失败',
-            });
-          }
-        }
-      } finally {
-        if (activeRequestRef.current === requestNo) {
-          sendingRef.current = false;
-          if (streamBufferRef.current === buffer) {
-            buffer?.dispose();
-            streamBufferRef.current = null;
-          }
-          if (abortControllerRef.current === controller)
-            abortControllerRef.current = null;
-          onRunStateChange?.(false, threadIdRef.current);
-        }
-      }
-    },
-    [
-      onCompleted,
-      onRunStateChange,
-      onThreadCreated,
-      onThreadUpdated,
-      packageId,
-      purpose,
-      state.busy,
-      thinkingPreference,
-      token,
-      version,
-    ],
-  );
-
-  const send = () => sendContent(state.draft);
-  const stop = useCallback(() => {
-    streamBufferRef.current?.flushNow();
-    activeRequestRef.current += 1;
-    sendingRef.current = false;
-    abortControllerRef.current?.abort();
-    abortControllerRef.current = null;
-    streamBufferRef.current?.dispose();
-    streamBufferRef.current = null;
-    dispatch({ type: 'stop' });
-    onRunStateChange?.(false, threadIdRef.current);
-  }, [onRunStateChange]);
+  const send = () => sendContent(state.draft, thinkingPreference);
 
   const setThinking = (enabled: boolean) => {
     setThinkingPreference(enabled);
@@ -447,9 +96,7 @@ export function SkillRunWorkspace({
       rerunRequest.versionNumber !== version?.versionNumber ||
       handledRerunRef.current === rerunRequest.requestId ||
       state.busy ||
-      sendingRef.current ||
       historyLoading ||
-      historyLoadingRef.current ||
       !version ||
       !rerunRequest.selection.question.trim()
     )
@@ -457,12 +104,23 @@ export function SkillRunWorkspace({
     // Effect replay must cancel admission before it marks a rerun as handled.
     let current = true;
     queueMicrotask(() => {
-      if (!current || historyLoadingRef.current || sendingRef.current) return;
+      if (!current || !canSend()) return;
       handledRerunRef.current = rerunRequest.requestId;
-      void sendContent(rerunRequest.selection.question);
+      void sendContent(rerunRequest.selection.question, thinkingPreference);
     });
-    return () => { current = false; };
-  }, [historyLoading, purpose, rerunRequest, sendContent, state.busy, version]);
+    return () => {
+      current = false;
+    };
+  }, [
+    canSend,
+    historyLoading,
+    purpose,
+    rerunRequest,
+    sendContent,
+    state.busy,
+    thinkingPreference,
+    version,
+  ]);
 
   return (
     <div className="skill-flat-conversation skill-run-workspace skill-view-enter">
@@ -479,8 +137,8 @@ export function SkillRunWorkspace({
               <p>正在读取已保存的消息，请稍候。</p>
             </div>
           ) : state.messages.length === 0 &&
-          !state.streaming &&
-          !state.streamingReasoning ? (
+            !state.streaming &&
+            !state.streamingReasoning ? (
             <div className="skill-flat-empty">
               <Play size={24} />
               <h2>
@@ -611,16 +269,19 @@ export function SkillRunWorkspace({
         <div className="skill-composer-input-row">
           <textarea
             aria-label={
-              purpose === 'test'
-                ? '输入测试任务'
-                : '输入 Skill 使用任务'
+              purpose === 'test' ? '输入测试任务' : '输入 Skill 使用任务'
             }
             value={state.draft}
             onChange={(event) =>
               dispatch({ type: 'draft', value: event.target.value })
             }
             onKeyDown={(event) => {
-              if (event.key === 'Enter' && !event.shiftKey && !state.busy && !historyLoading) {
+              if (
+                event.key === 'Enter' &&
+                !event.shiftKey &&
+                !state.busy &&
+                !historyLoading
+              ) {
                 event.preventDefault();
                 void send();
               }
@@ -638,7 +299,7 @@ export function SkillRunWorkspace({
               className="skill-composer-stop"
               aria-label="停止生成"
               title="停止生成"
-              onClick={stop}
+              onClick={() => void stop()}
             >
               <Square size={13} fill="currentColor" aria-hidden="true" />
             </button>
@@ -661,7 +322,9 @@ export function SkillRunWorkspace({
             supported={state.thinkingSupported}
             onChange={setThinking}
           />
-          <span className="skill-composer-shortcut">回车发送 · Shift+回车换行</span>
+          <span className="skill-composer-shortcut">
+            回车发送 · Shift+回车换行
+          </span>
         </div>
       </div>
     </div>

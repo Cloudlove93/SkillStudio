@@ -2,12 +2,29 @@ import { describe, expect, it } from 'vitest';
 import {
   parseSkillWorkspaceSearch,
   writeSkillWorkspaceSearch,
+  readSkillConversationId,
+  writeSkillConversationSearch,
 } from './skill-workspace-url-state';
 
 describe('Skill workspace URL state', () => {
+  it('restores only a conversation identity and preserves all other URL state', () => {
+    expect(readSkillConversationId('?view=run&conversation=91')).toBe('91');
+    expect(readSkillConversationId('?conversation=../secret')).toBeNull();
+    expect(
+      writeSkillConversationSearch(
+        '?view=test&skill=12%3A34&inspector=versions',
+        '91',
+      ),
+    ).toBe('?view=test&skill=12%3A34&inspector=versions&conversation=91');
+    expect(
+      writeSkillConversationSearch('?view=run&conversation=91', null),
+    ).toBe('?view=run');
+  });
   it('parses a shareable Skill surface and repository filter', () => {
     expect(
-      parseSkillWorkspaceSearch('?view=arena&skill=12%3A34&q=%E5%87%BD%E6%95%B0'),
+      parseSkillWorkspaceSearch(
+        '?view=arena&skill=12%3A34&q=%E5%87%BD%E6%95%B0',
+      ),
     ).toEqual({ view: 'arena', skillKey: '12:34', repositoryQuery: '函数' });
   });
 

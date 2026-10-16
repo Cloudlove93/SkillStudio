@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import type {
+  ArenaRunSnapshot,
   ArenaThread,
   GuidedCreationDocument,
   GuidedCreationSession,
@@ -56,7 +57,10 @@ import type {
   AnswerOptimizationSelection,
 } from '../components/skill-workspace/answer-optimization-selection';
 import { isSkillConversationThread } from '../components/skill-workspace/skill-conversation-list';
+import { discoverActiveSkillRuns } from '../components/skill-workspace/discover-skill-runs';
 import {
+  readSkillConversationId,
+  writeSkillConversationSearch,
   parseSkillWorkspaceSearch,
   writeSkillWorkspaceSearch,
 } from '../components/skill-workspace/skill-workspace-url-state';
@@ -134,6 +138,9 @@ export default function SkillFirstWorkspace() {
 function SkillFirstWorkspaceContent() {
   const location = useLocation();
   const navigate = useNavigate();
+  const initialConversationId = useRef(
+    readSkillConversationId(location.search),
+  );
   const initialUrlState = useRef(parseSkillWorkspaceSearch(location.search));
   const token = useAuthStore((state) => state.token) || '';
   const user = useAuthStore((state) => state.user);
@@ -200,11 +207,12 @@ function SkillFirstWorkspaceContent() {
   const [conversations, setConversations] = useState<ArenaThread[]>([]);
   const [selectedConversationId, setSelectedConversationId] = useState<
     string | null
-  >(null);
+  >(() => initialConversationId.current);
   const [conversationLoading, setConversationLoading] = useState(false);
-  const [runningConversationId, setRunningConversationId] = useState<
-    string | null
-  >(null);
+  const conversationLoadRef = useRef(0);
+  const [runningConversationIds, setRunningConversationIds] = useState<
+    Set<string>
+  >(new Set());
   const [completedConversationIds, setCompletedConversationIds] = useState<
     Set<string>
   >(new Set());
@@ -360,14 +368,15 @@ function SkillFirstWorkspaceContent() {
   }, [activeSkill?.packageId, activeSkill?.skillId, token]);
 
   const loadConversations = useCallback(async () => {
+    const requestNo = ++conversationLoadRef.current;
     if (!activeSkill?.packageId || !activeSkill.skillId) {
       setConversations([]);
-      setSelectedConversationId(null);
-      setRunningConversationId(null);
+      if (!initialConversationId.current) setSelectedConversationId(null);
+      setRunningConversationIds(new Set());
       setCompletedConversationIds(new Set());
       return;
     }
-    setRunningConversationId(null);
+    setRunningConversationIds(new Set());
     setCompletedConversationIds(new Set());
     setConversationLoading(true);
     try {
@@ -400,20 +409,37 @@ function SkillFirstWorkspaceContent() {
           (a, b) =>
             new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
         );
+      if (requestNo !== conversationLoadRef.current) return;
       setConversations(next);
+      void discoverActiveSkillRuns(
+        next.map((thread) => String(thread.id)),
+        async (id) => {
+          const { run } = await liteApi.recoverArenaRun(token, id);
+          return run?.status === 'running' || run?.status === 'stopping';
+        },
+        (id) =>
+          setRunningConversationIds((current) => new Set(current).add(id)),
+        () => requestNo === conversationLoadRef.current,
+      );
       setSelectedConversationId((current) =>
-        current && next.some((thread) => String(thread.id) === current)
-          ? current
+        (current ?? initialConversationId.current) &&
+        next.some(
+          (thread) =>
+            String(thread.id) === (current ?? initialConversationId.current),
+        )
+          ? (current ?? initialConversationId.current)
           : next[0]
             ? String(next[0].id)
             : null,
       );
+      initialConversationId.current = null;
     } catch (loadError) {
       toast.error(
         loadError instanceof Error ? loadError.message : '对话加载失败',
       );
     } finally {
-      setConversationLoading(false);
+      if (requestNo === conversationLoadRef.current)
+        setConversationLoading(false);
     }
   }, [activeSkill?.packageId, activeSkill?.skillId, token]);
 
@@ -423,6 +449,9 @@ function SkillFirstWorkspaceContent() {
 
   useEffect(() => {
     void loadConversations();
+    return () => {
+      conversationLoadRef.current += 1;
+    };
   }, [loadConversations]);
 
   const refreshRepository = useCallback(async () => {
@@ -998,32 +1027,74 @@ function SkillFirstWorkspaceContent() {
   const handleConversationRunState = (
     running: boolean,
     threadId?: string | null,
+    status?: ArenaRunSnapshot['status'],
   ) => {
-    if (running) {
-      const runId = threadId ?? selectedConversationId;
-      setRunningConversationId(runId);
-      if (runId) {
-        setCompletedConversationIds((current) => {
-          const next = new Set(current);
-          next.delete(runId);
-          return next;
-        });
-      }
-      return;
-    }
-    const completedId = threadId ?? runningConversationId;
-    setRunningConversationId((current) => {
-      if (!completedId || current === completedId) return null;
-      return current;
+    const id = threadId ?? selectedConversationId;
+    if (!id) return;
+    setRunningConversationIds((current) => {
+      const next = new Set(current);
+      if (running) next.add(id);
+      else next.delete(id);
+      return next;
     });
-    if (completedId) {
-      setCompletedConversationIds((current) => {
-        const next = new Set(current);
-        next.add(completedId);
-        return next;
-      });
-    }
+    setCompletedConversationIds((current) => {
+      const next = new Set(current);
+      if (!running && status === 'succeeded') next.add(id);
+      else next.delete(id);
+      return next;
+    });
   };
+
+  useEffect(() => {
+    if (initialConversationId.current) return;
+    const next = writeSkillConversationSearch(
+      location.search,
+      selectedConversationId,
+    );
+    if (next !== location.search)
+      navigate(
+        { pathname: location.pathname, search: next, hash: location.hash },
+        { replace: true },
+      );
+  }, [
+    selectedConversationId,
+    location.search,
+    location.pathname,
+    location.hash,
+    navigate,
+  ]);
+
+  useEffect(() => {
+    if (!runningConversationIds.size) return;
+    let disposed = false;
+    const timer = window.setInterval(() => {
+      for (const id of runningConversationIds) {
+        void liteApi
+          .recoverArenaRun(token, id)
+          .then(({ run }) => {
+            if (
+              disposed ||
+              (run && (run.status === 'running' || run.status === 'stopping'))
+            )
+              return;
+            setRunningConversationIds((current) => {
+              const next = new Set(current);
+              next.delete(id);
+              return next;
+            });
+            if (run?.status === 'succeeded')
+              setCompletedConversationIds((current) =>
+                new Set(current).add(id),
+              );
+          })
+          .catch(() => {});
+      }
+    }, 2000);
+    return () => {
+      disposed = true;
+      window.clearInterval(timer);
+    };
+  }, [runningConversationIds, token]);
 
   const handleNewConversation = () => {
     setSelectedConversationId(null);
@@ -1061,9 +1132,11 @@ function SkillFirstWorkspaceContent() {
         next.delete(String(thread.id));
         return next;
       });
-      setRunningConversationId((current) =>
-        current === String(thread.id) ? null : current,
-      );
+      setRunningConversationIds((current) => {
+        const next = new Set(current);
+        next.delete(String(thread.id));
+        return next;
+      });
       toast.success('对话已删除');
     } catch (deleteError) {
       toast.error(
@@ -1294,7 +1367,7 @@ function SkillFirstWorkspaceContent() {
         conversations={conversations}
         selectedConversationId={selectedConversationId}
         conversationLoading={conversationLoading}
-        conversationRunningId={runningConversationId}
+        conversationRunningIds={runningConversationIds}
         completedConversationIds={completedConversationIds}
         onConversationSelect={handleConversationSelect}
         onNewConversation={handleNewConversation}
@@ -1319,125 +1392,125 @@ function SkillFirstWorkspaceContent() {
                 : activeSkill
                   ? `skill-${activeSkill.packageId}-${activeSkill.skillId}`
                   : session?.id || 'new'
-              }
+            }
           >
             <Suspense
               fallback={<SkillWorkspaceLoadingState label="正在打开工作区" />}
             >
-            {workspaceState.activeView === 'repository' ? (
-              <SkillRepositoryWorkspace
-                skills={repositorySkills}
-                sessions={sessions}
-                search={search}
-                onSearch={handleWorkspaceSearch}
-                onSelectSkill={openRepositorySkill}
-                onSelectDraft={(item) => void openSession(item)}
-                onDeleteSkills={deleteRepositorySkills}
-                onRenameSkill={renameRepositorySkill}
-                onNew={newSkill}
-              />
-            ) : activeSkill ? (
-              <SkillDetailWorkspace
-                token={token}
-                skill={activeSkill}
-                view={detailView}
-                versions={versions}
-                currentVersionId={currentVersionId}
-                versionsLoading={versionsLoading}
-                onNavigate={(view) => navigateWorkspaceView(view)}
-                onRunStateChange={handleConversationRunState}
-                onPublishUpdate={publishUpdate}
-                onReloadVersions={loadVersions}
-                onOptimizeAnswer={(selection) => {
-                  setAnswerOptimization(selection);
-                  openInspector({
-                    owner: 'skill',
-                    view: 'optimization',
-                    title: '改进这条回答',
-                    description: '先审阅建议，再决定是否保存为新版本。',
-                    preferredWidth: 500,
-                  });
-                }}
-                conversations={conversations}
-                selectedConversationId={selectedConversationId}
-                onConversationCreated={handleConversationCreated}
-                onConversationUpdated={handleConversationUpdated}
-                answerRerunRequest={answerRerunRequest}
-              />
-            ) : session ? (
-              <GuidedSkillCreationPanel
-                session={session}
-                pendingMessage={visiblePendingGuidedMessage}
-                documents={documents}
-                busy={busy}
-                phase={phase}
-                previews={previews}
-                error={error}
-                onSend={send}
-                onConfirm={confirm}
-                onRetry={() => lastActionRef.current?.()}
-                onFiles={(files) => void addFiles(files)}
-                onRemoveDocument={(index) =>
-                  setDocuments((current) =>
-                    current.filter((_, itemIndex) => itemIndex !== index),
-                  )
-                }
-              />
-            ) : createMode === 'multimodal' ? (
-              <Suspense
-                fallback={
-                  <SkillWorkspaceLoadingState label="正在打开音视频蒸馏" />
-                }
-              >
-                <MultimodalSkillCreationPanel
-                  key={multimodalCreationKey}
-                  token={token}
-                  onPublished={refreshRepository}
-                  onOpenRepository={openRepository}
-                  onOpenGeneratedSkill={openGeneratedSkill}
+              {workspaceState.activeView === 'repository' ? (
+                <SkillRepositoryWorkspace
+                  skills={repositorySkills}
+                  sessions={sessions}
+                  search={search}
+                  onSearch={handleWorkspaceSearch}
+                  onSelectSkill={openRepositorySkill}
+                  onSelectDraft={(item) => void openSession(item)}
+                  onDeleteSkills={deleteRepositorySkills}
+                  onRenameSkill={renameRepositorySkill}
+                  onNew={newSkill}
                 />
-              </Suspense>
-            ) : createMode === 'document' ? (
-              <DocumentSkillCreationPanel
-                token={token}
-                onGenerated={async () => {
-                  await refreshRepository();
-                  closeInspector({ force: true });
-                  navigateWorkspaceView('repository', null, true);
-                }}
-              />
-            ) : createMode === 'manual' ? (
-              <StructuredSkillCreationPanel
-                documents={documents}
-                busy={busy}
-                onSubmit={send}
-                onFiles={(files) => void addFiles(files)}
-                onRemoveDocument={(index) =>
-                  setDocuments((current) =>
-                    current.filter((_, itemIndex) => itemIndex !== index),
-                  )
-                }
-              />
-            ) : (
-              <GuidedSkillCreationPanel
-                session={null}
-                pendingMessage={visiblePendingGuidedMessage}
-                documents={documents}
-                busy={busy}
-                phase={phase}
-                previews={previews}
-                error={error}
-                onSend={send}
-                onConfirm={confirm}
-                onRetry={() => lastActionRef.current?.()}
-                onFiles={(files) => void addFiles(files)}
-                onRemoveDocument={(index) =>
-                  setDocuments((current) =>
-                    current.filter((_, itemIndex) => itemIndex !== index),
-                  )
-                }
-              />
-            )}
+              ) : activeSkill ? (
+                <SkillDetailWorkspace
+                  token={token}
+                  skill={activeSkill}
+                  view={detailView}
+                  versions={versions}
+                  currentVersionId={currentVersionId}
+                  versionsLoading={versionsLoading}
+                  onNavigate={(view) => navigateWorkspaceView(view)}
+                  onRunStateChange={handleConversationRunState}
+                  onPublishUpdate={publishUpdate}
+                  onReloadVersions={loadVersions}
+                  onOptimizeAnswer={(selection) => {
+                    setAnswerOptimization(selection);
+                    openInspector({
+                      owner: 'skill',
+                      view: 'optimization',
+                      title: '改进这条回答',
+                      description: '先审阅建议，再决定是否保存为新版本。',
+                      preferredWidth: 500,
+                    });
+                  }}
+                  conversations={conversations}
+                  selectedConversationId={selectedConversationId}
+                  onConversationCreated={handleConversationCreated}
+                  onConversationUpdated={handleConversationUpdated}
+                  answerRerunRequest={answerRerunRequest}
+                />
+              ) : session ? (
+                <GuidedSkillCreationPanel
+                  session={session}
+                  pendingMessage={visiblePendingGuidedMessage}
+                  documents={documents}
+                  busy={busy}
+                  phase={phase}
+                  previews={previews}
+                  error={error}
+                  onSend={send}
+                  onConfirm={confirm}
+                  onRetry={() => lastActionRef.current?.()}
+                  onFiles={(files) => void addFiles(files)}
+                  onRemoveDocument={(index) =>
+                    setDocuments((current) =>
+                      current.filter((_, itemIndex) => itemIndex !== index),
+                    )
+                  }
+                />
+              ) : createMode === 'multimodal' ? (
+                <Suspense
+                  fallback={
+                    <SkillWorkspaceLoadingState label="正在打开音视频蒸馏" />
+                  }
+                >
+                  <MultimodalSkillCreationPanel
+                    key={multimodalCreationKey}
+                    token={token}
+                    onPublished={refreshRepository}
+                    onOpenRepository={openRepository}
+                    onOpenGeneratedSkill={openGeneratedSkill}
+                  />
+                </Suspense>
+              ) : createMode === 'document' ? (
+                <DocumentSkillCreationPanel
+                  token={token}
+                  onGenerated={async () => {
+                    await refreshRepository();
+                    closeInspector({ force: true });
+                    navigateWorkspaceView('repository', null, true);
+                  }}
+                />
+              ) : createMode === 'manual' ? (
+                <StructuredSkillCreationPanel
+                  documents={documents}
+                  busy={busy}
+                  onSubmit={send}
+                  onFiles={(files) => void addFiles(files)}
+                  onRemoveDocument={(index) =>
+                    setDocuments((current) =>
+                      current.filter((_, itemIndex) => itemIndex !== index),
+                    )
+                  }
+                />
+              ) : (
+                <GuidedSkillCreationPanel
+                  session={null}
+                  pendingMessage={visiblePendingGuidedMessage}
+                  documents={documents}
+                  busy={busy}
+                  phase={phase}
+                  previews={previews}
+                  error={error}
+                  onSend={send}
+                  onConfirm={confirm}
+                  onRetry={() => lastActionRef.current?.()}
+                  onFiles={(files) => void addFiles(files)}
+                  onRemoveDocument={(index) =>
+                    setDocuments((current) =>
+                      current.filter((_, itemIndex) => itemIndex !== index),
+                    )
+                  }
+                />
+              )}
             </Suspense>
           </div>
         </div>

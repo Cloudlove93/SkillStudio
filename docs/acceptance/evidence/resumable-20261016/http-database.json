@@ -1,0 +1,80 @@
+{
+  "environment": "isolated PostgreSQL + actual HTTP/routes/Pi SDK + simulated model/gateway",
+  "projectEnvironmentFilesBlocked": true,
+  "node": "v24.14.0",
+  "checks": [
+    {
+      "name": "Detached subscription, recovered same run, saved once",
+      "status": "passed",
+      "evidence": {
+        "threadId": "23",
+        "runId": "bc8bc0fe-2a73-42a6-80df-031b641ca67f",
+        "providerCalls": 1,
+        "messageCount": 2,
+        "answerRuns": 1
+      }
+    },
+    {
+      "name": "Idempotent start, parameter conflict, same-thread busy, cross-user protection",
+      "status": "passed",
+      "evidence": {
+        "providerCalls": 1,
+        "messageCount": 2,
+        "foreignRequestsRejected": 4
+      }
+    },
+    {
+      "name": "Explicit stop targets recovered run; stale stop leaves next run alive",
+      "status": "passed",
+      "evidence": {
+        "cancelledAnswerSaved": false,
+        "retrySucceeded": true,
+        "staleStopHarmless": true
+      }
+    },
+    {
+      "name": "Legacy stop and upstream failure do not save fake answers",
+      "status": "passed",
+      "evidence": {
+        "threadId": "26",
+        "cancelledAndFailedAnswersNotSaved": true,
+        "retrySucceeded": true
+      }
+    },
+    {
+      "name": "Finish racing recovery preserves persisted message identity",
+      "status": "passed",
+      "evidence": {
+        "parallelRecoveries": 10,
+        "messageCount": 2,
+        "providerCalls": 1
+      }
+    },
+    {
+      "name": "Active conversation deletion rejects; settled conversation deletes cleanly",
+      "status": "passed",
+      "evidence": {
+        "activeDeleteRejected": true,
+        "settledDeleteSucceeded": true,
+        "orphanMessages": 0
+      }
+    },
+    {
+      "name": "Pi upstream failure is terminal failure, then retry succeeds",
+      "status": "passed",
+      "evidence": {
+        "failureNotSavedAsAnswer": true,
+        "retrySucceeded": true
+      }
+    },
+    {
+      "name": "Real 180-second deadline cancels stalled execution and permits retry",
+      "status": "passed",
+      "evidence": {
+        "timeoutMs": 180000,
+        "failedAnswerNotSaved": true,
+        "retrySucceeded": true
+      }
+    }
+  ]
+}

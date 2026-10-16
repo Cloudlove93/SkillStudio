@@ -3,6 +3,9 @@ import type {
   AgentPackageSnapshot,
   AgentPackageSummary,
   ArenaMessage,
+  ArenaRunSnapshot,
+  ArenaRunRecovery,
+  ArenaRunStartRequest,
   ArenaReport,
   ArenaThread,
   ArenaThreadDetail,
@@ -563,7 +566,7 @@ async function request<T>(
     const body = await response
       .json()
       .catch(() => ({ error: `HTTP ${response.status}` }));
-    throw new Error(body.error || `HTTP ${response.status}`);
+    throw new LiteApiError(body.error || `HTTP ${response.status}`, body.code, response.status);
   }
   return response.json() as Promise<T>;
 }
@@ -751,6 +754,50 @@ async function streamRequest<TEvent>(
 }
 
 export const liteApi = {
+  startArenaRun: (
+    token: string,
+    threadId: string,
+    input: ArenaRunStartRequest,
+  ) =>
+    request<ArenaRunSnapshot>(
+      `/arena/threads/${encodeURIComponent(threadId)}/runs`,
+      { method: 'POST', body: JSON.stringify(input) },
+      token,
+    ),
+  recoverArenaRun: (token: string, threadId: string) =>
+    request<ArenaRunRecovery>(
+      `/arena/threads/${encodeURIComponent(threadId)}/runs`,
+      {},
+      token,
+    ),
+  getArenaRun: (token: string, threadId: string, runId: string) =>
+    request<ArenaRunSnapshot>(
+      `/arena/threads/${encodeURIComponent(threadId)}/runs/${encodeURIComponent(runId)}`,
+      {},
+      token,
+    ),
+  subscribeArenaRun: (
+    token: string,
+    threadId: string,
+    runId: string,
+    onSnapshot: (snapshot: ArenaRunSnapshot) => void,
+    signal?: AbortSignal,
+  ) =>
+    streamRequest<{ event: string; data: ArenaRunSnapshot }>(
+      `/arena/threads/${encodeURIComponent(threadId)}/runs/${encodeURIComponent(runId)}/events`,
+      { method: 'GET', signal },
+      token,
+      (event) => {
+        if (event.event === 'snapshot') onSnapshot(event.data);
+      },
+    ),
+  stopArenaRun: (token: string, threadId: string, runId: string) =>
+    request<ArenaRunSnapshot>(
+      `/arena/threads/${encodeURIComponent(threadId)}/runs/${encodeURIComponent(runId)}/stop`,
+      { method: 'POST' },
+      token,
+    ),
+
   createMediaSession: (
     token: string,
     input: { idempotencyKey: string; displayName: string },

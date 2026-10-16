@@ -9,6 +9,18 @@ const baseConfig = {
   llmBaselineModel: "baseline-model",
 };
 
+it("streamTextParts combines explicit cancellation with its timeout signal", async () => {
+  const controller = new AbortController(); let requestSignal: AbortSignal | undefined;
+  vi.stubGlobal("fetch", vi.fn(async (_url, init) => {
+    requestSignal = init.signal;
+    return new Promise((_resolve, reject) => requestSignal?.addEventListener("abort", () => reject(new DOMException("cancelled", "AbortError")), { once: true }));
+  }));
+  const { streamTextParts } = await loadService();
+  const pending = streamTextParts({ systemPrompt: "system", userPrompt: "question", signal: controller.signal }).next();
+  await Promise.resolve(); controller.abort();
+  await expect(pending).rejects.toThrow(); expect(requestSignal?.aborted).toBe(true);
+});
+
 async function loadService(configOverrides: Partial<typeof baseConfig> = {}) {
   vi.resetModules();
   vi.doMock("../config.js", () => ({

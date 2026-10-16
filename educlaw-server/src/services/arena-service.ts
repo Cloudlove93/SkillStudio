@@ -13,6 +13,7 @@ import type {
   SkillArenaConfig,
 } from "@educlaw/shared";
 import { query, type Queryable, withTransaction } from "./db.js";
+import { isSkillRunTestThread, reserveArenaThread } from "./arena-thread-lifecycle.js";
 import {
   generateJson,
   generateText,
@@ -1473,7 +1474,11 @@ export async function deleteArenaThread(input: {
   packageId: string;
   threadId: string;
 }) {
-  return withTransaction(async (client) => {
+  let release: () => void;
+  try { release = reserveArenaThread(input.authUserId, input.threadId); }
+  catch { throw new ArenaServiceError("Conversation has an active operation", 409, "RUN_BUSY"); }
+  try {
+  return await withTransaction(async (client) => {
     // These legacy tables do not all have a thread foreign key, so clean the
     // dependent records explicitly before removing the conversation itself.
     await client.query(
@@ -1497,6 +1502,7 @@ export async function deleteArenaThread(input: {
     }
     return { ok: true };
   });
+  } finally { release(); }
 }
 
 export async function createThread(userId: string, packageId: string | number, model?: string) {
@@ -1709,7 +1715,7 @@ export async function getThreadDetail(
     [threadId, userId],
   );
   const thread = threadResult.rows[0];
-  if (!thread) throw new Error("Arena thread not found");
+  if (!thread) throw new ArenaServiceError("Arena thread not found", 404, "THREAD_NOT_FOUND");
 
   const messages = await query<DbRowMessage>(
     `select *
@@ -1839,6 +1845,7 @@ export async function* streamMessage(
   mode: ArenaMode = "compare",
   thinkingEnabled = false,
   signal?: AbortSignal,
+  lifecycle?: { managedLifecycle: boolean },
 ): AsyncGenerator<ArenaChatStreamEvent> {
   const prompt = content.trim();
   if (!prompt) throw new Error("Message content is required");
@@ -1874,6 +1881,7 @@ export async function* streamMessage(
       })
     : null;
   let piRunLease: PiRunLease | null = null;
+  let threadRelease: (() => void) | undefined;
   if (piHarnessRunId && piHarnessLogger) {
     piHarnessLogger.info({
       event: "arena.pi_harness.path_selected",
@@ -1902,6 +1910,13 @@ export async function* streamMessage(
   }
 
   try {
+  if (!lifecycle?.managedLifecycle && isSkillRunTestThread(detail.thread)) {
+    try { threadRelease = reserveArenaThread(userId, threadId); }
+    catch { throw new ArenaServiceError("Conversation has an active operation", 409, "RUN_BUSY"); }
+    if (!usePiHarnessForRequest) detail.messages = (await getThreadDetail(userId, threadId)).messages;
+  }
+  const cancellable = usePiHarnessForRequest || lifecycle?.managedLifecycle === true;
+  if (cancellable && signal?.aborted) throw new ArenaServiceError("本次运行已取消。", 499, "RUN_CANCELLED");
   if (usePiHarnessForRequest) {
     if (signal?.aborted) {
       throw new ArenaServiceError("本次运行已取消。", 499, "RUN_CANCELLED");
@@ -1921,7 +1936,7 @@ export async function* streamMessage(
   );
 
   const shared: ArenaMessage = {
-    id: sharedResult.rows[0].id,
+    id: toPositiveSafeInteger(sharedResult.rows[0].id, "arena message ID"),
     threadId: Number(threadId),
     side: "shared",
     role: "user",
@@ -2074,7 +2089,9 @@ export async function* streamMessage(
           temperature: 0.3,
           thinkingMode:
             side === "enhanced" && thinkingActive ? "enabled" : "disabled",
+          ...(lifecycle?.managedLifecycle ? { signal } : {}),
         })) {
+          if (lifecycle?.managedLifecycle && signal?.aborted) break;
           if (part.type === "reasoning") {
             if (side === "enhanced" && thinkingActive) {
               sideReasoningContents[side] += part.delta;
@@ -2103,7 +2120,7 @@ export async function* streamMessage(
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Generation failed";
-      if (usePiHarness) {
+      if (usePiHarness || lifecycle?.managedLifecycle) {
         piHarnessFailure = error instanceof Error ? error : new Error(message);
         sideContents[side] = "";
         push({
@@ -2188,7 +2205,7 @@ export async function* streamMessage(
   }
 
   if (piHarnessFailure) throw piHarnessFailure;
-  if (usePiHarnessForRequest && signal?.aborted) {
+  if (cancellable && signal?.aborted) {
     piHarnessLogger?.warn({
       event: "arena.pi_harness.cancelled_before_persistence",
       errorCode: "RUN_CANCELLED",
@@ -2200,7 +2217,7 @@ export async function* streamMessage(
   let assistantMessages: ArenaMessage[];
   try {
     assistantMessages = await withTransaction(async (client) => {
-    if (usePiHarnessForRequest && signal?.aborted) {
+    if (cancellable && signal?.aborted) {
       throw new ArenaServiceError("本次运行已取消。", 499, "RUN_CANCELLED");
     }
     const messages: ArenaMessage[] = [];
@@ -2350,6 +2367,7 @@ export async function* streamMessage(
     },
   };
   } finally {
+    threadRelease?.();
     if (piRunLease) {
       piRunLease.release();
       piHarnessLogger?.info({

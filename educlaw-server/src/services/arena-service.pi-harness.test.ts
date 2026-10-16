@@ -253,6 +253,58 @@ afterEach(() => {
 });
 
 describe("Arena Pi Harness integration", () => {
+  it("Legacy and managed entry points share the same Run/Test thread reservation", async () => {
+    installQueryFixture();
+    const { streamMessage } = await loadService(false);
+    const { reserveArenaThread } = await import("./arena-thread-lifecycle.js");
+    const release = reserveArenaThread("user-1", "91");
+    try { await expect(collectEvents(streamMessage("user-1", "91", "blocked", undefined, "agent"))).rejects.toMatchObject({ code: "RUN_BUSY" }); }
+    finally { release(); }
+    expect(queryMock.mock.calls.some(([sql]) => sql.startsWith("insert into arena_messages"))).toBe(false);
+    const oldStream = streamMessage("user-1", "91", "old request", undefined, "agent");
+    while ((await oldStream.next()).value?.event !== "shared") { /* reach admission */ }
+    expect(() => reserveArenaThread("user-1", "91")).toThrow("active operation");
+    await oldStream.return(); const next = reserveArenaThread("user-1", "91"); next();
+  });
+  it("managed Legacy forwards cancellation and never persists a cancelled answer", async () => {
+    installQueryFixture(); const controller = new AbortController();
+    streamTextPartsMock.mockImplementation(async function* (input) {
+      expect(input.signal).toBe(controller.signal);
+      yield { type: "content", delta: "partial" }; controller.abort();
+    });
+    const { streamMessage } = await loadService(false);
+    await expect(collectEvents(streamMessage("user-1", "91", "Question", undefined, "agent", false, controller.signal, { managedLifecycle: true }))).rejects.toMatchObject({ code: "RUN_CANCELLED" });
+    expect(withTransactionMock).not.toHaveBeenCalled();
+  });
+  it("managed Legacy provider failure cannot save a fake success", async () => {
+    installQueryFixture();
+    streamTextPartsMock.mockImplementation(async function* () { yield* []; throw new Error("Legacy provider failed"); });
+    const { streamMessage } = await loadService(false);
+    await expect(collectEvents(streamMessage("user-1", "91", "Question", undefined, "agent", false, undefined, { managedLifecycle: true }))).rejects.toThrow("Legacy provider failed");
+    expect(withTransactionMock).not.toHaveBeenCalled();
+  });
+  it("managed Legacy checks cancellation after waiting for the persistence connection", async () => {
+    installQueryFixture(); const controller = new AbortController();
+    streamTextPartsMock.mockImplementation(async function* () { yield { type: "content", delta: "answer" }; });
+    withTransactionMock.mockImplementation(async (work) => { controller.abort(); return work({ query: queryMock }); });
+    const { streamMessage } = await loadService(false);
+    await expect(collectEvents(streamMessage("user-1", "91", "Question", undefined, "agent", false, controller.signal, { managedLifecycle: true }))).rejects.toMatchObject({ code: "RUN_CANCELLED" });
+    expect(queryMock.mock.calls.some(([sql, args]) => sql.startsWith("insert into arena_messages") && args[3] === "assistant")).toBe(false);
+  });
+  it("deletion and managed execution reservations reject one another without a check race", async () => {
+    installQueryFixture();
+    const { deleteArenaThread } = await loadService(false);
+    const { reserveArenaThread } = await import("./arena-thread-lifecycle.js");
+    const release = reserveArenaThread("user-1", "91");
+    try { await expect(deleteArenaThread({ authUserId: "user-1", packageId: "7", threadId: "91" })).rejects.toMatchObject({ code: "RUN_BUSY", status: 409 }); expect(withTransactionMock).not.toHaveBeenCalled(); }
+    finally { release(); }
+    let finish!: () => void;
+    withTransactionMock.mockImplementation(() => new Promise((resolve) => { finish = () => resolve({ ok: true }); }));
+    const deletion = deleteArenaThread({ authUserId: "user-1", packageId: "7", threadId: "91" });
+    await Promise.resolve();
+    expect(() => reserveArenaThread("user-1", "91")).toThrow("active operation");
+    finish(); await deletion; const released = reserveArenaThread("user-1", "91"); released();
+  });
   it.each([[false, true], [true, false]])("discards unexpected reasoning when requested=%s and supported=%s", async (requested, supported) => {
     installQueryFixture();
     supportsThinkingMock.mockReturnValue(supported);

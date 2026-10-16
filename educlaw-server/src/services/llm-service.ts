@@ -16,6 +16,7 @@ export type LlmStreamPart =
   | { type: "content"; delta: string };
 
 interface ChatRequestInput {
+  signal?: AbortSignal;
   systemPrompt: string;
   userPrompt: string;
   model?: string;
@@ -302,7 +303,7 @@ async function createChatResponse(input: ChatRequestInput, stream: boolean): Pro
         input.maxTokens,
         input.thinkingMode,
       )),
-      signal: createAbortSignal(config.llmTimeoutMs),
+      signal: input.signal ? AbortSignal.any([input.signal, AbortSignal.timeout(config.llmTimeoutMs)]) : createAbortSignal(config.llmTimeoutMs),
     },
     { kind: "prompt", model, stream },
   );

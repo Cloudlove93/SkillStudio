@@ -64,6 +64,7 @@ type Props = {
   selectedConversationId?: string | null;
   conversationLoading?: boolean;
   conversationRunningId?: string | null;
+  conversationRunningIds?: ReadonlySet<string>;
   completedConversationIds?: ReadonlySet<string>;
   onConversationSelect?: (id: string) => void;
   onNewConversation?: () => void;
@@ -153,6 +154,7 @@ export function SkillWorkspaceSidebar({
   selectedConversationId = null,
   conversationLoading = false,
   conversationRunningId = null,
+  conversationRunningIds,
   completedConversationIds,
   onConversationSelect,
   onNewConversation,
@@ -341,6 +343,7 @@ export function SkillWorkspaceSidebar({
                   conversations={conversations}
                   selectedConversationId={selectedConversationId}
                   runningConversationId={conversationRunningId}
+                  runningConversationIds={conversationRunningIds}
                   completedConversationIds={completedConversationIds}
                   loading={conversationLoading}
                   onConversationSelect={onConversationSelect}

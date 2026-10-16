@@ -13,20 +13,38 @@ const VIEWS = new Set<SkillWorkspaceView>([
 ]);
 const SKILL_KEY_PATTERN = /^[1-9]\d*:[1-9]\d*$/;
 
+export function readSkillConversationId(search: string): string | null {
+  const value = new URLSearchParams(search).get('conversation') ?? '';
+  return /^[1-9]\d*$/.test(value) ? value : null;
+}
+
+export function writeSkillConversationSearch(
+  search: string,
+  conversationId: string | null,
+): string {
+  const params = new URLSearchParams(search);
+  if (conversationId) params.set('conversation', conversationId);
+  else params.delete('conversation');
+  return params.size ? `?${params.toString()}` : '';
+}
+
 export interface SkillWorkspaceUrlState {
   view: SkillWorkspaceView;
   skillKey: string | null;
   repositoryQuery: string;
 }
 
-export function parseSkillWorkspaceSearch(search: string): SkillWorkspaceUrlState {
+export function parseSkillWorkspaceSearch(
+  search: string,
+): SkillWorkspaceUrlState {
   const params = new URLSearchParams(
     search.startsWith('?') ? search.slice(1) : search,
   );
   const rawView = params.get('view');
-  const view = rawView && VIEWS.has(rawView as SkillWorkspaceView)
-    ? rawView as SkillWorkspaceView
-    : 'create';
+  const view =
+    rawView && VIEWS.has(rawView as SkillWorkspaceView)
+      ? (rawView as SkillWorkspaceView)
+      : 'create';
   const rawSkillKey = params.get('skill')?.trim() ?? '';
   const repositoryQuery = (params.get('q') ?? '').trim().slice(0, 120);
   return {
@@ -46,7 +64,8 @@ export function writeSkillWorkspaceSearch(
   params.set('view', state.view);
   if (state.skillKey) params.set('skill', state.skillKey);
   else params.delete('skill');
-  if (state.repositoryQuery) params.set('q', state.repositoryQuery.slice(0, 120));
+  if (state.repositoryQuery)
+    params.set('q', state.repositoryQuery.slice(0, 120));
   else params.delete('q');
   const next = params.toString();
   return next ? `?${next}` : '';
