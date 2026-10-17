@@ -131,7 +131,7 @@ export const config = {
   llmApiKey,
   llmModel: process.env.LLM_MODEL || "gpt-4.1-mini",
   llmNetworkRetries: readNumber("LLM_NETWORK_RETRIES", 2),
-  piHarnessSkillRunEnabled: readBoolean("PI_HARNESS_SKILL_RUN_ENABLED", false),
+  piHarnessSkillRunEnabled: readBoolean("PI_HARNESS_SKILL_RUN_ENABLED", true),
   piHarnessMaxConcurrentRuns: readBoundedInteger(
     "PI_HARNESS_MAX_CONCURRENT_RUNS",
     4,

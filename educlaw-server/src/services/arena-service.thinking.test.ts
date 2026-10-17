@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+// This suite exercises the Legacy skill-chat streaming path, so pin the Pi
+// Core adapter off regardless of its (now default-on) configuration.
+vi.mock("../config.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../config.js")>();
+  return { config: { ...actual.config, piHarnessSkillRunEnabled: false } };
+});
+
 const queryMock = vi.fn();
 const withTransactionMock = vi.fn();
 const streamTextPartsMock = vi.fn();
