@@ -242,6 +242,11 @@ function SkillFirstWorkspaceContent() {
   const activeSkillKey = activeSkill
     ? `${activeSkill.packageId}:${activeSkill.skillId}`
     : null;
+  const activeSkillKeyRef = useRef(activeSkillKey);
+  activeSkillKeyRef.current = activeSkillKey;
+  const repositoryRequestRef = useRef(0);
+  const repositoryTokenRef = useRef(token);
+  repositoryTokenRef.current = token;
   const {
     versions,
     currentVersionId,
@@ -298,21 +303,6 @@ function SkillFirstWorkspaceContent() {
       replaceWorkspaceRoute(view, skillKey, clearInspector);
     },
     [activeSkillKey, replaceWorkspaceRoute],
-  );
-
-  const handleAnswerRerun = useSkillAnswerRerun(
-    token,
-    activeSkillKey,
-    loadVersions,
-    (versionNumber, selection) => {
-      navigateWorkspaceView(selection.origin);
-      if (selection.origin !== 'arena') setSelectedConversationId(null);
-      setAnswerRerunRequest({
-        requestId: createRequestId('rerun'),
-        versionNumber,
-        selection,
-      });
-    },
   );
 
   const handleWorkspaceSearch = useCallback(
@@ -451,6 +441,7 @@ function SkillFirstWorkspaceContent() {
   }, [loadConversations]);
 
   const refreshRepository = useCallback(async () => {
+    const request = ++repositoryRequestRef.current;
     const nextSkills: RepositorySkill[] = [];
     const visitedCursors = new Set<string>();
     let cursor: string | undefined;
@@ -484,10 +475,49 @@ function SkillFirstWorkspaceContent() {
         throw new Error('Skill 仓库数据量超出单次加载上限');
       }
     }
-    setRepositorySkills(nextSkills);
-    setRepositoryReady(true);
+    if (
+      request === repositoryRequestRef.current &&
+      repositoryTokenRef.current === token
+    ) {
+      setRepositorySkills(nextSkills);
+      setRepositoryReady(true);
+    }
     return nextSkills;
   }, [token]);
+
+  const reloadSkillVersions = useCallback(async () => {
+    if (
+      activeSkillKeyRef.current !== activeSkillKey ||
+      repositoryTokenRef.current !== token
+    )
+      return;
+    await Promise.all([
+      loadVersions(),
+      refreshRepository().catch((loadError) => {
+        if (repositoryTokenRef.current === token)
+          toast.error(
+            loadError instanceof Error
+              ? loadError.message
+              : 'Skill 仓库加载失败',
+          );
+      }),
+    ]);
+  }, [activeSkillKey, token, loadVersions, refreshRepository]);
+
+  const handleAnswerRerun = useSkillAnswerRerun(
+    token,
+    activeSkillKey,
+    reloadSkillVersions,
+    (versionNumber, selection) => {
+      navigateWorkspaceView(selection.origin);
+      if (selection.origin !== 'arena') setSelectedConversationId(null);
+      setAnswerRerunRequest({
+        requestId: createRequestId('rerun'),
+        versionNumber,
+        selection,
+      });
+    },
+  );
 
   useEffect(() => {
     void refreshRepository().catch((loadError) => {
@@ -1443,7 +1473,7 @@ function SkillFirstWorkspaceContent() {
                   onNavigate={(view) => navigateWorkspaceView(view)}
                   onRunStateChange={handleConversationRunState}
                   onPublishUpdate={publishUpdate}
-                  onReloadVersions={loadVersions}
+                  onReloadVersions={reloadSkillVersions}
                   onOptimizeAnswer={(selection) => {
                     setAnswerOptimization(selection);
                     openInspector({
@@ -1555,7 +1585,7 @@ function SkillFirstWorkspaceContent() {
             versionsLoading={versionsLoading}
             answerOptimization={answerOptimization}
             onAnswerOptimizationSaved={() => {
-              void loadVersions();
+              void reloadSkillVersions();
             }}
             onAnswerOptimizationRerun={handleAnswerRerun}
             onOpenVersionManager={() => {
@@ -1575,7 +1605,7 @@ function SkillFirstWorkspaceContent() {
             versionsLoading={versionsLoading}
             answerOptimization={answerOptimization}
             onAnswerOptimizationSaved={() => {
-              void loadVersions();
+              void reloadSkillVersions();
             }}
             onAnswerOptimizationRerun={handleAnswerRerun}
             onOpenVersionManager={() => {

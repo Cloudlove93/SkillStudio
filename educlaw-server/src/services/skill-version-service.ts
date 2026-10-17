@@ -770,6 +770,13 @@ export async function exportSkillVersionZip(input: {
         versionId,
       }),
     );
+    if (version.status === 'discarded') {
+      throw new SkillVersionError(
+        'SKILL_VERSION_DISCARDED',
+        '该版本已废弃，请先恢复再导出',
+        409,
+      );
+    }
     if (!version.skill.skillMd.trim()) {
       throw new SkillVersionError(
         'SKILL_VERSION_NOT_EXPORTABLE',

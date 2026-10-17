@@ -12,6 +12,37 @@ afterEach(() => {
 });
 
 describe('Skill version export', () => {
+  it('rejects a version discarded after the export list was loaded', async () => {
+    vi.doMock('./db.js', () => ({ withTransaction }));
+    client.query.mockResolvedValueOnce({
+      rows: [
+        {
+          id: '81',
+          skill_id: '12',
+          package_id: '3',
+          version_number: 1,
+          skill_snapshot_json: {
+            id: 's',
+            dirName: 's',
+            name: 's',
+            skillMd: '# Saved',
+          },
+          status: 'discarded',
+        },
+      ],
+    });
+    const { exportSkillVersionZip } =
+      await import('./skill-version-service.js');
+    await expect(
+      exportSkillVersionZip({
+        authUserId: 'owner-1',
+        packageId: '3',
+        skillId: '12',
+        versionId: '81',
+      }),
+    ).rejects.toMatchObject({ code: 'SKILL_VERSION_DISCARDED', status: 409 });
+  });
+
   it('exports the exact owned fixed-version SKILL.md without internal data', async () => {
     vi.doMock('./db.js', () => ({ withTransaction }));
     const skillMd = '# v1\n\nOnly the selected immutable version.';
@@ -44,9 +75,8 @@ describe('Skill version export', () => {
         },
       ],
     });
-    const { exportSkillVersionZip } = await import(
-      './skill-version-service.js'
-    );
+    const { exportSkillVersionZip } =
+      await import('./skill-version-service.js');
 
     const exported = await exportSkillVersionZip({
       authUserId: 'owner-1',
@@ -103,9 +133,8 @@ describe('Skill version export', () => {
     client.query
       .mockResolvedValueOnce({ rows: [row('81', 1, '# Version one')] })
       .mockResolvedValueOnce({ rows: [row('82', 2, '# Version two')] });
-    const { exportSkillVersionZip } = await import(
-      './skill-version-service.js'
-    );
+    const { exportSkillVersionZip } =
+      await import('./skill-version-service.js');
 
     const v1 = await exportSkillVersionZip({
       authUserId: 'owner-1',
@@ -129,9 +158,8 @@ describe('Skill version export', () => {
   it('fails closed when the version is not owned or has no SKILL.md', async () => {
     vi.doMock('./db.js', () => ({ withTransaction }));
     client.query.mockResolvedValueOnce({ rows: [] });
-    const { exportSkillVersionZip } = await import(
-      './skill-version-service.js'
-    );
+    const { exportSkillVersionZip } =
+      await import('./skill-version-service.js');
 
     await expect(
       exportSkillVersionZip({

@@ -33,19 +33,47 @@ async function loadExportableVersions(
     seenCursors.add(result.nextCursor);
     cursor = result.nextCursor;
   }
-  return versions.sort((left, right) => right.versionNumber - left.versionNumber);
+  return versions.sort(
+    (left, right) => right.versionNumber - left.versionNumber,
+  );
 }
 
 export function SkillExportDialog({ token, skill, onClose }: Props) {
+  return skill ? (
+    <SkillExportSession
+      key={JSON.stringify([token, skill.key])}
+      token={token}
+      skill={skill}
+      onClose={onClose}
+    />
+  ) : null;
+}
+
+function SkillExportSession({
+  token,
+  skill,
+  onClose,
+}: Props & { skill: RepositorySkill }) {
   const [versions, setVersions] = useState<SkillVersionDetail[]>([]);
   const [selectedVersionId, setSelectedVersionId] = useState('');
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState('');
   const exportLock = useRef(false);
+  const mounted = useRef(false);
+  const dialogRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    if (!skill) return;
+    mounted.current = true;
+    const opener = document.activeElement;
+    dialogRef.current?.focus();
+    return () => {
+      mounted.current = false;
+      if (opener instanceof HTMLElement && opener.isConnected) opener.focus();
+    };
+  }, []);
+
+  useEffect(() => {
     let current = true;
     setLoading(true);
     setError('');
@@ -71,8 +99,8 @@ export function SkillExportDialog({ token, skill, onClose }: Props) {
     };
   }, [skill, token]);
 
-  if (!skill) return null;
-  const selected = versions.find((item) => item.id === selectedVersionId) ?? null;
+  const selected =
+    versions.find((item) => item.id === selectedVersionId) ?? null;
 
   const exportVersion = async () => {
     if (!selected || exportLock.current) return;
@@ -88,15 +116,17 @@ export function SkillExportDialog({ token, skill, onClose }: Props) {
         selected.id,
         fallbackName,
       );
+      if (!mounted.current) return;
       toast.success(`已导出 ${fileName}`);
       onClose();
     } catch (exportError) {
+      if (!mounted.current) return;
       setError(
         exportError instanceof Error ? exportError.message : 'Skill 导出失败',
       );
     } finally {
       exportLock.current = false;
-      setExporting(false);
+      if (mounted.current) setExporting(false);
     }
   };
 
@@ -109,23 +139,59 @@ export function SkillExportDialog({ token, skill, onClose }: Props) {
       }}
     >
       <section
+        ref={dialogRef}
+        tabIndex={-1}
         className="skill-session-dialog skill-export-dialog"
         role="dialog"
         aria-modal="true"
         aria-label="导出 Skill"
+        onKeyDown={(event) => {
+          if (event.key === 'Escape' && !exportLock.current) onClose();
+          if (event.key !== 'Tab') return;
+          const controls = event.currentTarget.querySelectorAll<HTMLElement>(
+            'input:not(:disabled), button:not(:disabled)',
+          );
+          const first = controls[0];
+          const last = controls[controls.length - 1];
+          if (!first || !last) {
+            event.preventDefault();
+            event.currentTarget.focus();
+          } else if (
+            event.shiftKey &&
+            (document.activeElement === first ||
+              document.activeElement === event.currentTarget)
+          ) {
+            event.preventDefault();
+            last.focus();
+          } else if (
+            !event.shiftKey &&
+            (document.activeElement === last ||
+              document.activeElement === event.currentTarget)
+          ) {
+            event.preventDefault();
+            first.focus();
+          }
+        }}
       >
         <h2>导出 Skill</h2>
         <p>
-          选择要导出的固定版本。ZIP 只包含该版本真实保存的 SKILL.md，导出不会修改 Skill。
+          选择要导出的固定版本。ZIP 只包含该版本真实保存的
+          SKILL.md，导出不会修改 Skill。
         </p>
         {loading ? (
-          <div className="skill-export-state">
+          <div className="skill-export-state" role="status">
             <Loader2 className="spin" size={17} /> 正在读取版本
           </div>
         ) : versions.length === 0 ? (
-          <div className="skill-export-state">当前 Skill 暂无可导出的已发布版本</div>
+          <div className="skill-export-state">
+            当前 Skill 暂无可导出的正常版本
+          </div>
         ) : (
-          <div className="skill-export-version-list" role="radiogroup" aria-label="导出版本">
+          <div
+            className="skill-export-version-list"
+            role="radiogroup"
+            aria-label="导出版本"
+          >
             {versions.map((version) => (
               <label key={version.id}>
                 <input
@@ -138,13 +204,17 @@ export function SkillExportDialog({ token, skill, onClose }: Props) {
                 />
                 <span>
                   <strong>v{version.versionNumber}</strong>
-                  <small>{version.note || '已发布版本'}</small>
+                  <small>{version.note || '正常版本'}</small>
                 </span>
               </label>
             ))}
           </div>
         )}
-        {error ? <div className="skill-dialog-error" role="alert">{error}</div> : null}
+        {error ? (
+          <div className="skill-dialog-error" role="alert">
+            {error}
+          </div>
+        ) : null}
         <footer>
           <button type="button" onClick={onClose} disabled={exporting}>
             取消
@@ -155,7 +225,11 @@ export function SkillExportDialog({ token, skill, onClose }: Props) {
             disabled={loading || exporting || !selected}
             onClick={() => void exportVersion()}
           >
-            {exporting ? <Loader2 className="spin" size={15} /> : <Download size={15} />}
+            {exporting ? (
+              <Loader2 className="spin" size={15} />
+            ) : (
+              <Download size={15} />
+            )}
             {exporting ? '正在导出…' : '导出所选版本'}
           </button>
         </footer>

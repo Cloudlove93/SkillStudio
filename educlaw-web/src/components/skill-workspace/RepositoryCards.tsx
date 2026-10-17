@@ -71,7 +71,7 @@ export function RepositorySkillCard({
           <span className="skill-repository-card-status">已创建</span>
           <span className="skill-repository-card-version">
             {skill.latestVersionNumber === null
-              ? '暂无已发布版本'
+              ? '暂无正常版本'
               : `最新版本 v${skill.latestVersionNumber}`}
           </span>
         </span>
@@ -144,7 +144,7 @@ export function RepositorySkillCard({
                 disabled={skill.latestVersionId === null}
                 title={
                   skill.latestVersionId === null
-                    ? '当前 Skill 暂无可导出的已发布版本'
+                    ? '当前 Skill 暂无可导出的正常版本'
                     : undefined
                 }
               >
@@ -201,7 +201,8 @@ export function RepositoryDraftCard({
         </span>
         <span className="skill-repository-card-footer">
           <time dateTime={session.updated_at}>
-            更新于 {repositoryDateFormatter.format(new Date(session.updated_at))}
+            更新于{' '}
+            {repositoryDateFormatter.format(new Date(session.updated_at))}
           </time>
           <span className="skill-repository-card-open">
             继续完善

@@ -156,7 +156,7 @@ describe('Skill repository cards', () => {
       '用定义、辨析和示例组织高等数学函数概念课。',
     );
     expect(cards?.[0].textContent).toContain('最新版本 v2');
-    expect(cards?.[1].textContent).toContain('暂无已发布版本');
+    expect(cards?.[1].textContent).toContain('暂无正常版本');
   });
 
   it('opens the existing version manager and shared export flow from a card', async () => {

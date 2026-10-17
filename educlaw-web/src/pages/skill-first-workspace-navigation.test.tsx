@@ -11,6 +11,14 @@ const api = vi.hoisted(() => ({
   listSkillVersions: vi.fn(),
   recoverArenaRun: vi.fn(),
   getArenaThreadDetail: vi.fn(),
+  rollbackSkillVersion: vi.fn(),
+  discardSkillVersion: vi.fn(),
+  undiscardSkillVersion: vi.fn(),
+  createArenaThread: vi.fn(),
+  diagnosePackage: vi.fn(),
+  renameArenaThread: vi.fn(),
+  chatOptimize: vi.fn(),
+  applyInteractiveChanges: vi.fn(),
 }));
 vi.mock('../api/lite-api', () => ({ liteApi: api }));
 vi.mock('../stores/auth', () => ({
@@ -157,4 +165,247 @@ it.each(['run', 'test'] as const)(
       ).not.toBeNull();
     });
   },
+);
+
+it('refreshes the repository summary after saving through the actual optimization workspace', async () => {
+  let head = 1;
+  api.listRepositorySkills.mockImplementation(async () => ({
+    items: [
+      {
+        id: '11',
+        packageId: '7',
+        name: 'Fixture',
+        updatedAt: version.createdAt,
+        latestVersionId: String(head),
+        latestVersionNumber: head,
+      },
+    ],
+    nextCursor: null,
+  }));
+  api.listSkillVersions.mockImplementation(async () => ({
+    items: [{ ...version, id: String(head), versionNumber: head }],
+    currentVersionId: String(head),
+    currentPackageVersionId: '99',
+    nextCursor: null,
+  }));
+  api.createArenaThread.mockResolvedValue({ id: 93 });
+  api.diagnosePackage.mockResolvedValue({
+    issues: [],
+    session: { id: 'session-1' },
+  });
+  api.renameArenaThread.mockResolvedValue({ id: 93 });
+  api.chatOptimize.mockResolvedValue({
+    reply: '修改已准备',
+    newAdoptions: [
+      {
+        id: 'change',
+        target: 'skill',
+        targetId: 's',
+        targetName: 'Fixture',
+        original: 'Fixture',
+        modified: 'Updated',
+        reason: 'test',
+      },
+    ],
+  });
+  api.applyInteractiveChanges.mockImplementation(async () => {
+    head = 2;
+    return { versionNumber: 2 };
+  });
+  await Promise.all([
+    import('../components/skill-workspace/SkillOptimizeWorkspace'),
+    import('../components/skill-workspace/SkillRepositoryWorkspace'),
+  ]);
+  await act(async () =>
+    root.render(
+      <MemoryRouter initialEntries={['/?view=optimize&skill=7%3A11']}>
+        <SkillFirstWorkspace />
+      </MemoryRouter>,
+    ),
+  );
+  await vi.waitFor(async () => {
+    await act(async () => {});
+    expect(container.textContent).toContain('我已读取当前 v1');
+  });
+  const input = container.querySelector<HTMLTextAreaElement>(
+    '.skill-optimize-workspace textarea',
+  )!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(
+      HTMLTextAreaElement.prototype,
+      'value',
+    )!.set!.call(input, '更新示例');
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await act(async () =>
+    container
+      .querySelector<HTMLButtonElement>(
+        '.skill-optimize-workspace .skill-test-composer button',
+      )!
+      .click(),
+  );
+  await act(async () => button('保存为新版本')!.click());
+  await act(async () => button('Skill 仓库')!.click());
+  await vi.waitFor(async () => {
+    await act(async () => {});
+    expect(
+      container.querySelector('.skill-repository-card-version')?.textContent,
+    ).toBe('最新版本 v2');
+  });
+}, 20000);
+
+it('keeps the newest repository summary when refresh responses arrive out of order', async () => {
+  const item = (n: number) => ({
+    id: '11',
+    packageId: '7',
+    name: 'Fixture',
+    updatedAt: version.createdAt,
+    latestVersionId: String(n),
+    latestVersionNumber: n,
+  });
+  let finishOld!: (value: unknown) => void;
+  api.listRepositorySkills
+    .mockResolvedValueOnce({ items: [item(1)], nextCursor: null })
+    .mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishOld = resolve;
+        }),
+    )
+    .mockResolvedValue({ items: [item(3)], nextCursor: null });
+  await Promise.all([
+    import('../components/skill-workspace/SkillVersionWorkspace'),
+    import('../components/skill-workspace/SkillRepositoryWorkspace'),
+  ]);
+  await act(async () =>
+    root.render(
+      <MemoryRouter initialEntries={['/?view=versions&skill=7%3A11']}>
+        <SkillFirstWorkspace />
+      </MemoryRouter>,
+    ),
+  );
+  await vi.waitFor(async () => {
+    await act(async () => {});
+    expect(button('刷新版本')).toBeDefined();
+  });
+  await act(async () => button('刷新版本')!.click());
+  await act(async () => button('刷新版本')!.click());
+  await act(async () => button('Skill 仓库')!.click());
+  await vi.waitFor(async () => {
+    await act(async () => {});
+    expect(
+      container.querySelector('.skill-repository-card-version')?.textContent,
+    ).toBe('最新版本 v3');
+  });
+  await act(async () => finishOld({ items: [item(2)], nextCursor: null }));
+  expect(
+    container.querySelector('.skill-repository-card-version')?.textContent,
+  ).toBe('最新版本 v3');
+}, 20000);
+
+it.each(['rollback', 'discard', 'restore'] as const)(
+  'refreshes the actual repository card after %s without a browser reload',
+  async (action) => {
+    let latest = action === 'restore' ? 2 : 3;
+    let discarded = action === 'restore';
+    let current = action === 'rollback' ? 3 : 2;
+    const repositoryItem = () => ({
+      id: '11',
+      packageId: '7',
+      name: 'Fixture',
+      description: '',
+      updatedAt: '2026-10-16T00:00:00Z',
+      latestVersionId: String(latest),
+      latestVersionNumber: latest,
+      currentVersionId: String(current),
+      currentVersionNumber: current,
+    });
+    api.listRepositorySkills.mockImplementation(async () => ({
+      items: [repositoryItem()],
+      nextCursor: null,
+    }));
+    api.listSkillVersions.mockImplementation(async () => ({
+      items: [3, 2, 1].map((n) => ({
+        ...version,
+        id: String(n),
+        versionNumber: n,
+        status: n === 3 && discarded ? 'discarded' : 'active',
+      })),
+      currentVersionId: String(current),
+      currentPackageVersionId: '99',
+      nextCursor: null,
+    }));
+    api.rollbackSkillVersion.mockImplementation(async () => {
+      latest = 4;
+      current = 4;
+      return {};
+    });
+    api.discardSkillVersion.mockImplementation(async () => {
+      discarded = true;
+      latest = 2;
+      return {};
+    });
+    api.undiscardSkillVersion.mockImplementation(async () => {
+      discarded = false;
+      latest = 3;
+      return {};
+    });
+    await Promise.all([
+      import('../components/skill-workspace/SkillDetailWorkspace'),
+      import('../components/skill-workspace/SkillVersionWorkspace'),
+      import('../components/skill-workspace/SkillRepositoryWorkspace'),
+    ]);
+    await act(async () =>
+      root.render(
+        <MemoryRouter initialEntries={['/?view=versions&skill=7%3A11']}>
+          <SkillFirstWorkspace />
+        </MemoryRouter>,
+      ),
+    );
+    await vi.waitFor(async () => {
+      await act(async () => {});
+      expect(
+        container.querySelectorAll('.skill-version-row').length,
+      ).toBeGreaterThan(0);
+    });
+    if (action === 'restore')
+      await act(async () =>
+        container
+          .querySelector<HTMLInputElement>(
+            '[name="include-discarded-versions"]',
+          )!
+          .click(),
+      );
+    const target = [...container.querySelectorAll('.skill-version-row')].find(
+      (row) =>
+        row.querySelector('.skill-version-identity > span')?.textContent ===
+        (action === 'rollback' ? 'v1' : 'v3'),
+    )!;
+    const label =
+      action === 'rollback' ? '回退' : action === 'discard' ? '废弃' : '恢复';
+    await act(async () =>
+      [...target.querySelectorAll('button')]
+        .find((b) => b.textContent?.trim() === label)!
+        .click(),
+    );
+    await act(async () =>
+      container
+        .querySelector<HTMLButtonElement>(
+          '.skill-version-confirm .skill-primary-button',
+        )!
+        .click(),
+    );
+    await vi.waitFor(async () => {
+      await act(async () => {});
+      expect(container.querySelector('.skill-version-confirm')).toBeNull();
+    });
+    await act(async () => button('Skill 仓库')!.click());
+    await vi.waitFor(async () => {
+      await act(async () => {});
+      expect(
+        container.querySelector('.skill-repository-card-version')?.textContent,
+      ).toBe(`最新版本 v${latest}`);
+    });
+  },
+  20000,
 );
