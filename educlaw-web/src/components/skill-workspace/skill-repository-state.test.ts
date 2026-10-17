@@ -17,6 +17,10 @@ const skills: RepositorySkill[] = Array.from({ length: 10 }, (_, index) => ({
   name: index === 8 ? '物理实验' : `Skill ${index + 1}`,
   description: index === 9 ? '函数课程' : '',
   updatedAt: '2026-08-25T00:00:00.000Z',
+  latestVersionId: String(100 + index),
+  latestVersionNumber: index + 1,
+  currentVersionId: String(100 + index),
+  currentVersionNumber: index + 1,
 }));
 
 describe('Skill repository state', () => {

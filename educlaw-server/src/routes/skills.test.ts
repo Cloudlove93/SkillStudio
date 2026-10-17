@@ -3,6 +3,7 @@ import express from 'express';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const batchDeleteSkillsMock = vi.fn();
+const exportSkillVersionZipMock = vi.fn();
 const listRepositorySkillsMock = vi.fn();
 
 async function createApp() {
@@ -18,6 +19,7 @@ async function createApp() {
       }
     },
     batchDeleteSkills: batchDeleteSkillsMock,
+    exportSkillVersionZip: exportSkillVersionZipMock,
     listRepositorySkills: listRepositorySkillsMock,
   }));
   const routes = (await import('./skills.js')).default;
@@ -47,7 +49,102 @@ afterEach(() => {
   vi.resetModules();
   vi.doUnmock('../services/skill-version-service.js');
   batchDeleteSkillsMock.mockReset();
+  exportSkillVersionZipMock.mockReset();
   listRepositorySkillsMock.mockReset();
+});
+
+describe('GET /api/skills/:skillId/versions/:versionId/export', () => {
+  it('requires authentication before reading a Skill version', async () => {
+    const { server, url } = await listen(await createApp());
+
+    try {
+      const response = await fetch(
+        `${url}/api/skills/12/versions/82/export?packageId=3`,
+      );
+      expect(response.status).toBe(401);
+      expect(exportSkillVersionZipMock).not.toHaveBeenCalled();
+    } finally {
+      await close(server);
+    }
+  });
+
+  it('exports an owned fixed Skill version as a ZIP attachment', async () => {
+    exportSkillVersionZipMock.mockResolvedValueOnce({
+      data: Buffer.from('zip-bytes'),
+      fileName: 'math-skill-v2.zip',
+      versionNumber: 2,
+    });
+    const { server, url } = await listen(await createApp());
+
+    try {
+      const response = await fetch(
+        `${url}/api/skills/12/versions/82/export?packageId=3`,
+        { headers: { 'X-User-Id': 'real-user' } },
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('content-type')).toContain('application/zip');
+      expect(response.headers.get('content-disposition')).toContain(
+        'math-skill-v2.zip',
+      );
+      expect(Buffer.from(await response.arrayBuffer()).toString()).toBe(
+        'zip-bytes',
+      );
+      expect(exportSkillVersionZipMock).toHaveBeenCalledWith({
+        authUserId: 'real-user',
+        packageId: '3',
+        skillId: '12',
+        versionId: '82',
+      });
+    } finally {
+      await close(server);
+    }
+  });
+
+  it('rejects malformed identifiers and an injected owner identity', async () => {
+    const { server, url } = await listen(await createApp());
+
+    try {
+      for (const path of [
+        '/api/skills/0/versions/82/export?packageId=3',
+        '/api/skills/12/versions/nope/export?packageId=3',
+        '/api/skills/12/versions/82/export?packageId=0',
+        '/api/skills/12/versions/82/export?packageId=3&userId=attacker',
+      ]) {
+        const response = await fetch(`${url}${path}`, {
+          headers: { 'X-User-Id': 'real-user' },
+        });
+        expect(response.status).toBe(422);
+      }
+      expect(exportSkillVersionZipMock).not.toHaveBeenCalled();
+    } finally {
+      await close(server);
+    }
+  });
+
+  it('does not leak an unowned version', async () => {
+    exportSkillVersionZipMock.mockRejectedValueOnce(
+      Object.assign(new Error('Skill version not found'), {
+        code: 'SKILL_VERSION_NOT_FOUND',
+        status: 404,
+      }),
+    );
+    const { server, url } = await listen(await createApp());
+
+    try {
+      const response = await fetch(
+        `${url}/api/skills/12/versions/82/export?packageId=3`,
+        { headers: { 'X-User-Id': 'other-user' } },
+      );
+      expect(response.status).toBe(404);
+      expect(await response.json()).toEqual({
+        code: 'SKILL_VERSION_NOT_FOUND',
+        error: 'Skill version not found',
+      });
+    } finally {
+      await close(server);
+    }
+  });
 });
 
 describe('GET /api/skills/repository', () => {

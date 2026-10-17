@@ -29,6 +29,10 @@ describe('repository Skill listing', () => {
           updated_at: '2026-08-29T08:00:00.000Z',
           package_name: '高等数学',
           package_description: '课程包描述',
+          latest_version_id: '102',
+          latest_version_number: 2,
+          current_version_id: '102',
+          current_version_number: 2,
         },
         {
           id: '11',
@@ -44,6 +48,10 @@ describe('repository Skill listing', () => {
           updated_at: '2026-08-28T08:00:00.000Z',
           package_name: '线性代数',
           package_description: '备用描述',
+          latest_version_id: null,
+          latest_version_number: null,
+          current_version_id: null,
+          current_version_number: null,
         },
       ],
     });
@@ -57,6 +65,10 @@ describe('repository Skill listing', () => {
     expect(client.query).toHaveBeenCalledTimes(1);
     expect(client.query.mock.calls[0]?.[0]).toContain(
       'join agent_packages p on p.id = s.package_id',
+    );
+    expect(client.query.mock.calls[0]?.[0]).toContain('left join lateral');
+    expect(client.query.mock.calls[0]?.[0]).toContain(
+      "sv.status = 'active'",
     );
     expect(client.query.mock.calls[0]?.[1]).toEqual([
       'user-1',
@@ -75,6 +87,10 @@ describe('repository Skill listing', () => {
         updatedAt: '2026-08-29T08:00:00.000Z',
         packageName: '高等数学',
         packageDescription: '课程包描述',
+        latestVersionId: '102',
+        latestVersionNumber: 2,
+        currentVersionId: '102',
+        currentVersionNumber: 2,
       },
     ]);
     expect(result.nextCursor).toEqual(expect.any(String));

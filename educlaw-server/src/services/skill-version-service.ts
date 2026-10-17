@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import AdmZip from 'adm-zip';
 import type {
   AgentPackageSnapshot,
   PackageSkill,
@@ -620,6 +621,10 @@ function toSkillSummary(row: DbSkillRow) {
 interface DbRepositorySkillRow extends DbSkillRow {
   package_name: string;
   package_description: string;
+  latest_version_id: string | null;
+  latest_version_number: number | null;
+  current_version_id: string | null;
+  current_version_number: number | null;
 }
 
 function decodeRepositoryCursor(cursor: string | undefined) {
@@ -670,9 +675,29 @@ export async function listRepositorySkills(input: {
 
   return withTransaction(async (client) => {
     const result = await client.query<DbRepositorySkillRow>(
-      `select s.*, p.name as package_name, p.description as package_description
+      `select s.*,
+              p.name as package_name,
+              p.description as package_description,
+              latest_sv.id as latest_version_id,
+              latest_sv.version_number as latest_version_number,
+              current_sv.id as current_version_id,
+              current_sv.version_number as current_version_number
        from agent_package_skills s
        join agent_packages p on p.id = s.package_id
+       left join agent_package_version_skills current_link
+         on current_link.package_version_id = p.current_version_id
+        and current_link.skill_id = s.id
+       left join agent_skill_versions current_sv
+         on current_sv.id = current_link.skill_version_id
+       left join lateral (
+         select sv.id, sv.version_number
+         from agent_skill_versions sv
+         where sv.skill_id = s.id
+           and sv.package_id = s.package_id
+           and sv.status = 'active'
+         order by sv.version_number desc
+         limit 1
+       ) latest_sv on true
        where p.user_id = $1
          and s.status = 'active'
          and (
@@ -696,11 +721,72 @@ export async function listRepositorySkills(input: {
         updatedAt: row.updated_at,
         packageName: row.package_name,
         packageDescription: row.package_description,
+        latestVersionId: row.latest_version_id
+          ? String(row.latest_version_id)
+          : null,
+        latestVersionNumber: row.latest_version_number,
+        currentVersionId: row.current_version_id
+          ? String(row.current_version_id)
+          : null,
+        currentVersionNumber: row.current_version_number,
       })),
       nextCursor:
         hasMore && pageRows.length > 0
           ? encodeRepositoryCursor(pageRows[pageRows.length - 1]!)
           : null,
+    };
+  });
+}
+
+function sanitizeSkillExportBaseName(value: string): string {
+  const withoutControls = Array.from(value.normalize('NFKC'), (character) =>
+    character.charCodeAt(0) < 32 ? '-' : character,
+  ).join('');
+  const safe = withoutControls
+    .replace(/[<>:"/\\|?*]/g, '-')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^[.-]+|[.-]+$/g, '')
+    .slice(0, 80);
+  return safe || 'skill';
+}
+
+export async function exportSkillVersionZip(input: {
+  authUserId: string;
+  packageId: string;
+  skillId: string;
+  versionId: string;
+}) {
+  const packageId = positiveId(input.packageId, 'packageId');
+  const skillId = positiveId(input.skillId, 'skillId');
+  const versionId = positiveId(input.versionId, 'versionId');
+
+  return withTransaction(async (client) => {
+    const version = toSkillVersion(
+      await getOwnedSkillVersion(client, {
+        authUserId: input.authUserId,
+        packageId,
+        skillId,
+        versionId,
+      }),
+    );
+    if (!version.skill.skillMd.trim()) {
+      throw new SkillVersionError(
+        'SKILL_VERSION_NOT_EXPORTABLE',
+        'Skill version has no exportable SKILL.md content',
+        422,
+      );
+    }
+
+    const zip = new AdmZip();
+    zip.addFile('SKILL.md', Buffer.from(version.skill.skillMd, 'utf8'));
+    const baseName = sanitizeSkillExportBaseName(
+      version.skill.dirName || version.skill.name,
+    );
+    return {
+      data: zip.toBuffer(),
+      fileName: `${baseName}-v${version.versionNumber}.zip`,
+      versionNumber: version.versionNumber,
     };
   });
 }

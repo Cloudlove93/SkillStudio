@@ -268,6 +268,10 @@ export interface RepositorySkillRecord {
   updatedAt: string;
   packageName: string;
   packageDescription: string;
+  latestVersionId: string | null;
+  latestVersionNumber: number | null;
+  currentVersionId: string | null;
+  currentVersionNumber: number | null;
 }
 
 export interface RepositorySkillPage {
@@ -751,6 +755,30 @@ async function streamRequest<TEvent>(
       onEvent({ event: eventName, data: JSON.parse(data) } as TEvent);
     }
   }
+}
+
+function responseFileName(response: Response, fallback: string): string {
+  const disposition = response.headers.get('Content-Disposition') || '';
+  const encoded = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+  if (encoded) {
+    try {
+      return decodeURIComponent(encoded);
+    } catch {
+      // Use the safe fallback when a proxy rewrites the header incorrectly.
+    }
+  }
+  return disposition.match(/filename="?([^";]+)"?/i)?.[1] || fallback;
+}
+
+function saveBlob(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 export const liteApi = {
@@ -1666,6 +1694,28 @@ export const liteApi = {
       { method: 'POST', body: JSON.stringify({ note }) },
       token,
     ),
+  async exportSkillVersion(
+    token: string,
+    packageId: string,
+    skillId: string,
+    versionId: string,
+    fallbackFileName: string,
+  ): Promise<string> {
+    const query = new URLSearchParams({ packageId });
+    const response = await apiFetch(
+      `/api/skills/${encodeURIComponent(skillId)}/versions/${encodeURIComponent(versionId)}/export?${query.toString()}`,
+      { headers: token ? { Authorization: `Bearer ${token}` } : undefined },
+    );
+    if (!response.ok) {
+      const body = await response
+        .json()
+        .catch(() => ({ error: `HTTP ${response.status}` }));
+      throw new Error(body.error || `HTTP ${response.status}`);
+    }
+    const fileName = responseFileName(response, fallbackFileName);
+    saveBlob(await response.blob(), fileName);
+    return fileName;
+  },
   async exportPackage(token: string, packageId: string): Promise<void> {
     const response = await apiFetch(`/api/packages/${packageId}/export`, {
       headers: token ? { Authorization: `Bearer ${token}` } : undefined,

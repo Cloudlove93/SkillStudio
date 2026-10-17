@@ -37,6 +37,10 @@ export type RepositorySkill = {
   name: string;
   description: string;
   updatedAt: string;
+  latestVersionId: string | null;
+  latestVersionNumber: number | null;
+  currentVersionId: string | null;
+  currentVersionNumber: number | null;
 };
 
 type RepositoryTab = 'created' | 'drafts';
@@ -47,6 +51,8 @@ type Props = {
   search: string;
   onSearch: (value: string) => void;
   onSelectSkill: (skill: RepositorySkill) => void;
+  onVersionManagement: (skill: RepositorySkill) => void;
+  onExportSkill: (skill: RepositorySkill) => void;
   onSelectDraft: (session: GuidedCreationSession) => void;
   onDeleteSkills: (skills: RepositorySkill[]) => Promise<void>;
   onRenameSkill: (skill: RepositorySkill, displayName: string) => Promise<void>;
@@ -59,6 +65,8 @@ export function SkillRepositoryWorkspace({
   search,
   onSearch,
   onSelectSkill,
+  onVersionManagement,
+  onExportSkill,
   onSelectDraft,
   onDeleteSkills,
   onRenameSkill,
@@ -324,6 +332,14 @@ export function SkillRepositoryWorkspace({
                   menuOpen={menuSkillId === skill.skillId}
                   onPreview={() => previewRepositorySkill(skill)}
                   onOpen={() => onSelectSkill(skill)}
+                  onVersionManagement={() => {
+                    setMenuSkillId(null);
+                    onVersionManagement(skill);
+                  }}
+                  onExport={() => {
+                    setMenuSkillId(null);
+                    onExportSkill(skill);
+                  }}
                   onToggleSelection={() => toggleSelection(skill.skillId)}
                   onToggleMenu={() =>
                     setMenuSkillId((current) =>

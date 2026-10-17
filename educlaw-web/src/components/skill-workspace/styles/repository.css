@@ -298,6 +298,15 @@
   font-weight: 560;
   letter-spacing: 0.02em;
 }
+.skill-repository-card-version {
+  overflow: hidden;
+  margin-left: auto;
+  color: var(--workspace-primary);
+  font-size: var(--workspace-text-xs);
+  font-weight: 590;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .skill-repository-card-main > strong {
   display: -webkit-box;
   overflow: hidden;
@@ -396,7 +405,7 @@
   z-index: 12;
   top: 43px;
   right: 0;
-  width: 144px;
+  width: 168px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--workspace-surface);
@@ -413,13 +422,79 @@
   border-radius: 6px;
   background: transparent;
   padding: 0 8px;
-  color: var(--destructive);
+  color: var(--workspace-ink);
   font-size: var(--workspace-text-xs);
   cursor: pointer;
 }
 .skill-repository-card-menu > div button:hover,
 .skill-repository-card-menu > div button:focus-visible {
+  background: color-mix(in srgb, var(--workspace-primary) 8%, transparent);
+  color: var(--workspace-primary);
+}
+.skill-repository-card-menu > div button.is-destructive {
+  color: var(--destructive);
+}
+.skill-repository-card-menu > div button.is-destructive:hover,
+.skill-repository-card-menu > div button.is-destructive:focus-visible {
   background: color-mix(in srgb, var(--destructive) 9%, transparent);
+  color: var(--destructive);
+}
+.skill-repository-card-menu > div button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+.skill-export-dialog {
+  width: min(460px, calc(100vw - 32px));
+}
+.skill-export-version-list {
+  display: grid;
+  max-height: 260px;
+  gap: 8px;
+  overflow-y: auto;
+  margin-top: 16px;
+}
+.skill-export-version-list label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--workspace-border);
+  border-radius: var(--workspace-radius-md);
+  padding: 10px 12px;
+  cursor: pointer;
+}
+.skill-export-version-list label:has(input:checked) {
+  border-color: var(--workspace-primary);
+  background: color-mix(in srgb, var(--workspace-primary) 6%, transparent);
+}
+.skill-export-version-list input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--workspace-primary);
+}
+.skill-export-version-list span {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.skill-export-version-list small,
+.skill-export-state {
+  color: var(--workspace-muted);
+  font-size: var(--workspace-text-sm);
+}
+.skill-export-state {
+  display: flex;
+  min-height: 88px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.skill-dialog-error {
+  margin-top: 12px;
+  color: var(--destructive);
+  font-size: var(--workspace-text-sm);
 }
 .skill-repository-card.is-draft::before {
   background: color-mix(in srgb, var(--workspace-evidence) 22%, transparent);

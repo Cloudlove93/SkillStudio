@@ -4,8 +4,11 @@ import {
   BookOpen,
   Check,
   Clock3,
+  Download,
+  History,
   MoreHorizontal,
   PencilLine,
+  Play,
   Trash2,
 } from 'lucide-react';
 import { getSessionName } from './SkillWorkspaceSidebar';
@@ -24,6 +27,8 @@ export function RepositorySkillCard({
   menuOpen,
   onPreview,
   onOpen,
+  onVersionManagement,
+  onExport,
   onToggleSelection,
   onToggleMenu,
   onRequestRename,
@@ -35,6 +40,8 @@ export function RepositorySkillCard({
   menuOpen: boolean;
   onPreview: () => void;
   onOpen: () => void;
+  onVersionManagement: () => void;
+  onExport: () => void;
   onToggleSelection: () => void;
   onToggleMenu: () => void;
   onRequestRename: () => void;
@@ -62,6 +69,11 @@ export function RepositorySkillCard({
             <BookOpen size={18} />
           </span>
           <span className="skill-repository-card-status">已创建</span>
+          <span className="skill-repository-card-version">
+            {skill.latestVersionNumber === null
+              ? '暂无已发布版本'
+              : `最新版本 v${skill.latestVersionNumber}`}
+          </span>
         </span>
         <strong>{skill.name}</strong>
         <span className="skill-repository-card-description">
@@ -113,11 +125,42 @@ export function RepositorySkillCard({
           </button>
           {menuOpen ? (
             <div role="menu">
+              <button type="button" role="menuitem" onClick={onOpen}>
+                <Play size={14} aria-hidden="true" />
+                打开 Skill
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={onVersionManagement}
+              >
+                <History size={14} aria-hidden="true" />
+                版本管理
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={onExport}
+                disabled={skill.latestVersionId === null}
+                title={
+                  skill.latestVersionId === null
+                    ? '当前 Skill 暂无可导出的已发布版本'
+                    : undefined
+                }
+              >
+                <Download size={14} aria-hidden="true" />
+                导出 Skill
+              </button>
               <button type="button" role="menuitem" onClick={onRequestRename}>
                 <PencilLine size={14} aria-hidden="true" />
                 重命名 Skill
               </button>
-              <button type="button" role="menuitem" onClick={onRequestDelete}>
+              <button
+                type="button"
+                role="menuitem"
+                className="is-destructive"
+                onClick={onRequestDelete}
+              >
                 <Trash2 size={14} aria-hidden="true" />
                 删除 Skill
               </button>

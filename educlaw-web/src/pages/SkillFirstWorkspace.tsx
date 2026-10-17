@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 import { liteApi, type GuidedCreationSseEvent } from '../api/lite-api';
 import { useAuthStore } from '../stores/auth';
 import { SkillImportDialog } from '../components/skill-workspace/SkillImportDialog';
+import { SkillExportDialog } from '../components/skill-workspace/SkillExportDialog';
 import { SkillRenameDialog } from '../components/skill-workspace/SkillRenameDialog';
 import {
   isGuidedFinalizationStale,
@@ -177,6 +178,7 @@ function SkillFirstWorkspaceContent() {
     useState<RepositorySkill | null>(null);
   const [sidebarRenameSkill, setSidebarRenameSkill] =
     useState<RepositorySkill | null>(null);
+  const [exportSkill, setExportSkill] = useState<RepositorySkill | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
     null,
   );
@@ -466,6 +468,10 @@ function SkillFirstWorkspaceContent() {
           name: skill.name,
           description: skill.description || skill.packageDescription,
           updatedAt: skill.updatedAt,
+          latestVersionId: skill.latestVersionId,
+          latestVersionNumber: skill.latestVersionNumber,
+          currentVersionId: skill.currentVersionId,
+          currentVersionNumber: skill.currentVersionNumber,
         })),
       );
       if (!page.nextCursor) break;
@@ -1257,6 +1263,10 @@ function SkillFirstWorkspaceContent() {
       setSidebarRenameSkill(skill);
       return;
     }
+    if (action === 'export') {
+      setExportSkill(skill);
+      return;
+    }
     openRepositorySkill(skill);
     if (action === 'open') return;
     navigateWorkspaceView(
@@ -1404,6 +1414,11 @@ function SkillFirstWorkspaceContent() {
                   search={search}
                   onSearch={handleWorkspaceSearch}
                   onSelectSkill={openRepositorySkill}
+                  onVersionManagement={(skill) => {
+                    openRepositorySkill(skill);
+                    navigateWorkspaceView('versions', skill.key, true);
+                  }}
+                  onExportSkill={setExportSkill}
                   onSelectDraft={(item) => void openSession(item)}
                   onDeleteSkills={deleteRepositorySkills}
                   onRenameSkill={renameRepositorySkill}
@@ -1618,6 +1633,11 @@ function SkillFirstWorkspaceContent() {
         busy={importBusy}
         onClose={() => setImportOpen(false)}
         onImport={(file) => void importSkill(file)}
+      />
+      <SkillExportDialog
+        token={token}
+        skill={exportSkill}
+        onClose={() => setExportSkill(null)}
       />
       {sidebarRenameSkill ? (
         <SkillRenameDialog

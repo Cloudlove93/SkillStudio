@@ -18,6 +18,10 @@ const skills: RepositorySkill[] = [
     name: '函数概念教学',
     description: '用定义、辨析和示例组织高等数学函数概念课。',
     updatedAt: '2026-08-26T08:00:00.000Z',
+    latestVersionId: 'version-2',
+    latestVersionNumber: 2,
+    currentVersionId: 'version-2',
+    currentVersionNumber: 2,
   },
   {
     key: 'package-1:skill-2',
@@ -26,6 +30,10 @@ const skills: RepositorySkill[] = [
     name: '分段函数分析',
     description: '围绕区间、边界与图像建立分段函数分析框架。',
     updatedAt: '2026-08-25T08:00:00.000Z',
+    latestVersionId: null,
+    latestVersionNumber: null,
+    currentVersionId: null,
+    currentVersionNumber: null,
   },
 ];
 
@@ -84,11 +92,15 @@ describe('Skill repository cards', () => {
     sessions = [],
     onSelectDraft = vi.fn(),
     onRenameSkill = vi.fn().mockResolvedValue(undefined),
+    onVersionManagement = vi.fn(),
+    onExportSkill = vi.fn(),
   }: {
     onSelectSkill?: ReturnType<typeof vi.fn>;
     sessions?: GuidedCreationSession[];
     onSelectDraft?: ReturnType<typeof vi.fn>;
     onRenameSkill?: ReturnType<typeof vi.fn>;
+    onVersionManagement?: ReturnType<typeof vi.fn>;
+    onExportSkill?: ReturnType<typeof vi.fn>;
   } = {}) {
     await act(async () => {
       root.render(
@@ -101,6 +113,8 @@ describe('Skill repository cards', () => {
               onSearch={vi.fn()}
               onSelectSkill={onSelectSkill}
               onSelectDraft={onSelectDraft}
+              onVersionManagement={onVersionManagement}
+              onExportSkill={onExportSkill}
               onDeleteSkills={vi.fn().mockResolvedValue(undefined)}
               onNew={vi.fn()}
               {...({ onRenameSkill } as Record<string, unknown>)}
@@ -109,7 +123,13 @@ describe('Skill repository cards', () => {
         </MemoryRouter>,
       );
     });
-    return { onSelectSkill, onSelectDraft, onRenameSkill };
+    return {
+      onSelectSkill,
+      onSelectDraft,
+      onRenameSkill,
+      onVersionManagement,
+      onExportSkill,
+    };
   }
 
   function setInputValue(input: HTMLInputElement, value: string) {
@@ -135,6 +155,35 @@ describe('Skill repository cards', () => {
     expect(cards?.[0].textContent).toContain(
       '用定义、辨析和示例组织高等数学函数概念课。',
     );
+    expect(cards?.[0].textContent).toContain('最新版本 v2');
+    expect(cards?.[1].textContent).toContain('暂无已发布版本');
+  });
+
+  it('opens the existing version manager and shared export flow from a card', async () => {
+    const { onVersionManagement, onExportSkill } = await renderRepository();
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('[aria-label="函数概念教学操作"]')
+        ?.click();
+    });
+    const versionButton = [...container.querySelectorAll('[role="menuitem"]')]
+      .find((item) => item.textContent?.includes('版本管理')) as
+      | HTMLButtonElement
+      | undefined;
+    await act(async () => versionButton?.click());
+    expect(onVersionManagement).toHaveBeenCalledWith(skills[0]);
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('[aria-label="函数概念教学操作"]')
+        ?.click();
+    });
+    const exportButton = [...container.querySelectorAll('[role="menuitem"]')]
+      .find((item) => item.textContent?.includes('导出 Skill')) as
+      | HTMLButtonElement
+      | undefined;
+    await act(async () => exportButton?.click());
+    expect(onExportSkill).toHaveBeenCalledWith(skills[0]);
   });
 
   it('opens a Skill from its card action', async () => {

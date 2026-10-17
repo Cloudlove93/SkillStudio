@@ -14,6 +14,10 @@ const skill = {
   name: '函数概念教学',
   description: '函数概念课',
   updatedAt: '2026-08-27T00:00:00.000Z',
+  latestVersionId: '82',
+  latestVersionNumber: 2,
+  currentVersionId: '82',
+  currentVersionNumber: 2,
 };
 
 describe('Skill workspace sidebar actions', () => {
@@ -75,5 +79,50 @@ describe('Skill workspace sidebar actions', () => {
     expect(rename).toBeDefined();
     await act(async () => rename?.click());
     expect(onSkillAction).toHaveBeenCalledWith(skill, 'rename');
+  });
+
+  it('uses the shared export action from the workspace item menu', async () => {
+    const onSkillAction = vi.fn();
+    await act(async () => {
+      root.render(
+        <SkillWorkspaceSidebar
+          sessions={[]}
+          selectedSessionId={null}
+          repositoryActive={false}
+          selectedCreateMode="conversation"
+          collapsed={false}
+          search=""
+          userName="教师"
+          onSearch={vi.fn()}
+          onToggle={vi.fn()}
+          onRepository={vi.fn()}
+          onCreateMode={vi.fn()}
+          onSelect={vi.fn()}
+          skills={[skill]}
+          allRepositorySkills={[skill]}
+          activeSkillKey={skill.key}
+          activeSkillName={skill.name}
+          onSelectSkill={vi.fn()}
+          onSkillAction={onSkillAction}
+          onRename={vi.fn().mockResolvedValue(undefined)}
+          onDelete={vi.fn().mockResolvedValue(undefined)}
+          onLogout={vi.fn()}
+        />,
+      );
+    });
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(
+          '[aria-label="函数概念教学 更多操作"]',
+        )
+        ?.click();
+    });
+    const exportButton = [...container.querySelectorAll('[role="menuitem"]')]
+      .find((item) => item.textContent?.includes('导出 Skill')) as
+      | HTMLButtonElement
+      | undefined;
+    await act(async () => exportButton?.click());
+    expect(onSkillAction).toHaveBeenCalledWith(skill, 'export');
   });
 });

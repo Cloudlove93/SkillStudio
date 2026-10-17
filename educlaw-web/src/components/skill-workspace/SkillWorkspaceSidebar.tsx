@@ -5,6 +5,7 @@ import {
   FileText,
   FileUp,
   FlaskConical,
+  Download,
   History,
   Info,
   Library,
@@ -36,6 +37,7 @@ export type SkillMenuAction =
   | 'overview'
   | 'test'
   | 'versions'
+  | 'export'
   | 'rename'
   | 'remove';
 
@@ -178,7 +180,18 @@ export function SkillWorkspaceSidebar({
   const [addDialogQuery, setAddDialogQuery] = useState('');
   const [expandedSkillKey, setExpandedSkillKey] = useState<string | null>(activeSkillKey);
   const skillEntries = activeSkillKey && activeSkillName && !skills.some((skill) => skill.key === activeSkillKey)
-    ? [{ key: activeSkillKey, packageId: '', skillId: '', name: activeSkillName, description: '', updatedAt: '' }, ...skills]
+    ? [{
+        key: activeSkillKey,
+        packageId: '',
+        skillId: '',
+        name: activeSkillName,
+        description: '',
+        updatedAt: '',
+        latestVersionId: null,
+        latestVersionNumber: null,
+        currentVersionId: null,
+        currentVersionNumber: null,
+      }, ...skills]
     : skills;
   const visibleDrafts = sessions.filter((item) => {
     if (item.status === 'completed') return false;
@@ -199,6 +212,7 @@ export function SkillWorkspaceSidebar({
     { id: 'overview', label: '查看详情', icon: Info },
     { id: 'test', label: '测试 Skill', icon: FlaskConical },
     { id: 'versions', label: '版本管理', icon: History },
+    { id: 'export', label: '导出 Skill', icon: Download },
     { id: 'rename', label: '重命名', icon: PencilLine },
     { id: 'remove', label: '从工作区移除', icon: LogOut },
   ];

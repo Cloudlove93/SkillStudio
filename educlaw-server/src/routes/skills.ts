@@ -3,11 +3,28 @@ import type { AuthedRequest } from '../types.js';
 import { requireAuth } from '../middleware/auth.js';
 import {
   batchDeleteSkills,
+  exportSkillVersionZip,
   listRepositorySkills,
   SkillVersionError,
 } from '../services/skill-version-service.js';
 
 const router: import('express').Router = Router();
+
+function positiveParam(value: unknown, fieldName: string): string {
+  if (typeof value !== 'string' || !/^[1-9]\d*$/.test(value)) {
+    throw new SkillVersionError(
+      'INVALID_ARGUMENT',
+      `${fieldName} must be a positive integer string`,
+      422,
+    );
+  }
+  return value;
+}
+
+function attachmentHeader(fileName: string): string {
+  const fallback = fileName.replace(/[^\x20-\x7e]/g, '_').replace(/["\\]/g, '_');
+  return `attachment; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(fileName)}`;
+}
 
 function parseSkillIds(body: unknown): string[] {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
@@ -163,5 +180,39 @@ router.post('/skills/batch-delete', requireAuth, async (req, res) => {
     res.status(response.status).json(response.body);
   }
 });
+
+router.get(
+  '/skills/:skillId/versions/:versionId/export',
+  requireAuth,
+  async (req, res) => {
+    try {
+      const unknownKeys = Object.keys(req.query).filter(
+        (key) => key !== 'packageId',
+      );
+      if (unknownKeys.length > 0) {
+        throw new SkillVersionError(
+          'INVALID_ARGUMENT',
+          `Query contains unknown fields: ${unknownKeys.join(', ')}`,
+          422,
+        );
+      }
+      const exported = await exportSkillVersionZip({
+        authUserId: (req as AuthedRequest).userId || '',
+        packageId: positiveParam(req.query.packageId, 'packageId'),
+        skillId: positiveParam(req.params.skillId, 'skillId'),
+        versionId: positiveParam(req.params.versionId, 'versionId'),
+      });
+      res.setHeader('Content-Type', 'application/zip');
+      res.setHeader('Content-Disposition', attachmentHeader(exported.fileName));
+      res.send(exported.data);
+    } catch (error) {
+      const response = errorResponse(error, {
+        code: 'SKILL_EXPORT_FAILED',
+        message: 'Skill export failed',
+      });
+      res.status(response.status).json(response.body);
+    }
+  },
+);
 
 export default router;
