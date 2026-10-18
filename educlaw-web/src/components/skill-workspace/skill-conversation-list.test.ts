@@ -46,7 +46,7 @@ describe('Skill conversation list helpers', () => {
     // legacy different-version → arena
     expect(getConversationSurface(thread({ skillArenaConfig: { ...base.skillArenaConfig!, right: { ...base.skillArenaConfig!.right, skillVersionId: '2' } } }))).toBe('arena');
     expect(getSurfaceLabel('run')).toBe('使用');
-    expect(getSurfaceLabel('test')).toBe('测试');
+    expect(getSurfaceLabel('test')).toBe('使用');
     expect(getSurfaceLabel('optimize')).toBe('优化');
     expect(getSurfaceLabel('arena')).toBe('对比');
     expect(getSurfaceLabel(null)).toBe('');

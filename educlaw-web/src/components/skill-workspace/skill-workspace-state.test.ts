@@ -67,4 +67,13 @@ describe('Skill workspace navigation state', () => {
     expect(running.pinnedUpdate).toBeNull();
     expect(arena.activeView).toBe('arena');
   });
+
+  it('maps legacy Test navigation to the unified Use workspace', () => {
+    expect(createSkillWorkspaceState('test').activeView).toBe('run');
+    const state = skillWorkspaceReducer(createSkillWorkspaceState(), {
+      type: 'navigate',
+      view: 'test',
+    });
+    expect(state.activeView).toBe('run');
+  });
 });

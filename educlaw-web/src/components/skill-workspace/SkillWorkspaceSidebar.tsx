@@ -4,7 +4,6 @@ import {
   AudioLines,
   FileText,
   FileUp,
-  FlaskConical,
   Download,
   History,
   Info,
@@ -35,7 +34,6 @@ export type SkillCreateAction = SkillCreateMode | 'import';
 export type SkillMenuAction =
   | 'open'
   | 'overview'
-  | 'test'
   | 'versions'
   | 'export'
   | 'rename'
@@ -210,7 +208,6 @@ export function SkillWorkspaceSidebar({
   const skillMenuItems = [
     { id: 'open', label: '打开 Skill', icon: Play },
     { id: 'overview', label: '查看详情', icon: Info },
-    { id: 'test', label: '测试 Skill', icon: FlaskConical },
     { id: 'versions', label: '版本管理', icon: History },
     { id: 'export', label: '导出 Skill', icon: Download },
     { id: 'rename', label: '重命名', icon: PencilLine },

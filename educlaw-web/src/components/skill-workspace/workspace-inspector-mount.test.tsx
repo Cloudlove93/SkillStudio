@@ -202,6 +202,9 @@ describe('workspace inspector mount stability', () => {
       );
     });
 
+    expect(container.querySelector('[aria-label="切换到 使用"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="切换到 测试"]')).toBeNull();
+
     await act(async () => {
       container
         .querySelector<HTMLButtonElement>('[aria-label="切换到 Arena"]')

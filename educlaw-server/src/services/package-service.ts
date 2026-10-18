@@ -34,6 +34,11 @@ import type { DbRowPackage, DbRowPackageVersion } from '../types.js';
 import { parseDbJson } from '../utils/json.js';
 import { syncPackageVersionSkillsFromSnapshot } from './skill-version-service.js';
 import {
+  extractSkillFrontmatterValue,
+  validateSkillMdStandard,
+} from './skill-markdown-validation.js';
+export { validateSkillMdStandard } from './skill-markdown-validation.js';
+import {
   createPackageZipReader,
   PackageZipSecurityError,
 } from './package-import-security.js';
@@ -1921,91 +1926,6 @@ function getCompactSkillTemplatePrompt(): string {
   ].join('\n');
 }
 
-function extractFrontmatterValue(skillMd: string, key: string): string | null {
-  const match = skillMd.match(/^---\s*\r?\n([\s\S]*?)\r?\n---/);
-  if (!match) return null;
-  const line = match[1].split(/\r?\n/).find((l) => l.trim().startsWith(`${key}:`));
-  if (!line) return null;
-  const value = line.slice(line.indexOf(':') + 1).trim();
-  return value.replace(/^["']|["']$/g, '');
-}
-
-export function validateSkillMdStandard(
-  skillMd: string,
-  dirName: string,
-): string[] {
-  const errors: string[] = [];
-
-  // 1. 检查是否以 YAML frontmatter 开头
-  if (!skillMd.trim().startsWith('---')) {
-    errors.push('SKILL.md 必须以 YAML frontmatter（---）开头');
-    return errors; // 没有 frontmatter 后续检查无意义
-  }
-
-  const fmName = extractFrontmatterValue(skillMd, 'name');
-  const fmDescription = extractFrontmatterValue(skillMd, 'description');
-
-  // 2. 检查 frontmatter 中是否包含 name 和 description
-  if (!fmName) errors.push('YAML frontmatter 缺少 name 字段');
-  if (!fmDescription) errors.push('YAML frontmatter 缺少 description 字段');
-
-  // 3. 检查 name 是否为小写英文 kebab-case
-  if (fmName && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(fmName)) {
-    errors.push(`frontmatter name "${fmName}" 不是小写英文 kebab-case`);
-  }
-
-  // 4. 检查 name 是否包含保留词
-  if (fmName && /\b(claude|anthropic)\b/i.test(fmName)) {
-    errors.push(
-      `frontmatter name "${fmName}" 包含保留词（claude / anthropic）`,
-    );
-  }
-
-  // 5. 检查 dirName 是否与 frontmatter name 一致
-  if (fmName && dirName !== fmName) {
-    errors.push(`dirName "${dirName}" 与 frontmatter name "${fmName}" 不一致`);
-  }
-
-  // 6. 检查 description 是否过长（>200 字符）
-  if (fmDescription && fmDescription.length > 200) {
-    errors.push(
-      `frontmatter description 过长（${fmDescription.length} 字符，建议 ≤200）`,
-    );
-  }
-
-  // 7. 检查 description 是否包含 XML 尖括号
-  if (fmDescription && /[<>]/.test(fmDescription)) {
-    errors.push('frontmatter description 不应包含 XML 尖括号');
-  }
-  const triggerPattern =
-    /(\u5f53|\u5982\u679c|\u7528\u4e8e|\u9002\u5408|\u573a\u666f|\u89e6\u53d1|\u8c03\u7528|\u9700\u8981|\u60c5\u51b5|\u9488\u5bf9|\u9047\u5230|\u9762\u5bf9|\u51fa\u73b0|\u7528\u6237|\u8f93\u5165|\u8bf7\u6c42|\u95ee\u9898|\u4efb\u52a1|\u4f8b\u5982|\bwhen\b|\bwhenever\b|\bif\b|\bfor\b|\buse(?:d|s|ing)?\b|\buser\b|\brequest\b|\binput\b|\btask\b|\bworkflow\b|\bscenario\b|\btrigger\b)/i;
-  if (fmDescription && !triggerPattern.test(fmDescription)) {
-    errors.push(
-      'frontmatter description 应说明 skill 的触发场景（什么时候使用）',
-    );
-  }
-
-  const body = skillMd.replace(/^---\s*\n[\s\S]*?\n---\s*\n?/, '').trim();
-  if (body.length < 200) {
-    errors.push('SKILL.md 正文过短（<200 字符），请补充详细说明');
-  }
-
-  const requiredSections = [
-    'Instructions',
-    'Workflow',
-    'Output Format',
-    'Examples',
-    'Common Issues',
-  ];
-  for (const section of requiredSections) {
-    if (!new RegExp(`^##?\\s*${section}`, 'im').test(body)) {
-      errors.push(`正文缺少必要章节：${section}`);
-    }
-  }
-
-  return errors;
-}
-
 function validateBaseGenerationResult(
   generated: PackageBaseGenerationResult,
 ): void {
@@ -3115,8 +3035,8 @@ export async function applyManualMarkdownEdit(
   );
   if (skillIndex === -1) throw new Error('技能不存在');
 
-  const fmName = extractFrontmatterValue(content, 'name');
-  const fmDescription = extractFrontmatterValue(content, 'description');
+  const fmName = extractSkillFrontmatterValue(content, 'name');
+  const fmDescription = extractSkillFrontmatterValue(content, 'description');
   if (!content.startsWith('---') || !fmName || !fmDescription) {
     throw new Error(
       'SKILL.md 必须保留 YAML frontmatter，并包含 name 和 description',

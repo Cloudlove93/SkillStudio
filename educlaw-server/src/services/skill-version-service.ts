@@ -8,6 +8,10 @@ import type {
 import { withTransaction, type Queryable } from './db.js';
 import type { DbRowPackage, DbRowPackageVersion } from '../types.js';
 import { parseDbJson } from '../utils/json.js';
+import {
+  extractSkillFrontmatterValue,
+  validateSkillMdStandard,
+} from './skill-markdown-validation.js';
 
 type SkillVersionSource = PackageVersion['source'];
 
@@ -1393,6 +1397,230 @@ async function completeIdempotencyKey(
       JSON.stringify(input.responseJson),
     ],
   );
+}
+
+export async function createManualSkillVersion(input: {
+  authUserId: string;
+  packageId: string;
+  skillId: string;
+  baseVersionId: string;
+  expectedPackageVersionId: string;
+  idempotencyKey: string;
+  skillMd: string;
+  note?: string;
+}) {
+  const packageId = positiveId(input.packageId, 'packageId');
+  const skillId = positiveId(input.skillId, 'skillId');
+  const baseVersionId = positiveId(input.baseVersionId, 'baseVersionId');
+  const expectedPackageVersionId = positiveId(
+    input.expectedPackageVersionId,
+    'expectedPackageVersionId',
+  );
+  const idempotencyKey = String(input.idempotencyKey || '').trim();
+  if (!idempotencyKey || idempotencyKey.length > 120) {
+    throw new SkillVersionError(
+      'INVALID_ARGUMENT',
+      'idempotencyKey is required',
+      422,
+    );
+  }
+  const skillMd = String(input.skillMd || '').replace(/\r\n/g, '\n');
+  if (!skillMd.trim() || skillMd.length > 250_000) {
+    throw new SkillVersionError(
+      'INVALID_SKILL_MD',
+      'SKILL.md must contain between 1 and 250000 characters',
+      422,
+    );
+  }
+  const note = String(input.note || '').trim();
+  if (note.length > 500) {
+    throw new SkillVersionError('INVALID_ARGUMENT', 'note is too long', 422);
+  }
+  const requestHash = buildRequestHash({
+    packageId,
+    skillId,
+    baseVersionId,
+    expectedPackageVersionId,
+    skillMd,
+    note,
+  });
+
+  return withTransaction(async (client) => {
+    const idempotency = await claimIdempotencyKey(client, {
+      authUserId: input.authUserId,
+      action: 'skill.version.manual-edit',
+      packageId,
+      idempotencyKey,
+      requestHash,
+    });
+    if (idempotency.kind === 'replayed') {
+      return parseDbJson<Record<string, unknown>>(idempotency.responseJson, {});
+    }
+
+    const pkg = await getOwnedPackage(
+      client,
+      input.authUserId,
+      packageId,
+      true,
+    );
+    await ensurePackageSkillHistory(client, pkg);
+    if (String(pkg.current_version_id) !== expectedPackageVersionId) {
+      throw new SkillVersionError(
+        'PACKAGE_VERSION_CONFLICT',
+        'Package has changed. Refresh before retrying.',
+        409,
+        { currentPackageVersionId: String(pkg.current_version_id) },
+      );
+    }
+
+    await getOwnedSkill(client, input.authUserId, packageId, skillId);
+    const baseVersion = await getOwnedSkillVersion(client, {
+      authUserId: input.authUserId,
+      packageId,
+      skillId,
+      versionId: baseVersionId,
+      lock: true,
+    });
+    const baseSkill = normalizeSkillSnapshot(
+      parseDbJson<PackageSkill>(baseVersion.skill_snapshot_json, {
+        id: '',
+        dirName: '',
+        name: '',
+        description: '',
+        skillMd: '',
+      }),
+    );
+    if (skillMd === baseSkill.skillMd.replace(/\r\n/g, '\n')) {
+      throw new SkillVersionError(
+        'SKILL_CONTENT_UNCHANGED',
+        '内容没有变化，无需保存新版本',
+        422,
+      );
+    }
+    const validationErrors = validateSkillMdStandard(skillMd, baseSkill.dirName);
+    if (validationErrors.length > 0) {
+      throw new SkillVersionError(
+        'INVALID_SKILL_MD',
+        validationErrors.join('\n'),
+        422,
+        { validationErrors },
+      );
+    }
+    const editedSkill: PackageSkill = {
+      ...baseSkill,
+      description:
+        extractSkillFrontmatterValue(skillMd, 'description') ||
+        baseSkill.description,
+      skillMd,
+    };
+
+    const currentVersion = await getPackageVersion(
+      client,
+      packageId,
+      pkg.current_version_id,
+    );
+    const currentSnapshot = parseDbJson<AgentPackageSnapshot>(
+      currentVersion.snapshot_json,
+      emptySnapshot(),
+    );
+    const targetIndex = currentSnapshot.skills.findIndex(
+      (skill) => skill.id === editedSkill.id,
+    );
+    if (targetIndex < 0) {
+      throw new SkillVersionError(
+        'SKILL_NOT_IN_CURRENT_PACKAGE',
+        'Skill is no longer part of the current package',
+        409,
+      );
+    }
+    const nextPackageVersionNumber = currentVersion.version_number + 1;
+    const nextSkills = currentSnapshot.skills.map((skill, index) =>
+      index === targetIndex ? editedSkill : { ...skill },
+    );
+    const nextSnapshot: AgentPackageSnapshot = {
+      ...currentSnapshot,
+      versionLabel: `v${nextPackageVersionNumber}`,
+      skills: nextSkills,
+    };
+    const now = new Date().toISOString();
+    const versionNote = note || `手动编辑 Skill v${baseVersion.version_number}`;
+    const packageVersionResult = await client.query<{ id: string }>(
+      `insert into agent_package_versions
+        (package_id, version_number, source, snapshot_json, note, created_at)
+       values ($1, $2, 'manual', $3, $4, $5)
+       returning id`,
+      [
+        packageId,
+        nextPackageVersionNumber,
+        JSON.stringify(nextSnapshot),
+        versionNote,
+        now,
+      ],
+    );
+    const nextPackageVersionId = packageVersionResult.rows[0]!.id;
+    const syncedVersions = await syncPackageVersionSkillsFromSnapshot(client, {
+      packageId,
+      packageVersionId: nextPackageVersionId,
+      packageVersionNumber: nextPackageVersionNumber,
+      source: 'manual',
+      snapshot: nextSnapshot,
+      forcedSkillVersions: new Map([
+        [
+          editedSkill.id,
+          {
+            source: 'manual',
+            basedOnVersionId: baseVersionId,
+            note: versionNote,
+          },
+        ],
+      ]),
+    });
+    const nextSkillVersion = syncedVersions.get(editedSkill.id);
+    if (!nextSkillVersion) {
+      throw new SkillVersionError(
+        'SKILL_VERSION_NOT_FOUND',
+        'Skill version not created',
+        500,
+      );
+    }
+    const packageUpdate = await client.query(
+      `update agent_packages
+       set current_version_id = $1, updated_at = $2
+       where id = $3 and user_id = $4 and current_version_id = $5`,
+      [
+        nextPackageVersionId,
+        now,
+        packageId,
+        input.authUserId,
+        expectedPackageVersionId,
+      ],
+    );
+    if ((packageUpdate.rowCount || 0) !== 1) {
+      throw new SkillVersionError(
+        'PACKAGE_VERSION_CONFLICT',
+        'Package has changed. Refresh before retrying.',
+        409,
+      );
+    }
+    const response = {
+      packageId,
+      packageVersionId: String(nextPackageVersionId),
+      packageVersionNumber: nextPackageVersionNumber,
+      skillVersionId: nextSkillVersion.id,
+      skillVersionNumber: nextSkillVersion.versionNumber,
+      basedOnVersionId: baseVersionId,
+    };
+    await completeIdempotencyKey(client, {
+      authUserId: input.authUserId,
+      action: 'skill.version.manual-edit',
+      packageId,
+      idempotencyKey,
+      requestHash,
+      responseStatus: 200,
+      responseJson: response,
+    });
+    return response;
+  });
 }
 
 export async function rollbackSkillVersion(input: {

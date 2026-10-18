@@ -21,7 +21,7 @@ export function getSurfaceLabel(surface: SkillConversationSurface | null): strin
     case 'run':
       return '使用';
     case 'test':
-      return '测试';
+      return '使用';
     case 'optimize':
       return '优化';
     case 'arena':

@@ -127,7 +127,7 @@ it.each(['run', 'test'] as const)(
   'opens a %s conversation from versions without stale synchronization restoring the previous view and inspector',
   async (surface) => {
     threads[1].skillArenaConfig.surface = surface;
-    const selectedLabel = `${surface === 'test' ? '测试' : '使用'} Conversation 92`;
+    const selectedLabel = `使用 Conversation 92`;
     await Promise.all([
       import('../components/skill-workspace/SkillDetailWorkspace'),
       import('../components/skill-workspace/SkillVersionWorkspace'),
@@ -155,12 +155,12 @@ it.each(['run', 'test'] as const)(
       const params = new URLSearchParams(
         container.querySelector('[data-route]')!.textContent!,
       );
-      expect(params.get('view')).toBe(surface);
+      expect(params.get('view')).toBe('run');
       expect(params.get('conversation')).toBe('92');
       expect(params.has('inspector')).toBe(false);
       expect(
         container.querySelector(
-          `textarea[aria-label="${surface === 'test' ? '输入测试任务' : '输入 Skill 使用任务'}"]`,
+          'textarea[aria-label="输入 Skill 使用任务"]',
         ),
       ).not.toBeNull();
     });

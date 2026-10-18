@@ -37,7 +37,7 @@ const SkillVersionWorkspace = lazy(() =>
 
 type DetailView = Extract<
   SkillWorkspaceView,
-  'overview' | 'run' | 'test' | 'arena' | 'optimize' | 'versions'
+  'overview' | 'run' | 'arena' | 'optimize' | 'versions'
 >;
 
 export type SkillDetailSelection = {
@@ -190,7 +190,7 @@ export function SkillDetailWorkspace(props: Props) {
 
   return (
     <main className="skill-center skill-detail-workspace">
-      {(props.view === 'run' || props.view === 'test') && (
+      {props.view === 'run' && (
         <header className="skill-workspace-topbar">
           {props.selectedConversationId && (
             <span role="status">
@@ -261,24 +261,6 @@ export function SkillDetailWorkspace(props: Props) {
               currentPackageVersionId={
                 props.currentPackageVersionId ?? undefined
               }
-              onRunStateChange={props.onRunStateChange}
-              onOptimizeAnswer={props.onOptimizeAnswer}
-              selectedThreadId={props.selectedConversationId}
-              onThreadCreated={props.onConversationCreated}
-              onThreadUpdated={props.onConversationUpdated}
-              rerunRequest={props.answerRerunRequest}
-              onRerunHandled={props.onRerunHandled}
-            />
-          )}
-          {props.view === 'test' && (
-            <SkillRunWorkspace
-              token={props.token}
-              packageId={props.skill.packageId}
-              version={runVersion}
-              currentPackageVersionId={
-                props.currentPackageVersionId ?? undefined
-              }
-              purpose="test"
               onRunStateChange={props.onRunStateChange}
               onOptimizeAnswer={props.onOptimizeAnswer}
               selectedThreadId={props.selectedConversationId}

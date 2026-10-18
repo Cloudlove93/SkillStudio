@@ -13,6 +13,7 @@ import {
   deleteArenaThread,
 } from '../services/arena-service.js';
 import {
+  createManualSkillVersion,
   discardSkillVersion,
   getSkillVersionDetail,
   listPackageSkills,
@@ -347,6 +348,47 @@ const actionMap = new Map<string, ApiHandler>([
         authUserId,
         packageId: parsed.packageId,
         versionId: asPositiveId(parsed.payload.versionId, 'versionId'),
+      });
+    },
+  ],
+  [
+    'skill.version.manual-edit',
+    async ({ body, authUserId }) => {
+      const parsed = parseBase(body, [
+        'skillId',
+        'baseVersionId',
+        'expectedPackageVersionId',
+        'idempotencyKey',
+        'skillMd',
+        'note',
+      ]);
+      const skillMd = optionalString(parsed.payload.skillMd, 'skillMd', 250_000);
+      if (skillMd === undefined) {
+        throw new SkillVersionError(
+          'INVALID_ARGUMENT',
+          'skillMd is required',
+          422,
+        );
+      }
+      return createManualSkillVersion({
+        authUserId,
+        packageId: parsed.packageId,
+        skillId: asPositiveId(parsed.payload.skillId, 'skillId'),
+        baseVersionId: asPositiveId(
+          parsed.payload.baseVersionId,
+          'baseVersionId',
+        ),
+        expectedPackageVersionId: asPositiveId(
+          parsed.payload.expectedPackageVersionId,
+          'expectedPackageVersionId',
+        ),
+        idempotencyKey: requiredString(
+          parsed.payload.idempotencyKey,
+          'idempotencyKey',
+          120,
+        ),
+        skillMd,
+        note: optionalString(parsed.payload.note, 'note', 500),
       });
     },
   ],

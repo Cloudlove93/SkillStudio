@@ -6,6 +6,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SkillRepositoryWorkspace, type RepositorySkill } from './SkillRepositoryWorkspace';
+import { RepositorySkillCard } from './RepositoryCards';
 import { WorkspaceInspectorProvider } from './WorkspaceInspectorProvider';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -188,13 +189,57 @@ describe('Skill repository cards', () => {
 
   it('opens a Skill from its card action', async () => {
     const { onSelectSkill } = await renderRepository();
-    const openButton = [...container.querySelectorAll('button')].find(
-      (button) => button.getAttribute('aria-label') === '打开函数概念教学',
-    );
-
-    expect(openButton).toBeDefined();
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('[aria-label="函数概念教学操作"]')
+        ?.click();
+    });
+    const openButton = [...container.querySelectorAll('[role="menuitem"]')].find(
+      (button) => button.textContent?.includes('打开 Skill'),
+    ) as HTMLButtonElement | undefined;
     await act(async () => openButton?.click());
     expect(onSelectSkill).toHaveBeenCalledWith(skills[0]);
+  });
+
+  it('keeps card detail selection independent from the overflow menu', async () => {
+    const onPreview = vi.fn();
+    const onOpen = vi.fn();
+    const onToggleMenu = vi.fn();
+    await act(async () => {
+      root.render(
+        <RepositorySkillCard
+          skill={skills[0]}
+          managing={false}
+          selected={false}
+          menuOpen={false}
+          onPreview={onPreview}
+          onOpen={onOpen}
+          onVersionManagement={vi.fn()}
+          onExport={vi.fn()}
+          onToggleSelection={vi.fn()}
+          onToggleMenu={onToggleMenu}
+          onRequestRename={vi.fn()}
+          onRequestDelete={vi.fn()}
+        />,
+      );
+    });
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('[aria-label="查看函数概念教学详情"]')
+        ?.click();
+    });
+    expect(onPreview).toHaveBeenCalledTimes(1);
+    expect(onOpen).not.toHaveBeenCalled();
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('[aria-label="函数概念教学操作"]')
+        ?.click();
+    });
+    expect(onToggleMenu).toHaveBeenCalledTimes(1);
+    expect(onPreview).toHaveBeenCalledTimes(1);
+    expect(onOpen).not.toHaveBeenCalled();
   });
 
   it('renames a Skill from its card menu and closes after saving', async () => {

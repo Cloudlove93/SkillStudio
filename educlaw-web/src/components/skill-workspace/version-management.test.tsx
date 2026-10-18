@@ -3,7 +3,11 @@ import { act, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { SkillVersionDetail } from '@educlaw/shared';
-const api = vi.hoisted(() => ({ rollbackSkillVersion: vi.fn() }));
+const api = vi.hoisted(() => ({
+  rollbackSkillVersion: vi.fn(),
+  createManualSkillVersion: vi.fn(),
+  getSkillVersionDetail: vi.fn(),
+}));
 vi.mock('../../api/lite-api', () => ({ liteApi: api }));
 import { SkillVersionWorkspace } from './SkillVersionWorkspace';
 (
@@ -68,10 +72,13 @@ async function render(extra: Record<string, unknown> = {}) {
 }
 async function click(text: string) {
   await act(async () =>
-    Array.from(container.querySelectorAll('button'))
+    Array.from(document.body.querySelectorAll('button'))
       .find((b) => b.textContent?.trim() === text)!
       .click(),
   );
+}
+function validSkillMd(marker: string) {
+  return `---\nname: s\ndescription: 用于课堂教学任务的规则\n---\n# Skill\n## Instructions\n${marker} ${'具体规则。'.repeat(30)}\n## Workflow\n1. 分析\n2. 回答\n## Output Format\n给出结构化答案。\n## Examples\n示例回答。\n## Common Issues\n避免遗漏。`;
 }
 it('rolls back against the package head, not the Skill creation package', async () => {
   await render();
@@ -128,4 +135,108 @@ it('does not publish a late rollback completion into another Skill after unmount
   await act(async () => resolve({}));
   expect(changed).not.toHaveBeenCalled();
   expect(reload).not.toHaveBeenCalled();
+});
+
+it('opens the fixed SKILL.md snapshot and saves edits as a new version', async () => {
+  const base = {
+    ...versions[0],
+    skill: { ...versions[0].skill, skillMd: validSkillMd('原版本') },
+  };
+  const created = {
+    ...base,
+    id: '3',
+    versionNumber: 3,
+    basedOnVersionId: '2',
+    skill: { ...base.skill, skillMd: validSkillMd('新版本') },
+  };
+  api.createManualSkillVersion.mockResolvedValueOnce({
+    packageId: '7',
+    packageVersionId: '100',
+    packageVersionNumber: 100,
+    skillVersionId: '3',
+    skillVersionNumber: 3,
+    basedOnVersionId: '2',
+  });
+  api.getSkillVersionDetail.mockResolvedValueOnce(created);
+  const reload = vi.fn().mockResolvedValue(undefined);
+  const changed = vi.fn();
+  await render({
+    versions: [base, versions[1]],
+    onReload: reload,
+    onVersionChanged: changed,
+  });
+  await click('预览');
+
+  const dialog = document.body.querySelector('[role="dialog"]');
+  expect(dialog?.parentElement).toBe(document.body);
+  expect(container.querySelector('[role="dialog"]')).toBeNull();
+  expect(dialog?.textContent).toContain('Skill · v2');
+  expect(dialog?.textContent).toContain('当前只展示此固定版本真实保存的 SKILL.md');
+  await click('编辑 SKILL.md');
+  const editor = document.body.querySelector<HTMLTextAreaElement>(
+    'textarea[aria-label="SKILL.md 源码"]',
+  )!;
+  const setter = Object.getOwnPropertyDescriptor(
+    HTMLTextAreaElement.prototype,
+    'value',
+  )?.set;
+  await act(async () => {
+    setter?.call(editor, validSkillMd('新版本'));
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await click('保存为新版本');
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  expect(api.createManualSkillVersion).toHaveBeenCalledWith(
+    't',
+    '7',
+    expect.objectContaining({
+      skillId: '11',
+      baseVersionId: '2',
+      expectedPackageVersionId: '99',
+      skillMd: validSkillMd('新版本'),
+    }),
+  );
+  expect(reload).toHaveBeenCalledOnce();
+  expect(changed).toHaveBeenCalledWith(expect.stringContaining('v3'));
+  expect(base.skill.skillMd).toBe(validSkillMd('原版本'));
+  expect(document.body.textContent).toContain('Skill · v3');
+});
+
+it('keeps the edited draft visible when creating a new version fails', async () => {
+  const base = {
+    ...versions[0],
+    skill: { ...versions[0].skill, skillMd: validSkillMd('原版本') },
+  };
+  api.createManualSkillVersion.mockRejectedValueOnce(
+    new Error('Package has changed. Refresh before retrying.'),
+  );
+  await render({ versions: [base, versions[1]] });
+  await click('预览');
+  await click('编辑 SKILL.md');
+  const editor = document.body.querySelector<HTMLTextAreaElement>(
+    'textarea[aria-label="SKILL.md 源码"]',
+  )!;
+  const next = validSkillMd('保留草稿');
+  const setter = Object.getOwnPropertyDescriptor(
+    HTMLTextAreaElement.prototype,
+    'value',
+  )?.set;
+  await act(async () => {
+    setter?.call(editor, next);
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await click('保存为新版本');
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  expect(document.body.querySelector('[role="alert"]')?.textContent).toContain(
+    'Package has changed',
+  );
+  expect(editor.value).toBe(next);
 });

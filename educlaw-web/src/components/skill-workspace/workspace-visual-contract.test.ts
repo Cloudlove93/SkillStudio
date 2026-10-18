@@ -25,6 +25,21 @@ describe('Skill workspace visual contract', () => {
     expect(tokens).not.toMatch(/--workspace-text-[^:]+:\s*(?:[0-9]|1[01])px/);
   });
 
+  it('keeps the portaled Skill content dialog opaque in both themes', () => {
+    const tokens = read('./styles/workspace-tokens.css');
+    const detail = read('./styles/skill-detail.css');
+
+    expect(tokens).toMatch(
+      /\.skill-workspace-root,\s*\.skill-content-dialog\s*\{/,
+    );
+    expect(tokens).toMatch(
+      /\.dark \.skill-workspace-root,\s*\.dark \.skill-content-dialog\s*\{/,
+    );
+    expect(detail).toMatch(
+      /\.skill-content-shell\s*\{[^}]*background:\s*var\(--workspace-surface, #ffffff\)/s,
+    );
+  });
+
   it('keeps the legacy stylesheet as an import-only compatibility entry', () => {
     const css = read('./skill-workspace.css');
     const expectedImports = [

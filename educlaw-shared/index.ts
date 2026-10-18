@@ -149,6 +149,7 @@ export type SkillAction =
   | "skill.list"
   | "skill.version.list"
   | "skill.version.detail"
+  | "skill.version.manual-edit"
   | "skill.version.rollback"
   | "skill.version.discard"
   | "skill.version.undiscard"
@@ -184,6 +185,24 @@ export interface RollbackSkillVersionPayload {
   expectedPackageVersionId: string;
   idempotencyKey: string;
   note?: string;
+}
+
+export interface ManualEditSkillVersionPayload {
+  skillId: string;
+  baseVersionId: string;
+  expectedPackageVersionId: string;
+  idempotencyKey: string;
+  skillMd: string;
+  note?: string;
+}
+
+export interface ManualEditSkillVersionResult {
+  packageId: string;
+  packageVersionId: string;
+  packageVersionNumber: number;
+  skillVersionId: string;
+  skillVersionNumber: number;
+  basedOnVersionId: string;
 }
 
 export interface SkillVersionListResult {

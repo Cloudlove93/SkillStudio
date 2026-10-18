@@ -15,6 +15,7 @@ class MockMultimodalJobServiceError extends Error {
 
 const listPackageSkillsMock = vi.fn();
 const renameSkillMock = vi.fn();
+const createManualSkillVersionMock = vi.fn();
 const createArenaThreadMock = vi.fn();
 const getArenaThreadDetailMock = vi.fn();
 const deleteArenaThreadMock = vi.fn();
@@ -44,6 +45,7 @@ async function createApp() {
     },
     listPackageSkills: listPackageSkillsMock,
     renameSkill: renameSkillMock,
+    createManualSkillVersion: createManualSkillVersionMock,
     listSkillVersions: vi.fn(),
     getSkillVersionDetail: vi.fn(),
     rollbackSkillVersion: vi.fn(),
@@ -123,6 +125,7 @@ afterEach(() => {
   vi.doUnmock('../services/multimodal-guided-creation-service.js');
   listPackageSkillsMock.mockReset();
   renameSkillMock.mockReset();
+  createManualSkillVersionMock.mockReset();
   createArenaThreadMock.mockReset();
   getArenaThreadDetailMock.mockReset();
   deleteArenaThreadMock.mockReset();
@@ -237,6 +240,49 @@ describe('POST /api action dispatcher', () => {
       expect(await response.json()).toEqual({
         success: true,
         data: { id: '11', packageId: '7', name: '函数概念辨析' },
+      });
+    } finally {
+      await close(server);
+    }
+  });
+
+  it('validates and dispatches immutable manual Skill version creation', async () => {
+    createManualSkillVersionMock.mockResolvedValueOnce({
+      skillVersionId: '25',
+      skillVersionNumber: 5,
+    });
+    const { server, url } = await listen(await createApp());
+    const skillMd = '---\nname: lesson-skill\ndescription: 用于课堂任务\n---\n# Lesson';
+    try {
+      const response = await fetch(`${url}/api`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Id': 'real-user',
+        },
+        body: JSON.stringify({
+          action: 'skill.version.manual-edit',
+          pkgId: '7',
+          payload: {
+            skillId: '11',
+            baseVersionId: '21',
+            expectedPackageVersionId: '10',
+            idempotencyKey: 'manual-edit-1',
+            skillMd,
+          },
+        }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(createManualSkillVersionMock).toHaveBeenCalledWith({
+        authUserId: 'real-user',
+        packageId: '7',
+        skillId: '11',
+        baseVersionId: '21',
+        expectedPackageVersionId: '10',
+        idempotencyKey: 'manual-edit-1',
+        skillMd,
+        note: undefined,
       });
     } finally {
       await close(server);

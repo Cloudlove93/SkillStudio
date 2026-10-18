@@ -77,6 +77,7 @@ describe('Skill workspace sidebar actions', () => {
     ) as HTMLButtonElement | undefined;
 
     expect(rename).toBeDefined();
+    expect(container.textContent).not.toContain('测试 Skill');
     await act(async () => rename?.click());
     expect(onSkillAction).toHaveBeenCalledWith(skill, 'rename');
   });

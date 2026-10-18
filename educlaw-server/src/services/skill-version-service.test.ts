@@ -37,6 +37,114 @@ afterEach(() => {
   withTransactionMock.mockReset();
 });
 
+describe('manual Skill version editing', () => {
+  it('creates a new version from historical content without updating the base row', async () => {
+    const originalMd = validSkillMd('原始规则');
+    const editedMd = validSkillMd('手动修改');
+    let insertedSnapshot: { skills: Array<{ skillMd: string }> } | null = null;
+    let basedOnVersionId: unknown;
+    queryMock.mockImplementation(async (sql: string, values?: unknown[]) => {
+      if (sql.startsWith('delete from api_idempotency_keys')) return { rows: [], rowCount: 0 };
+      if (sql.startsWith('insert into api_idempotency_keys')) return { rows: [{ id: 'idem-1' }], rowCount: 1 };
+      if (sql.startsWith('select * from agent_packages')) {
+        return { rows: [{ id: '1', user_id: 'user-1', name: 'Package', description: '', current_version_id: '10' }], rowCount: 1 };
+      }
+      if (sql.includes('from agent_package_versions') && sql.includes('order by version_number asc')) {
+        return { rows: [{ id: '10', package_id: '1', version_number: 4, source: 'manual', snapshot_json: currentSnapshot(originalMd) }], rowCount: 1 };
+      }
+      if (sql.startsWith('select distinct package_version_id')) return { rows: [{ package_version_id: '10' }], rowCount: 1 };
+      if (sql.includes('from agent_package_skills s')) return { rows: [skillRow()], rowCount: 1 };
+      if (sql.includes('select sv.*')) {
+        return {
+          rows: [{
+            id: '21', skill_id: '11', package_id: '1', created_in_package_version_id: '8',
+            version_number: 2, source: 'generated', based_on_version_id: null,
+            skill_snapshot_json: currentSnapshot(originalMd).skills[0], content_hash: 'old-hash',
+            status: 'active', note: '', created_at: '', discarded_at: null,
+            discarded_by: null, discard_reason: null, restored_at: null, restored_by: null,
+          }],
+          rowCount: 1,
+        };
+      }
+      if (sql.startsWith('select * from agent_package_versions where id = $1')) {
+        return { rows: [{ id: '10', package_id: '1', version_number: 4, source: 'manual', snapshot_json: currentSnapshot(originalMd) }], rowCount: 1 };
+      }
+      if (sql.startsWith('insert into agent_package_versions')) {
+        insertedSnapshot = JSON.parse(String(values?.[2]));
+        return { rows: [{ id: '12' }], rowCount: 1 };
+      }
+      if (sql.includes('select skill_uid, dir_name')) return { rows: [{ skill_uid: 'lesson-skill', dir_name: 'lesson-skill' }], rowCount: 1 };
+      if (sql.startsWith('insert into agent_package_skills')) return { rows: [skillRow()], rowCount: 1 };
+      if (sql.startsWith('update agent_package_skills') && sql.includes('returning next_version_number')) return { rows: [{ version_number: 5 }], rowCount: 1 };
+      if (sql.startsWith('insert into agent_skill_versions')) {
+        basedOnVersionId = values?.[5];
+        return { rows: [{ id: '25' }], rowCount: 1 };
+      }
+      if (sql.startsWith('insert into agent_package_version_skills')) return { rows: [], rowCount: 1 };
+      if (sql.startsWith("update agent_package_skills set status = 'removed'")) return { rows: [], rowCount: 0 };
+      if (sql.startsWith('update agent_packages')) return { rows: [], rowCount: 1 };
+      if (sql.startsWith('update api_idempotency_keys')) return { rows: [], rowCount: 1 };
+      throw new Error(`Unexpected query: ${sql}`);
+    });
+    const { createManualSkillVersion } = await loadService();
+
+    const result = await createManualSkillVersion({
+      authUserId: 'user-1', packageId: '1', skillId: '11', baseVersionId: '21',
+      expectedPackageVersionId: '10', idempotencyKey: 'manual-edit-1', skillMd: editedMd,
+    });
+
+    expect(result).toMatchObject({
+      packageVersionId: '12', packageVersionNumber: 5, skillVersionId: '25',
+      skillVersionNumber: 5, basedOnVersionId: '21',
+    });
+    expect(basedOnVersionId).toBe('21');
+    expect(insertedSnapshot?.skills[0]?.skillMd).toBe(editedMd);
+    expect(queryMock.mock.calls.some(([sql]) => String(sql).startsWith('update agent_skill_versions'))).toBe(false);
+  });
+
+  it('fails before creating a version when the package head changed', async () => {
+    queryMock.mockImplementation(async (sql: string) => {
+      if (sql.startsWith('delete from api_idempotency_keys')) return { rows: [], rowCount: 0 };
+      if (sql.startsWith('insert into api_idempotency_keys')) return { rows: [{ id: 'idem-2' }], rowCount: 1 };
+      if (sql.startsWith('select * from agent_packages')) {
+        return { rows: [{ id: '1', user_id: 'user-1', current_version_id: '12' }], rowCount: 1 };
+      }
+      if (sql.includes('from agent_package_versions') && sql.includes('order by version_number asc')) {
+        return { rows: [{ id: '12', package_id: '1', version_number: 6, source: 'manual', snapshot_json: currentSnapshot(validSkillMd('并发版本')) }], rowCount: 1 };
+      }
+      if (sql.startsWith('select distinct package_version_id')) return { rows: [{ package_version_id: '12' }], rowCount: 1 };
+      throw new Error(`Unexpected query: ${sql}`);
+    });
+    const { createManualSkillVersion } = await loadService();
+
+    await expect(createManualSkillVersion({
+      authUserId: 'user-1', packageId: '1', skillId: '11', baseVersionId: '21',
+      expectedPackageVersionId: '10', idempotencyKey: 'manual-edit-2',
+      skillMd: validSkillMd('不会写入'),
+    })).rejects.toMatchObject({ code: 'PACKAGE_VERSION_CONFLICT', status: 409 });
+    expect(queryMock.mock.calls.some(([sql]) => String(sql).startsWith('insert into agent_package_versions'))).toBe(false);
+  });
+});
+
+function validSkillMd(marker: string) {
+  return `---\nname: lesson-skill\ndescription: 用于课堂教学任务的规则\n---\n# Lesson\n## Instructions\n${marker} ${'具体规则。'.repeat(30)}\n## Workflow\n1. 分析\n2. 回答\n## Output Format\n结构化答案。\n## Examples\n示例。\n## Common Issues\n避免遗漏。`;
+}
+
+function currentSnapshot(skillMd: string) {
+  return {
+    name: 'Package', description: '', versionLabel: 'v4', agentMd: '', rubricMd: '',
+    skills: [{ id: 'lesson-skill', dirName: 'lesson-skill', name: 'Lesson Skill', description: '用于课堂任务', skillMd }],
+  };
+}
+
+function skillRow() {
+  return {
+    id: '11', package_id: '1', skill_uid: 'lesson-skill', dir_name: 'lesson-skill',
+    name: 'Lesson Skill', display_name: null, description: '用于课堂教学任务的规则',
+    status: 'active', next_version_number: 5, created_at: '', updated_at: '',
+  };
+}
+
 describe('skill version service', () => {
   it('returns the current package head independently of Skill creation history', async () => {
     queryMock.mockImplementation(async (sql: string) => {

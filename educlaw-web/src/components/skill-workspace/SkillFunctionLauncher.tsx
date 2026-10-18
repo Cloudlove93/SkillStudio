@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  FlaskConical,
   GitBranch,
   LayoutGrid,
   Pin,
@@ -15,7 +14,7 @@ const PINNED_KEY = 'eduskill:skill-launcher-pinned:v1';
 
 export type SkillNavigationView = Extract<
   SkillWorkspaceView,
-  'run' | 'test' | 'arena' | 'optimize' | 'versions'
+  'run' | 'arena' | 'optimize' | 'versions'
 >;
 
 export type SkillNavigation = {
@@ -25,7 +24,6 @@ export type SkillNavigation = {
 
 const launcherItems = [
   { view: 'run', label: '使用', description: '运行当前版本', icon: Play },
-  { view: 'test', label: '测试', description: '验证真实任务效果', icon: FlaskConical },
   { view: 'arena', label: 'Arena', description: '对比两个版本', icon: Scale },
   { view: 'optimize', label: '优化', description: '通过对话改进', icon: WandSparkles },
   { view: 'versions', label: '版本', description: '管理历史版本', icon: GitBranch },
@@ -87,7 +85,7 @@ export function SkillFunctionLauncher({
         onClick={() => setOpen((current) => !current)}
         aria-label="功能切换"
         aria-expanded={open}
-        title="使用、测试、Arena、优化与版本"
+        title="使用、Arena、优化与版本"
       >
         <LayoutGrid size={17} aria-hidden="true" />
       </button>

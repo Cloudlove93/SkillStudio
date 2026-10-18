@@ -30,7 +30,7 @@ export function createSkillWorkspaceState(
   activeView: SkillWorkspaceView = 'create',
 ): SkillWorkspaceState {
   return {
-    activeView,
+    activeView: activeView === 'test' ? 'run' : activeView,
     pinnedUpdate: null,
   };
 }
@@ -40,17 +40,18 @@ export function skillWorkspaceReducer(
   event: SkillWorkspaceEvent,
 ): SkillWorkspaceState {
   if (event.type === 'navigate') {
-    if (event.view === 'run' || event.view === 'test' || event.view === 'arena' || event.view === 'versions') {
+    const view = event.view === 'test' ? 'run' : event.view;
+    if (view === 'run' || view === 'arena' || view === 'versions') {
       return {
         ...state,
-        activeView: event.view,
+        activeView: view,
         pinnedUpdate: null,
       };
     }
     return {
       ...state,
-      activeView: event.view,
-      pinnedUpdate: event.view === 'versions' || event.view === 'overview' ? null : state.pinnedUpdate,
+      activeView: view,
+      pinnedUpdate: view === 'versions' || view === 'overview' ? null : state.pinnedUpdate,
     };
   }
   if (event.type === 'publish-update') {

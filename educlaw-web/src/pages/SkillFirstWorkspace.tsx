@@ -57,7 +57,6 @@ import type {
   AnswerOptimizationSelection,
 } from '../components/skill-workspace/answer-optimization-selection';
 import {
-  getConversationSurface,
   isSkillConversationThread,
 } from '../components/skill-workspace/skill-conversation-list';
 import { discoverActiveSkillRuns } from '../components/skill-workspace/discover-skill-runs';
@@ -299,8 +298,9 @@ function SkillFirstWorkspaceContent() {
       skillKey: string | null = activeSkillKey,
       clearInspector = false,
     ) => {
-      dispatchWorkspace({ type: 'navigate', view });
-      replaceWorkspaceRoute(view, skillKey, clearInspector);
+      const normalizedView = view === 'test' ? 'run' : view;
+      dispatchWorkspace({ type: 'navigate', view: normalizedView });
+      replaceWorkspaceRoute(normalizedView, skillKey, clearInspector);
     },
     [activeSkillKey, replaceWorkspaceRoute],
   );
@@ -1045,12 +1045,9 @@ function SkillFirstWorkspaceContent() {
   };
 
   const handleConversationSelect = (id: string) => {
-    const thread = conversations.find((item) => String(item.id) === id);
-    const view =
-      thread && getConversationSurface(thread) === 'test' ? 'test' : 'run';
     setSelectedConversationId(id);
     closeInspector({ force: true });
-    navigateWorkspaceView(view, activeSkillKey, true);
+    navigateWorkspaceView('run', activeSkillKey, true);
   };
 
   const handleConversationRunState = (
@@ -1349,12 +1346,12 @@ function SkillFirstWorkspaceContent() {
   );
 
   const detailView = (
-    ['overview', 'run', 'test', 'arena', 'optimize', 'versions'].includes(
+    ['overview', 'run', 'arena', 'optimize', 'versions'].includes(
       workspaceState.activeView,
     )
       ? workspaceState.activeView
       : 'run'
-  ) as 'overview' | 'run' | 'test' | 'arena' | 'optimize' | 'versions';
+  ) as 'overview' | 'run' | 'arena' | 'optimize' | 'versions';
   const handlePinnedAction = (update: SkillPinnedUpdateValue) => {
     if (update.id === 'version-changed') {
       closeInspector({ force: true });

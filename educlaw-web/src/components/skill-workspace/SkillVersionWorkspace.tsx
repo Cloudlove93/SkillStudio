@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPatch } from 'diff';
-import type { SkillVersionDetail } from '@educlaw/shared';
+import type {
+  ManualEditSkillVersionResult,
+  SkillVersionDetail,
+} from '@educlaw/shared';
 import {
   ArrowLeft,
   Check,
@@ -18,6 +21,7 @@ import {
   canRollbackSkillVersion,
   visibleSkillVersions,
 } from './skill-version-state';
+import { SkillVersionContentDialog } from './SkillVersionContentDialog';
 
 type Props = {
   token: string;
@@ -141,6 +145,25 @@ export function SkillVersionWorkspace(props: Props) {
       mutationLock.current = false;
       if (currentRequest()) setMutating(false);
     }
+  };
+
+  const handleManualVersionSaved = async (
+    result: ManualEditSkillVersionResult,
+  ) => {
+    const baseVersionNumber = preview?.versionNumber;
+    await props.onReload();
+    const created = await liteApi.getSkillVersionDetail(
+      props.token,
+      props.packageId,
+      result.skillVersionId,
+    );
+    setPreview(created);
+    props.onVersionChanged(
+      `已从 Skill v${baseVersionNumber ?? '历史'} 创建手动编辑版本 v${result.skillVersionNumber}`,
+    );
+    toast.success(
+      `已从 v${baseVersionNumber ?? '历史'} 创建新版本 v${result.skillVersionNumber}`,
+    );
   };
 
   if (compare && current) {
@@ -299,25 +322,15 @@ export function SkillVersionWorkspace(props: Props) {
         </button>
       )}
       {preview && (
-        <div className="skill-version-preview" role="dialog" aria-modal="true">
-          <div>
-            <header>
-              <div>
-                <span className="skill-eyebrow">版本预览</span>
-                <h3>Skill v{preview.versionNumber}</h3>
-              </div>
-              <button
-                type="button"
-                className="skill-icon-button"
-                onClick={() => setPreview(null)}
-                aria-label="关闭版本预览"
-              >
-                ×
-              </button>
-            </header>
-            <pre>{preview.skill.skillMd}</pre>
-          </div>
-        </div>
+        <SkillVersionContentDialog
+          key={preview.id}
+          token={props.token}
+          packageId={props.packageId}
+          version={preview}
+          currentPackageVersionId={props.currentPackageVersionId}
+          onClose={() => setPreview(null)}
+          onSaved={handleManualVersionSaved}
+        />
       )}
       {pending && (
         <div className="skill-version-confirm" role="dialog" aria-modal="true">

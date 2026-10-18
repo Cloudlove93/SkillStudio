@@ -25,6 +25,8 @@ import type {
   MediaJobStatus,
   MediaJobType,
   MediaStage,
+  ManualEditSkillVersionPayload,
+  ManualEditSkillVersionResult,
   MultimodalCandidatePasses,
   MultimodalEvidence,
   PublicMultimodalSessionState,
@@ -1337,6 +1339,17 @@ export const liteApi = {
       'skill.version.detail',
       packageId,
       { versionId },
+    ),
+  createManualSkillVersion: (
+    token: string,
+    packageId: string,
+    payload: ManualEditSkillVersionPayload,
+  ) =>
+    actionRequest<ManualEditSkillVersionResult>(
+      token,
+      'skill.version.manual-edit',
+      packageId,
+      payload,
     ),
   rollbackSkillVersion: (
     token: string,
