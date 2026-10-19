@@ -1303,6 +1303,7 @@ export const liteApi = {
     token: string,
     packageId: string,
     data: {
+      expectedPackageVersionId: string;
       target: 'agent' | 'rubric' | 'skill';
       content: string;
       skillId?: string;
@@ -1573,7 +1574,7 @@ export const liteApi = {
     signal?: AbortSignal,
   ) =>
     streamRequest<ArenaMessageStreamEvent>(
-      `${ARENA_ROUTES.MESSAGE_STREAM}?threadId=${encodeURIComponent(threadId)}`,
+      ARENA_ROUTES.MESSAGE_STREAM.replace(':threadId', encodeURIComponent(threadId)),
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

@@ -23,6 +23,9 @@ export function createHealthService(options: {
   const cacheTtlMs = options.cacheTtlMs ?? 5_000;
   let cached: { expiresAtMs: number; snapshot: HealthSnapshot } | null = null;
   let pending: Promise<HealthSnapshot> | null = null;
+  let draining = false;
+  const readiness = (snapshot: HealthSnapshot): HealthSnapshot => draining
+    ? {...snapshot, ok:false, status:'unavailable'} : snapshot;
 
   async function runCheck(): Promise<HealthSnapshot> {
     const checks = await Promise.allSettled([
@@ -52,17 +55,18 @@ export function createHealthService(options: {
   }
 
   return {
+    beginDrain() { draining = true; },
     async check() {
       const currentTimeMs = now().getTime();
       if (cached && currentTimeMs < cached.expiresAtMs) {
-        return cached.snapshot;
+        return readiness(cached.snapshot);
       }
       if (!pending) {
         pending = runCheck().finally(() => {
           pending = null;
         });
       }
-      return pending;
+      return pending.then(readiness);
     },
   };
 }

@@ -17,6 +17,7 @@ export interface MultimodalPipelineRunner {
   start(): void;
   stop(): void;
   runOnce(): Promise<void>;
+  waitForIdle(): Promise<void>;
 }
 
 interface MultimodalPipelineRunnerDependencies {
@@ -314,7 +315,7 @@ export function createMultimodalPipelineRunner(
     }
     const workerCount = Math.min(concurrency, pending.length);
     const workers = Array.from({ length: workerCount }, async () => {
-      while (pending.length > 0) {
+      while (!stopped && pending.length > 0) {
         const session = pending.shift();
         if (!session) {
           return;
@@ -329,6 +330,7 @@ export function createMultimodalPipelineRunner(
     if (activeRun) {
       return activeRun;
     }
+    if (stopped) return Promise.resolve();
 
     activeRun = (async () => {
       try {
@@ -395,5 +397,6 @@ export function createMultimodalPipelineRunner(
     start,
     stop,
     runOnce,
+    waitForIdle: () => activeRun ?? Promise.resolve(),
   };
 }

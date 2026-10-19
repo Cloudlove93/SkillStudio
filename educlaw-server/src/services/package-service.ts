@@ -2874,76 +2874,14 @@ export async function applyOptimizedSnapshot(
   packageId: string | number,
   snapshot: AgentPackageSnapshot,
   source: PackageVersion['source'],
-  note?: string,
+  note: string | undefined,
+  expectedPackageVersionId: string | number,
 ) {
-  const now = new Date().toISOString();
-
-  await withTransaction(async (client) => {
-    const packageResult = await client.query<DbRowPackage>(
-      'select * from agent_packages where id = $1 and user_id = $2 for update',
-      [packageId, userId],
-    );
-    const pkg = packageResult.rows[0];
-    if (!pkg) throw new Error('智能体不存在');
-
-    const versions = await client.query<DbRowPackageVersion>(
-      'select * from agent_package_versions where package_id = $1 order by version_number desc limit 1 for update',
-      [packageId],
-    );
-    const nextVersion = (versions.rows[0]?.version_number || 0) + 1;
-    const currentVersion = versions.rows[0];
-    const currentSnapshot = currentVersion
-      ? parseDbJson<AgentPackageSnapshot>(
-          currentVersion.snapshot_json,
-          emptyPackageSnapshot(),
-        )
-      : emptyPackageSnapshot();
-
-    const nextSnapshot: AgentPackageSnapshot = ensureSkillIds({
-      ...snapshot,
-      name: snapshot.name || pkg.name,
-      description: snapshot.description || pkg.description,
-      rubricMd: normalizeStoredRubricMarkdown(snapshot.rubricMd),
-      versionLabel: `v${nextVersion}`,
-    });
-
-    const verResult = await client.query<{ id: number }>(
-      'insert into agent_package_versions (package_id, version_number, source, snapshot_json, note, created_at) values ($1, $2, $3, $4, $5, $6) returning id',
-      [
-        packageId,
-        nextVersion,
-        source,
-        JSON.stringify(nextSnapshot),
-        note || '',
-        now,
-      ],
-    );
-    const versionId = verResult.rows[0].id;
-
-    if (currentVersion) {
-      await syncPackageVersionSkillsFromSnapshot(client, {
-        packageId,
-        packageVersionId: currentVersion.id,
-        packageVersionNumber: currentVersion.version_number,
-        source: currentVersion.source as PackageVersion['source'],
-        snapshot: currentSnapshot,
-      });
-    }
-    await syncPackageVersionSkillsFromSnapshot(client, {
-      packageId,
-      packageVersionId: versionId,
-      packageVersionNumber: nextVersion,
-      source,
-      snapshot: nextSnapshot,
-      note,
-    });
-
-    await client.query(
-      'update agent_packages set name = $1, description = $2, current_version_id = $3, updated_at = $4 where id = $5 and user_id = $6',
-      [pkg.name, pkg.description, versionId, now, pkg.id, userId],
-    );
-  });
-
+  await withTransaction(client => createPackageVersionWithSnapshotTx(client, {
+    userId, packageId, expectedPackageVersionId,
+    snapshot: {...snapshot, rubricMd: normalizeStoredRubricMarkdown(snapshot.rubricMd)},
+    source, note,
+  }));
   return getPackage(userId, packageId);
 }
 
@@ -2953,7 +2891,7 @@ export async function repairPackageRubric(
   model?: string,
 ) {
   void model;
-  const pkg = await getPackage(userId, packageId);
+  const { package: pkg, versionId } = await getPackageWithVersionId(userId, packageId);
   const currentRawRubric = normalizeRubricMarkdown(pkg.snapshot.rubricMd);
   const currentRubric = normalizeStoredRubricMarkdown(pkg.snapshot.rubricMd);
 
@@ -2971,6 +2909,7 @@ export async function repairPackageRubric(
         nextSnapshot,
         'optimized',
         'AI 修复 rubric.md',
+        versionId,
       );
     }
 
@@ -2985,7 +2924,7 @@ export async function optimizePackageRubric(
   packageId: string,
   model?: string,
 ) {
-  const pkg = await getPackage(userId, packageId);
+  const { package: pkg, versionId } = await getPackageWithVersionId(userId, packageId);
   const currentRawRubric = normalizeRubricMarkdown(pkg.snapshot.rubricMd);
   const currentRubric = normalizeStoredRubricMarkdown(pkg.snapshot.rubricMd);
 
@@ -3003,6 +2942,7 @@ export async function optimizePackageRubric(
         nextSnapshot,
         'optimized',
         'AI 优化 rubric.md',
+        versionId,
       );
     }
   }
@@ -3042,6 +2982,7 @@ export async function optimizePackageRubric(
     nextSnapshot,
     'optimized',
     'AI 优化 rubric.md',
+        versionId,
   );
 }
 
@@ -3049,13 +2990,25 @@ export async function applyManualMarkdownEdit(
   userId: string,
   packageId: string,
   input: {
+    expectedPackageVersionId: string;
     target: 'agent' | 'rubric' | 'skill';
     content: string;
     skillId?: string;
     note?: string;
   },
 ) {
-  const pkg = await getPackage(userId, packageId);
+  if (typeof input.expectedPackageVersionId !== 'string' || !input.expectedPackageVersionId.trim()) {
+    throw Object.assign(new Error('expectedPackageVersionId is required'), { status: 422, code: 'INVALID_ARGUMENT' });
+  }
+  const { package: pkg, versionId } = await getPackageWithVersionId(userId, packageId);
+  if (String(versionId) !== input.expectedPackageVersionId) throw new Error('PACKAGE_VERSION_CONFLICT');
+  const save = async (snapshot: AgentPackageSnapshot, note: string) => {
+    await withTransaction(client => createPackageVersionWithSnapshotTx(client, {
+      userId, packageId, expectedPackageVersionId: input.expectedPackageVersionId,
+      snapshot, source: 'manual', note,
+    }));
+    return getPackage(userId, packageId);
+  };
   const content = String(input.content || '').trim();
   if (!content) throw new Error('编辑内容不能为空');
 
@@ -3068,11 +3021,8 @@ export async function applyManualMarkdownEdit(
     if (content === pkg.snapshot.agentMd.trim())
       throw new Error('内容没有变化，无需保存新版本');
     nextSnapshot.agentMd = content;
-    return applyOptimizedSnapshot(
-      userId,
-      packageId,
+    return save(
       nextSnapshot,
-      'manual',
       input.note || '手动编辑 agent.md',
     );
   }
@@ -3091,11 +3041,8 @@ export async function applyManualMarkdownEdit(
       throw new Error('内容没有变化，无需保存新版本');
     }
     nextSnapshot.rubricMd = normalizedNextRubric;
-    return applyOptimizedSnapshot(
-      userId,
-      packageId,
+    return save(
       nextSnapshot,
-      'manual',
       input.note || '手动编辑 rubric.md',
     );
   }
@@ -3126,11 +3073,8 @@ export async function applyManualMarkdownEdit(
     skillMd: normalizedContent,
   };
 
-  return applyOptimizedSnapshot(
-    userId,
-    packageId,
+  return save(
     nextSnapshot,
-    'manual',
     input.note || `手动编辑 ${currentSkill.dirName}/SKILL.md`,
   );
 }

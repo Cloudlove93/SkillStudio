@@ -110,6 +110,7 @@ describe('POST /packages/:packageId/manual-edit', () => {
         },
         body: JSON.stringify({
           target: 'rubric',
+          expectedPackageVersionId: '12',
           content: '# Rubric\n\n## 评分目标',
           note: 'update rubric',
         }),
@@ -121,6 +122,7 @@ describe('POST /packages/:packageId/manual-edit', () => {
         'pkg-1',
         {
           target: 'rubric',
+          expectedPackageVersionId: '12',
           skillId: undefined,
           content: '# Rubric\n\n## 评分目标',
           note: 'update rubric',
@@ -130,4 +132,15 @@ describe('POST /packages/:packageId/manual-edit', () => {
       await close(server);
     }
   });
+});
+
+it.each([['missing',{},422],['conflict',{expectedPackageVersionId:'old'},409]])('preserves the %s precondition error contract',async (_name,extra,status)=>{
+  applyManualMarkdownEditMock.mockRejectedValue(new Error('PACKAGE_VERSION_CONFLICT'));
+  const {server,url}=await listen(await createApp());
+  try{
+    const response=await fetch(`${url}/packages/1/manual-edit`,{method:'POST',headers:{'X-User-Id':'owner','Content-Type':'application/json'},body:JSON.stringify({target:'agent',content:'# Changed',...extra})});
+    expect(response.status).toBe(status);
+    if(status===409)expect(await response.json()).toMatchObject({code:'PACKAGE_VERSION_CONFLICT'});
+    else expect(applyManualMarkdownEditMock).not.toHaveBeenCalled();
+  }finally{await close(server);}
 });

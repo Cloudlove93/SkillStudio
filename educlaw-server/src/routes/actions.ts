@@ -1,3 +1,4 @@
+import { createTrackedRouter } from '../services/http-drain.js';
 import { Router } from 'express';
 import type { AuthedRequest } from '../types.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -43,7 +44,7 @@ type ApiHandler = (input: {
   authUserId: string;
 }) => Promise<unknown>;
 
-const router: import('express').Router = Router();
+const router: import('express').Router = createTrackedRouter(Router());
 const internalWorkerAuth = createInternalWorkerAuth();
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {

@@ -5,7 +5,10 @@ import { config } from "./config.js";
 import { getLogger, getRequestId } from "./lib/request-context.js";
 import { safeError } from "./lib/logger.js";
 import { withRequestContext } from "./middleware/request-context.js";
-import { checkDbConnection } from "./services/db.js";
+import { checkDbConnection, closeDbPool } from "./services/db.js";
+import { arenaRunService } from './services/arena-run-service.js';
+import { createServerShutdown } from './services/server-shutdown.js';
+import { createHttpDrain } from './services/http-drain.js';
 import { readObjectStorageConfig } from "./config/object-storage-config.js";
 import { createHealthService } from "./services/health-service.js";
 import { createObjectStorageService } from "./services/object-storage/object-storage.service.js";
@@ -28,12 +31,14 @@ app.use(cors({
   credentials: false,
 }));
 app.use(withRequestContext);
-app.use(compression());
+const httpDrain=createHttpDrain();
+app.use(httpDrain.middleware);
+app.use(httpDrain.trackMiddleware(compression()));
 app.use(
   "/api/actions",
-  express.json({ limit: config.internalWorkerBodyLimit }),
+  httpDrain.trackMiddleware(express.json({ limit: config.internalWorkerBodyLimit })),
 );
-app.use(express.json({ limit: config.bodyLimit }));
+app.use(httpDrain.trackMiddleware(express.json({ limit: config.bodyLimit })));
 
 const objectStorageConfig = readObjectStorageConfig(process.env);
 const objectStorage = objectStorageConfig
@@ -77,6 +82,18 @@ if (runtime) {
     concurrency: config.multimodalPipelineRunnerConcurrency,
   }).info("multimodal.pipeline.runner.enabled");
 }
-app.listen(config.port, () => {
+const server = app.listen(config.port, () => {
   getLogger({ port: config.port }).info("server.listen");
 });
+const shutdown = createServerShutdown({
+  beginDrain: () => { httpDrain.beginDrain(); healthService.beginDrain(); arenaRunService.beginDrain(); },
+  stopBackground: () => runtime?.runner.stop(),
+  waitForIdle: async () => { await Promise.all([httpDrain.waitForIdle(), arenaRunService.waitForIdle(), runtime?.runner.waitForIdle()]); },
+  abortActive: () => arenaRunService.abortActive(),
+  closeHttp: () => new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())),
+  forceCloseHttp: () => server.closeAllConnections(),
+  closeResources: closeDbPool,
+  exit: code => process.exit(code),
+  log: event => getLogger().info({event}, event),
+});
+for (const signal of ['SIGTERM','SIGINT'] as const) process.on(signal, () => { void shutdown(); });

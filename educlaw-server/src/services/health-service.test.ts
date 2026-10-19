@@ -3,6 +3,13 @@ import { describe, expect, it, vi } from 'vitest';
 import { createHealthService } from './health-service.js';
 
 describe('health service', () => {
+  it('marks cached and pending readiness unavailable once drain begins',async()=>{
+    let release!:()=>void;const pending=new Promise<void>(r=>{release=r;});
+    const service=createHealthService({checkDatabase:()=>pending});
+    const reading=service.check();service.beginDrain();release();
+    expect((await reading).ok).toBe(false);
+    expect((await service.check()).status).toBe('unavailable');
+  });
   it('reports ready only after required dependencies respond', async () => {
     const checkDatabase = vi.fn().mockResolvedValue(undefined);
     const checkObjectStorage = vi.fn().mockResolvedValue(undefined);

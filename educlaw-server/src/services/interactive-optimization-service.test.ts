@@ -11,6 +11,7 @@ async function loadService() {
   vi.resetModules();
   vi.doMock("./package-service.js", () => ({
     getPackage: getPackageMock,
+    getPackageWithVersionId: async (...args:unknown[]) => ({package:await getPackageMock(...args),versionId:10}),
     applyOptimizedSnapshot: applyOptimizedSnapshotMock,
     listVersions: listVersionsMock,
     assertRubricConfigured: (rubricMd: string | undefined | null, feature: string) => {

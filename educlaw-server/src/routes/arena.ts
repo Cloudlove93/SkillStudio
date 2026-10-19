@@ -1,3 +1,4 @@
+import { createTrackedRouter } from '../services/http-drain.js';
 import { Router, type Request, type Response } from 'express';
 import { ARENA_ROUTES } from '@educlaw/shared';
 import type { AuthedRequest } from '../types.js';
@@ -23,7 +24,7 @@ import { listAnswerOptimizationSummariesForThread } from '../services/answer-ski
 import { arenaRunService } from '../services/arena-run-service.js';
 import { writeArenaRunSnapshot } from '../utils/arena-run-sse.js';
 
-const router: import('express').Router = Router();
+const router: import('express').Router = createTrackedRouter(Router());
 
 function runError(res: Response, error: unknown) {
   const structured = error as { status?: number; code?: string };
@@ -250,7 +251,16 @@ router.post("/arena/threads/:threadId/messages", requireAuth, async (req, res) =
   }
 });
 
-router.post(ARENA_ROUTES.MESSAGE_STREAM, requireAuth, async (req: Request, res: Response) => {
+async function streamArenaMessage(req: Request, res: Response) {
+  // Exactly one identity source per entry. Never let a query override the path
+  // or silently choose the first of repeated legacy query parameters.
+  const scoped = req.params.threadId !== undefined;
+  const threadId = scoped ? req.params.threadId : req.query.threadId;
+  if ((scoped && req.query.threadId !== undefined)
+    || typeof threadId !== 'string' || !threadId.trim()) {
+    res.status(400).json({ error: 'threadId 必须来自当前入口唯一的非空标识' });
+    return;
+  }
   const content = String(req.body?.content || "").trim();
   if (!content) {
     res.status(400).json({ error: "消息内容不能为空" });
@@ -272,7 +282,7 @@ router.post(ARENA_ROUTES.MESSAGE_STREAM, requireAuth, async (req: Request, res: 
   try {
     for await (const event of streamMessage(
       (req as AuthedRequest).userId || "",
-      one(req.query.threadId as string | string[] | undefined),
+      threadId.trim(),
       content,
       typeof req.body?.model === "string" ? req.body.model : undefined,
       parseArenaMode(req.body?.mode),
@@ -300,7 +310,10 @@ router.post(ARENA_ROUTES.MESSAGE_STREAM, requireAuth, async (req: Request, res: 
     stopSseHeartbeat(heartbeat);
     if (canWriteSse(res)) res.end();
   }
-});
+}
+
+router.post(ARENA_ROUTES.MESSAGE_STREAM, requireAuth, streamArenaMessage);
+router.post(ARENA_ROUTES.LEGACY_MESSAGE_STREAM, requireAuth, streamArenaMessage);
 
 router.post("/arena/threads/:threadId/report", requireAuth, async (req, res) => {
   try {

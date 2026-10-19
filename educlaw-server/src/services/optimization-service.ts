@@ -1,6 +1,6 @@
 import type { AgentPackageSnapshot, OptimizationIssue, OptimizationResult, PackageSkill } from "@educlaw/shared";
 import { generateJson } from "./llm-service.js";
-import { applyOptimizedSnapshot, assertRubricConfigured, getPackage, listVersions } from "./package-service.js";
+import { applyOptimizedSnapshot, assertRubricConfigured, getPackageWithVersionId, listVersions } from "./package-service.js";
 import { getThreadDetail } from "./arena-service.js";
 
 type ProgressCallback = (label: string) => Promise<void> | void;
@@ -17,7 +17,7 @@ export async function optimizePackage(
   onProgress?: ProgressCallback,
 ): Promise<OptimizationResult> {
   await onProgress?.("读取智能体与对话轨迹");
-  const pkg = await getPackage(userId, packageId);
+  const { package: pkg, versionId } = await getPackageWithVersionId(userId, packageId);
   assertRubricConfigured(pkg.snapshot.rubricMd, "报告驱动优化");
   const detail = await getThreadDetail(userId, threadId);
   if (Number(detail.thread.packageId) !== Number(packageId)) {
@@ -140,7 +140,7 @@ export async function optimizePackage(
       : pkg.snapshot.skills,
   };
 
-  await applyOptimizedSnapshot(userId, packageId, normalizedSnapshot, "optimized");
+  await applyOptimizedSnapshot(userId, packageId, normalizedSnapshot, "optimized", undefined, versionId);
   const versions = await listVersions(userId, packageId);
   const latest = versions[0]!;
 

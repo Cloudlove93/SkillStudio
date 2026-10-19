@@ -1,3 +1,4 @@
+import { createTrackedRouter } from '../services/http-drain.js';
 import { Router, type Request, type Response } from "express";
 import { ANSWER_SKILL_OPTIMIZATION_ROUTES } from "@educlaw/shared";
 import { getLogger, getRequestId } from "../lib/request-context.js";
@@ -33,7 +34,7 @@ import {
   suggestAnswerOptimizationFeedback,
 } from "../services/answer-optimization-suggestion-service.js";
 
-const router: import("express").Router = Router();
+const router: import("express").Router = createTrackedRouter(Router());
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

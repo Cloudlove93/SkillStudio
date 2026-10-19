@@ -138,6 +138,7 @@ async function loadService(state: SeedState) {
     ) => work({ query: queryMock }),
     query: queryMock.mockImplementation(
       async (sql: string, args: unknown[]) => {
+        sql = sql.replace(/\s+/g, ' ').trim();
         if (
           sql.startsWith(
             'select * from agent_packages where id = $1 and user_id = $2',
@@ -155,7 +156,7 @@ async function loadService(state: SeedState) {
           sql.startsWith('select * from agent_package_versions where id = $1')
         ) {
           const version =
-            state.versions.find((item) => item.id === args[0]) || null;
+            state.versions.find((item) => String(item.id) === String(args[0])) || null;
           return { rows: version ? [version] : [], rowCount: version ? 1 : 0 };
         }
 
@@ -206,7 +207,7 @@ async function loadService(state: SeedState) {
   }));
 
   vi.doMock('./skill-version-service.js', () => ({
-    syncPackageVersionSkillsFromSnapshot: vi.fn(),
+    syncPackageVersionSkillsFromSnapshot: vi.fn().mockResolvedValue(new Map()),
   }));
 
   vi.doMock('./llm-service.js', () => ({

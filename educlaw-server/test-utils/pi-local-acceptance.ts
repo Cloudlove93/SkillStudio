@@ -128,7 +128,7 @@ await new Promise<void>((done) => server.once("listening", done));
 const base = "http://127.0.0.1:3219";
 type SseEvent = { event: string; data: Record<string, unknown> };
 async function send(id: number, content: string, thinkingEnabled = false, token = "pi-local-token", signal?: AbortSignal): Promise<SseEvent[]> {
-  const response = await fetch(`${base}/api/arena/threads/messages/stream?threadId=${id}`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ content, mode: "agent", thinkingEnabled }), signal });
+  const response = await fetch(`${base}/api/arena/threads/${encodeURIComponent(String(id))}/messages/stream`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ content, mode: "agent", thinkingEnabled }), signal });
   return (await response.text()).split(/\r?\n\r?\n/).flatMap((block) => {
     const event = /^event: (.+)$/m.exec(block)?.[1];
     const data = /^data: (.+)$/m.exec(block)?.[1];

@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "check:types": "node ../scripts/check-web-types.mjs",
+    "check:types:full": "tsc --noEmit -p tsconfig.app.json",
     "test": "pnpm run test:unit && pnpm run test:contracts",
     "test:unit": "vitest run --exclude src/frontend-encoding.test.ts --exclude src/app-routes.test.ts --exclude src/api/token-storage.test.ts --exclude src/components/lite/**/*.test.ts",
     "test:contracts": "node scripts/run-contract-tests.mjs",

@@ -828,15 +828,15 @@ async function ensurePackageSkillHistory(client: Queryable, pkg: DbRowPackage) {
     if (mappedVersionIds.has(String(version.id))) {
       continue;
     }
+    const snapshot = parseDbJson<AgentPackageSnapshot>(version.snapshot_json, emptySnapshot());
+    // An empty historical snapshot has no meaningful mapping to materialize.
+    if (snapshot.skills.length === 0) continue;
     await syncPackageVersionSkillsFromSnapshot(client, {
       packageId: pkg.id,
       packageVersionId: version.id,
       packageVersionNumber: version.version_number,
       source: version.source as SkillVersionSource,
-      snapshot: parseDbJson<AgentPackageSnapshot>(
-        version.snapshot_json,
-        emptySnapshot(),
-      ),
+      snapshot,
     });
     backfilled = true;
   }
@@ -869,7 +869,7 @@ export async function listPackageSkills(input: {
 }) {
   const packageId = positiveId(input.packageId, 'packageId');
   return withTransaction(async (client) => {
-    const pkg = await getOwnedPackage(client, input.authUserId, packageId);
+    const pkg = await getOwnedPackage(client, input.authUserId, packageId, true);
     await ensurePackageSkillHistory(client, pkg);
     const result = await client.query<DbSkillRow>(
       `select * from agent_package_skills
@@ -1112,7 +1112,7 @@ export async function listSkillVersions(input: {
   const limit = Math.min(Math.max(input.limit || 50, 1), 100);
   const cursor = input.cursor ? positiveId(input.cursor, 'cursor') : null;
   return withTransaction(async (client) => {
-    const pkg = await getOwnedPackage(client, input.authUserId, packageId);
+    const pkg = await getOwnedPackage(client, input.authUserId, packageId, true);
     await ensurePackageSkillHistory(client, pkg);
     await getOwnedSkill(client, input.authUserId, packageId, skillId);
     const result = await client.query<DbSkillVersionRow>(
@@ -1156,7 +1156,7 @@ export async function getSkillVersionDetail(input: {
   const packageId = positiveId(input.packageId, 'packageId');
   const versionId = positiveId(input.versionId, 'versionId');
   return withTransaction(async (client) => {
-    const pkg = await getOwnedPackage(client, input.authUserId, packageId);
+    const pkg = await getOwnedPackage(client, input.authUserId, packageId, true);
     await ensurePackageSkillHistory(client, pkg);
     return toSkillVersion(
       await getOwnedSkillVersion(client, {

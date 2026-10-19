@@ -5,6 +5,12 @@ import { LiteApiError, liteApi } from './lite-api';
 const encoder = new TextEncoder();
 
 describe('resumable Arena run API', () => {
+  it('sends the captured manual-edit version and preserves a conflict without retry',async()=>{
+    const fetchMock=vi.spyOn(globalThis,'fetch').mockResolvedValue(createJsonResponse({code:'PACKAGE_VERSION_CONFLICT',error:'版本已变化'},409));
+    await expect(liteApi.saveManualMarkdownEdit('token','7',{target:'agent',content:'# User draft',expectedPackageVersionId:'12'})).rejects.toMatchObject({status:409,code:'PACKAGE_VERSION_CONFLICT'});
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({target:'agent',content:'# User draft',expectedPackageVersionId:'12'});
+  });
   afterEach(() => vi.restoreAllMocks());
   it('starts and recovers a run with authenticated, scoped paths', async () => {
     const fetchMock = vi
@@ -398,7 +404,7 @@ describe('liteApi multimodal media progress helpers', () => {
 
     await liteApi.sendMessageStream(
       'token-arena',
-      '91',
+      'thread/91?part=1&x=2',
       '问题',
       undefined,
       'agent',
@@ -407,7 +413,9 @@ describe('liteApi multimodal media progress helpers', () => {
       controller.signal,
     );
 
-    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('/api/arena/threads/thread%2F91%3Fpart%3D1%26x%3D2/messages/stream');
+    expect(new Headers(init.headers).get('Authorization')).toBe('Bearer token-arena');
     expect(JSON.parse(String(init.body))).toMatchObject({
       content: '问题',
       mode: 'agent',

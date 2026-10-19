@@ -115,6 +115,7 @@ import {
 import type { ConfirmAnswerOptimizationResult } from '../../api/answer-skill-optimizations';
 
 type ManualEditState = {
+  expectedPackageVersionId: string;
   target: 'agent' | 'rubric' | 'skill';
   skillId?: string;
   title: string;
@@ -1698,6 +1699,7 @@ export default function LiteArenaPanel() {
     setRightExpanded(false);
     setCenterPreview(null);
     setManualEdit({
+      expectedPackageVersionId: String(currentPackageVersionId),
       target: 'agent',
       title: 'agent.md',
       content: selectedPackage.snapshot.agentMd,
@@ -1711,6 +1713,7 @@ export default function LiteArenaPanel() {
     setRightExpanded(false);
     setCenterPreview(null);
     setManualEdit({
+      expectedPackageVersionId: String(currentPackageVersionId),
       target: 'skill',
       skillId: selectedSkill.id || selectedSkill.dirName,
       title: `${selectedSkill.name} / SKILL.md`,
@@ -1724,6 +1727,7 @@ export default function LiteArenaPanel() {
     setRightExpanded(false);
     setCenterPreview(null);
     setManualEdit({
+      expectedPackageVersionId: String(currentPackageVersionId),
       target: 'rubric',
       title: '手动编辑 rubric.md',
       content: buildRubricDraft(
@@ -1741,22 +1745,25 @@ export default function LiteArenaPanel() {
   async function handleRubricFiles(fileList: FileList | null) {
     const file = fileList?.[0];
     if (!file || !token || !selectedPackageId) return;
+    const expectedPackageVersionId = String(currentPackageVersionId);
     try {
       const parsed = await readTextDocument(file);
       startProgress('导入 rubric', `正在保存 ${parsed.name}...`);
       setDetailTab('rubric');
       setCenterPreview(null);
-      setManualEdit(null);
+      setManualEdit({target:'rubric',expectedPackageVersionId,title:`导入 ${parsed.name}`,content:parsed.content,preview:false});
       const imported = await liteApi.saveManualMarkdownEdit(
         token,
         selectedPackageId,
         {
+          expectedPackageVersionId,
           target: 'rubric',
           content: parsed.content,
           note: `导入 ${parsed.name}`,
         },
       );
       setSelectedPackage(imported);
+      setManualEdit(null);
       await refreshPackages(imported.id);
       finishProgress(`已导入 ${parsed.name}`);
       setStatus(
@@ -1769,8 +1776,10 @@ export default function LiteArenaPanel() {
       const message = `${file.name} 读取失败：${
         error instanceof Error ? error.message : '不支持的文档格式'
       }`;
-      failProgress(message);
-      setStatus(message);
+      const failure = error instanceof LiteApiError && error.status === 409
+        ? '版本已变化，导入草稿已保留；请刷新并比较版本后再保存。' : message;
+      failProgress(failure);
+      setStatus(failure);
     }
   }
 
@@ -1829,6 +1838,7 @@ export default function LiteArenaPanel() {
         token,
         selectedPackageId,
         {
+          expectedPackageVersionId: manualEdit.expectedPackageVersionId,
           target: manualEdit.target,
           skillId: manualEdit.skillId,
           content: manualEdit.content.replace(/\r\n/g, '\n'),
@@ -1865,7 +1875,9 @@ export default function LiteArenaPanel() {
       );
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : '\u4fdd\u5b58\u5931\u8d25';
+        error instanceof LiteApiError && error.status === 409
+          ? '版本已变化，编辑草稿已保留；请刷新并比较版本后再保存。'
+          : error instanceof Error ? error.message : '\u4fdd\u5b58\u5931\u8d25';
       failProgress(message);
       setStatus(message);
       toast.error(message);

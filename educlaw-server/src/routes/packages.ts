@@ -1,3 +1,4 @@
+import { createTrackedRouter } from '../services/http-drain.js';
 import multer from 'multer';
 import { Router, type Request, type Response } from 'express';
 import { PACKAGE_ROUTES } from '@educlaw/shared';
@@ -41,7 +42,7 @@ import {
   type AdoptedChange,
 } from '../services/interactive-optimization-service.js';
 
-const router: import('express').Router = Router();
+const router: import('express').Router = createTrackedRouter(Router());
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: config.uploadLimitBytes },
@@ -270,10 +271,16 @@ router.post(
   requireAuth,
   async (req, res) => {
     try {
+      const expectedPackageVersionId = req.body?.expectedPackageVersionId;
+      if (typeof expectedPackageVersionId !== 'string' || !expectedPackageVersionId.trim()) {
+        res.status(422).json({ code: 'INVALID_ARGUMENT', error: 'expectedPackageVersionId is required' });
+        return;
+      }
       const result = await applyManualMarkdownEdit(
         (req as AuthedRequest).userId || '',
         one(req.params.packageId),
         {
+          expectedPackageVersionId,
           target:
             req.body?.target === 'skill'
               ? 'skill'
@@ -290,6 +297,10 @@ router.post(
       );
       res.json(result);
     } catch (error) {
+      if (error instanceof Error && error.message === 'PACKAGE_VERSION_CONFLICT') {
+        res.status(409).json({ code: 'PACKAGE_VERSION_CONFLICT', error: '版本已变化，请重新加载后再保存' });
+        return;
+      }
       res.status(400).json({
         error: error instanceof Error ? error.message : '保存手动编辑失败',
       });

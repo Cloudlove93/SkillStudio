@@ -1,3 +1,4 @@
+import { createTrackedRouter } from '../services/http-drain.js';
 import { Router, type Request, type Response } from "express";
 import type { AuthedRequest } from "../types.js";
 import { requireAuth } from "../middleware/auth.js";
@@ -15,7 +16,7 @@ import {
   writeSseEvent,
 } from "../utils/sse.js";
 
-const router: import("express").Router = Router();
+const router: import("express").Router = createTrackedRouter(Router());
 
 /* ─── Helpers ─── */
 

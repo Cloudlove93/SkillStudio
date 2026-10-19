@@ -1,0 +1,38 @@
+import express from 'express';
+import pg from 'pg';
+import {ArenaRunService} from './arena-run-service.js';
+import {createServerShutdown} from './server-shutdown.js';
+import {createHttpDrain,createTrackedRouter} from './http-drain.js';
+import {createHealthService} from './health-service.js';
+const name=process.env.HARDENING_DATABASE_NAME;
+if(!/^eduskill_hardening_[a-f0-9]{32}$/.test(name??''))throw Error('Unsafe integration database');
+const connection=new URL(process.env.DATABASE_URL);
+if(decodeURIComponent(connection.pathname.slice(1))===name)throw Error('Test target must differ from business database');
+connection.pathname=`/${name}`;
+const pool=new pg.Pool({connectionString:connection.toString()});
+if((await pool.query('select current_database() as name')).rows[0].name!==name)throw Error('Wrong integration database');
+await pool.query('create table if not exists shutdown_http_writes(kind text not null)');
+let release;const work=new Promise(resolve=>{release=resolve;});
+const stalled=process.env.HARDENING_STALLED==='1',order=[];let dbClosed=false;
+const drain=createHttpDrain(),app=express(),router=createTrackedRouter();
+const health=createHealthService({checkDatabase:async()=>{await pool.query('select 1');}});
+const service=new ArenaRunService({getDetail:async()=>({thread:{id:91,arenaKind:'skill_arena',skillArenaConfig:{surface:'run'}},messages:[]}),stream:async function*(){yield {event:'done',data:{messages:[]}};}});
+app.use(drain.middleware);app.use(express.json());
+router.get('/readyz',async(_req,res)=>{const state=await health.check();res.status(state.ok?200:503).json(state);});
+router.post('/api/arena/threads/91/runs',async(_req,res)=>{const started=await service.start({userId:'owner',threadId:91,requestId:'initial',content:'fixture',mode:'agent'});await service.waitForIdle();res.json(await service.get('owner',91,started.runId));});
+router.get('/api/arena/threads/91/runs',async(_req,res)=>res.json(await service.recover('owner',91)));
+router.post('/ordinary',async(_req,res)=>{
+ console.log(JSON.stringify({event:'accepted',kind:'ordinary'}));await work;
+ await pool.query('insert into shutdown_http_writes values ($1)',['ordinary']);order.push('persist:ordinary');res.json({saved:true});
+});
+for(const [path,kind] of [['/api/arena/threads/91/messages/stream','canonical'],['/api/arena/threads/messages/stream','alias']])router.post(path,async(_req,res)=>{
+ res.setHeader('content-type','text/event-stream');res.write('event: phase\ndata: {}\n\n');console.log(JSON.stringify({event:'accepted',kind}));
+ await work;await pool.query('insert into shutdown_http_writes values ($1)',[kind]);order.push(`persist:${kind}`);res.end('event: stream_end\ndata: {"ok":true}\n\n');
+});
+router.all(/.*/,(_req,res)=>res.json({unexpected:true}));app.use(router);
+app.use((error,_req,res,_next)=>{order.push('request-error');if(!res.headersSent)res.status(500).json({error:error.name});else res.end();});
+const server=app.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));
+const shutdown=createServerShutdown({beginDrain:()=>{drain.beginDrain();health.beginDrain();service.beginDrain();order.push('drain');},stopBackground:()=>{},waitForIdle:async()=>{await Promise.all([drain.waitForIdle(),service.waitForIdle()]);},abortActive:()=>{order.push('abort');service.abortActive();},closeHttp:()=>new Promise(resolve=>server.close(()=>{order.push('http-closed');resolve();})),forceCloseHttp:()=>{order.push('forced');server.closeAllConnections();},closeResources:async()=>{order.push('db-close-start');await pool.end();dbClosed=true;order.push('db-closed');},exit:code=>{console.log(JSON.stringify({event:'exit',code,order,dbClosed}));process.exit(code);},log:event=>order.push(event),drainMs:stalled?100:2000,cancelMs:stalled?50:200,closeMs:stalled?100:500});
+for(const signal of ['SIGTERM','SIGINT'])process.on(signal,()=>{void shutdown();});
+process.stdin.setEncoding('utf8');process.stdin.on('data',data=>{if(data.includes('finish'))release();});
+console.log(JSON.stringify({event:'ready',port:server.address().port}));

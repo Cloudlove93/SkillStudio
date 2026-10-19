@@ -3,6 +3,7 @@ import { generateChat, generateJson, generateText, type ChatMessage } from "./ll
 import {
   assertRubricConfigured,
   getPackage,
+  getPackageWithVersionId,
   applyOptimizedSnapshot,
   listVersions,
   normalizeAndRepairSkillMd,
@@ -901,7 +902,7 @@ export async function applyInteractiveChanges(
   sessionId?: string,
   targetSkillDirName?: string,
 ): Promise<{ versionId: number; versionNumber: number }> {
-  const pkg = await getPackage(userId, packageId);
+  const { package: pkg, versionId } = await getPackageWithVersionId(userId, packageId);
   let boundTargetSkillDirName = targetSkillDirName?.trim();
   if (sessionId) {
     const persistedSession = await getInteractiveSession(userId, sessionId);
@@ -922,7 +923,7 @@ export async function applyInteractiveChanges(
   }
   const normalizedSnapshot = buildInteractiveSnapshotFromAdoptions(pkg, changes);
 
-  await applyOptimizedSnapshot(userId, packageId, normalizedSnapshot, "interactive", note);
+  await applyOptimizedSnapshot(userId, packageId, normalizedSnapshot, "interactive", note, versionId);
   const versions = await listVersions(userId, packageId);
   const latest = versions[0]!;
 
@@ -1616,7 +1617,7 @@ export async function applyFeedbackOptimizationDraft(
   packageId: string | number,
   input: { draftSnapshot?: unknown; changeSummary?: string },
 ): Promise<FeedbackDraftApplyResult> {
-  const pkg = await getPackage(userId, packageId);
+  const { package: pkg, versionId } = await getPackageWithVersionId(userId, packageId);
   const draftSnapshot = normalizeDraftSnapshot(input.draftSnapshot, pkg.snapshot);
   const validationErrors = validateSnapshotSkills(draftSnapshot);
   if (validationErrors.length > 0) {
@@ -1632,6 +1633,7 @@ export async function applyFeedbackOptimizationDraft(
     "interactive",
     String(input.changeSummary || "交互式反馈优化").trim() ||
       "交互式反馈优化",
+    versionId,
   );
   const versions = await listVersions(userId, packageId);
   const latest = versions[0]!;

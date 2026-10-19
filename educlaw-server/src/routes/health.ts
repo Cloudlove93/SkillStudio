@@ -1,3 +1,4 @@
+import { createTrackedRouter } from '../services/http-drain.js';
 import { Router } from 'express';
 import type { HealthSnapshot } from '../services/health-service.js';
 
@@ -6,7 +7,7 @@ interface HealthService {
 }
 
 export function createHealthRouter(healthService: HealthService) {
-  const router: import('express').Router = Router();
+  const router: import('express').Router = createTrackedRouter(Router());
 
   router.get('/livez', (_req, res) => {
     res.json({

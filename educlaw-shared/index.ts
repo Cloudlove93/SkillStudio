@@ -13,7 +13,8 @@ export const ARENA_ROUTES = {
   THREADS: '/arena/threads',
   CREATE_THREAD: '/arena/threads/create',
   THREAD_DETAIL: '/arena/threads/detail',
-  MESSAGE_STREAM: '/arena/threads/messages/stream',
+  MESSAGE_STREAM: '/arena/threads/:threadId/messages/stream',
+  LEGACY_MESSAGE_STREAM: '/arena/threads/messages/stream',
 } as const;
 
 export const ANSWER_SKILL_OPTIMIZATION_ROUTES = {

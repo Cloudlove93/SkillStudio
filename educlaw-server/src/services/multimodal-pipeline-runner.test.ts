@@ -3,6 +3,12 @@ import { GuidedCreationError } from './guided-creation-service.js';
 import { createMultimodalPipelineRunner } from './multimodal-pipeline-runner';
 
 describe('multimodal pipeline runner', () => {
+  it('stops claiming the rest of a scanned batch and waits for the accepted session',async()=>{
+    let release!:()=>void;const pending=new Promise<void>(r=>{release=r;});let entered!:()=>void;const started=new Promise<void>(r=>{entered=r;});const seen:string[]=[];
+    const runner=createMultimodalPipelineRunner({store:{scanRunnableSessions:async()=>['1','2'].map(sessionId=>({sessionId,authUserId:'owner',mediaStage:'building_skills'}))},orchestrator:{runCandidatePipeline:vi.fn(),runSkillBuildPipeline:async({sessionId})=>{seen.push(sessionId);entered();await pending;return {}; }},logger:{info:vi.fn(),warn:vi.fn(),error:vi.fn()},pollIntervalMs:1000,batchLimit:2,concurrency:1});
+    const work=runner.runOnce();await started;runner.stop();let idle=false;const wait=runner.waitForIdle().then(()=>{idle=true;});await Promise.resolve();expect(idle).toBe(false);
+    release();await work;await wait;await runner.runOnce();expect(seen).toEqual(['1']);
+  });
   it.each([
     ['LLM request failed: 401', 1],
     ['LLM request failed: 404', 1],

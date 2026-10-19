@@ -1,0 +1,991 @@
+{
+  "version": 1,
+  "sourceCommit": "b52fdce2f81b8c63719d5f26812213994e9893fc",
+  "sourceState": "Includes frozen message-stream changes; captured before engineering-hardening implementation",
+  "diagnostics": [
+    {
+      "file": "educlaw-web/src/api/chat.ts",
+      "code": 2305,
+      "message": "Module '\"@educlaw/shared\"' has no exported member 'HomeChatCreateSessionInput'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/api/chat.ts",
+      "code": 2305,
+      "message": "Module '\"@educlaw/shared\"' has no exported member 'HomeChatMessage'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/api/chat.ts",
+      "code": 2305,
+      "message": "Module '\"@educlaw/shared\"' has no exported member 'HomeChatSession'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/api/chat.ts",
+      "code": 2305,
+      "message": "Module '\"@educlaw/shared\"' has no exported member 'HomeChatUpdateSessionInput'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/api/events.ts",
+      "code": 2304,
+      "message": "Cannot find name 'QuestionRequest'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/api/events.ts",
+      "code": 2304,
+      "message": "Cannot find name 'useInteractionQueueStore'.",
+      "count": 4
+    },
+    {
+      "file": "educlaw-web/src/api/lite-api.ts",
+      "code": 1294,
+      "message": "This syntax is not allowed when 'erasableSyntaxOnly' is enabled.",
+      "count": 3
+    },
+    {
+      "file": "educlaw-web/src/api/lite-api.ts",
+      "code": 2345,
+      "message": "Argument of type '\"package.version.rollback\"' is not assignable to parameter of type 'SkillAction'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/api/lite-api.ts",
+      "code": 2345,
+      "message": "Argument of type '\"skill.rename\"' is not assignable to parameter of type 'SkillAction'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/api/lite-api.ts",
+      "code": 2345,
+      "message": "Argument of type 'ManualEditSkillVersionPayload' is not assignable to parameter of type 'Record<string, unknown>'.\n  Index signature for type 'string' is missing in type 'ManualEditSkillVersionPayload'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/api/lite-api.ts",
+      "code": 2345,
+      "message": "Argument of type 'RollbackSkillVersionPayload' is not assignable to parameter of type 'Record<string, unknown>'.\n  Index signature for type 'string' is missing in type 'RollbackSkillVersionPayload'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/api/manager.ts",
+      "code": 2305,
+      "message": "Module '\"@educlaw/shared\"' has no exported member 'AgentConfig'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/api/manager.ts",
+      "code": 2305,
+      "message": "Module '\"@educlaw/shared\"' has no exported member 'AgentProfile'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/api/token-storage.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:assert' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/api/token-storage.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:test' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/app-routes.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:assert' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/app-routes.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:fs' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/app-routes.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:test' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/agent/AgentSettingsDialog.tsx",
+      "code": 2339,
+      "message": "Property 'id' does not exist on type 'AgentConfigWithOwner'.",
+      "count": 2
+    },
+    {
+      "file": "educlaw-web/src/components/agent/AgentSettingsDialog.tsx",
+      "code": 2339,
+      "message": "Property 'name' does not exist on type 'AgentConfigWithOwner'.",
+      "count": 2
+    },
+    {
+      "file": "educlaw-web/src/components/agent/AgentSettingsDialog.tsx",
+      "code": 2339,
+      "message": "Property 'public' does not exist on type 'AgentConfigWithOwner'.",
+      "count": 7
+    },
+    {
+      "file": "educlaw-web/src/components/agent/BuildAgentPanel.tsx",
+      "code": 2339,
+      "message": "Property 'id' does not exist on type 'AgentConfigWithOwner'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/agent/ProfileGallery.tsx",
+      "code": 2304,
+      "message": "Cannot find name 'setDeepStudyTab'.",
+      "count": 3
+    },
+    {
+      "file": "educlaw-web/src/components/agent/ProfileGallery.tsx",
+      "code": 2339,
+      "message": "Property 'id' does not exist on type 'AgentConfigWithOwner'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/agent/ProfileGallery.tsx",
+      "code": 2339,
+      "message": "Property 'name' does not exist on type 'AgentConfigWithOwner'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/chat/ChatPanel.tsx",
+      "code": 2339,
+      "message": "Property 'id' does not exist on type 'AgentConfigWithOwner'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/chat/ChatPanel.tsx",
+      "code": 2339,
+      "message": "Property 'status' does not exist on type 'AgentConfigWithOwner'.",
+      "count": 2
+    },
+    {
+      "file": "educlaw-web/src/components/chat/ChatPanel.tsx",
+      "code": 7006,
+      "message": "Parameter 'p' implicitly has an 'any' type.",
+      "count": 2
+    },
+    {
+      "file": "educlaw-web/src/components/chat/hooks/useChatMessages.ts",
+      "code": 2305,
+      "message": "Module '\"@educlaw/shared\"' has no exported member 'Message'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/chat/hooks/useChatMessages.ts",
+      "code": 2339,
+      "message": "Property 'id' does not exist on type 'AgentConfigWithOwner'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/chat/hooks/useChatMessages.ts",
+      "code": 2339,
+      "message": "Property 'profileFileName' does not exist on type 'AgentConfigWithOwner'.",
+      "count": 2
+    },
+    {
+      "file": "educlaw-web/src/components/chat/hooks/useChatMessages.ts",
+      "code": 7006,
+      "message": "Parameter 'n' implicitly has an 'any' type.",
+      "count": 2
+    },
+    {
+      "file": "educlaw-web/src/components/chat/hooks/useChatMessages.ts",
+      "code": 7006,
+      "message": "Parameter 'p' implicitly has an 'any' type.",
+      "count": 2
+    },
+    {
+      "file": "educlaw-web/src/components/chat/hooks/useChatMessages.ts",
+      "code": 7006,
+      "message": "Parameter 'part' implicitly has an 'any' type.",
+      "count": 2
+    },
+    {
+      "file": "educlaw-web/src/components/chat/hooks/useChatSessions.ts",
+      "code": 2305,
+      "message": "Module '\"@educlaw/shared\"' has no exported member 'SessionInfo'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/chat/hooks/useChatSessions.ts",
+      "code": 2339,
+      "message": "Property 'id' does not exist on type 'AgentConfigWithOwner'.",
+      "count": 4
+    },
+    {
+      "file": "educlaw-web/src/components/chat/hooks/useChatSessions.ts",
+      "code": 2339,
+      "message": "Property 'name' does not exist on type 'AgentConfigWithOwner'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/chat/hooks/useChatSessions.ts",
+      "code": 2339,
+      "message": "Property 'status' does not exist on type 'AgentConfigWithOwner'.",
+      "count": 2
+    },
+    {
+      "file": "educlaw-web/src/components/chat/MessageItem.tsx",
+      "code": 7006,
+      "message": "Parameter 'i' implicitly has an 'any' type.",
+      "count": 2
+    },
+    {
+      "file": "educlaw-web/src/components/chat/MessageItem.tsx",
+      "code": 7006,
+      "message": "Parameter 'p' implicitly has an 'any' type.",
+      "count": 5
+    },
+    {
+      "file": "educlaw-web/src/components/chat/MessageItem.tsx",
+      "code": 7006,
+      "message": "Parameter 'part' implicitly has an 'any' type.",
+      "count": 2
+    },
+    {
+      "file": "educlaw-web/src/components/deep-study/ArenaPanel.tsx",
+      "code": 2339,
+      "message": "Property 'id' does not exist on type 'AgentConfigWithOwner'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/deep-study/ArenaPanel.tsx",
+      "code": 2339,
+      "message": "Property 'name' does not exist on type 'AgentConfigWithOwner'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/home/DeepStudyMatchDialog.tsx",
+      "code": 2339,
+      "message": "Property 'id' does not exist on type 'AgentConfigWithOwner'.",
+      "count": 2
+    },
+    {
+      "file": "educlaw-web/src/components/home/DeepStudyMatchDialog.tsx",
+      "code": 2339,
+      "message": "Property 'name' does not exist on type 'AgentConfigWithOwner'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/layout/AppLayout.tsx",
+      "code": 2339,
+      "message": "Property 'id' does not exist on type 'AgentConfigWithOwner'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/layout/AppLayout.tsx",
+      "code": 2339,
+      "message": "Property 'status' does not exist on type 'AgentConfigWithOwner'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/lite/answer-skill-optimization-state.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:assert' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/lite/answer-skill-optimization-state.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:test' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/lite/answer-skill-optimization-state.test.ts",
+      "code": 2352,
+      "message": "Conversion of type '{ status: \"test_ready\"; revision: number; replayAvailability: { available: true; reason: null; }; targetSkill: { skillId: string; }; patch: { section: \"Workflow\"; operation: \"replace\"; }; draft: { validation: { ...; }; }; testResult: { ...; }; }' to type 'AnswerSkillOptimizationDetail' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.\n  Type '{ status: \"test_ready\"; revision: number; replayAvailability: { available: true; reason: null; }; targetSkill: { skillId: string; }; patch: { section: \"Workflow\"; operation: \"replace\"; }; draft: { validation: { ...; }; }; testResult: { ...; }; }' is missing the following properties from type 'AnswerSkillOptimizationDetail': optimizationId, packageId, threadId, baseVersionId, and 18 more.",
+      "count": 2
+    },
+    {
+      "file": "educlaw-web/src/components/lite/answer-skill-optimization-state.test.ts",
+      "code": 2352,
+      "message": "Conversion of type '{ testResult: { qualityGate: { passed: false; overallSummary: string; }; samples: [{ passed: false; unmetRequirements: string[]; riskNotes: string[]; criticalRisk: false; }, { passed: false; unmetRequirements: string[]; riskNotes: never[]; criticalRisk: true; }, { ...; }]; runtimeSelectionCheck: { ...; }; }; }' to type 'AnswerSkillOptimizationDetail' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.\n  Type '{ testResult: { qualityGate: { passed: false; overallSummary: string; }; samples: [{ passed: false; unmetRequirements: string[]; riskNotes: string[]; criticalRisk: false; }, { passed: false; unmetRequirements: string[]; riskNotes: never[]; criticalRisk: true; }, { ...; }]; runtimeSelectionCheck: { ...; }; }; }' is missing the following properties from type 'AnswerSkillOptimizationDetail': optimizationId, packageId, threadId, baseVersionId, and 24 more.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/lite/answer-skill-optimization-ui.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:assert' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/lite/answer-skill-optimization-ui.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:fs' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/lite/answer-skill-optimization-ui.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:test' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/lite/arena-report.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:assert' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/lite/arena-report.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:test' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/lite/detail-tab.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:assert' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/lite/detail-tab.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:test' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/lite/lite-arena-panel-skill-arena.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:assert' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/lite/lite-arena-panel-skill-arena.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:fs' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/lite/lite-arena-panel-skill-arena.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:test' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/lite/lite-arena-panel-skill-history-actions.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:assert' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/lite/lite-arena-panel-skill-history-actions.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:fs' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/lite/lite-arena-panel-skill-history-actions.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:test' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/lite/lite-arena-panel-strings.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:assert' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/lite/lite-arena-panel-strings.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:fs' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/lite/lite-arena-panel-strings.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:test' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/lite/lite-rendering.tsx",
+      "code": 18048,
+      "message": "'baselineMsg' is possibly 'undefined'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/lite/lite-rendering.tsx",
+      "code": 18048,
+      "message": "'enhancedMsg' is possibly 'undefined'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/lite/LiteArenaPanel.tsx",
+      "code": 18047,
+      "message": "'t.skillArenaConfig.left' is possibly 'null'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/lite/LiteArenaPanel.tsx",
+      "code": 18047,
+      "message": "'t.skillArenaConfig.right' is possibly 'null'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/lite/LiteArenaPanel.tsx",
+      "code": 18047,
+      "message": "'variant' is possibly 'null'.",
+      "count": 2
+    },
+    {
+      "file": "educlaw-web/src/components/lite/LiteArenaPanel.tsx",
+      "code": 2322,
+      "message": "Type 'number' is not assignable to type 'string'.",
+      "count": 3
+    },
+    {
+      "file": "educlaw-web/src/components/lite/LiteArenaPanel.tsx",
+      "code": 2322,
+      "message": "Type 'string | number' is not assignable to type 'string'.\n  Type 'number' is not assignable to type 'string'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/lite/LiteArenaPanel.tsx",
+      "code": 2322,
+      "message": "Type 'string' is not assignable to type 'number'.",
+      "count": 3
+    },
+    {
+      "file": "educlaw-web/src/components/lite/LiteArenaPanel.tsx",
+      "code": 2345,
+      "message": "Argument of type 'number' is not assignable to parameter of type 'string'.",
+      "count": 23
+    },
+    {
+      "file": "educlaw-web/src/components/lite/LiteArenaPanel.tsx",
+      "code": 2345,
+      "message": "Argument of type 'string | number' is not assignable to parameter of type 'string'.\n  Type 'number' is not assignable to type 'string'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/lite/LiteArenaPanel.tsx",
+      "code": 2367,
+      "message": "This comparison appears to be unintentional because the types 'number' and 'string' have no overlap.",
+      "count": 12
+    },
+    {
+      "file": "educlaw-web/src/components/lite/LiteArenaPanel.tsx",
+      "code": 2367,
+      "message": "This comparison appears to be unintentional because the types 'string' and 'number' have no overlap.",
+      "count": 2
+    },
+    {
+      "file": "educlaw-web/src/components/lite/progress-state.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:assert' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/lite/progress-state.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:test' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/lite/progress-state.test.ts",
+      "code": 2345,
+      "message": "Argument of type 'ProgressState | null' is not assignable to parameter of type 'ProgressState'.\n  Type 'null' is not assignable to type 'ProgressState'.",
+      "count": 2
+    },
+    {
+      "file": "educlaw-web/src/components/lite/report-compat.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:assert' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/lite/report-compat.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:test' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/lite/report-preview-state.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:assert' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/lite/report-preview-state.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:test' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/lite/report-status.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:assert' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/lite/report-status.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:test' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/lite/rubric-display.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:assert' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/lite/rubric-display.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:test' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/lite/rubric-edit-state.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:assert' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/lite/rubric-edit-state.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:test' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/lite/rubric-presentation.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:assert' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/lite/rubric-presentation.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:test' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/lite/rubric-status.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:assert' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/lite/rubric-status.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:test' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/lite/rubric-structured-view.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:assert' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/lite/rubric-structured-view.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:fs' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/lite/rubric-structured-view.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:test' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/lite/workspace-switch-state.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:assert' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/lite/workspace-switch-state.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:test' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/permission/PermissionDialog.tsx",
+      "code": 2339,
+      "message": "Property 'id' does not exist on type 'AgentConfigWithOwner'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/permission/PermissionDialog.tsx",
+      "code": 2339,
+      "message": "Property 'name' does not exist on type 'AgentConfigWithOwner'.",
+      "count": 2
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/multimodal-guided-creation-state.test.ts",
+      "code": 2741,
+      "message": "Property 'fused' is missing in type '{ frameworks: never[]; principles: never[]; cases: never[]; counterexamples: never[]; terms: never[]; }' but required in type 'MultimodalCandidatePasses'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/multimodal/candidate-action-colors.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:fs' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/multimodal/candidate-action-colors.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:path' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/multimodal/candidate-action-colors.test.ts",
+      "code": 2591,
+      "message": "Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/multimodal/multimodal-progress-presentation.test.tsx",
+      "code": 2741,
+      "message": "Property 'fused' is missing in type '{ frameworks: never[]; principles: never[]; cases: never[]; counterexamples: never[]; terms: never[]; }' but required in type 'MultimodalCandidatePasses'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/multimodal/multimodal-progress-presentation.test.tsx",
+      "code": 7017,
+      "message": "Element implicitly has an 'any' type because type 'typeof globalThis' has no index signature.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/multimodal/multimodal-wizard-model.test.ts",
+      "code": 2352,
+      "message": "Conversion of type '{ mediaStage: \"failed\"; mediaState: { candidatePasses: { frameworks: { candidateId: string; }[]; principles: never[]; cases: never[]; counterexamples: never[]; terms: never[]; fused: never[]; }; candidateValidations: never[]; }; }' to type 'MediaSessionDetail' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.\n  Type '{ mediaStage: \"failed\"; mediaState: { candidatePasses: { frameworks: { candidateId: string; }[]; principles: never[]; cases: never[]; counterexamples: never[]; terms: never[]; fused: never[]; }; candidateValidations: never[]; }; }' is missing the following properties from type 'MediaSessionDetail': error, sessionId, displayName, status, and 3 more.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/multimodal/multimodal-wizard-ui.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:fs' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/skill-conversation-list.test.ts",
+      "code": 2322,
+      "message": "Type '{ id: number; packageId: number; title: string; model?: string | null | undefined; arenaKind: ArenaKind; basePackageVersionId: string | null; skillArenaConfig: SkillArenaConfig | null; warning?: string | null | undefined; createdAt: string; updatedAt: string; }' is not assignable to type 'ArenaThread'.\n  Types of property 'model' are incompatible.\n    Type 'string | null | undefined' is not assignable to type 'string | null'.\n      Type 'undefined' is not assignable to type 'string | null'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/skill-conversation-list.test.ts",
+      "code": 2322,
+      "message": "Type '{ skillId: string; side?: \"left\" | \"right\" | undefined; skillVersionId?: string | undefined; skillUid?: string | undefined; skillName?: string | undefined; versionNumber?: number | undefined; }' is not assignable to type 'ArenaThreadVariant'.\n  Types of property 'side' are incompatible.\n    Type '\"left\" | \"right\" | undefined' is not assignable to type '\"left\" | \"right\"'.\n      Type 'undefined' is not assignable to type '\"left\" | \"right\"'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/skill-conversation-list.test.ts",
+      "code": 2322,
+      "message": "Type '{ skillVersionId: string; side?: \"left\" | \"right\" | undefined; skillId?: string | undefined; skillUid?: string | undefined; skillName?: string | undefined; versionNumber?: number | undefined; }' is not assignable to type 'ArenaThreadVariant'.\n  Types of property 'side' are incompatible.\n    Type '\"left\" | \"right\" | undefined' is not assignable to type '\"left\" | \"right\"'.\n      Type 'undefined' is not assignable to type '\"left\" | \"right\"'.",
+      "count": 2
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/skill-conversation-list.ts",
+      "code": 18047,
+      "message": "'config.left' is possibly 'null'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/skill-conversation-list.ts",
+      "code": 18047,
+      "message": "'config.right' is possibly 'null'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/skill-conversation-list.ts",
+      "code": 18047,
+      "message": "'left' is possibly 'null'.",
+      "count": 2
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/skill-conversation-list.ts",
+      "code": 18047,
+      "message": "'right' is possibly 'null'.",
+      "count": 2
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/skill-repository-cards.test.tsx",
+      "code": 2322,
+      "message": "Type 'Mock<Procedure | Constructable>' is not assignable to type '(session: GuidedCreationSession) => void'.\n  Type 'MockInstance<Procedure | Constructable> & (new (...args: any[]) => any) & {}' is not assignable to type '(session: GuidedCreationSession) => void'.\n    Type 'MockInstance<Procedure | Constructable> & (new (...args: any[]) => any) & {}' provides no match for the signature '(session: GuidedCreationSession): void'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/skill-repository-cards.test.tsx",
+      "code": 2322,
+      "message": "Type 'Mock<Procedure | Constructable>' is not assignable to type '(skill: RepositorySkill) => void'.\n  Type 'MockInstance<Procedure | Constructable> & (new (...args: any[]) => any) & {}' is not assignable to type '(skill: RepositorySkill) => void'.\n    Type 'MockInstance<Procedure | Constructable> & (new (...args: any[]) => any) & {}' provides no match for the signature '(skill: RepositorySkill): void'.",
+      "count": 3
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/skill-repository-cards.test.tsx",
+      "code": 7017,
+      "message": "Element implicitly has an 'any' type because type 'typeof globalThis' has no index signature.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/skill-sidebar-status.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:fs' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/skill-thinking-ui.test.tsx",
+      "code": 7017,
+      "message": "Element implicitly has an 'any' type because type 'typeof globalThis' has no index signature.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/skill-workspace-sidebar-actions.test.tsx",
+      "code": 7017,
+      "message": "Element implicitly has an 'any' type because type 'typeof globalThis' has no index signature.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/skill-workspace-state.ts",
+      "code": 2367,
+      "message": "This comparison appears to be unintentional because the types '\"overview\" | \"optimize\" | \"create\" | \"repository\" | \"report\"' and '\"versions\"' have no overlap.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/skill-workspace-ui.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:fs' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/SkillAnswerOptimizationPanel.tsx",
+      "code": 18047,
+      "message": "'detail' is possibly 'null'.",
+      "count": 2
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/SkillInspectorContent.tsx",
+      "code": 2741,
+      "message": "Property 'distilled' is missing in type '{ generated: string; imported: string; optimized: string; manual: string; interactive: string; rollback: string; }' but required in type 'Record<\"manual\" | \"generated\" | \"imported\" | \"optimized\" | \"interactive\" | \"rollback\" | \"distilled\", string>'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/SkillWorkspaceSidebar.tsx",
+      "code": 2322,
+      "message": "Type '(() => void) | undefined' is not assignable to type '() => void'.\n  Type 'undefined' is not assignable to type '() => void'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/SkillWorkspaceSidebar.tsx",
+      "code": 2322,
+      "message": "Type '((id: string) => void) | undefined' is not assignable to type '(id: string) => void'.\n  Type 'undefined' is not assignable to type '(id: string) => void'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/SkillWorkspaceSidebar.tsx",
+      "code": 2322,
+      "message": "Type '((thread: ArenaThread, title: string) => void | Promise<void>) | undefined' is not assignable to type '(thread: ArenaThread, title: string) => void | Promise<void>'.\n  Type 'undefined' is not assignable to type '(thread: ArenaThread, title: string) => void | Promise<void>'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/SkillWorkspaceSidebar.tsx",
+      "code": 2322,
+      "message": "Type '((thread: ArenaThread) => void | Promise<void>) | undefined' is not assignable to type '(thread: ArenaThread) => void | Promise<void>'.\n  Type 'undefined' is not assignable to type '(thread: ArenaThread) => void | Promise<void>'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/workspace-accessibility-contract.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:fs' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/workspace-inspector-mount.test.tsx",
+      "code": 7017,
+      "message": "Element implicitly has an 'any' type because type 'typeof globalThis' has no index signature.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/workspace-visual-contract.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:fs' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/font-loading.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:fs' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/frontend-encoding.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:assert' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/frontend-encoding.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:fs' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/frontend-encoding.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:path' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/frontend-encoding.test.ts",
+      "code": 2307,
+      "message": "Cannot find module 'node:test' or its corresponding type declarations.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/frontend-encoding.test.ts",
+      "code": 2339,
+      "message": "Property 'dirname' does not exist on type 'ImportMeta'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/lib/message-converter.ts",
+      "code": 2305,
+      "message": "Module '\"@educlaw/shared\"' has no exported member 'Message'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/lib/message-converter.ts",
+      "code": 2305,
+      "message": "Module '\"@educlaw/shared\"' has no exported member 'MessagePart'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/pages/SkillFirstWorkspace.tsx",
+      "code": 2322,
+      "message": "Type '() => Promise<RepositorySkill[]>' is not assignable to type '() => void | Promise<void>'.\n  Type 'Promise<RepositorySkill[]>' is not assignable to type 'void | Promise<void>'.\n    Type 'Promise<RepositorySkill[]>' is not assignable to type 'Promise<void>'.\n      Type 'RepositorySkill[]' is not assignable to type 'void'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/pages/Workspace.tsx",
+      "code": 2339,
+      "message": "Property 'id' does not exist on type 'AgentConfigWithOwner'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/pages/Workspace.tsx",
+      "code": 2339,
+      "message": "Property 'name' does not exist on type 'AgentConfigWithOwner'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/services/agent-polling.ts",
+      "code": 2305,
+      "message": "Module '\"@educlaw/shared\"' has no exported member 'AgentConfig'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/services/agent-polling.ts",
+      "code": 2339,
+      "message": "Property 'id' does not exist on type 'AgentConfigWithOwner'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/services/agent-polling.ts",
+      "code": 2339,
+      "message": "Property 'status' does not exist on type 'AgentConfigWithOwner'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/stores/agent.ts",
+      "code": 2305,
+      "message": "Module '\"@educlaw/shared\"' has no exported member 'AgentConfig'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/stores/agent.ts",
+      "code": 2305,
+      "message": "Module '\"@educlaw/shared\"' has no exported member 'AgentProfile'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/stores/agent.ts",
+      "code": 2339,
+      "message": "Property 'id' does not exist on type 'AgentConfigWithOwner'.",
+      "count": 10
+    },
+    {
+      "file": "educlaw-web/src/stores/agent.ts",
+      "code": 2339,
+      "message": "Property 'status' does not exist on type 'AgentConfigWithOwner'.",
+      "count": 2
+    },
+    {
+      "file": "educlaw-web/src/stores/batch-build.ts",
+      "code": 2305,
+      "message": "Module '\"@educlaw/shared\"' has no exported member 'AgentConfig'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/stores/build.ts",
+      "code": 2305,
+      "message": "Module '\"@educlaw/shared\"' has no exported member 'AgentConfig'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/stores/chat.ts",
+      "code": 2305,
+      "message": "Module '\"@educlaw/shared\"' has no exported member 'Message'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/stores/chat.ts",
+      "code": 2305,
+      "message": "Module '\"@educlaw/shared\"' has no exported member 'MessagePart'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/stores/chat.ts",
+      "code": 2305,
+      "message": "Module '\"@educlaw/shared\"' has no exported member 'SessionInfo'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/stores/chat.ts",
+      "code": 2339,
+      "message": "Property 'id' does not exist on type 'AgentConfigWithOwner'.",
+      "count": 2
+    },
+    {
+      "file": "educlaw-web/src/stores/chat.ts",
+      "code": 2339,
+      "message": "Property 'name' does not exist on type 'AgentConfigWithOwner'.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/stores/chat.ts",
+      "code": 7006,
+      "message": "Parameter 'p' implicitly has an 'any' type.",
+      "count": 3
+    },
+    {
+      "file": "educlaw-web/src/stores/chat.ts",
+      "code": 7006,
+      "message": "Parameter 'part' implicitly has an 'any' type.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/stores/chat.ts",
+      "code": 7006,
+      "message": "Parameter 'total' implicitly has an 'any' type.",
+      "count": 1
+    },
+    {
+      "file": "educlaw-web/src/stores/home-chat.ts",
+      "code": 2305,
+      "message": "Module '\"@educlaw/shared\"' has no exported member 'HomeChatSession'.",
+      "count": 1
+    }
+  ]
+}

@@ -53,6 +53,22 @@ export class ArenaRunService {
   private readonly now: () => number;
   private readonly maxBytes: number;
   private readonly cleanupTimer: ReturnType<typeof setInterval>;
+  private draining = false;
+  private readonly idleWaiters = new Set<() => void>();
+  beginDrain(): void { this.draining = true; clearInterval(this.cleanupTimer); }
+  waitForIdle(): Promise<void> {
+    if ([...this.records.values()].every(record => record.settled)) return Promise.resolve();
+    return new Promise(resolve => this.idleWaiters.add(resolve));
+  }
+  abortActive(): void {
+    for (const record of this.records.values()) if (!record.settled) {
+      if (!terminal(record.snapshot)) this.publish(record, { status: 'stopping' });
+      record.controller.abort();
+    }
+  }
+  private assertAdmission(): void {
+    if (this.draining) throw failure('Server is draining', 503, 'SERVER_DRAINING');
+  }
   constructor(private readonly deps: Dependencies) {
     this.now = deps.now ?? Date.now;
     this.maxBytes = deps.maxSnapshotBytes ?? 1024 * 1024;
@@ -99,6 +115,7 @@ export class ArenaRunService {
     for (const notify of record.listeners) notify();
   }
   async start(raw: StartInput): Promise<ArenaRunSnapshot> {
+    this.assertAdmission();
     if (
       !raw.userId ||
       !Number.isSafeInteger(raw.threadId) ||
@@ -127,6 +144,7 @@ export class ArenaRunService {
     const maxConcurrent = this.deps.getMaxConcurrent
       ? await this.deps.getMaxConcurrent()
       : (this.deps.maxConcurrent ?? 4);
+    this.assertAdmission();
     if (!isSkillRunTestThread(detail.thread))
       throw failure(
         'Resumable runs require a Skill Run/Test conversation',
@@ -298,6 +316,10 @@ export class ArenaRunService {
       clearTimeout(record.timer);
       record.settled = true;
       record.release();
+      if ([...this.records.values()].every(item => item.settled)) {
+        for (const resolve of this.idleWaiters) resolve();
+        this.idleWaiters.clear();
+      }
       for (const notify of record.listeners) notify();
       record.listeners.clear();
     }

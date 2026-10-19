@@ -225,6 +225,23 @@ describe('resumable Skill run lifecycle', () => {
     expect(api.startArenaRun).not.toHaveBeenCalled();
     expect(container.querySelector('[aria-label="停止生成"]')).not.toBeNull();
   });
+  it('remounts after a refresh by recovering the same run without stopping or resending', async () => {
+    api.recoverArenaRun.mockResolvedValue({
+      detail: { thread, messages: [question] },
+      run: run(),
+    });
+    await render();
+    const firstSubscriptionSignal = api.subscribeArenaRun.mock.calls[0][4];
+    await act(async () => root.unmount());
+    expect(firstSubscriptionSignal.aborted).toBe(true);
+    root = createRoot(container);
+    await render();
+    expect(container.textContent).toContain('partial-answer');
+    expect(container.textContent).toContain('partial-reason');
+    expect(api.subscribeArenaRun.mock.calls.map(call => call[2])).toEqual(['r1', 'r1']);
+    expect(api.startArenaRun).not.toHaveBeenCalled();
+    expect(api.stopArenaRun).not.toHaveBeenCalled();
+  });
   it('detaches A, displays B, and restores A without cancelling or resending', async () => {
     api.recoverArenaRun.mockImplementation((_t, id) =>
       Promise.resolve({

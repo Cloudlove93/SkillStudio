@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const streamMessageMock = vi.fn();
 
-async function createApp() {
+async function createApp(userId: string | null = "user-1", draining = false) {
   vi.resetModules();
   vi.doMock("../services/arena-service.js", () => ({
     createThread: vi.fn(),
@@ -17,12 +17,15 @@ async function createApp() {
 
   const router = (await import("./arena.js")).default;
   const app = express();
+  const drain=(await import('../services/http-drain.js')).createHttpDrain();
+  if(draining)drain.beginDrain();
+  app.use(drain.middleware);
   app.use(express.json());
   app.use((req, _res, next) => {
-    req.headers["x-user-id"] = "user-1";
+    if (userId) req.headers["x-user-id"] = userId;
     next();
   });
-  app.use(router);
+  app.use('/api', router);
   return app;
 }
 
@@ -42,11 +45,11 @@ async function close(server: Server) {
   });
 }
 
-async function postMessage(thinkingEnabled: unknown) {
+async function postMessage(thinkingEnabled: unknown, path: string) {
   const { server, url } = await listen(await createApp());
   try {
     const response = await fetch(
-      `${url}/arena/threads/messages/stream?threadId=thread-1`,
+      `${url}${path}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -70,13 +73,39 @@ afterEach(() => {
   streamMessageMock.mockReset();
 });
 
-describe("POST /arena/threads/messages/stream", () => {
+const paths = [
+  '/api/arena/threads/thread-1/messages/stream',
+  '/api/arena/threads/messages/stream?threadId=thread-1',
+];
+it.each(paths)('refuses generation on the real Arena route while draining: %s',async(path)=>{
+  const {server,url}=await listen(await createApp('user-1',true));
+  try{
+    const response=await fetch(url+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({content:'question'})});
+    expect(response.status).toBe(503);expect(await response.json()).toMatchObject({code:'SERVER_DRAINING'});expect(streamMessageMock).not.toHaveBeenCalled();
+  }finally{await close(server);}
+});
+it('serves identical SSE for canonical and alias requests with one execution per request', async () => {
+  streamMessageMock.mockImplementation(async function* () {
+    yield {event:'delta',data:{side:'enhanced',delta:'same answer'}};
+    yield {event:'done',data:{messages:[]}};
+  });
+  const canonical=await postMessage(true,paths[0]);
+  const alias=await postMessage(true,paths[1]);
+  expect(canonical.body).toBe(alias.body);
+  expect(canonical.body).toContain('same answer');
+  expect(streamMessageMock).toHaveBeenCalledTimes(2);
+  expect(streamMessageMock.mock.calls.map(call=>call.slice(0,6))).toEqual([
+    ['user-1','thread-1','请回答',undefined,'agent',true],
+    ['user-1','thread-1','请回答',undefined,'agent',true],
+  ]);
+});
+describe.each(paths)('legacy Arena SSE entry %s', (path) => {
   it("forwards the literal boolean true to the service", async () => {
     streamMessageMock.mockImplementation(async function* () {
-      yield { event: "stream_end", data: { ok: true } };
+      yield { event: "done", data: { messages: [] } };
     });
 
-    const { response } = await postMessage(true);
+    const { response, body } = await postMessage(true, path);
 
     expect(response.status).toBe(200);
     expect(streamMessageMock).toHaveBeenCalledWith(
@@ -89,14 +118,19 @@ describe("POST /arena/threads/messages/stream", () => {
       expect.any(AbortSignal),
     );
     expect(streamMessageMock.mock.calls[0]?.[6].aborted).toBe(false);
+    expect(streamMessageMock).toHaveBeenCalledTimes(1);
+    expect(response.headers.get('content-type')).toContain('text/event-stream');
+    expect(response.headers.get('cache-control')).toBe('no-cache, no-transform');
+    expect(response.headers.get('x-accel-buffering')).toBe('no');
+    expect((body.match(/event: stream_end/g) ?? []).length).toBe(1);
   });
 
   it("does not coerce string values into an enabled thinking request", async () => {
     streamMessageMock.mockImplementation(async function* () {
-      yield { event: "stream_end", data: { ok: true } };
+      yield { event: "done", data: { messages: [] } };
     });
 
-    await postMessage("true");
+    await postMessage("true", path);
 
     expect(streamMessageMock.mock.calls[0]?.[5]).toBe(false);
   });
@@ -107,11 +141,12 @@ describe("POST /arena/threads/messages/stream", () => {
       throw new Error("controlled generation failure");
     });
 
-    const { body } = await postMessage(false);
+    const { body } = await postMessage(false, path);
 
     expect(body).toContain('event: error');
     expect(body).toContain('data: {"ok":false}');
     expect(body).not.toContain('data: {"ok":true}');
+    expect((body.match(/event: stream_end/g) ?? []).length).toBe(1);
   });
 
   it("aborts the service signal when the streaming response is disconnected", async () => {
@@ -129,7 +164,7 @@ describe("POST /arena/threads/messages/stream", () => {
     const controller = new AbortController();
     try {
       const response = await fetch(
-        `${url}/arena/threads/messages/stream?threadId=thread-1`,
+        `${url}${path}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -148,4 +183,85 @@ describe("POST /arena/threads/messages/stream", () => {
       await close(server);
     }
   });
+
+  it('rejects unauthenticated requests before streaming or executing', async () => {
+    const {server,url}=await listen(await createApp(null));
+    try {
+      const response=await fetch(url+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({content:'question'})});
+      expect(response.status).toBe(401);
+      expect(response.headers.get('content-type')).toContain('application/json');
+      expect(streamMessageMock).not.toHaveBeenCalled();
+    } finally {await close(server);}
+  });
+
+  it('preserves service ownership errors without successful terminal output', async () => {
+    streamMessageMock.mockImplementation(async function* (userId) {
+      if(userId==='other-user') throw new Error('Arena thread not found');
+      yield {event:'done',data:{messages:[]}};
+    });
+    const {server,url}=await listen(await createApp('other-user'));
+    try {
+      const response=await fetch(url+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({content:'question'})});
+      const body=await response.text();
+      expect(body).toContain('Arena thread not found');
+      expect(body).toContain('data: {"ok":false}');
+      expect(body).not.toContain('event: done');
+      expect(streamMessageMock.mock.calls[0]?.[0]).toBe('other-user');
+    } finally {await close(server);}
+  });
+
+  it('keeps empty-content errors JSON and does not start generation', async () => {
+    const {server,url}=await listen(await createApp());
+    try {
+      const response=await fetch(url+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({content:'  '})});
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({error:'消息内容不能为空'});
+      expect(streamMessageMock).not.toHaveBeenCalled();
+    } finally {await close(server);}
+  });
+
+  it('retains heartbeat events and cleans up after normal completion', async () => {
+    vi.stubEnv('ARENA_STREAM_HEARTBEAT_MS','5');
+    streamMessageMock.mockImplementation(async function* () {
+      await new Promise(resolve=>setTimeout(resolve,20));
+      yield {event:'delta',data:{side:'enhanced',delta:'answer'}};
+    });
+    try {
+      const {body}=await postMessage(false,path);
+      expect(body).toContain('event: ping');
+      expect(body).toContain('event: delta');
+      expect(body.trim().endsWith('data: {"ok":true}')).toBe(true);
+      expect((body.match(/event: stream_end/g)??[]).length).toBe(1);
+    } finally {vi.unstubAllEnvs();}
+  });
+});
+
+it.each([
+  '/api/arena/threads/messages/stream',
+  '/api/arena/threads/messages/stream?threadId=',
+  '/api/arena/threads/messages/stream?threadId=one&threadId=two',
+  '/api/arena/threads/messages/stream?threadId[x]=one',
+  '/api/arena/threads/%20/messages/stream',
+  '/api/arena/threads/thread-1/messages/stream?threadId=thread-2',
+  '/api/arena/threads/thread-1/messages/stream?threadId=thread-1',
+])('rejects ambiguous or missing thread identity before executing: %s',async(path)=>{
+  const {server,url}=await listen(await createApp());
+  try {
+    const response=await fetch(url+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({content:'question'})});
+    expect(response.status).toBe(400);
+    expect(response.headers.get('content-type')).toContain('application/json');
+    expect(streamMessageMock).not.toHaveBeenCalled();
+  } finally {await close(server);}
+});
+
+it('decodes the scoped path once and never takes a thread ID from the body',async()=>{
+  streamMessageMock.mockImplementation(async function* () {yield {event:'done',data:{messages:[]}};});
+  const {server,url}=await listen(await createApp());
+  try {
+    const response=await fetch(url+'/api/arena/threads/thread%2Fone%3Fpart%3D2/messages/stream',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({content:'question',threadId:'wrong-thread'})});
+    expect(response.status).toBe(200);
+    await response.text();
+    expect(streamMessageMock.mock.calls[0]?.[1]).toBe('thread/one?part=2');
+    expect(streamMessageMock).toHaveBeenCalledTimes(1);
+  } finally {await close(server);}
 });
