@@ -134,6 +134,23 @@ function frameCandidateManifest(overrides?: Record<string, unknown>) {
 }
 
 describe('MediaEvidenceService', () => {
+  it('keeps bounded visible rules separate from conflicting ASR and ranking inference', async () => {
+    const service = buildService({ visionRankingAdapter: { async rankVisualCandidates() {
+      return {model:'vision-test',rankings:[{candidateId:'candidate-1',score:0.9,reason:'清晰且符合教学目标',visualObservation:{visibleText:['温度不得超过 65 °C；否则停止。','连续 3 次全对才撤去支架；否则保留提示，再做 5 道复核题。'],uncertainties:['右下角标记不清晰。']}}]};
+    }}});
+    const moment=semanticMoment({transcriptEvidence:{timeRange:{startMs:1000,endMs:1500},text:'温度达到 80 °C 后继续。',confidence:0.95}});
+    const ranked=await service.rankVisualCandidates({sourceKind:'video',durationMs:5000,semanticMoments:[moment],frameCandidateManifest:[frameCandidateManifest()]});
+    const result=service.buildEvidenceTimeline({durationMs:5000,primarySource:primarySource('video'),transcript:transcript(),semanticMoments:[moment],selectedFrames:ranked.selectedFrames,sourceHasAudio:true});
+    const frame=result.evidenceItems.find(x=>x.kind==='frame')!;
+    expect(frame.text).toContain('温度不得超过 65 °C；否则停止。');
+    expect(frame.text).toContain('连续 3 次全对才撤去支架；否则保留提示，再做 5 道复核题。');
+    expect(frame.text).toContain('右下角标记不清晰。');
+    expect(frame.text).not.toContain('80 °C');
+    expect(frame.text).not.toContain('清晰且符合教学目标');
+    expect(frame.claimType).toBe('modelInference');
+    expect(frame.assetRef).toEqual(assetRef('skill-sessions/1/frames/selected/frame-1.png','image/png','c'));
+    expect(frame.timeRange).toEqual({startMs:1200,endMs:1201});
+  });
   it('normalizes semantic moments with deterministic ids and rejects invalid model drafts', async () => {
     const service = buildService({
       semanticMomentModelAdapter: {

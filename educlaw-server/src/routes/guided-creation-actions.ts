@@ -1,4 +1,5 @@
 import type { Response } from 'express';
+import { parseStructuredGuidedInput } from '../services/structured-guided-input.js';
 import type {
   GuidedCreationAction,
   GuidedCreationDocument,
@@ -16,6 +17,7 @@ import {
   processGuidedCreationMessage,
   renameGuidedCreation,
   startGuidedCreation,
+  summarizeGuidedCreation,
 } from '../services/guided-creation-service.js';
 import { createMultimodalGuidedCreationService } from '../services/multimodal-guided-creation-service.js';
 import { createMultimodalProgressStreamService } from '../services/multimodal-progress-stream-service.js';
@@ -62,6 +64,7 @@ const ACTIONS = new Set<GuidedCreationApiAction>([
   'SkillGuidedCreationDetail',
   'SkillGuidedCreationMessage',
   'SkillGuidedCreationConfirm',
+  'SkillGuidedCreationSummarize',
   'SkillGuidedCreationCancel',
   'SkillGuidedCreationRename',
   'SkillGuidedCreationDelete',
@@ -91,6 +94,7 @@ const STREAM_ACTIONS = new Set<GuidedCreationStreamAction>([
   'SkillGuidedCreationStart',
   'SkillGuidedCreationMessage',
   'SkillGuidedCreationConfirm',
+  'SkillGuidedCreationSummarize',
   'skill.media.progress.stream',
 ]);
 const STATUSES = new Set<GuidedCreationStatus>([
@@ -217,7 +221,7 @@ function candidateIds(value: unknown): string[] {
     }
   }
   const ids = value.map((item, index) =>
-    candidateId(item, `selectedCandidateIds[${index}]`)
+    candidateId(item, `selectedCandidateIds[${index}]`),
   );
   if (new Set(ids).size !== ids.length) {
     invalid('selectedCandidateIds 不能重复');
@@ -264,7 +268,9 @@ function parseDocuments(value: unknown): GuidedCreationDocument[] | undefined {
 export function isGuidedCreationAction(
   value: unknown,
 ): value is GuidedCreationApiAction {
-  return typeof value === 'string' && ACTIONS.has(value as GuidedCreationApiAction);
+  return (
+    typeof value === 'string' && ACTIONS.has(value as GuidedCreationApiAction)
+  );
 }
 
 export function isGuidedCreationStreamAction(
@@ -306,8 +312,16 @@ export function parseGuidedCreationRequest(
       };
     }
     case 'skill.media.upload.intent': {
-      exactKeys(body, ['action', 'sessionId', 'idempotencyKey', 'payload'], 'body');
-      exactKeys(payload, ['fileName', 'declaredMimeType', 'sizeBytes'], 'payload');
+      exactKeys(
+        body,
+        ['action', 'sessionId', 'idempotencyKey', 'payload'],
+        'body',
+      );
+      exactKeys(
+        payload,
+        ['fileName', 'declaredMimeType', 'sizeBytes'],
+        'payload',
+      );
       if (
         typeof payload.sizeBytes !== 'number' ||
         !Number.isInteger(payload.sizeBytes) ||
@@ -331,7 +345,11 @@ export function parseGuidedCreationRequest(
       };
     }
     case 'skill.media.url.import': {
-      exactKeys(body, ['action', 'sessionId', 'idempotencyKey', 'payload'], 'body');
+      exactKeys(
+        body,
+        ['action', 'sessionId', 'idempotencyKey', 'payload'],
+        'body',
+      );
       exactKeys(payload, ['url', 'rightsConfirmed'], 'payload');
       if (payload.rightsConfirmed !== true) {
         invalid('rightsConfirmed 必须明确为 true');
@@ -347,8 +365,16 @@ export function parseGuidedCreationRequest(
       };
     }
     case 'skill.media.upload.confirm': {
-      exactKeys(body, ['action', 'sessionId', 'idempotencyKey', 'payload'], 'body');
-      exactKeys(payload, ['uploadToken', 'expectedRevisionNo', 'parts'], 'payload');
+      exactKeys(
+        body,
+        ['action', 'sessionId', 'idempotencyKey', 'payload'],
+        'body',
+      );
+      exactKeys(
+        payload,
+        ['uploadToken', 'expectedRevisionNo', 'parts'],
+        'payload',
+      );
 
       if (
         typeof payload.expectedRevisionNo !== 'number' ||
@@ -394,7 +420,11 @@ export function parseGuidedCreationRequest(
       };
     }
     case 'skill.media.process.start': {
-      exactKeys(body, ['action', 'sessionId', 'idempotencyKey', 'payload'], 'body');
+      exactKeys(
+        body,
+        ['action', 'sessionId', 'idempotencyKey', 'payload'],
+        'body',
+      );
       exactKeys(
         payload,
         ['expectedRevisionNo', 'understandingMode', 'transcriptionMode'],
@@ -422,7 +452,11 @@ export function parseGuidedCreationRequest(
       };
     }
     case 'skill.media.retry': {
-      exactKeys(body, ['action', 'sessionId', 'idempotencyKey', 'payload'], 'body');
+      exactKeys(
+        body,
+        ['action', 'sessionId', 'idempotencyKey', 'payload'],
+        'body',
+      );
       exactKeys(payload, ['expectedRevisionNo', 'failedJobId'], 'payload');
       return {
         action: body.action,
@@ -472,7 +506,11 @@ export function parseGuidedCreationRequest(
       };
     }
     case 'skill.media.transcript.update': {
-      exactKeys(body, ['action', 'sessionId', 'idempotencyKey', 'payload'], 'body');
+      exactKeys(
+        body,
+        ['action', 'sessionId', 'idempotencyKey', 'payload'],
+        'body',
+      );
       exactKeys(
         payload,
         [
@@ -517,7 +555,11 @@ export function parseGuidedCreationRequest(
       };
     }
     case 'skill.media.evidence.update': {
-      exactKeys(body, ['action', 'sessionId', 'idempotencyKey', 'payload'], 'body');
+      exactKeys(
+        body,
+        ['action', 'sessionId', 'idempotencyKey', 'payload'],
+        'body',
+      );
       exactKeys(payload, ['expectedRevisionNo', 'evidenceItems'], 'payload');
       if (
         !Array.isArray(payload.evidenceItems) ||
@@ -537,7 +579,11 @@ export function parseGuidedCreationRequest(
       };
     }
     case 'skill.media.candidate.update': {
-      exactKeys(body, ['action', 'sessionId', 'idempotencyKey', 'payload'], 'body');
+      exactKeys(
+        body,
+        ['action', 'sessionId', 'idempotencyKey', 'payload'],
+        'body',
+      );
       exactKeys(payload, ['expectedRevisionNo', 'candidatePasses'], 'payload');
       if (!isRecord(payload.candidatePasses)) {
         invalid('candidatePasses 必须是对象');
@@ -553,12 +599,20 @@ export function parseGuidedCreationRequest(
       };
     }
     case 'skill.media.overview.confirm': {
-      exactKeys(body, ['action', 'sessionId', 'idempotencyKey', 'payload'], 'body');
+      exactKeys(
+        body,
+        ['action', 'sessionId', 'idempotencyKey', 'payload'],
+        'body',
+      );
       exactKeys(payload, ['expectedRevisionNo', 'overview'], 'payload');
       if (!isRecord(payload.overview)) {
         invalid('overview 必须是对象');
       }
-      exactKeys(payload.overview, ['title', 'approved', 'userNotes'], 'overview');
+      exactKeys(
+        payload.overview,
+        ['title', 'approved', 'userNotes'],
+        'overview',
+      );
       if (payload.overview.approved !== true) {
         invalid('overview.approved 必须为 true');
       }
@@ -577,8 +631,16 @@ export function parseGuidedCreationRequest(
       };
     }
     case 'skill.media.candidate.confirm': {
-      exactKeys(body, ['action', 'sessionId', 'idempotencyKey', 'payload'], 'body');
-      exactKeys(payload, ['expectedRevisionNo', 'selectedCandidateIds'], 'payload');
+      exactKeys(
+        body,
+        ['action', 'sessionId', 'idempotencyKey', 'payload'],
+        'body',
+      );
+      exactKeys(
+        payload,
+        ['expectedRevisionNo', 'selectedCandidateIds'],
+        'payload',
+      );
       return {
         action: body.action,
         sessionId: positiveId(body.sessionId, 'sessionId'),
@@ -590,7 +652,11 @@ export function parseGuidedCreationRequest(
       };
     }
     case 'skill.media.test.start': {
-      exactKeys(body, ['action', 'sessionId', 'idempotencyKey', 'payload'], 'body');
+      exactKeys(
+        body,
+        ['action', 'sessionId', 'idempotencyKey', 'payload'],
+        'body',
+      );
       exactKeys(payload, ['expectedRevisionNo'], 'payload');
       return {
         action: body.action,
@@ -601,7 +667,11 @@ export function parseGuidedCreationRequest(
     }
     case 'skill.media.generate.confirm':
     case 'skill.media.publish': {
-      exactKeys(body, ['action', 'sessionId', 'idempotencyKey', 'payload'], 'body');
+      exactKeys(
+        body,
+        ['action', 'sessionId', 'idempotencyKey', 'payload'],
+        'body',
+      );
       exactKeys(
         payload,
         ['expectedRevisionNo', 'targetPackageId', 'expectedPackageVersionId'],
@@ -616,7 +686,9 @@ export function parseGuidedCreationRequest(
           ? null
           : positiveId(payload.expectedPackageVersionId, 'expectedPackageVersionId');
       if ((targetPackageId === null) !== (expectedPackageVersionId === null)) {
-        invalid('targetPackageId 与 expectedPackageVersionId 必须同时提供或同时为 null');
+        invalid(
+          'targetPackageId 与 expectedPackageVersionId 必须同时提供或同时为 null',
+        );
       }
       return {
         action: body.action,
@@ -633,7 +705,13 @@ export function parseGuidedCreationRequest(
       exactKeys(body, ['action', 'payload'], 'body');
       exactKeys(
         payload,
-        ['content', 'client_message_id', 'model', 'documents'],
+        [
+          'content',
+          'client_message_id',
+          'model',
+          'documents',
+          'structured_fields',
+        ],
         'payload',
       );
       return {
@@ -646,6 +724,13 @@ export function parseGuidedCreationRequest(
           ),
           model: optionalText(payload.model, 'model', 120),
           documents: parseDocuments(payload.documents),
+          structured_fields: (() => {
+            try {
+              return parseStructuredGuidedInput(payload.structured_fields);
+            } catch {
+              return invalid('完整填写字段格式不正确');
+            }
+          })(),
         },
       };
     }
@@ -682,6 +767,17 @@ export function parseGuidedCreationRequest(
           session_id: positiveId(payload.session_id, 'session_id'),
           revision_no: revision(payload.revision_no),
           request_id: requestId(payload.request_id, 'request_id'),
+        },
+      };
+    }
+    case 'SkillGuidedCreationSummarize': {
+      exactKeys(body, ['action', 'payload'], 'body');
+      exactKeys(payload, ['session_id', 'revision_no'], 'payload');
+      return {
+        action: body.action,
+        payload: {
+          session_id: positiveId(payload.session_id, 'session_id'),
+          revision_no: revision(payload.revision_no),
         },
       };
     }
@@ -739,7 +835,9 @@ export function parseGuidedCreationRequest(
         if (
           !Array.isArray(payload.status) ||
           payload.status.some(
-            (item) => typeof item !== 'string' || !STATUSES.has(item as GuidedCreationStatus),
+            (item) =>
+              typeof item !== 'string' ||
+              !STATUSES.has(item as GuidedCreationStatus),
           )
         ) {
           invalid('status 格式不正确');
@@ -798,7 +896,9 @@ export async function handleGuidedCreationJsonAction(input: {
         idempotencyKey: input.request.idempotencyKey ?? '',
         uploadToken: String(payload.uploadToken ?? ''),
         expectedRevisionNo: payload.expectedRevisionNo as number,
-        parts: payload.parts as Array<{ partNumber: number; etag: string }> | undefined,
+        parts: payload.parts as
+          | Array<{ partNumber: number; etag: string }>
+          | undefined,
       });
     case 'skill.media.url.import':
       return getMediaUrlImportService().importToSession({
@@ -872,7 +972,8 @@ export async function handleGuidedCreationJsonAction(input: {
         expectedRevisionNo: payload.expectedRevisionNo as number,
         mutation: {
           segmentIndex: payload.segmentIndex as number,
-          expectedSegmentRevisionNo: payload.expectedSegmentRevisionNo as number,
+          expectedSegmentRevisionNo:
+            payload.expectedSegmentRevisionNo as number,
           text: payload.text as string,
           speaker: payload.speaker as string | null,
         },
@@ -927,7 +1028,9 @@ export async function handleGuidedCreationJsonAction(input: {
         idempotencyKey: input.request.idempotencyKey ?? '',
         expectedRevisionNo: payload.expectedRevisionNo as number,
         targetPackageId: payload.targetPackageId as string | null,
-        expectedPackageVersionId: payload.expectedPackageVersionId as string | null,
+        expectedPackageVersionId: payload.expectedPackageVersionId as
+          | string
+          | null,
       });
     case 'skill.media.publish':
       return getMultimodalReleaseService().publish({
@@ -936,7 +1039,9 @@ export async function handleGuidedCreationJsonAction(input: {
         idempotencyKey: input.request.idempotencyKey ?? '',
         expectedRevisionNo: payload.expectedRevisionNo as number,
         targetPackageId: payload.targetPackageId as string | null,
-        expectedPackageVersionId: payload.expectedPackageVersionId as string | null,
+        expectedPackageVersionId: payload.expectedPackageVersionId as
+          | string
+          | null,
       });
     case 'SkillGuidedCreationList':
       return listGuidedCreations({
@@ -1014,7 +1119,9 @@ export async function handleGuidedCreationStreamAction(input: {
         sessionId: String(payload.sessionId ?? ''),
         emit: emitSse,
         isClosed: () =>
-          closed || responseState.writableEnded || responseState.destroyed === true,
+          closed ||
+          responseState.writableEnded ||
+          responseState.destroyed === true,
       });
       return;
     }
@@ -1028,6 +1135,9 @@ export async function handleGuidedCreationStreamAction(input: {
         client_message_id: payload.client_message_id as string,
         model: payload.model as string | undefined,
         documents: payload.documents as GuidedCreationDocument[] | undefined,
+        structured_fields: payload.structured_fields as
+          | import('@educlaw/shared').StructuredGuidedInput
+          | undefined,
       });
     } else if (input.request.action === 'SkillGuidedCreationMessage') {
       await emitSse('phase', { phase: 'understanding' });
@@ -1037,6 +1147,13 @@ export async function handleGuidedCreationStreamAction(input: {
         client_message_id: payload.client_message_id as string,
         revision_no: payload.revision_no as number,
         content: payload.content as string,
+      });
+    } else if (input.request.action === 'SkillGuidedCreationSummarize') {
+      await emitSse('phase', { phase: 'summarizing' });
+      detail = await summarizeGuidedCreation({
+        auth_user_id: input.auth_user_id,
+        session_id: payload.session_id as string,
+        revision_no: payload.revision_no as number,
       });
     } else if (input.request.action === 'SkillGuidedCreationConfirm') {
       detail = await confirmGuidedCreation({

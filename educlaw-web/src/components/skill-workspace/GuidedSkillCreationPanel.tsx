@@ -38,6 +38,7 @@ type Props = {
   error: { code: string; message: string; retryable: boolean } | null;
   onSend: (content: string) => void;
   onConfirm: () => void;
+  onSummarize: () => void;
   onRetry: () => void;
   onFiles: (files: FileList) => void;
   onRemoveDocument: (index: number) => void;
@@ -462,6 +463,18 @@ export function GuidedSkillCreationPanel(props: Props) {
                 </button>
               )}
               <span>Enter 发送 · Shift + Enter 换行</span>
+              {props.session && !isConfirmation && (
+                <button
+                  type="button"
+                  className="skill-summarize-button"
+                  onClick={props.onSummarize}
+                  disabled={props.busy}
+                  title="我已经说得差不多了，先整理成方案"
+                  aria-label="整理总结并确认"
+                >
+                  整理总结
+                </button>
+              )}
               <button
                 type="button"
                 className="skill-send-button"

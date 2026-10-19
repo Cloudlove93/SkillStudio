@@ -230,6 +230,13 @@ export interface MultimodalEvidence {
   provenance: MultimodalEvidenceProvenance;
   claimType: MultimodalClaimType;
   selectionReason: string;
+  /** Machine transcription of directly visible content; separate from ranking inference. */
+  visualObservation?: MultimodalVisualObservation;
+}
+
+export interface MultimodalVisualObservation {
+  visibleText: string[];
+  uncertainties: string[];
 }
 
 export interface MultimodalTranscriptSegment {
@@ -581,7 +588,22 @@ export interface MediaJobRecord {
 }
 
 function fail(_message?: string): never {
-  throw new Error(INVALID_MULTIMODAL_CONTRACT);
+  const error = new Error(INVALID_MULTIMODAL_CONTRACT);
+  // Keep the public message stable; internal diagnostics retain only an
+  // allow-listed field path and category, never the rejected value.
+  const path = _message
+    ?.match(
+      /^((?:semanticMoments|normalizedSemanticMoments|transcript|primarySource|visualContext)(?:\[\d+\]|\.[A-Za-z][A-Za-z0-9]*)*)\b/,
+    )?.[1]
+    ?.slice(0, 160);
+  if (path)
+    Object.defineProperties(error, {
+      contractPath: { value: path },
+      contractReason: {
+        value: /\.(?:startMs|endMs)\b/.test(path) ? 'time_bounds' : 'schema',
+      },
+    });
+  throw error;
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -950,6 +972,15 @@ function parseEvidenceProvenance(
   };
 }
 
+export function parseVisualObservation(value: unknown, path = 'visualObservation'): MultimodalVisualObservation {
+  const record = readRecord(value, path);
+  ensureExactKeys(record, path, ['visibleText', 'uncertainties']);
+  const visibleText = readDenseArray(record.visibleText, `${path}.visibleText`, {maxLength:4}).map((item,index)=>readString(item,`${path}.visibleText[${index}]`,200));
+  const uncertainties = readDenseArray(record.uncertainties, `${path}.uncertainties`, {maxLength:2}).map((item,index)=>readString(item,`${path}.uncertainties[${index}]`,120));
+  if (!visibleText.length && !uncertainties.length) fail(`${path} must report visible content or uncertainty`);
+  return {visibleText,uncertainties};
+}
+
 export function parseEvidenceCard(value: unknown): MultimodalEvidence {
   const path = 'multimodalSessionState.evidenceTimeline.evidenceItems[]';
   const record = readRecord(value, path);
@@ -963,12 +994,14 @@ export function parseEvidenceCard(value: unknown): MultimodalEvidence {
     'provenance',
     'claimType',
     'selectionReason',
+    'visualObservation',
   ]);
   const kind = readEnumValue(
     record.kind,
     `${path}.kind`,
     MULTIMODAL_EVIDENCE_KINDS,
   );
+  if (record.visualObservation !== undefined && kind !== 'frame') fail(`${path}.visualObservation requires a frame`);
   const assetRef =
     record.assetRef === undefined || record.assetRef === null
       ? (record.assetRef ?? undefined)
@@ -982,6 +1015,7 @@ export function parseEvidenceCard(value: unknown): MultimodalEvidence {
   return {
     evidenceId: readSafeId(record.evidenceId, `${path}.evidenceId`),
     kind,
+    ...(record.visualObservation !== undefined ? {visualObservation:parseVisualObservation(record.visualObservation,`${path}.visualObservation`)} : {}),
     source: parseEvidenceSource(record.source, `${path}.source`),
     timeRange: parseTimeRange(record.timeRange, `${path}.timeRange`),
     text: readString(record.text, `${path}.text`, MAX_TEXT_LENGTH),

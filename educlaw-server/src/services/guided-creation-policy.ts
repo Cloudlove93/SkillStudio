@@ -116,8 +116,28 @@ function assertDraftField(path: string): asserts path is GuidedDraftField {
   }
 }
 
+// Whitespace and punctuation are noise here: keep the same tolerant rule as the
+// education flow so explicit evidence is not dropped over formatting differences.
+const EVIDENCE_NOISE =
+  /[\s\u3000，。！？、；：,!?;:"'“”‘’（）()【】[\]《》〈〉{}…—－·~`@#$%^&*+=|\\/_-]/g;
+
 function normalizeEvidence(value: string): string {
-  return value.normalize('NFKC').toLocaleLowerCase().replace(/\s+/g, '');
+  return value
+    .normalize('NFKC')
+    .toLocaleLowerCase()
+    .replace(EVIDENCE_NOISE, '');
+}
+
+function orderedCoverage(haystack: string, needle: string): number {
+  let matched = 0;
+  let cursor = 0;
+  for (const char of needle) {
+    const found = haystack.indexOf(char, cursor);
+    if (found === -1) continue;
+    matched += 1;
+    cursor = found + 1;
+  }
+  return needle.length ? matched / needle.length : 0;
 }
 
 export function validateExplicitEvidence(
@@ -127,9 +147,10 @@ export function validateExplicitEvidence(
   if (!evidence?.trim()) return false;
   const normalizedMessage = normalizeEvidence(userMessage);
   const normalizedEvidence = normalizeEvidence(evidence);
-  return Boolean(
-    normalizedEvidence && normalizedMessage.includes(normalizedEvidence),
-  );
+  if (!normalizedMessage || !normalizedEvidence) return false;
+  if (normalizedMessage.includes(normalizedEvidence)) return true;
+  if (normalizedEvidence.length < 4) return false;
+  return orderedCoverage(normalizedMessage, normalizedEvidence) >= 0.7;
 }
 
 export function sanitizeDraftOperations(

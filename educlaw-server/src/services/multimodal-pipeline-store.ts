@@ -65,16 +65,14 @@ const CONFIRMED_STAGES = [
   'publish',
 ] as const satisfies readonly MediaConfirmationStage[];
 const PIPELINE_STAGES = [
+  'building_semantic_windows',
+  'building_evidence',
+  'building_adler',
   'extracting_candidates',
   'validating_candidates',
   'building_skills',
 ] as const;
-const RUNNABLE_PIPELINE_STAGES = [
-  'building_semantic_windows',
-  'building_evidence',
-  'building_adler',
-  ...PIPELINE_STAGES,
-] as const;
+const RUNNABLE_PIPELINE_STAGES = [...PIPELINE_STAGES] as const;
 const SAFE_CODE_PATTERN = /^[A-Z0-9_:-]+$/;
 const MAX_ERROR_MESSAGE_LENGTH = 512;
 const MAX_SCAN_LIMIT = 64;
@@ -132,7 +130,9 @@ export interface RunnablePipelineSession {
 }
 
 export interface MultimodalPipelineStore {
-  scanRunnableSessions(input: { limit: number }): Promise<RunnablePipelineSession[]>;
+  scanRunnableSessions(input: {
+    limit: number;
+  }): Promise<RunnablePipelineSession[]>;
   runWithPipelineLease<T>(
     input: { sessionId: string },
     work: () => Promise<T>,

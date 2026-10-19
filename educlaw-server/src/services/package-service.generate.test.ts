@@ -107,6 +107,22 @@ async function loadService() {
   return import('./package-service.js');
 }
 
+describe('explicit generation names', () => {
+  it('uses the complete title clause and never truncates the following task as a name', async () => {
+    const { extractExplicitSkillName } = await loadService();
+    expect(
+      extractExplicitSkillName(
+        'Skill 名称：生成验收对话1018。教育目标：设计辨析题。',
+      ),
+    ).toBe('生成验收对话1018');
+    expect(
+      extractExplicitSkillName(
+        `Skill 名称：${'甲'.repeat(81)}\n教育目标：设计辨析题`,
+      ),
+    ).toBeUndefined();
+  });
+});
+
 function makeLongSkillMarkdown() {
   return [
     '# Core Task',
@@ -284,6 +300,37 @@ afterEach(() => {
 });
 
 describe('generatePackage', () => {
+  it('fails visibly when parsed metadata is incomplete and no task title is available', async () => {
+    generateJsonMock.mockResolvedValue({});
+
+    const { buildGeneratedPackageSnapshot } = await loadService();
+    await expect(
+      buildGeneratedPackageSnapshot({
+        instruction: '请创建一个教育场景使用的 Skill',
+      }),
+    ).rejects.toThrow('名称生成未完成');
+    expect(streamTextMock).not.toHaveBeenCalled();
+  });
+  it('preserves an explicit Skill name when metadata generation fails', async () => {
+    generateJsonMock.mockRejectedValue(new Error('LLM request failed: 503'));
+    let calls = 0;
+    streamTextMock.mockImplementation(() =>
+      (async function* () {
+        yield ++calls === 1
+          ? '# Runtime\n'.repeat(50)
+          : makeLongSkillMarkdown();
+      })(),
+    );
+
+    const { buildGeneratedPackageSnapshot } = await loadService();
+    const snapshot = await buildGeneratedPackageSnapshot({
+      instruction: 'Skill 名称：分层作业设计助手\n教育目标：设计三层作业',
+      max_skills: 1,
+    });
+    expect(snapshot.name).toBe('分层作业设计助手');
+    expect(snapshot.skills[0].name).toBe('分层作业设计助手');
+    expect(snapshot.skills[0].name).not.toBe('核心任务处理');
+  });
   it('builds a one-Skill snapshot without persisting it', async () => {
     generateJsonMock.mockResolvedValue({
       name: '课堂反馈 Skill',
@@ -292,7 +339,8 @@ describe('generatePackage', () => {
         {
           dirName: 'class-feedback',
           name: '课堂反馈',
-          description: 'Use this when a teacher needs structured classroom feedback.',
+          description:
+            'Use this when a teacher needs structured classroom feedback.',
         },
         {
           dirName: 'extra-skill',
@@ -334,7 +382,6 @@ describe('generatePackage', () => {
         },
       ],
     });
-
     let streamCall = 0;
     streamTextMock.mockImplementation(() => {
       streamCall += 1;
@@ -434,7 +481,6 @@ describe('generatePackage', () => {
         },
       ],
     });
-
     let streamCall = 0;
     streamTextMock.mockImplementation(() => {
       streamCall += 1;
@@ -469,7 +515,6 @@ describe('generatePackage', () => {
         },
       ],
     });
-
     let streamCall = 0;
     streamTextMock.mockImplementation(() => {
       streamCall += 1;
@@ -509,7 +554,6 @@ describe('generatePackage', () => {
         },
       ],
     });
-
     let streamCall = 0;
     streamTextMock.mockImplementation(() => {
       streamCall += 1;
@@ -548,7 +592,6 @@ describe('generatePackage', () => {
         },
       ],
     });
-
     let streamCall = 0;
     streamTextMock.mockImplementation(() => {
       streamCall += 1;
@@ -588,7 +631,6 @@ describe('generatePackage', () => {
         },
       ],
     });
-
     let streamCall = 0;
     streamTextMock.mockImplementation(() => {
       streamCall += 1;
@@ -622,7 +664,6 @@ describe('generatePackage', () => {
         },
       ],
     });
-
     let streamCall = 0;
     streamTextMock.mockImplementation(() => {
       streamCall += 1;
@@ -659,7 +700,6 @@ describe('generatePackage', () => {
         },
       ],
     });
-
     let streamCall = 0;
     streamTextMock.mockImplementation(() => {
       streamCall += 1;
@@ -704,7 +744,6 @@ describe('generatePackage', () => {
         },
       ],
     });
-
     let streamCall = 0;
     streamTextMock.mockImplementation(() => {
       streamCall += 1;
@@ -754,7 +793,6 @@ describe('generatePackage', () => {
       'AI协作的风险管控 25% 限制 AI 直接代做并给出监管方法',
       '学生融入与差异适配 25% 为基础差学生设计阶梯角色',
     ].join('\n');
-
     let streamCall = 0;
     streamTextMock.mockImplementation(() => {
       streamCall += 1;
@@ -817,7 +855,6 @@ describe('generatePackage', () => {
       '《中小学教师职业道德规范》（2008年修订）',
       '《义务教育学校管理标准》（教基〔2017〕9号）',
     ].join('\n');
-
     let streamCall = 0;
     streamTextMock.mockImplementation(() => {
       streamCall += 1;

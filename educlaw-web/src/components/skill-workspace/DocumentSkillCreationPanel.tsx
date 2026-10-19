@@ -280,6 +280,7 @@ async function generateDocumentSkill(
         throw new Error(event.data.error || '生成失败');
       }
     },
+    true,
   );
   if (!packageId) throw new Error('服务未返回生成结果');
   return { packageId, packageName };

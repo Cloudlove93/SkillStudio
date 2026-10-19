@@ -623,6 +623,24 @@
   color: var(--muted-foreground);
   font-size: var(--workspace-text-xs);
 }
+.skill-summarize-button {
+  flex: 0 0 auto;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.12));
+  border-radius: 999px;
+  background: transparent;
+  color: var(--foreground, inherit);
+  font-size: var(--workspace-text-xs, 12px);
+  cursor: pointer;
+}
+.skill-summarize-button:hover:not(:disabled) {
+  border-color: var(--foreground, rgba(0, 0, 0, 0.7));
+}
+.skill-summarize-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 .skill-create-methods {
   display: flex;
   align-items: center;

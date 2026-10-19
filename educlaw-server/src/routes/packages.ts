@@ -61,11 +61,9 @@ router.post('/packages/generate', requireAuth, async (req, res) => {
     );
     res.json(pkg);
   } catch (error) {
-    res
-      .status(400)
-      .json({
-        error: error instanceof Error ? error.message : '生成智能体失败',
-      });
+    res.status(400).json({
+      error: error instanceof Error ? error.message : '生成智能体失败',
+    });
   }
 });
 
@@ -73,6 +71,13 @@ router.post(
   '/packages/generate/stream',
   requireAuth,
   async (req: Request, res: Response) => {
+    if (
+      req.body?.singleSkill !== undefined &&
+      typeof req.body.singleSkill !== 'boolean'
+    ) {
+      res.status(400).json({ error: 'singleSkill must be a boolean' });
+      return;
+    }
     initSse(res);
     const startedAt = Date.now();
     const documents: Array<{ name: string; content: string }> | undefined =
@@ -103,6 +108,7 @@ router.post(
         documents,
         (preview) => writeSseEvent(res, 'preview', preview),
         (delta) => writeSseEvent(res, 'preview_delta', delta),
+        req.body?.singleSkill === true ? 1 : undefined,
       );
       writeSseEvent(res, 'phase', { label: '保存智能体与初始版本' });
       writeSseEvent(res, 'done', pkg);
@@ -164,11 +170,9 @@ router.get(
         ),
       );
     } catch (error) {
-      res
-        .status(400)
-        .json({
-          error: error instanceof Error ? error.message : '读取优化记录失败',
-        });
+      res.status(400).json({
+        error: error instanceof Error ? error.message : '读取优化记录失败',
+      });
     }
   },
 );
@@ -188,11 +192,9 @@ router.get(
       }
       res.json(session);
     } catch (error) {
-      res
-        .status(404)
-        .json({
-          error: error instanceof Error ? error.message : '读取优化记录失败',
-        });
+      res.status(404).json({
+        error: error instanceof Error ? error.message : '读取优化记录失败',
+      });
     }
   },
 );
@@ -237,11 +239,9 @@ router.get('/packages/:packageId/versions', requireAuth, async (req, res) => {
       ),
     );
   } catch (error) {
-    res
-      .status(404)
-      .json({
-        error: error instanceof Error ? error.message : '找不到版本记录',
-      });
+    res.status(404).json({
+      error: error instanceof Error ? error.message : '找不到版本记录',
+    });
   }
 });
 
@@ -290,11 +290,9 @@ router.post(
       );
       res.json(result);
     } catch (error) {
-      res
-        .status(400)
-        .json({
-          error: error instanceof Error ? error.message : '保存手动编辑失败',
-        });
+      res.status(400).json({
+        error: error instanceof Error ? error.message : '保存手动编辑失败',
+      });
     }
   },
 );
@@ -311,11 +309,9 @@ router.post(
       );
       res.json(result);
     } catch (error) {
-      res
-        .status(400)
-        .json({
-          error: error instanceof Error ? error.message : '修复 rubric 失败',
-        });
+      res.status(400).json({
+        error: error instanceof Error ? error.message : '修复 rubric 失败',
+      });
     }
   },
 );
@@ -463,11 +459,9 @@ router.post(
       );
       res.json(result);
     } catch (error) {
-      res
-        .status(400)
-        .json({
-          error: error instanceof Error ? error.message : '应用修改失败',
-        });
+      res.status(400).json({
+        error: error instanceof Error ? error.message : '应用修改失败',
+      });
     }
   },
 );
@@ -513,8 +507,7 @@ router.post(
       res.json(result);
     } catch (error) {
       res.status(400).json({
-        error:
-          error instanceof Error ? error.message : '反馈式优化失败',
+        error: error instanceof Error ? error.message : '反馈式优化失败',
       });
     }
   },
@@ -542,8 +535,7 @@ router.post(
       res.json(result);
     } catch (error) {
       res.status(400).json({
-        error:
-          error instanceof Error ? error.message : '草稿重测失败',
+        error: error instanceof Error ? error.message : '草稿重测失败',
       });
     }
   },
@@ -569,8 +561,7 @@ router.post(
       res.json(result);
     } catch (error) {
       res.status(400).json({
-        error:
-          error instanceof Error ? error.message : '保存草稿失败',
+        error: error instanceof Error ? error.message : '保存草稿失败',
       });
     }
   },
@@ -590,11 +581,9 @@ router.post(
       );
       res.json(result);
     } catch (error) {
-      res
-        .status(400)
-        .json({
-          error: error instanceof Error ? error.message : '版本对比失败',
-        });
+      res.status(400).json({
+        error: error instanceof Error ? error.message : '版本对比失败',
+      });
     }
   },
 );
@@ -612,11 +601,9 @@ router.post(
       );
       res.json(result);
     } catch (error) {
-      res
-        .status(400)
-        .json({
-          error: error instanceof Error ? error.message : '更新备注失败',
-        });
+      res.status(400).json({
+        error: error instanceof Error ? error.message : '更新备注失败',
+      });
     }
   },
 );

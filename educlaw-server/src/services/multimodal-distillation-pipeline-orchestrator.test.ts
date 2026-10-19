@@ -243,6 +243,54 @@ function storeFrom(
 }
 
 describe('multimodal distillation pipeline orchestrator', () => {
+  it('starts no semantic model call after cancellation during transcript correction', async () => {
+    const snapshot = makeSnapshot({
+      source: audioSource,
+      mediaStage: 'building_semantic_windows',
+    });
+    let cancelled = false;
+    const store = storeFrom({
+      loadSnapshot: vi.fn().mockImplementation(async () =>
+        cancelled
+          ? {
+              ...snapshot,
+              mediaStage: 'cancelled',
+              status: 'cancelled',
+              revisionNo: 5,
+            }
+          : snapshot,
+      ),
+      loadLatestJob: vi.fn().mockImplementation(async ({ jobType }) => ({
+        jobId: '701',
+        jobType,
+        status: 'succeeded',
+        attemptNo: 1,
+        inputManifest: {},
+        outputManifest:
+          jobType === 'media_prepare'
+            ? prepareOutput(audioSource)
+            : transcribeOutput(audioSource),
+      })),
+    });
+    const evidence = evidenceService();
+    vi.spyOn(evidence, 'correctTranscript').mockImplementation(async () => {
+      cancelled = true;
+      return null;
+    });
+    const semantic = vi.spyOn(evidence, 'generateSemanticMoments');
+    const orchestrator = createMultimodalDistillationPipelineOrchestrator({
+      store,
+      mediaEvidenceService: evidence,
+      sessionService: { generateAdlerOverview: vi.fn() },
+    });
+    await expect(
+      orchestrator.runDistillationPipeline({
+        authUserId: 'user-1',
+        sessionId: '101',
+      }),
+    ).rejects.toMatchObject({ code: 'SESSION_REVISION_CONFLICT' });
+    expect(semantic).not.toHaveBeenCalled();
+  });
   it('builds timestamp evidence for audio while explicitly creating no frame job', async () => {
     const snapshot = makeSnapshot({
       source: audioSource,

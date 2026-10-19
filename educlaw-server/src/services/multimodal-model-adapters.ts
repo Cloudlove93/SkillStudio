@@ -9,10 +9,12 @@ import {
   type MultimodalEvidence,
   type MultimodalPrimarySource,
   type MultimodalTranscript,
+  type RiaSkillDraft,
 } from '@educlaw/shared';
 import { config } from '../config.js';
 import { getLogger } from '../lib/request-context.js';
 import { generateJson, resolveEnhancedModel } from './llm-service.js';
+import { assembleRiaSkillMarkdown, RiaContentError } from './ria-skill-markdown.js';
 import {
   MultimodalSessionServiceError,
   parseValidationEnvelope,
@@ -37,7 +39,6 @@ const MAX_VALIDATION_LIST = 8;
 const MAX_EXECUTION_STEPS = 16;
 const MAX_BOUNDARY_ITEMS = 8;
 const MAX_RELATIONS = 16;
-const MAX_SKILL_MD_LENGTH = 50_000;
 const MIN_MULTIMODAL_MODEL_MAX_TOKENS = 256;
 const MAX_MULTIMODAL_MODEL_MAX_TOKENS = 65_536;
 
@@ -54,7 +55,7 @@ export const MULTIMODAL_PROMPT_VERSIONS = {
     terms: 'multimodal-candidates-terms-v3-zh',
   } as const,
   validation: 'multimodal-validation-v2-zh',
-  ria: 'multimodal-ria-v3-zh',
+  ria: 'multimodal-ria-v5-assembled-parameters-zh',
   fused: 'multimodal-fused-candidates-v1-zh',
 } as const;
 
@@ -174,7 +175,7 @@ function withStableError<T>(operation: () => Promise<T>): Promise<T> {
       },
       'multimodal.model_adapter_failed',
     );
-    if (error instanceof MultimodalSessionServiceError) {
+    if (error instanceof MultimodalSessionServiceError || error instanceof RiaContentError) {
       throw error;
     }
     throw new MultimodalSessionServiceError();
@@ -219,6 +220,7 @@ function evidencePayload(evidenceTimeline: MultimodalEvidence[]) {
       model: evidence.provenance.model ?? null,
     },
     selectionReason: evidence.selectionReason,
+    ...(evidence.visualObservation ? {visualObservation:evidence.visualObservation} : {}),
   }));
 }
 
@@ -375,14 +377,14 @@ const RIA_PROMPT_SCHEMA = [
   'Return exactly one JSON object with the exact top-level key "skills".',
   `"skills" must be a dense array with 1..${MAX_RIA_SKILLS} items when at least one selected candidate is provided.`,
   'The output candidateId set must exactly equal the input selected candidateId set: one skill per input candidate, no extras, no duplicates, no omissions.',
-  'Each skill must be an object with exact keys: "candidateId", "id", "dirName", "name", "description", "skillMd", "sourceEvidenceIds", "mechanism", "sourceExample", "futureApplicability", "execution", "boundaries", "evidenceIds", "relations".',
+  'Each skill must be an object with exact keys: "candidateId", "id", "dirName", "name", "description", "sourceEvidenceIds", "mechanism", "sourceExample", "futureApplicability", "execution", "boundaries", "evidenceIds", "relations".',
   `"candidateId" must match ${SAFE_ID}.`,
   `"id" must match ${SAFE_ID}.`,
   'Each output "id" must exactly equal the skillId for its candidateId in the supplied Pack skillDirectory.',
   '"id" must be unique within the response.',
   `"dirName" must match ${DIR_NAME} and be unique within the response.`,
   `"name" and "description" must each be non-empty strings up to ${MAX_SHORT_TEXT} characters.`,
-  `"skillMd" must be a non-empty string up to ${MAX_SKILL_MD_LENGTH} characters.`,
+  'Do not generate skillMd. The server assembles the Skill body locally from these structured fields and source evidence.',
   `"sourceEvidenceIds" and "evidenceIds" must each be dense arrays of 1..${MAX_EVIDENCE_PER_ITEM} unique evidence IDs from the input candidate.evidenceIds.`,
   '"sourceEvidenceIds" must be a subset of "evidenceIds".',
   `"mechanism", "sourceExample", and "futureApplicability" must each be non-empty strings up to ${MAX_TEXT} characters.`,
@@ -1191,6 +1193,12 @@ export function createProductionMultimodalModelAdapters(options?: {
               RIA_PROMPT_SCHEMA,
               'The skill body must realize R/I/A1/A2/E/B: source evidence, mechanism, source example, future applicability, execution, and boundaries.',
               'Audio-only sources are valid. Do not require frame evidence unless the selected candidate itself asserts visual content.',
+              'Separate the transferable method from the original sourceExample. Preserve the original case quantities, units, negations, repeated-success conditions, order and otherwise/exception branches in sourceExample; do not promote case numbers into universal standards.',
+              'Use named task parameters in mechanism, description and execution for source-specific quantities and thresholds. Define each parameter in execution.input and require confirmation for the new task before execution; missing parameters are a stop condition. Keep original literal values and their meanings in sourceExample, explicitly labelled as this source case only. The same separation applies to completionCriteria, stopCriteria and boundaries; do not embed unqualified source-case defaults there.',
+              'Candidate summaries are model proposals, not source evidence. Recheck their claims against the supplied evidence; correct unsupported generalizations even if they appear in a candidate title, summary or reusableRule. Retain the exact logical subjects of source conditions instead of replacing them with broader assessment dimensions.',
+              'Do not add correctness dimensions, difficulty escalation or automation to the source example or executable method unless the supplied evidence explicitly requires them. An inferred pedagogical extension is not a source fact; omit it from required execution and sourceExample. Preserve the source branch for every non-satisfied condition, including an insufficient success streak, without inventing a different trigger.',
+              'A repeated-success requirement cannot become immediate action after one success. Do not swap conditions before/after removing support. When audio and visual evidence conflict, retain the separate claims and stop for confirmation instead of silently reconciling them.',
+              'sourceEvidenceIds must bind to readable evidence. Frames with empty visualObservation.visibleText or unresolved uncertainties cannot support a confirmed source example; leave uncertain material as a draft rather than inventing it.',
             ].join('\n'),
             MULTIMODAL_PROMPT_VERSIONS.ria,
           );
@@ -1362,7 +1370,7 @@ export function createProductionMultimodalModelAdapters(options?: {
               const relations = readDenseArray(
                 record.relations,
                 MAX_RELATIONS,
-              ).map((relation, relationIndex) => {
+              ).map((relation, relationIndex): RiaSkillDraft['relations'][number] => {
                 const relationRecord = readRecord(relation);
                 ensureExactKeys(relationRecord, ['type', 'targetSkillId']);
                 const type = readRiaString(
@@ -1385,7 +1393,7 @@ export function createProductionMultimodalModelAdapters(options?: {
                   ),
                 };
               });
-              return {
+              const assembledSkill = {
                 candidateId,
                 id,
                 dirName,
@@ -1398,11 +1406,6 @@ export function createProductionMultimodalModelAdapters(options?: {
                   record.description,
                   `skills[${index}].description`,
                   MAX_SHORT_TEXT,
-                ),
-                skillMd: readRiaString(
-                  record.skillMd,
-                  `skills[${index}].skillMd`,
-                  MAX_SKILL_MD_LENGTH,
                 ),
                 sourceEvidenceIds,
                 mechanism: readRiaString(
@@ -1477,6 +1480,7 @@ export function createProductionMultimodalModelAdapters(options?: {
                 promptVersion: MULTIMODAL_PROMPT_VERSIONS.ria,
                 generatorVersion: MULTIMODAL_GENERATOR_VERSION,
               };
+              return {...assembledSkill,skillMd:assembleRiaSkillMarkdown(assembledSkill,input.evidenceTimeline)};
             });
             for (const skill of skills) {
               const ownPackSkillId = directoryByCandidateId.get(

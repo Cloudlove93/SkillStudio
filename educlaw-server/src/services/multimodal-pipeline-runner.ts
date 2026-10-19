@@ -1,4 +1,5 @@
 import { GuidedCreationError } from './guided-creation-service.js';
+import { classifyGenerationFailure } from './generation-failure.js';
 import type {
   MultimodalPipelineStore,
   RunnablePipelineSession,
@@ -20,7 +21,14 @@ export interface MultimodalPipelineRunner {
 
 interface MultimodalPipelineRunnerDependencies {
   store: Pick<MultimodalPipelineStore, 'scanRunnableSessions'> &
-    Partial<Pick<MultimodalPipelineStore, 'runWithPipelineLease'>>;
+    Partial<
+      Pick<
+        MultimodalPipelineStore,
+        | 'runWithPipelineLease'
+        | 'loadSessionSnapshot'
+        | 'persistPipelineFailure'
+      >
+    >;
   orchestrator: {
     runDistillationPipeline(input: {
       authUserId: string;
@@ -54,7 +62,9 @@ function positiveInteger(value: number, fieldName: string, maximum: number): num
 }
 
 function isStaleWorkError(error: unknown): error is GuidedCreationError {
-  return error instanceof GuidedCreationError && STALE_WORK_CODES.has(error.code);
+  return (
+    error instanceof GuidedCreationError && STALE_WORK_CODES.has(error.code)
+  );
 }
 
 function returnedMediaStage(value: unknown): string | null {
@@ -82,6 +92,10 @@ export function createMultimodalPipelineRunner(
   let activeRun: Promise<void> | null = null;
   const inFlightSessionIds = new Set<string>();
   const retryAfterBySessionId = new Map<string, number>();
+  const failures = new Map<
+    string,
+    { scope: string; attempts: number; terminal: boolean }
+  >();
 
   function scheduleNext() {
     if (!started || stopped) {
@@ -122,8 +136,27 @@ export function createMultimodalPipelineRunner(
 
     const startedAtMs = nowMs();
     inFlightSessionIds.add(session.sessionId);
+    let snapshot:
+      | Awaited<ReturnType<MultimodalPipelineStore['loadSessionSnapshot']>>
+      | undefined;
     try {
       const runClaimedSession = async (): Promise<unknown> => {
+        if (deps.store.loadSessionSnapshot)
+          snapshot = await deps.store.loadSessionSnapshot({
+            authUserId: session.authUserId,
+            sessionId: session.sessionId,
+          });
+        if (
+          snapshot &&
+          (snapshot.mediaStage !== session.mediaStage ||
+            snapshot.status === 'cancelled' ||
+            snapshot.status === 'failed')
+        )
+          return snapshot;
+        const scope = `${session.mediaStage}:${snapshot?.revisionNo ?? ''}`;
+        const previous = failures.get(session.sessionId);
+        if (previous?.scope === scope && previous.terminal) return snapshot;
+        if (previous?.scope !== scope) failures.delete(session.sessionId);
         if (
           session.mediaStage === 'building_semantic_windows' ||
           session.mediaStage === 'building_evidence' ||
@@ -203,7 +236,50 @@ export function createMultimodalPipelineRunner(
         return;
       }
 
-      retryAfterBySessionId.set(session.sessionId, nowMs() + Math.max(60_000, pollIntervalMs));
+      const diagnostic = classifyGenerationFailure(error);
+      const scope = `${session.mediaStage}:${snapshot?.revisionNo ?? ''}`;
+      const previous = failures.get(session.sessionId);
+      const attempts = previous?.scope === scope ? previous.attempts + 1 : 1;
+      const terminal = !diagnostic.retryable || attempts >= 3;
+      failures.set(session.sessionId, { scope, attempts, terminal });
+      if (terminal && snapshot && deps.store.persistPipelineFailure) {
+        try {
+          await deps.store.persistPipelineFailure({
+            authUserId: session.authUserId,
+            sessionId: session.sessionId,
+            expectedRevisionNo: snapshot.revisionNo,
+            expectedStage: session.mediaStage,
+            error: {
+              code: 'MULTIMODAL_PIPELINE_FAILED',
+              stage: session.mediaStage,
+              resumeStage: session.mediaStage,
+              // A failed stage is excluded from automatic scans. The user may
+              // explicitly resume it after fixing configuration or input.
+              retryable: true,
+              message: diagnostic.retryable
+                ? '处理多次未完成，请检查后明确重试'
+                : '模型配置或输入契约不可用，请修正后重新处理',
+            },
+          });
+        } catch (persistError) {
+          logger.warn(
+            {
+              event: 'multimodal.pipeline.runner.failure_persist_failed',
+              sessionId: session.sessionId,
+              errorType:
+                persistError instanceof Error
+                  ? persistError.name
+                  : typeof persistError,
+            },
+            'multimodal.pipeline.runner.failure_persist_failed',
+          );
+        }
+      }
+
+      retryAfterBySessionId.set(
+        session.sessionId,
+        nowMs() + Math.max(60_000, pollIntervalMs),
+      );
 
       logger.error(
         {

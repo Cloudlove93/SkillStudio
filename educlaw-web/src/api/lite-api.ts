@@ -572,7 +572,11 @@ async function request<T>(
     const body = await response
       .json()
       .catch(() => ({ error: `HTTP ${response.status}` }));
-    throw new LiteApiError(body.error || `HTTP ${response.status}`, body.code, response.status);
+    throw new LiteApiError(
+      body.error || `HTTP ${response.status}`,
+      body.code,
+      response.status,
+    );
   }
   return response.json() as Promise<T>;
 }
@@ -641,7 +645,9 @@ async function guidedActionRequest<T>(
     .catch(() => ({ message: `HTTP ${response.status}` }));
   if (!response.ok) {
     throw new LiteApiError(
-      typeof body?.message === 'string' ? body.message : `HTTP ${response.status}`,
+      typeof body?.message === 'string'
+        ? body.message
+        : `HTTP ${response.status}`,
       typeof body?.code === 'string' ? body.code : undefined,
       response.status,
       body && typeof body === 'object' ? body : undefined,
@@ -668,9 +674,7 @@ async function mediaActionRequest<T>(
     body: JSON.stringify({
       action,
       ...(input.sessionId ? { sessionId: input.sessionId } : {}),
-      ...(input.idempotencyKey
-        ? { idempotencyKey: input.idempotencyKey }
-        : {}),
+      ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : {}),
       payload: input.payload ?? {},
     }),
   });
@@ -832,10 +836,14 @@ export const liteApi = {
     token: string,
     input: { idempotencyKey: string; displayName: string },
   ) =>
-    mediaActionRequest<MediaSessionDetail>(token, 'skill.media.session.create', {
-      idempotencyKey: input.idempotencyKey,
-      payload: { displayName: input.displayName },
-    }),
+    mediaActionRequest<MediaSessionDetail>(
+      token,
+      'skill.media.session.create',
+      {
+        idempotencyKey: input.idempotencyKey,
+        payload: { displayName: input.displayName },
+      },
+    ),
   listMediaSessions: (
     token: string,
     input: { limit?: number; cursor?: string } = {},
@@ -945,7 +953,12 @@ export const liteApi = {
       revisionNo: number;
       mediaStage: MediaStage;
       retriedJobId: string | null;
-      job: { jobId: string; jobType: string; status: string; attemptNo: number } | null;
+      job: {
+        jobId: string;
+        jobType: string;
+        status: string;
+        attemptNo: number;
+      } | null;
       replayed: boolean;
     }>(token, 'skill.media.retry', {
       sessionId: input.sessionId,
@@ -972,14 +985,14 @@ export const liteApi = {
     token: string,
     input: { sessionId: string; expectedRevisionNo: number },
   ) =>
-    mediaActionRequest<{ sessionId: string; revisionNo: number; deletedAt: string }>(
-      token,
-      'skill.media.session.delete',
-      {
-        sessionId: input.sessionId,
-        payload: { expectedRevisionNo: input.expectedRevisionNo },
-      },
-    ),
+    mediaActionRequest<{
+      sessionId: string;
+      revisionNo: number;
+      deletedAt: string;
+    }>(token, 'skill.media.session.delete', {
+      sessionId: input.sessionId,
+      payload: { expectedRevisionNo: input.expectedRevisionNo },
+    }),
   updateMediaTranscriptSegment: (
     token: string,
     input: {
@@ -1016,14 +1029,18 @@ export const liteApi = {
       evidenceItems: MultimodalEvidence[];
     },
   ) =>
-    mediaActionRequest<MediaMutationResult>(token, 'skill.media.evidence.update', {
-      sessionId: input.sessionId,
-      idempotencyKey: input.idempotencyKey,
-      payload: {
-        expectedRevisionNo: input.expectedRevisionNo,
-        evidenceItems: input.evidenceItems,
+    mediaActionRequest<MediaMutationResult>(
+      token,
+      'skill.media.evidence.update',
+      {
+        sessionId: input.sessionId,
+        idempotencyKey: input.idempotencyKey,
+        payload: {
+          expectedRevisionNo: input.expectedRevisionNo,
+          evidenceItems: input.evidenceItems,
+        },
       },
-    }),
+    ),
   updateMediaCandidates: (
     token: string,
     input: {
@@ -1033,14 +1050,18 @@ export const liteApi = {
       candidatePasses: MultimodalCandidatePasses;
     },
   ) =>
-    mediaActionRequest<MediaMutationResult>(token, 'skill.media.candidate.update', {
-      sessionId: input.sessionId,
-      idempotencyKey: input.idempotencyKey,
-      payload: {
-        expectedRevisionNo: input.expectedRevisionNo,
-        candidatePasses: input.candidatePasses,
+    mediaActionRequest<MediaMutationResult>(
+      token,
+      'skill.media.candidate.update',
+      {
+        sessionId: input.sessionId,
+        idempotencyKey: input.idempotencyKey,
+        payload: {
+          expectedRevisionNo: input.expectedRevisionNo,
+          candidatePasses: input.candidatePasses,
+        },
       },
-    }),
+    ),
   confirmMediaOverview: (
     token: string,
     input: {
@@ -1111,15 +1132,19 @@ export const liteApi = {
       expectedPackageVersionId: string | null;
     },
   ) =>
-    mediaActionRequest<MediaPublishResult>(token, 'skill.media.generate.confirm', {
-      sessionId: input.sessionId,
-      idempotencyKey: input.idempotencyKey,
-      payload: {
-        expectedRevisionNo: input.expectedRevisionNo,
-        targetPackageId: input.targetPackageId,
-        expectedPackageVersionId: input.expectedPackageVersionId,
+    mediaActionRequest<MediaPublishResult>(
+      token,
+      'skill.media.generate.confirm',
+      {
+        sessionId: input.sessionId,
+        idempotencyKey: input.idempotencyKey,
+        payload: {
+          expectedRevisionNo: input.expectedRevisionNo,
+          targetPackageId: input.targetPackageId,
+          expectedPackageVersionId: input.expectedPackageVersionId,
+        },
       },
-    }),
+    ),
   publishMediaSkillPack: (
     token: string,
     input: {
@@ -1139,11 +1164,18 @@ export const liteApi = {
         expectedPackageVersionId: input.expectedPackageVersionId,
       },
     }),
-  listGuidedCreations: (token: string, payload: GuidedCreationListPayload = {}) =>
+  listGuidedCreations: (
+    token: string,
+    payload: GuidedCreationListPayload = {},
+  ) =>
     guidedActionRequest<{
       items: GuidedCreationSession[];
       next_cursor: string | null;
-    }>(token, 'SkillGuidedCreationList', payload as unknown as Record<string, unknown>),
+    }>(
+      token,
+      'SkillGuidedCreationList',
+      payload as unknown as Record<string, unknown>,
+    ),
   getGuidedCreationDetail: (
     token: string,
     payload: GuidedCreationDetailPayload,
@@ -1175,28 +1207,19 @@ export const liteApi = {
       'skill.media.progress',
       payload as unknown as Record<string, unknown>,
     ),
-  cancelGuidedCreation: (
-    token: string,
-    payload: GuidedCreationCancelPayload,
-  ) =>
+  cancelGuidedCreation: (token: string, payload: GuidedCreationCancelPayload) =>
     guidedActionRequest<GuidedCreationSessionDetail>(
       token,
       'SkillGuidedCreationCancel',
       payload as unknown as Record<string, unknown>,
     ),
-  renameGuidedCreation: (
-    token: string,
-    payload: GuidedCreationRenamePayload,
-  ) =>
+  renameGuidedCreation: (token: string, payload: GuidedCreationRenamePayload) =>
     guidedActionRequest<GuidedCreationSessionDetail>(
       token,
       'SkillGuidedCreationRename',
       payload as unknown as Record<string, unknown>,
     ),
-  deleteGuidedCreation: (
-    token: string,
-    payload: GuidedCreationDeletePayload,
-  ) =>
+  deleteGuidedCreation: (token: string, payload: GuidedCreationDeletePayload) =>
     guidedActionRequest<{ id: string; deleted_at: string }>(
       token,
       'SkillGuidedCreationDelete',
@@ -1232,6 +1255,17 @@ export const liteApi = {
     guidedStreamRequest(
       token,
       'SkillGuidedCreationConfirm',
+      payload as unknown as Record<string, unknown>,
+      onEvent,
+    ),
+  summarizeGuidedCreationStream: (
+    token: string,
+    payload: { session_id: string; revision_no: number },
+    onEvent: (event: GuidedCreationSseEvent) => void,
+  ) =>
+    guidedStreamRequest(
+      token,
+      'SkillGuidedCreationSummarize',
       payload as unknown as Record<string, unknown>,
       onEvent,
     ),
@@ -1333,7 +1367,11 @@ export const liteApi = {
         limit: options?.limit,
       },
     ),
-  getSkillVersionDetail: (token: string, packageId: string, versionId: string) =>
+  getSkillVersionDetail: (
+    token: string,
+    packageId: string,
+    versionId: string,
+  ) =>
     actionRequest<SkillVersionDetail>(
       token,
       'skill.version.detail',
@@ -1391,7 +1429,11 @@ export const liteApi = {
       packageId,
       { versionId, reason },
     ),
-  undiscardSkillVersion: (token: string, packageId: string, versionId: string) =>
+  undiscardSkillVersion: (
+    token: string,
+    packageId: string,
+    versionId: string,
+  ) =>
     actionRequest<SkillVersionDetail>(
       token,
       'skill.version.undiscard',
@@ -1404,13 +1446,14 @@ export const liteApi = {
     model: string | undefined,
     documents: Array<{ name: string; content: string }>,
     onEvent: (event: PackageGenerateStreamEvent) => void,
+    singleSkill?: boolean,
   ) =>
     streamRequest<PackageGenerateStreamEvent>(
       '/packages/generate/stream',
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ instruction, model, documents }),
+        body: JSON.stringify({ instruction, model, documents, singleSkill }),
       },
       token,
       onEvent,
@@ -1505,7 +1548,12 @@ export const liteApi = {
     actionRequest<ArenaThreadDetail>(token, 'arena.thread.detail', packageId, {
       threadId,
     }),
-  renameArenaThread: (token: string, packageId: string, threadId: string, title: string) =>
+  renameArenaThread: (
+    token: string,
+    packageId: string,
+    threadId: string,
+    title: string,
+  ) =>
     actionRequest<ArenaThread>(token, 'arena.thread.rename', packageId, {
       threadId,
       title,
@@ -1593,7 +1641,10 @@ export const liteApi = {
   ) =>
     request<DiagnosisResult & { session?: InteractiveOptimizationSession }>(
       `/packages/${packageId}/optimize/diagnose`,
-      { method: 'POST', body: JSON.stringify({ threadId, model, targetSkillDirName }) },
+      {
+        method: 'POST',
+        body: JSON.stringify({ threadId, model, targetSkillDirName }),
+      },
       token,
     ),
   listInteractiveSessions: (token: string, packageId: string) =>
@@ -1615,7 +1666,13 @@ export const liteApi = {
       `/packages/${packageId}/optimize/chat`,
       {
         method: 'POST',
-        body: JSON.stringify({ sessionId, messages, adoptedChanges, model, targetSkillDirName }),
+        body: JSON.stringify({
+          sessionId,
+          messages,
+          adoptedChanges,
+          model,
+          targetSkillDirName,
+        }),
       },
       token,
     ),
@@ -1629,7 +1686,10 @@ export const liteApi = {
   ) =>
     request<{ versionId: string; versionNumber: number }>(
       `/packages/${packageId}/optimize/apply`,
-      { method: 'POST', body: JSON.stringify({ sessionId, changes, note, targetSkillDirName }) },
+      {
+        method: 'POST',
+        body: JSON.stringify({ sessionId, changes, note, targetSkillDirName }),
+      },
       token,
     ),
   createFeedbackOptimization: (
@@ -1677,10 +1737,14 @@ export const liteApi = {
       versionId: string;
       versionNumber: number;
       package: AgentPackageDetail;
-    }>(`/packages/${packageId}/optimize/apply-draft`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }, token),
+    }>(
+      `/packages/${packageId}/optimize/apply-draft`,
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      },
+      token,
+    ),
   compareVersions: (
     token: string,
     packageId: string,

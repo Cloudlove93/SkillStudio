@@ -3,6 +3,95 @@ import { GuidedCreationError } from './guided-creation-service.js';
 import { createMultimodalPipelineRunner } from './multimodal-pipeline-runner';
 
 describe('multimodal pipeline runner', () => {
+  it.each([
+    ['LLM request failed: 401', 1],
+    ['LLM request failed: 404', 1],
+    ['LLM request failed: 503', 3],
+  ])(
+    'stops bounded attempts for %s and persists a safe failure',
+    async (message, limit) => {
+      let now = 0;
+      const snapshot = {
+        sessionId: '901',
+        mediaStage: 'building_semantic_windows',
+        status: 'collecting',
+        revisionNo: 4,
+      };
+      const persistPipelineFailure = vi.fn().mockImplementation(async () => {
+        snapshot.mediaStage = 'failed';
+        return snapshot;
+      });
+      const runDistillationPipeline = vi
+        .fn()
+        .mockRejectedValue(new Error(message));
+      const runner = createMultimodalPipelineRunner({
+        store: {
+          scanRunnableSessions: vi.fn().mockResolvedValue([
+            {
+              sessionId: '901',
+              authUserId: 'owner',
+              mediaStage: 'building_semantic_windows',
+            },
+          ]),
+          loadSessionSnapshot: vi.fn().mockImplementation(async () => snapshot),
+          persistPipelineFailure,
+        },
+        orchestrator: {
+          runDistillationPipeline,
+          runCandidatePipeline: vi.fn(),
+          runSkillBuildPipeline: vi.fn(),
+        },
+        logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+        pollIntervalMs: 1000,
+        batchLimit: 1,
+        concurrency: 1,
+        nowMs: () => now,
+      });
+      for (let n = 0; n < 6; n++) {
+        await runner.runOnce();
+        now += 60001;
+      }
+      expect(runDistillationPipeline).toHaveBeenCalledTimes(limit);
+      expect(persistPipelineFailure).toHaveBeenCalledWith(
+        expect.objectContaining({
+          expectedRevisionNo: 4,
+          error: expect.objectContaining({
+            retryable: true,
+          }),
+        }),
+      );
+    },
+  );
+  it('does not call a model for a cancelled session returned by a stale scan', async () => {
+    const runDistillationPipeline = vi.fn();
+    const runner = createMultimodalPipelineRunner({
+      store: {
+        scanRunnableSessions: vi.fn().mockResolvedValue([
+          {
+            sessionId: '901',
+            authUserId: 'owner',
+            mediaStage: 'building_semantic_windows',
+          },
+        ]),
+        loadSessionSnapshot: vi.fn().mockResolvedValue({
+          mediaStage: 'cancelled',
+          status: 'cancelled',
+          revisionNo: 5,
+        }),
+      },
+      orchestrator: {
+        runDistillationPipeline,
+        runCandidatePipeline: vi.fn(),
+        runSkillBuildPipeline: vi.fn(),
+      },
+      logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+      pollIntervalMs: 1000,
+      batchLimit: 1,
+      concurrency: 1,
+    });
+    await runner.runOnce();
+    expect(runDistillationPipeline).not.toHaveBeenCalled();
+  });
   afterEach(() => {
     vi.useRealTimers();
   });
@@ -558,6 +647,8 @@ describe('multimodal pipeline runner', () => {
       },
       'multimodal.pipeline.runner.scan_failed',
     );
-    expect(JSON.stringify(logger.error.mock.calls)).not.toContain('secret sql and transcript');
+    expect(JSON.stringify(logger.error.mock.calls)).not.toContain(
+      'secret sql and transcript',
+    );
   });
 });

@@ -17,9 +17,16 @@ import type {
   GuidedSkillDraft,
 } from '@educlaw/shared';
 import { query, withTransaction } from './db.js';
+import {
+  parseStructuredGuidedInput,
+  structuredInputToEducationDraft,
+} from './structured-guided-input.js';
 import { generateJson } from './llm-service.js';
+import { getLogger } from '../lib/request-context.js';
+import { classifyGenerationFailure } from './generation-failure.js';
 import {
   buildGeneratedPackageSnapshot,
+  extractExplicitSkillName,
   createPackageWithSnapshotTx,
 } from './package-service.js';
 import {
@@ -148,6 +155,13 @@ function cleanAcknowledgement(value: string): string {
   return cleaned.slice(0, 200) || '明白了。';
 }
 
+function normalizeQuestion(value: string): string {
+  return value
+    .normalize('NFKC')
+    .replace(/\s+/g, '')
+    .replace(/[，。！？、；：,.!?;:]/g, '');
+}
+
 export function parseExtractionResult(value: unknown): GuidedExtractionResult {
   if (!isRecord(value) || !Array.isArray(value.operations)) {
     throw new Error('INVALID_MODEL_EXTRACTION');
@@ -231,11 +245,8 @@ export function parseEducationExtractionResult(
         ? (operation.op as GuidedEducationDraftOp)
         : undefined;
     // remove 不要求 content；其他 op 必须有非空 content。
-    if (op !== 'remove') {
-      if (
-        typeof operation.content !== 'string' ||
-        !operation.content.trim()
-      ) {
+    if (op !== 'remove' && operation.source !== 'conflicted') {
+      if (typeof operation.content !== 'string' || !operation.content.trim()) {
         throw new Error('INVALID_EDUCATION_EXTRACTION');
       }
     }
@@ -414,7 +425,7 @@ function parseStagePhrasing(
 
 function isClearStageConfirmation(value: string): boolean {
   const normalized = value.normalize('NFKC').replace(/\s+/g, '');
-  return /^(?:嗯+[，,]?)?(?:准确|正确|是的|对(?:的)?|没错|没问题|可以(?:的)?|好的|确认|就是这样|就这样|就按这个来|按这个来|好[的呀]?|行|可以[了]?|继续|下一步|好了|可以了|就这样吧|结束吧|没有了|没了|差不多了|够了|就这样|先这样|就这些|就到这里|就按这个|按这个来|按这样|知道了|明白了|了解了|懂了|清楚了|收到|没问题了|没问题)(?:[，,。.!！]*(?:继续|下一步|吧|了|结束|啦|呗|哈|呀|哦|喔))*[。.!！]?$/.test(
+  return /^(?:嗯+[，,]?)?(?:准确|正确|是的|对(?:的)?|没错|没问题|可以(?:的)?|好的|确认|就是这样|就这样|就按这个来|按这个来|好[的呀]?|行|可以[了]?|继续|下一步|好了|可以了|就这样吧|结束吧|没有了|没了|差不多了|够了|就这样|先这样|就这些|就到这里|就按这个|按这个来|按这样|知道了|明白了|了解了|懂了|清楚了|收到|没问题了|没问题|听你的|按你说的(?:来|办|就行)?|就按你说的(?:来|办)?|继续吧|好呀|行吧|明白|ok)(?:[，,。.!！]*(?:继续|下一步|吧|了|结束|啦|呗|哈|呀|哦|喔))*[。.!！]?$/.test(
     normalized,
   );
 }
@@ -524,6 +535,47 @@ export function buildGuidedAssistantTurnV2(input: {
   };
 }
 
+// Manual or round-limit close-out: build the confirmation card from whatever
+// the draft already holds, without inventing user-owned evidence.
+export function buildEducationSummarizeTurn(input: {
+  draft: GuidedEducationDraft;
+  completed_steps: GuidedCreationStep[];
+  acknowledgement: string;
+  user_message?: string;
+  operations?: EducationDraftOperation[];
+}): GuidedAssistantTurn {
+  const draft = applyEducationOperations(
+    input.draft,
+    sanitizeEducationOperations(
+      input.draft,
+      input.operations ?? [],
+      input.user_message ?? '',
+    ),
+  );
+  const evaluation = evaluateEducationFlow(draft, input.completed_steps);
+  const acknowledgement = cleanAcknowledgement(input.acknowledgement);
+  const legacyStates = Object.fromEntries(
+    GUIDED_DRAFT_FIELDS.map((field) => [field, 'missing']),
+  ) as Record<GuidedDraftField, GuidedFieldState>;
+  return {
+    draft: {},
+    field_states: legacyStates,
+    education_draft: evaluation.normalized_draft,
+    completed_steps: evaluation.completed_steps,
+    current_step: null,
+    focus_step: null,
+    status: 'ready_for_confirmation',
+    next_blocking_field: null,
+    acknowledgement,
+    content: `${acknowledgement}\n\n我们已经聊了较多轮次，我先把它整理成方案，请你确认或补充未明确的部分。确认后我会生成这个 Skill。`,
+    suggested_options: [],
+    confirmation: buildEducationConfirmationCard(evaluation.normalized_draft),
+    confirmed_stages: [],
+    next_stage: null,
+    focus_stage: null,
+  };
+}
+
 const STEP_DIMENSIONS: Record<
   GuidedCreationStep,
   readonly GuidedEducationDimension[]
@@ -581,7 +633,23 @@ function parseEducationPhrasing(
   phrasing: GuidedQuestionPhrasing | null,
   step: GuidedCreationStep,
   draft: GuidedEducationDraft,
+  blockedDimension: GuidedEducationDimension | null = null,
 ): { question: string; suggested_options: string[] } {
+  // The dimension is already described but not yet owned by the user. Re-asking
+  // it as a collection question makes the interview loop; confirm it instead.
+  const blockedContent = blockedDimension
+    ? draft[blockedDimension]?.content?.trim()
+    : '';
+  if (blockedDimension && blockedContent) {
+    const concise =
+      blockedContent.length > 48
+        ? `${blockedContent.slice(0, 48)}…`
+        : blockedContent;
+    return {
+      question: `我理解「${GUIDED_EDUCATION_LABELS[blockedDimension]}」为“${concise}”，这个理解准确吗？`,
+      suggested_options: STAGE_CONFIRMATION_OPTIONS,
+    };
+  }
   const candidate = phrasing?.question?.replace(/\s+/g, ' ').trim() ?? '';
   const firstQuestion = candidate.match(/^.*?[？?]/)?.[0]?.trim() ?? '';
   const usesExpectedStep = !phrasing?.step || phrasing.step === step;
@@ -601,6 +669,7 @@ function parseEducationPhrasing(
     : usesExpectedStep && firstQuestion.length > 0 && firstQuestion.length <= 180
     ? firstQuestion.replace(/\?$/, '？')
     : intentFallback;
+
   const candidateOptions = Array.isArray(phrasing?.suggested_options)
     ? phrasing.suggested_options
         .filter((option): option is string => typeof option === 'string')
@@ -627,12 +696,7 @@ function addUserAdoption(
   const next = structuredClone(draft);
   for (const dimension of STEP_DIMENSIONS[step]) {
     if (hasUserOwnedEvidence(next, dimension)) continue;
-    if (!next[dimension]?.content) {
-      next[dimension] = {
-        content: '由用户确认采纳',
-        evidence: [{ source: 'user_adopted', quote }],
-      };
-    } else {
+    if (next[dimension]?.content) {
       const section = next[dimension];
       section.evidence = section.evidence.filter(
         (item) => item.source !== 'conflicted',
@@ -688,28 +752,36 @@ export function buildGuidedAssistantTurnV3(input: {
     );
     const hasAccumulatedEvidence = hasRequiredEvidence && !hasConflictedInStep;
     if (
-      (participated || confirmedExisting || hasAccumulatedEvidence || userDelegated) &&
+      (participated ||
+        confirmedExisting ||
+        hasAccumulatedEvidence ||
+        userDelegated) &&
       hasRequiredEvidence &&
       !hasConflictedInStep &&
       !completedSteps.includes(input.current_step)
     ) {
       completedSteps.push(input.current_step);
     }
-    if (
-      !completedSteps.includes(input.current_step) &&
-      !hasConflictedInStep &&
-      requiredDimensions.every((dimension) =>
-        Boolean(draft[dimension]?.content),
-      ) &&
-      !hasRequiredEvidence
-    ) {
-      draft = addUserAdoption(draft, input.current_step, '系统根据已有内容自动整理');
-      completedSteps.push(input.current_step);
-    }
   }
 
   // Do not silently fill education dimensions with platform defaults. The
   // teacher must express or explicitly adopt materials and responsibility.
+  if (input.current_step && completedSteps.includes(input.current_step)) {
+    for (const step of GUIDED_CREATION_STEPS) {
+      if (completedSteps.includes(step)) continue;
+      if (
+        !STEP_DIMENSIONS[step].every(
+          (dimension) =>
+            hasUserOwnedEvidence(draft, dimension) &&
+            !draft[dimension]?.evidence.some(
+              (item) => item.source === 'conflicted',
+            ),
+        )
+      )
+        break;
+      completedSteps.push(step);
+    }
+  }
   const platformDefaultsEnabled = false;
   if (platformDefaultsEnabled) {
     const defaults: EducationDraftOperation[] = [];
@@ -751,9 +823,7 @@ export function buildGuidedAssistantTurnV3(input: {
       acknowledgement,
       content: `${acknowledgement}\n\n你的教学想法已经整理成完整方案，请检查确认。确认后我会生成这个 Skill。`,
       suggested_options: [],
-      confirmation: buildEducationConfirmationCard(
-        evaluation.normalized_draft,
-      ),
+      confirmation: buildEducationConfirmationCard(evaluation.normalized_draft),
       confirmed_stages: [],
       next_stage: null,
       focus_stage: null,
@@ -761,10 +831,17 @@ export function buildGuidedAssistantTurnV3(input: {
   }
 
   const focusStep = evaluation.current_step ?? 'evidence_review';
+  const blockedDimension =
+    [
+      ...evaluation.missing_dimensions,
+      ...evaluation.missing_user_decisions,
+      ...evaluation.conflicted_dimensions,
+    ][0] ?? null;
   const { question, suggested_options } = parseEducationPhrasing(
     input.phrasing,
     focusStep,
     evaluation.normalized_draft,
+    blockedDimension,
   );
   return {
     draft: {},
@@ -876,11 +953,12 @@ function mapSession(row: Record<string, unknown>): GuidedCreationSession {
     education_draft: educationEvaluation?.normalized_draft,
     flow_version: flowVersion,
     confirmed_stages: flowVersion === 2 ? confirmedStages : [],
-    next_stage:
-      flowVersion === 2 ? nextGuidedStage(confirmedStages) : null,
+    next_stage: flowVersion === 2 ? nextGuidedStage(confirmedStages) : null,
     completed_steps: flowVersion >= 3 ? completedSteps : undefined,
     current_step:
-      flowVersion >= 3 ? educationEvaluation?.current_step ?? null : undefined,
+      flowVersion >= 3
+        ? (educationEvaluation?.current_step ?? null)
+        : undefined,
     confirmation: parseJson<GuidedConfirmationCard | null>(
       row.confirmation_json,
       null,
@@ -1196,7 +1274,7 @@ function extractionPromptV3(input: {
 
   return {
     systemPrompt:
-      '你负责通过自然对话帮助教师把真实教育经验提炼为可执行的 Skill。只返回 JSON。一次回答可以更新多个教育维度，但不得把 AI 推测冒充成用户意见。source=user_explicit 或 user_adopted 时，quote 必须逐字来自本轮用户消息；用户没有表达或采纳的候选经验只能帮助你提出更好的问题，绝不能写入 operations。不要重复询问草案中已经明确的内容。如果本轮已经回答当前步骤，question 应自然进入下一个步骤；信息含糊或冲突时才针对当前步骤补问一次。每轮只提出一个最有价值的问题，question 只能有一个问号，suggested_options 提供 2 到 4 个贴合当前情境的方向并允许用户自由表达。step_complete 只是辅助判断，后端会依据证据独立决定是否推进。\noperations 每项可带 op 字段：补充新信息用 set（默认，追加合并）；用户明确纠正或否定先前说法时用 replace（覆盖该维度 content 与证据，必须配 source=user_explicit/user_adopted）；用户撤回某个维度内容时用 remove（不需要 content/source）。不要用 replace 覆盖你推测出来的内容。\n当本轮用户说法与草案已有内容明显冲突（例如对象从「小学生」改成「中学生」）且用户未明确表示纠正时，用 source=conflicted 标记该维度，content 留空，并在 question 中向用户确认真实意图；不要直接合并矛盾内容。',
+      '你负责通过自然对话帮助教师把真实教育经验提炼为可执行的 Skill。只返回 JSON。一次回答可以更新多个教育维度，但不得把 AI 推测冒充成用户意见。source=user_explicit 或 user_adopted 时，quote 必须逐字复制本轮用户消息的完整句子或整行（保留字段标签、否定词、数字、主体，不可只截取其中短语）；用户没有表达或采纳的候选经验只能帮助你提出更好的问题，绝不能写入 operations。不要重复询问草案中已经明确的内容。如果本轮已经回答当前步骤，question 应自然进入下一个步骤；信息含糊或冲突时才针对当前步骤补问一次。每轮只提出一个最有价值的问题，question 只能有一个问号，suggested_options 提供 2 到 4 个贴合当前情境的方向并允许用户自由表达。step_complete 只是辅助判断，后端会依据证据独立决定是否推进。\noperations 每项可带 op 字段：补充新信息用 set（默认，追加合并）；用户明确纠正或否定先前说法时用 replace（覆盖该维度 content 与证据，必须配 source=user_explicit/user_adopted）；用户明确撤回某个维度内容时用 remove（不需要 content/source，但 quote 必须完整引用含该维度名称与撤回意图的原句）。不要用 replace 覆盖你推测出来的内容。\n当本轮用户说法与草案已有内容明显冲突（例如对象从「小学生」改成「中学生」）且用户未明确表示纠正时，用 source=conflicted 标记该维度，content 留空，并在 question 中向用户确认真实意图；不要直接合并矛盾内容。',
     userPrompt: `七个维度：${GUIDED_EDUCATION_DIMENSIONS.map((dimension) => `${dimension}（${GUIDED_EDUCATION_LABELS[dimension]}）`).join('，')}\n当前共创步骤：${input.currentStep ?? '尚未开始；先吸收初始需求，再从教育意图开始'}\n当前草案：${JSON.stringify(input.draft)}\n对话：\n${history}\n本轮用户消息：${input.content}\n参考材料：\n${documentSummary || '无'}\n最多两条内部候选经验（只用于启发追问）：${JSON.stringify(candidateContext)}\nSkill 转化提醒：${GUIDED_SKILL_CONVERSION_RULES.join('；')}\n返回：{"operations":[{"dimension":"educational_goal","op":"set","content":"提炼后的结论","source":"user_explicit","quote":"本轮用户原话"}],"step_complete":false,"acknowledgement":"一句具体承接，不要重复用户整句话","question":"下一步唯一的问题？","suggested_options":["方向1","方向2"]}`,
     maxTokens: 4_096,
   };
@@ -1298,7 +1376,7 @@ function fallbackEducationExtraction(input: {
           dimension: 'audience_context',
           content: `使用对象与情境：${[...new Set(audience)].join('、')}`,
           source: 'user_explicit',
-          quote: audience[0],
+          quote,
         });
       }
     } else {
@@ -1349,6 +1427,24 @@ async function generateAssistantTurn(input: {
 }): Promise<GuidedAssistantTurn> {
   if (input.session.flow_version >= 3) {
     const currentStep = currentFocusStep(input.session);
+    if (
+      !input.session.messages.some((message) => message.role === 'assistant') &&
+      Object.keys(input.session.education_draft ?? {}).length > 0
+    ) {
+      return buildGuidedAssistantTurnV3({
+        current_draft: input.session.education_draft ?? {},
+        completed_steps: [],
+        current_step: 'intent_context',
+        user_message: input.content,
+        extraction: {
+          operations: [],
+          step_complete: false,
+          acknowledgement:
+            '已接收你填写的需求，我们继续补充尚未明确的教学经验。',
+        },
+        phrasing: null,
+      });
+    }
     let extraction: GuidedEducationExtractionResult;
     try {
       extraction = parseEducationExtractionResult(
@@ -1368,39 +1464,40 @@ async function generateAssistantTurn(input: {
           input.content,
         );
       }
-    } catch {
+    } catch (error) {
+      getLogger({ component: 'guided-creation' }).warn({
+        event: 'guided.extraction.failed',
+        ...classifyGenerationFailure(error),
+      });
       extraction = fallbackEducationExtraction({
         content: input.content,
         currentStep,
       });
     }
-    let effectiveDraft = input.session.education_draft ?? {};
+    const effectiveDraft = input.session.education_draft ?? {};
     const effectiveCompletedSteps = [...(input.session.completed_steps ?? [])];
-    if (currentStep && !effectiveCompletedSteps.includes(currentStep)) {
-      const stepRounds = input.session.messages.filter(
-        (m) =>
-          m.role === 'assistant' && m.metadata?.focus_step === currentStep,
-      ).length;
       const totalUserMessages = input.session.messages.filter(
         (m) => m.role === 'user',
       ).length;
-      if (
-        stepRounds >= MAX_ROUNDS_PER_STEP ||
-        totalUserMessages >= MAX_TOTAL_USER_MESSAGES
-      ) {
-        effectiveDraft = structuredClone(effectiveDraft);
-        for (const dimension of STEP_DIMENSIONS[currentStep]) {
-          if (!hasUserOwnedEvidence(effectiveDraft, dimension)) {
-            effectiveDraft[dimension] = {
-              content: '系统根据多轮对话自动整理',
-              evidence: [
-                { source: 'user_adopted', quote: '多轮对话汇总' },
-              ],
-            };
-          }
-        }
-        effectiveCompletedSteps.push(currentStep);
-      }
+    const stepRounds = currentStep
+      ? input.session.messages.filter(
+          (m) =>
+            m.role === 'assistant' && m.metadata?.focus_step === currentStep,
+        ).length
+      : 0;
+    if (
+      totalUserMessages >= MAX_TOTAL_USER_MESSAGES ||
+      (currentStep !== null && stepRounds >= MAX_ROUNDS_PER_STEP)
+    ) {
+      // Stop the endless interview by asking the user to confirm instead of
+      // fabricating `user_adopted` evidence the teacher never gave.
+      return buildEducationSummarizeTurn({
+        draft: effectiveDraft,
+        completed_steps: effectiveCompletedSteps,
+        acknowledgement: extraction.acknowledgement,
+        user_message: input.content,
+        operations: extraction.operations,
+      });
     }
     const baseInput = {
       current_draft: effectiveDraft,
@@ -1414,13 +1511,31 @@ async function generateAssistantTurn(input: {
       phrasing: null,
     });
     if (preview.status === 'ready_for_confirmation') return preview;
+    // Drop a question the interview already asked, so the flow falls back to the
+    // deterministic step/confirmation phrasing instead of repeating itself.
+    const recentAssistantContents = input.session.messages
+      .filter((message) => message.role === 'assistant')
+      .slice(-4)
+      .map((message) => normalizeQuestion(message.content));
+    const normalizedQuestion = extraction.question
+      ? normalizeQuestion(extraction.question)
+      : '';
+    const repeatsRecentQuestion =
+      normalizedQuestion.length >= 6 &&
+      recentAssistantContents.some((content) =>
+        content.includes(normalizedQuestion),
+      );
+    const usableQuestion =
+      extraction.question && !repeatsRecentQuestion
+        ? extraction.question
+        : undefined;
     return buildGuidedAssistantTurnV3({
       ...baseInput,
       phrasing:
-        currentStep && extraction.question && extraction.suggested_options
+        currentStep && usableQuestion && extraction.suggested_options
           ? {
               step: preview.current_step ?? undefined,
-              question: extraction.question,
+              question: usableQuestion,
               suggested_options: extraction.suggested_options,
             }
           : null,
@@ -1557,9 +1672,9 @@ async function generateAssistantTurn(input: {
       phrasing: null,
     });
   }
-  const totalUserMessages = input.session.messages.filter(
-    (m) => m.role === 'user',
-  ).length;
+      const totalUserMessages = input.session.messages.filter(
+        (m) => m.role === 'user',
+      ).length;
   if (totalUserMessages >= MAX_TOTAL_USER_MESSAGES) {
     const forcedExtraction: GuidedExtractionResult = {
       operations: [],
@@ -1601,6 +1716,7 @@ export async function processGuidedCreationMessage(input: {
   client_message_id: string;
   revision_no: number;
   content: string;
+  retry?: number;
 }): Promise<GuidedCreationSessionDetail> {
   let content = normalizeMessage(input.content);
   const clientMessageId = normalizeClientMessageId(input.client_message_id);
@@ -1767,7 +1883,16 @@ export async function processGuidedCreationMessage(input: {
       };
     });
     if (!accepted.inserted) {
-      return processGuidedCreationMessage(input);
+      // A concurrent duplicate insert raced with us. Retry at most once, then
+      // return the current session instead of recursing without bound.
+      const retry = input.retry ?? 0;
+      if (retry >= 1) {
+        return getGuidedCreationDetail({
+          auth_user_id: input.auth_user_id,
+          session_id: input.session_id,
+        });
+      }
+      return processGuidedCreationMessage({ ...input, retry: retry + 1 });
     }
     acceptedRevision = accepted.revision;
     userMessageNo = accepted.messageNo;
@@ -1814,7 +1939,7 @@ export async function processGuidedCreationMessage(input: {
         for update`,
       [input.session_id, input.auth_user_id],
     );
-    const lockedRow = locked.rows[0];
+      const lockedRow = locked.rows[0];
     if (
       !lockedRow ||
       Number(lockedRow.revision_no) !== acceptedRevision ||
@@ -1890,14 +2015,25 @@ export async function startGuidedCreation(input: {
   client_message_id: string;
   model?: string;
   documents?: GuidedCreationDocument[];
+  structured_fields?: import('@educlaw/shared').StructuredGuidedInput;
 }): Promise<GuidedCreationSessionDetail> {
+  let structuredFields;
+  try {
+    structuredFields = parseStructuredGuidedInput(input.structured_fields);
+  } catch {
+    throw new GuidedCreationError(
+      'INVALID_GUIDED_REQUEST',
+      '完整填写字段格式不正确',
+      422,
+    );
+  }
   const documents = normalizeDocuments(input.documents);
   const content = normalizeMessage(input.content);
   const clientMessageId = normalizeClientMessageId(input.client_message_id);
   const result = await query<Record<string, unknown>>(
     `insert into skill_guided_creation_sessions (
-       user_id, model, documents_json, start_client_message_id, flow_version
-     ) values ($1, $2, $3::jsonb, $4, 3)
+       user_id, model, documents_json, start_client_message_id, flow_version, draft_json
+     ) values ($1, $2, $3::jsonb, $4, 3, $5::jsonb)
      on conflict (user_id, start_client_message_id)
        where start_client_message_id is not null
      do nothing
@@ -1907,6 +2043,7 @@ export async function startGuidedCreation(input: {
       input.model?.trim() || null,
       JSON.stringify(documents),
       clientMessageId,
+      JSON.stringify(structuredInputToEducationDraft(structuredFields)),
     ],
   );
   let sessionId = String(result.rows[0]?.id ?? '');
@@ -1971,6 +2108,125 @@ export async function cancelGuidedCreation(input: {
   });
 }
 
+// User-triggered close-out: turn the current draft into a confirmation card so
+// the teacher can end the interview early and confirm or top up the missing parts.
+export async function summarizeGuidedCreation(input: {
+  auth_user_id: string;
+  session_id: string;
+  revision_no: number;
+}): Promise<GuidedCreationSessionDetail> {
+  const session = await getGuidedCreationDetail({
+    auth_user_id: input.auth_user_id,
+    session_id: input.session_id,
+  });
+  if (session.status === 'ready_for_confirmation') return session;
+  if (session.status !== 'collecting' && session.status !== 'failed') {
+    throw new GuidedCreationError(
+      'GUIDED_SESSION_NOT_EDITABLE',
+      '当前 Skill 草稿不能继续编辑',
+      409,
+    );
+  }
+  if (session.flow_version < 3) {
+    throw new GuidedCreationError(
+      'GUIDED_SESSION_NOT_EDITABLE',
+      '当前草稿版本不支持手动整理',
+      409,
+    );
+  }
+  if (session.revision_no !== input.revision_no) {
+    throw new GuidedCreationError(
+      'SESSION_REVISION_CONFLICT',
+      '草稿已更新，请刷新后重试',
+      409,
+      true,
+    );
+  }
+  const turn = buildEducationSummarizeTurn({
+    draft: session.education_draft ?? {},
+    completed_steps: session.completed_steps ?? [],
+    acknowledgement: '好的。',
+  });
+  await withTransaction(async (client) => {
+    const locked = await client.query<Record<string, unknown>>(
+      `select revision_no
+         from skill_guided_creation_sessions
+        where id = $1 and user_id = $2
+        for update`,
+      [input.session_id, input.auth_user_id],
+    );
+    if (Number(locked.rows[0]?.revision_no) !== input.revision_no) {
+      throw new GuidedCreationError(
+        'SESSION_REVISION_CONFLICT',
+        '草稿已更新，请刷新后重试',
+        409,
+        true,
+      );
+    }
+    const sequence = await client.query<Record<string, unknown>>(
+      `select coalesce(max(message_no), 0) as last_message_no
+         from skill_guided_creation_messages
+        where session_id = $1`,
+      [input.session_id],
+    );
+      const messageNo = Number(sequence.rows[0]?.last_message_no ?? 0) + 1;
+    await client.query(
+      `insert into skill_guided_creation_messages (
+         session_id, message_no, role, content, metadata_json
+       ) values ($1, $2, 'assistant', $3, $4::jsonb)`,
+      [
+        input.session_id,
+        messageNo,
+        turn.content,
+        JSON.stringify({
+          manual_summary: true,
+          next_blocking_field: turn.next_blocking_field,
+          focus_stage: turn.focus_stage,
+          focus_step: turn.focus_step,
+          confirmed_stages: turn.confirmed_stages,
+          completed_steps: turn.completed_steps,
+          suggested_options: turn.suggested_options,
+          confirmation: turn.confirmation,
+        }),
+      ],
+    );
+    const updated = await client.query(
+      `update skill_guided_creation_sessions
+          set status = $3,
+              draft_json = $4::jsonb,
+              field_states_json = $5::jsonb,
+              confirmed_stages_json = $6::jsonb,
+              confirmation_json = $7::jsonb,
+              error_json = null,
+              revision_no = revision_no + 1,
+              updated_at = now()
+        where id = $1 and user_id = $2 and revision_no = $8`,
+      [
+        input.session_id,
+        input.auth_user_id,
+        turn.status,
+        JSON.stringify(turn.education_draft ?? turn.draft),
+        JSON.stringify(turn.education_draft ? {} : turn.field_states),
+        JSON.stringify(turn.completed_steps ?? turn.confirmed_stages),
+        turn.confirmation ? JSON.stringify(turn.confirmation) : null,
+        input.revision_no,
+      ],
+    );
+    if (updated.rowCount !== 1) {
+      throw new GuidedCreationError(
+        'SESSION_REVISION_CONFLICT',
+        '草稿已更新，请刷新后重试',
+        409,
+        true,
+      );
+    }
+  });
+  return getGuidedCreationDetail({
+    auth_user_id: input.auth_user_id,
+    session_id: input.session_id,
+  });
+}
+
 export function buildGuidedGenerationInstruction(
   draft: GuidedSkillDraft,
 ): string {
@@ -1988,9 +2244,11 @@ export function buildGuidedGenerationInstruction(
 
 export function buildGuidedEducationGenerationInstruction(
   draft: GuidedEducationDraft,
+  explicitName?: string,
 ): string {
   return [
     '请创建一个教育场景使用的 Skill。',
+    ...(explicitName ? [`Skill 名称：${explicitName}`] : []),
     '只生成 1 个 Skill，不要拆分成多个 Skill。',
     'Package 和 agent.md 仅作为内部运行容器，用户看到和使用的主体必须是这个 Skill。',
     '请把已确认的教育经验转成清晰、可执行、可检查的规则。',
@@ -2047,9 +2305,7 @@ export async function confirmGuidedCreation(input: {
   session_id: string;
   revision_no: number;
   request_id: string;
-  on_phase?: (
-    phase: 'generating' | 'validating' | 'saving',
-  ) => void;
+  on_phase?: (phase: 'generating' | 'validating' | 'saving') => void;
   on_preview?: (preview: {
     type: string;
     name: string;
@@ -2137,6 +2393,10 @@ export async function confirmGuidedCreation(input: {
         session.flow_version >= 3
           ? buildGuidedEducationGenerationInstruction(
               session.education_draft ?? {},
+              session.messages
+                .filter((message) => message.role === 'user')
+                .map((message) => extractExplicitSkillName(message.content))
+                .find(Boolean),
             )
           : buildGuidedGenerationInstruction(session.draft),
       model: session.model ?? undefined,

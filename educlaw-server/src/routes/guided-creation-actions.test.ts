@@ -6,6 +6,37 @@ import {
 } from './guided-creation-actions.js';
 
 describe('guided creation POST /api actions', () => {
+  it('accepts validated structured fields without allowing evidence or owner injection', () => {
+    const fields = {
+      name: '分层作业',
+      audience: '教师',
+      scenario: '课后',
+      task: '分层作业',
+      input: '教材',
+      output: '作业',
+      boundaries: '教师确认',
+    };
+    const payload = {
+      content: '完整填写',
+      client_message_id: 'structured-start-001',
+      structured_fields: fields,
+    };
+    expect(
+      parseGuidedCreationRequest({
+        action: 'SkillGuidedCreationStart',
+        payload,
+      }).payload.structured_fields,
+    ).toEqual(fields);
+    expect(() =>
+      parseGuidedCreationRequest({
+        action: 'SkillGuidedCreationStart',
+        payload: {
+          ...payload,
+          structured_fields: { ...fields, source: 'user_adopted' },
+        },
+      }),
+    ).toThrow();
+  });
   it('recognizes the guided creation PascalCase actions', () => {
     expect(isGuidedCreationAction('SkillGuidedCreationStart')).toBe(true);
     expect(isGuidedCreationAction('SkillGuidedCreationConfirm')).toBe(true);
@@ -37,18 +68,31 @@ describe('guided creation POST /api actions', () => {
   });
 
   it('parses strict Arena test and atomic publish requests', () => {
-    expect(parseGuidedCreationRequest({
-      action: 'skill.media.test.start',
-      sessionId: '101',
-      idempotencyKey: 'arena-test-001',
-      payload: { expectedRevisionNo: 8 },
-    })).toEqual({
+    expect(
+      parseGuidedCreationRequest({
+        action: 'skill.media.test.start',
+        sessionId: '101',
+        idempotencyKey: 'arena-test-001',
+        payload: { expectedRevisionNo: 8 },
+      }),
+    ).toEqual({
       action: 'skill.media.test.start',
       sessionId: '101',
       idempotencyKey: 'arena-test-001',
       payload: { expectedRevisionNo: 8 },
     });
-    expect(parseGuidedCreationRequest({
+    expect(
+      parseGuidedCreationRequest({
+        action: 'skill.media.publish',
+        sessionId: '101',
+        idempotencyKey: 'media-publish-001',
+        payload: {
+          expectedRevisionNo: 9,
+          targetPackageId: null,
+          expectedPackageVersionId: null,
+        },
+      }),
+    ).toEqual({
       action: 'skill.media.publish',
       sessionId: '101',
       idempotencyKey: 'media-publish-001',
@@ -57,35 +101,34 @@ describe('guided creation POST /api actions', () => {
         targetPackageId: null,
         expectedPackageVersionId: null,
       },
-    })).toEqual({
-      action: 'skill.media.publish',
-      sessionId: '101',
-      idempotencyKey: 'media-publish-001',
-      payload: {
-        expectedRevisionNo: 9,
-        targetPackageId: null,
-        expectedPackageVersionId: null,
-      },
     });
-    expect(() => parseGuidedCreationRequest({
-      action: 'skill.media.publish',
-      sessionId: '101',
-      idempotencyKey: 'media-publish-001',
-      payload: { expectedRevisionNo: 9, targetPackageId: '55', expectedPackageVersionId: null },
-    })).toThrowError();
+    expect(() =>
+      parseGuidedCreationRequest({
+        action: 'skill.media.publish',
+        sessionId: '101',
+        idempotencyKey: 'media-publish-001',
+        payload: {
+          expectedRevisionNo: 9,
+          targetPackageId: '55',
+          expectedPackageVersionId: null,
+        },
+      }),
+    ).toThrowError();
   });
 
   it('parses direct multimodal generation confirmation', () => {
-    expect(parseGuidedCreationRequest({
-      action: 'skill.media.generate.confirm',
-      sessionId: '101',
-      idempotencyKey: 'generate-confirm-001',
-      payload: {
-        expectedRevisionNo: 10,
-        targetPackageId: null,
-        expectedPackageVersionId: null,
-      },
-    })).toEqual({
+    expect(
+      parseGuidedCreationRequest({
+        action: 'skill.media.generate.confirm',
+        sessionId: '101',
+        idempotencyKey: 'generate-confirm-001',
+        payload: {
+          expectedRevisionNo: 10,
+          targetPackageId: null,
+          expectedPackageVersionId: null,
+        },
+      }),
+    ).toEqual({
       action: 'skill.media.generate.confirm',
       sessionId: '101',
       idempotencyKey: 'generate-confirm-001',
@@ -98,7 +141,9 @@ describe('guided creation POST /api actions', () => {
   });
 
   it('treats multimodal progress stream as stream-only while keeping progress JSON-only', () => {
-    expect(isGuidedCreationStreamAction('skill.media.progress.stream')).toBe(true);
+    expect(isGuidedCreationStreamAction('skill.media.progress.stream')).toBe(
+      true,
+    );
     expect(isGuidedCreationStreamAction('skill.media.progress')).toBe(false);
   });
 
@@ -108,14 +153,16 @@ describe('guided creation POST /api actions', () => {
         action: 'skill.media.asset.preview',
         payload: {
           sessionId: '101',
-          objectKey: 'skill-sessions/101/source/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.mp4',
+          objectKey:
+            'skill-sessions/101/source/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.mp4',
         },
       }),
     ).toEqual({
       action: 'skill.media.asset.preview',
       payload: {
         sessionId: '101',
-        objectKey: 'skill-sessions/101/source/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.mp4',
+        objectKey:
+          'skill-sessions/101/source/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.mp4',
       },
     });
     expect(() =>
@@ -170,7 +217,7 @@ describe('guided creation POST /api actions', () => {
     ).toEqual({
       action: 'skill.media.session.detail',
       payload: {
-      sessionId: '101',
+        sessionId: '101',
       },
     });
 
@@ -427,7 +474,10 @@ describe('guided creation POST /api actions', () => {
       payload: { expectedRevisionNo: 14 },
     });
 
-    for (const action of ['skill.media.cancel', 'skill.media.session.delete'] as const) {
+    for (const action of [
+      'skill.media.cancel',
+      'skill.media.session.delete',
+    ] as const) {
       expect(
         parseGuidedCreationRequest({
           action,

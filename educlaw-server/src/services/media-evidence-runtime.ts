@@ -1,9 +1,12 @@
 import { createHash } from 'node:crypto';
+import { getLogger } from '../lib/request-context.js';
+import { classifyGenerationFailure } from './generation-failure.js';
 import type {
   MultimodalAssetRef,
   MultimodalTranscript,
   SemanticMomentDraft,
 } from '@educlaw/shared';
+import { parseSemanticMomentDrafts } from '@educlaw/shared';
 import { config } from '../config.js';
 import { readObjectStorageConfig } from '../config/object-storage-config.js';
 import {
@@ -29,7 +32,7 @@ type CreateSignedGetGrant = (input: {
 type ReadFrameDataUrl = (assetRef: MultimodalAssetRef) => Promise<string>;
 type OpenReadStream = ReturnType<typeof createObjectStorageService>['openReadStream'];
 
-const PROMPT_VERSION = 'semantic-moments-v3-chunked-zh';
+const PROMPT_VERSION = 'semantic-moments-v4-chunked-zh';
 const DEFAULT_SEMANTIC_CHUNK_CHAR_BUDGET = 48_000;
 const MAX_INLINE_FRAME_BYTES = 8 * 1024 * 1024;
 const ALLOWED_TYPES = [
@@ -219,14 +222,17 @@ export function createProductionVisionRankingAdapter(options: {
           candidateId: string;
           score: number;
           reason: string;
+          visualObservation?: {visibleText:string[];uncertainties:string[]};
         }>;
       }>({
         systemPrompt: [
           '你是教学视频关键帧重排器。只输出 JSON。',
           '结合语义目标与每张候选画面，判断其是否完整、清晰地呈现板书、幻灯片、图表、实验或演示步骤。',
           '不要仅按画质评分；优先选择能支撑教学结论、内容完整且非中间过渡态的画面。',
-          '严格返回 {"rankings":[{"candidateId":string,"score":0到1,"reason":string}]}。',
+          '严格返回 {"rankings":[{"candidateId":string,"score":0到1,"reason":string,"visualObservation":{"visibleText":[string],"uncertainties":[string]}}]}。',
           'candidateId 必须来自输入；最多返回两张，不得重复。',
+          '对入选画面同时摘录直接可见的教学规则、文字及图形对应关系，visibleText 最多4条，每条最多200字；保留原文数字、单位、否定、连续/次数条件、先后顺序和否则/例外分支，不概括掉限定词。排序理由与画面原文分开，不能把旁白或你的推断当作可见内容。',
+          'uncertainties 最多2条，每条最多120字；读不清就指出不确定，不猜测、不用ASR补全。确实无法可靠读取时 visibleText=[] 并说明原因。只摘录与当前教学目标相关的内容，保留完整规则。',
         ].join('\n'),
         userPrompt: JSON.stringify({
           semanticMoment: {
@@ -253,7 +259,7 @@ export function createProductionVisionRankingAdapter(options: {
         maxTokens: options.maxTokens,
       });
       return {
-        rankings: response.rankings,
+        rankings: response.rankings.map(ranking=>({...ranking,visualObservation:ranking.visualObservation ?? {visibleText:[],uncertainties:['模型未提供可见内容摘录，待人工核对。']}})),
         model: options.visionModel,
       };
     },
@@ -281,7 +287,9 @@ export function createProductionMediaEvidenceService(options?: {
     semanticChunkCharBudget < 128 ||
     semanticChunkCharBudget > 1_000_000
   ) {
-    throw new Error('semanticChunkCharBudget must be an integer between 128 and 1000000');
+    throw new Error(
+      'semanticChunkCharBudget must be an integer between 128 and 1000000',
+    );
   }
   let readFrameDataUrl = options?.readFrameDataUrl;
   const createSignedGetGrant = options?.createSignedGetGrant;
@@ -289,7 +297,9 @@ export function createProductionMediaEvidenceService(options?: {
     const storageConfig = readObjectStorageConfig();
     if (storageConfig) {
       const storage = createObjectStorageService({ config: storageConfig });
-      readFrameDataUrl = createVerifiedInlineFrameReader(storage.openReadStream);
+      readFrameDataUrl = createVerifiedInlineFrameReader(
+        storage.openReadStream,
+      );
     }
   }
   const visionRankingAdapter =
@@ -312,6 +322,7 @@ export function createProductionMediaEvidenceService(options?: {
           input.correctable,
           semanticChunkCharBudget,
         )) {
+          await input.beforeModelCall?.();
           const response = await generate<{
             corrections: Array<{ index: number; text: string }>;
           }>(
@@ -364,39 +375,58 @@ export function createProductionMediaEvidenceService(options?: {
         );
         const moments: SemanticMomentDraft[] = [];
         for (const transcript of chunks) {
+          await input.beforeModelCall?.();
           const analysisWindow = {
             startMs: transcript[0]!.startMs,
             endMs: transcript[transcript.length - 1]!.endMs,
           };
-          const response = await generate<{ moments: SemanticMomentDraft[] }>(
-            {
-              systemPrompt: [
-                '你是教学视频的语义时刻识别器。只输出 JSON。',
-                `type 只能是：${ALLOWED_TYPES.join(', ')}。`,
-                'moments 必须按时间递增、互不重叠；每项严格包含 startMs,endMs,importance,type,summary,visualTarget,audioEvidence,transcriptEvidence,selectionReason。',
-                '每个 moment 必须完全位于 analysisWindow 内，不得引用窗口外时间。',
-                'audioEvidence 与 transcriptEvidence 可为 null；若不为 null，严格包含 timeRange:{startMs,endMs},text,confidence。',
-                '优先识别定义、步骤、例题、演示、反例、限制和总结，避免按固定时长机械切段。',
-                'summary、visualTarget、selectionReason 必须使用简体中文撰写。',
-                '转录文本来自语音识别（ASR），可能包含同音字与术语误识（例如「函数」误识为「韩树」、「映射」误识为「影射」）。summary 与 visualTarget 必须使用结合教学语境推断出的正确中文术语，不要照抄 ASR 错别字。',
-                'audioEvidence.text 与 transcriptEvidence.text 引用转录时同样使用纠正后的规范术语。',
-              ].join('\n'),
-              userPrompt: JSON.stringify({
+          try {
+            const response = await generate<{ moments: SemanticMomentDraft[] }>(
+              {
+                systemPrompt: [
+                  '你是教学视频的语义时刻识别器。只输出 JSON。',
+                  `type 只能是：${ALLOWED_TYPES.join(', ')}。`,
+                  'moments 必须按时间递增、互不重叠；每项严格包含 startMs,endMs,importance,type,summary,visualTarget,audioEvidence,transcriptEvidence,selectionReason。',
+                  'importance 必须是 0 到 1 之间的数字（例如 0.8），不是百分数、等级或字符串；confidence 必须是 0 到 1 之间的数字。',
+                  'startMs、endMs 必须是整数毫秒，且 startMs < endMs；visualTarget 无画面依据时使用 null。',
+                  '每个 moment 必须完全位于 analysisWindow 内，不得引用窗口外时间。',
+                  'audioEvidence 与 transcriptEvidence 可为 null；若不为 null，严格包含 timeRange:{startMs,endMs},text,confidence。',
+                  '优先识别定义、步骤、例题、演示、反例、限制和总结，避免按固定时长机械切段。',
+                  'summary、visualTarget、selectionReason 必须使用简体中文撰写。',
+                  '转录文本来自语音识别（ASR），可能包含同音字与术语误识（例如「函数」误识为「韩树」、「映射」误识为「影射」）。summary 与 visualTarget 必须使用结合教学语境推断出的正确中文术语，不要照抄 ASR 错别字。',
+                  'audioEvidence.text 与 transcriptEvidence.text 引用转录时同样使用纠正后的规范术语。',
+                ].join('\n'),
+                userPrompt: JSON.stringify({
+                  durationMs: input.durationMs,
+                  sourceKind: input.primarySource.kind,
+                  analysisWindow,
+                  transcript,
+                }),
+                model,
+                temperature: 0,
+                maxTokens: config.multimodalModelMaxTokens,
+                hidePromptContentInLogs: true,
+              },
+              0,
+              true,
+            );
+            validateChunkMoments(response.moments, analysisWindow);
+            moments.push(
+              ...parseSemanticMomentDrafts(response.moments, {
                 durationMs: input.durationMs,
-                sourceKind: input.primarySource.kind,
-                analysisWindow,
-                transcript,
               }),
+            );
+          } catch (error) {
+            getLogger({ component: 'media-evidence-runtime' }).warn({
+              event: 'media.semantic.model_failed',
+              stage: 'building_semantic_windows',
               model,
-              temperature: 0,
-              maxTokens: config.multimodalModelMaxTokens,
-              hidePromptContentInLogs: true,
-            },
-            0,
-            true,
-          );
-          validateChunkMoments(response.moments, analysisWindow);
-          moments.push(...response.moments);
+              windowStartMs: analysisWindow.startMs,
+              windowEndMs: analysisWindow.endMs,
+              ...classifyGenerationFailure(error),
+            });
+            throw error;
+          }
         }
         return {
           moments,

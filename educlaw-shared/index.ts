@@ -1,31 +1,31 @@
 export const AUTH_ROUTES = {
-  REGISTER: "/register",
-  LOGIN: "/login",
-  ME: "/me",
+  REGISTER: '/register',
+  LOGIN: '/login',
+  ME: '/me',
 } as const;
 
 export const PACKAGE_ROUTES = {
-  LIST: "/packages",
-  DETAIL: "/packages/detail",
+  LIST: '/packages',
+  DETAIL: '/packages/detail',
 } as const;
 
 export const ARENA_ROUTES = {
-  THREADS: "/arena/threads",
-  CREATE_THREAD: "/arena/threads/create",
-  THREAD_DETAIL: "/arena/threads/detail",
-  MESSAGE_STREAM: "/arena/threads/messages/stream",
+  THREADS: '/arena/threads',
+  CREATE_THREAD: '/arena/threads/create',
+  THREAD_DETAIL: '/arena/threads/detail',
+  MESSAGE_STREAM: '/arena/threads/messages/stream',
 } as const;
 
 export const ANSWER_SKILL_OPTIMIZATION_ROUTES = {
-  CREATE: "/arena/answer-optimizations",
-  RESOLVE: "/arena/answer-optimizations/resolve",
-  SUGGESTIONS: "/arena/answer-optimizations/suggestions",
-  DETAIL: "/arena/answer-optimizations/:optimizationId",
-  REVISE: "/arena/answer-optimizations/:optimizationId/revise",
-  REBASE: "/arena/answer-optimizations/:optimizationId/rebase",
-  TEST: "/arena/answer-optimizations/:optimizationId/test",
-  CONFIRM: "/arena/answer-optimizations/:optimizationId/confirm",
-  CANCEL: "/arena/answer-optimizations/:optimizationId/cancel",
+  CREATE: '/arena/answer-optimizations',
+  RESOLVE: '/arena/answer-optimizations/resolve',
+  SUGGESTIONS: '/arena/answer-optimizations/suggestions',
+  DETAIL: '/arena/answer-optimizations/:optimizationId',
+  REVISE: '/arena/answer-optimizations/:optimizationId/revise',
+  REBASE: '/arena/answer-optimizations/:optimizationId/rebase',
+  TEST: '/arena/answer-optimizations/:optimizationId/test',
+  CONFIRM: '/arena/answer-optimizations/:optimizationId/confirm',
+  CANCEL: '/arena/answer-optimizations/:optimizationId/cancel',
 } as const;
 
 export interface AnswerOptimizationSuggestionsRequest {
@@ -33,19 +33,23 @@ export interface AnswerOptimizationSuggestionsRequest {
   threadId: number;
   questionMessageId: number;
   answerMessageId: number;
-  answerSide: "baseline" | "enhanced";
+  answerSide: 'baseline' | 'enhanced';
   answerVersionNumber: number;
 }
 
 export interface AnswerOptimizationSuggestionsResult {
   suggestions: [string, string, string];
-  source: "ai" | "fallback";
+  source: 'ai' | 'fallback';
 }
 
-export const ANSWER_OPTIMIZATION_SUGGESTION_FALLBACKS: [string, string, string] = [
-  "让回答更贴合具体教学目标和学生情况",
-  "增加引导学生思考、判断和调整的过程",
-  "补充关键边界、安全提醒和完成标准",
+export const ANSWER_OPTIMIZATION_SUGGESTION_FALLBACKS: [
+  string,
+  string,
+  string,
+] = [
+  '让回答更贴合具体教学目标和学生情况',
+  '增加引导学生思考、判断和调整的过程',
+  '补充关键边界、安全提醒和完成标准',
 ];
 
 export interface LoginRequest {
@@ -99,20 +103,20 @@ export interface PackageVersion {
   versionNumber: number;
   createdAt: string;
   source:
-    | "generated"
-    | "imported"
-    | "optimized"
-    | "manual"
-    | "interactive"
-    | "rollback"
-    | "distilled";
+    | 'generated'
+    | 'imported'
+    | 'optimized'
+    | 'manual'
+    | 'interactive'
+    | 'rollback'
+    | 'distilled';
   note: string;
   snapshot: AgentPackageSnapshot;
 }
 
-export type SkillEntityStatus = "active" | "removed";
-export type SkillVersionStatus = "active" | "discarded";
-export type SkillVersionSource = PackageVersion["source"];
+export type SkillEntityStatus = 'active' | 'removed';
+export type SkillVersionStatus = 'active' | 'discarded';
+export type SkillVersionSource = PackageVersion['source'];
 
 export interface PackageSkillRecord {
   id: string;
@@ -146,22 +150,22 @@ export interface SkillVersionDetail {
 }
 
 export type SkillAction =
-  | "skill.list"
-  | "skill.version.list"
-  | "skill.version.detail"
-  | "skill.version.manual-edit"
-  | "skill.version.rollback"
-  | "skill.version.discard"
-  | "skill.version.undiscard"
-  | "arena.thread.create"
-  | "arena.thread.detail"
-  | "arena.thread.rename"
-  | "arena.thread.delete";
+  | 'skill.list'
+  | 'skill.version.list'
+  | 'skill.version.detail'
+  | 'skill.version.manual-edit'
+  | 'skill.version.rollback'
+  | 'skill.version.discard'
+  | 'skill.version.undiscard'
+  | 'arena.thread.create'
+  | 'arena.thread.detail'
+  | 'arena.thread.rename'
+  | 'arena.thread.delete';
 
-export type ArenaKind = "package_arena" | "skill_arena";
+export type ArenaKind = 'package_arena' | 'skill_arena';
 
 export interface ArenaThreadVariant {
-  side: "left" | "right";
+  side: 'left' | 'right';
   skillId: string;
   skillVersionId: string;
   skillUid: string;
@@ -170,10 +174,10 @@ export interface ArenaThreadVariant {
 }
 
 export interface SkillArenaConfig {
-  mode: "skill_arena";
-  compositionMode: "skill_only";
+  mode: 'skill_arena';
+  compositionMode: 'skill_only';
   /** run: 单版本运行；test: 固定版本测试；arena: 双版本对比；optimize: 交互式优化 */
-  surface?: "run" | "test" | "arena" | "optimize";
+  surface?: 'run' | 'test' | 'arena' | 'optimize';
   basePackageVersionId: string;
   left: ArenaThreadVariant | null;
   right: ArenaThreadVariant | null;
@@ -212,8 +216,8 @@ export interface SkillVersionListResult {
   currentPackageVersionId: string | null;
 }
 
-export type ArenaSide = "shared" | "baseline" | "enhanced";
-export type ArenaRole = "user" | "assistant";
+export type ArenaSide = 'shared' | 'baseline' | 'enhanced';
+export type ArenaRole = 'user' | 'assistant';
 
 export interface ArenaThread {
   id: number;
@@ -241,25 +245,25 @@ export interface ArenaMessage {
 }
 
 export type ArenaAnswerOptimizationStatus =
-  | "processing"
-  | "target_selection_required"
-  | "draft_ready"
-  | "test_ready"
-  | "completed"
-  | "cancelled"
-  | "failed";
+  | 'processing'
+  | 'target_selection_required'
+  | 'draft_ready'
+  | 'test_ready'
+  | 'completed'
+  | 'cancelled'
+  | 'failed';
 
 export type ArenaAnswerOptimizationAction =
-  | "create"
-  | "resume"
-  | "restart"
-  | "completed"
-  | "unavailable";
+  | 'create'
+  | 'resume'
+  | 'restart'
+  | 'completed'
+  | 'unavailable';
 
 export type ArenaAnswerOptimizationUnavailableReason =
-  | "missing_answer_run"
-  | "replay_context_unavailable"
-  | "replay_model_unavailable";
+  | 'missing_answer_run'
+  | 'replay_context_unavailable'
+  | 'replay_model_unavailable';
 
 export interface ArenaAnswerOptimizationSummary {
   enhancedAnswerMessageId: number;
@@ -295,7 +299,12 @@ export interface ArenaChatResult {
   shared: ArenaMessage;
 }
 
-export type ArenaRunStatus = "running" | "stopping" | "succeeded" | "cancelled" | "failed";
+export type ArenaRunStatus =
+  | 'running'
+  | 'stopping'
+  | 'succeeded'
+  | 'cancelled'
+  | 'failed';
 export interface ArenaRunSnapshot {
   /** A large persisted result must be read through recovery/history. */
   historyRequired?: boolean;
@@ -319,7 +328,7 @@ export interface ArenaRunStartRequest {
   requestId: string;
   content: string;
   model?: string;
-  mode: "agent";
+  mode: 'agent';
   thinkingEnabled?: boolean;
 }
 export interface ArenaRunRecovery {
@@ -346,7 +355,7 @@ export interface ArenaReport {
   baseline: ArenaReportSide;
   enhanced: ArenaReportSide;
   recommendation: string;
-  winningSide: "baseline" | "enhanced" | "tie";
+  winningSide: 'baseline' | 'enhanced' | 'tie';
   labels?: {
     baseline: string;
     enhanced: string;
@@ -357,7 +366,7 @@ export interface AutoEvalQuestion {
   id: string;
   title: string;
   prompt: string;
-  source: "builtin" | "document";
+  source: 'builtin' | 'document';
 }
 
 export interface AutoEvalDimensionScore {
@@ -384,7 +393,7 @@ export interface AutoEvalReport {
   runId: number;
   packageId: number;
   sceneName: string;
-  status: "pending" | "running" | "completed" | "failed";
+  status: 'pending' | 'running' | 'completed' | 'failed';
   totalScore: number;
   maxScore: number;
   summary: string;
@@ -404,13 +413,18 @@ export interface AutoEvalPreview {
   skillCount: number;
   builtinQuestions: AutoEvalQuestion[];
   documentQuestions: AutoEvalQuestion[];
-  dimensions: Array<{ key: string; name: string; maxScore: number; description: string }>;
+  dimensions: Array<{
+    key: string;
+    name: string;
+    maxScore: number;
+    description: string;
+  }>;
   latestRun?: AutoEvalReport;
 }
 
 export interface OptimizationIssue {
-  expert: "persona" | "skill" | "rubric" | "merge";
-  target: "agent" | "skill" | "rubric";
+  expert: 'persona' | 'skill' | 'rubric' | 'merge';
+  target: 'agent' | 'skill' | 'rubric';
   targetId?: string;
   title: string;
   reason: string;
@@ -426,75 +440,76 @@ export interface OptimizationResult {
 }
 
 export type GuidedCreationAction =
-  | "SkillGuidedCreationStart"
-  | "SkillGuidedCreationList"
-  | "SkillGuidedCreationDetail"
-  | "SkillGuidedCreationMessage"
-  | "SkillGuidedCreationConfirm"
-  | "SkillGuidedCreationCancel"
-  | "SkillGuidedCreationRename"
-  | "SkillGuidedCreationDelete";
+  | 'SkillGuidedCreationStart'
+  | 'SkillGuidedCreationList'
+  | 'SkillGuidedCreationDetail'
+  | 'SkillGuidedCreationMessage'
+  | 'SkillGuidedCreationConfirm'
+  | 'SkillGuidedCreationSummarize'
+  | 'SkillGuidedCreationCancel'
+  | 'SkillGuidedCreationRename'
+  | 'SkillGuidedCreationDelete';
 
 export type GuidedCreationStatus =
-  | "collecting"
-  | "ready_for_confirmation"
-  | "finalizing"
-  | "completed"
-  | "failed"
-  | "cancelled";
+  | 'collecting'
+  | 'ready_for_confirmation'
+  | 'finalizing'
+  | 'completed'
+  | 'failed'
+  | 'cancelled';
 
 export type GuidedCreationStage =
-  | "positioning"
-  | "scenario_input"
-  | "expected_result"
-  | "working_method"
-  | "evidence_scope"
-  | "boundaries_completion";
+  | 'positioning'
+  | 'scenario_input'
+  | 'expected_result'
+  | 'working_method'
+  | 'evidence_scope'
+  | 'boundaries_completion';
 
 export type GuidedDraftField =
-  | "roles"
-  | "goal"
-  | "usage_scenario"
-  | "input_contract"
-  | "output_contract"
-  | "core_capabilities"
-  | "workflow"
-  | "knowledge_evidence"
-  | "boundaries_permissions"
-  | "exception_recovery"
-  | "completion_evidence";
+  | 'roles'
+  | 'goal'
+  | 'usage_scenario'
+  | 'input_contract'
+  | 'output_contract'
+  | 'core_capabilities'
+  | 'workflow'
+  | 'knowledge_evidence'
+  | 'boundaries_permissions'
+  | 'exception_recovery'
+  | 'completion_evidence';
 
 export type GuidedFieldState =
-  | "explicit"
-  | "inferred"
-  | "defaulted"
-  | "missing"
-  | "conflicted";
+  | 'explicit'
+  | 'inferred'
+  | 'defaulted'
+  | 'missing'
+  | 'conflicted';
 
 export type GuidedSkillDraft = Partial<Record<GuidedDraftField, string>>;
 
 export type GuidedEducationDimension =
-  | "educational_goal"
-  | "audience_context"
-  | "input_evidence"
-  | "teaching_strategy"
-  | "action_adaptation"
-  | "boundaries_responsibility"
-  | "completion_evidence";
+  | 'educational_goal'
+  | 'audience_context'
+  | 'input_evidence'
+  | 'teaching_strategy'
+  | 'action_adaptation'
+  | 'boundaries_responsibility'
+  | 'completion_evidence';
 
 export type GuidedCreationStep =
-  | "intent_context"
-  | "teacher_experience"
-  | "strategy_co_creation"
-  | "action_adjustment"
-  | "evidence_review";
+  | 'intent_context'
+  | 'teacher_experience'
+  | 'strategy_co_creation'
+  | 'action_adjustment'
+  | 'evidence_review';
 
 export type GuidedEducationEvidenceSource =
-  | "user_explicit"
-  | "user_adopted"
-  | "inferred"
-  | "platform_default"
-  | "conflicted";
+  | 'user_explicit'
+  | 'user_adopted'
+  | 'inferred'
+  | 'platform_default'
+  | 'conflicted';
 
 /**
  * v3 教育版草稿操作类型。
@@ -502,7 +517,7 @@ export type GuidedEducationEvidenceSource =
  * - replace：用户明确纠正或否定先前说法时覆盖 content 并清空旧 evidence
  * - remove：用户撤回该维度内容时删除整个 section
  */
-export type GuidedEducationDraftOp = "set" | "replace" | "remove";
+export type GuidedEducationDraftOp = 'set' | 'replace' | 'remove';
 
 export interface GuidedEducationEvidence {
   source: GuidedEducationEvidenceSource;
@@ -527,12 +542,12 @@ export interface GuidedCreationDocument {
 
 export interface GuidedConfirmationSection {
   key:
-    | "positioning"
-    | "scenario"
-    | "input_output"
-    | "capability_flow"
-    | "knowledge_boundary"
-    | "recovery_completion"
+    | 'positioning'
+    | 'scenario'
+    | 'input_output'
+    | 'capability_flow'
+    | 'knowledge_boundary'
+    | 'recovery_completion'
     | GuidedEducationDimension;
   title: string;
   content: string;
@@ -548,7 +563,7 @@ export interface GuidedCreationMessage {
   session_id: string;
   message_no: number;
   client_message_id: string | null;
-  role: "user" | "assistant";
+  role: 'user' | 'assistant';
   content: string;
   metadata: Record<string, unknown>;
   created_at: string;
@@ -589,6 +604,17 @@ export interface GuidedCreationStartPayload {
   client_message_id: string;
   model?: string;
   documents?: GuidedCreationDocument[];
+  structured_fields?: StructuredGuidedInput;
+}
+
+export interface StructuredGuidedInput {
+  name: string;
+  audience: string;
+  scenario: string;
+  task: string;
+  input: string;
+  output: string;
+  boundaries: string;
 }
 
 export interface GuidedCreationMessagePayload {
@@ -631,11 +657,19 @@ export interface GuidedCreationDeletePayload {
 }
 
 export type GuidedCreationStreamEvent =
-  | { type: "phase"; phase: "understanding" | "questioning" | "generating" | "validating" | "saving" }
-  | { type: "message"; message: GuidedCreationMessage }
-  | { type: "confirmation"; session: GuidedCreationSession }
-  | { type: "preview"; files: Array<{ path: string; content: string }> }
-  | { type: "done"; session: GuidedCreationSession }
-  | { type: "error"; code: string; message: string; retryable: boolean }
-  | { type: "stream_end" };
-export * from "./src/multimodal-contract.js";
+  | {
+      type: 'phase';
+      phase:
+        | 'understanding'
+        | 'questioning'
+        | 'generating'
+        | 'validating'
+        | 'saving';
+    }
+  | { type: 'message'; message: GuidedCreationMessage }
+  | { type: 'confirmation'; session: GuidedCreationSession }
+  | { type: 'preview'; files: Array<{ path: string; content: string }> }
+  | { type: 'done'; session: GuidedCreationSession }
+  | { type: 'error'; code: string; message: string; retryable: boolean }
+  | { type: 'stream_end' };
+export * from './src/multimodal-contract.js';

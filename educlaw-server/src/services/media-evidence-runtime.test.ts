@@ -8,28 +8,91 @@ import {
 } from './media-evidence-runtime.js';
 
 describe('production media evidence runtime', () => {
+  it('checks cancellation before each semantic chunk and stops later model calls', async () => {
+    const generateJson = vi.fn().mockResolvedValue({
+      moments: [
+        {
+          startMs: 0,
+          endMs: 1000,
+          importance: 0.8,
+          type: 'concept',
+          summary: '定义',
+          visualTarget: null,
+          audioEvidence: null,
+          transcriptEvidence: null,
+          selectionReason: '核心定义',
+        },
+      ],
+    });
+    let checks = 0;
+    const service = createProductionMediaEvidenceService({
+      generateJson,
+      semanticModel: 'semantic-model',
+      semanticChunkCharBudget: 180,
+    });
+    await expect(
+      service.generateSemanticMoments({
+        primarySource: {
+          sourceId: 'audio-source-1',
+          kind: 'audio',
+          assetRef: {
+            objectKey: 'skill-sessions/1/source/audio.wav',
+            mimeType: 'audio/wav',
+            sizeBytes: 1024,
+            sha256: 'a'.repeat(64),
+          },
+        },
+        durationMs: 2000,
+        transcript: {
+          status: 'ready',
+          editable: true,
+          segments: [
+            {
+              startMs: 0,
+              endMs: 1000,
+              text: '甲'.repeat(100),
+              confidence: 0.9,
+            },
+            {
+              startMs: 1000,
+              endMs: 2000,
+              text: '乙'.repeat(100),
+              confidence: 0.9,
+            },
+          ],
+        },
+        beforeModelCall: async () => {
+          if (++checks > 1) throw new Error('SESSION_REVISION_CONFLICT');
+        },
+      }),
+    ).rejects.toThrow();
+    expect(generateJson).toHaveBeenCalledTimes(1);
+    expect(checks).toBe(2);
+  });
   it('chunks long transcripts before semantic model calls and merges time-bound results', async () => {
-    const generateJson = vi.fn().mockImplementation(async (request: { userPrompt: string }) => {
+    const generateJson = vi
+      .fn()
+      .mockImplementation(async (request: { userPrompt: string }) => {
       const payload = JSON.parse(request.userPrompt) as {
         analysisWindow: { startMs: number; endMs: number };
       };
       const { startMs, endMs } = payload.analysisWindow;
-      return {
-        moments: [
-          {
-            startMs,
-            endMs,
-            importance: 0.8,
-            type: 'concept',
-            summary: `窗口 ${startMs}-${endMs}`,
-            visualTarget: null,
-            audioEvidence: null,
-            transcriptEvidence: null,
-            selectionReason: '分段语义识别',
-          },
-        ],
-      };
-    });
+        return {
+          moments: [
+            {
+              startMs,
+              endMs,
+              importance: 0.8,
+              type: 'concept',
+              summary: `窗口 ${startMs}-${endMs}`,
+              visualTarget: null,
+              audioEvidence: null,
+              transcriptEvidence: null,
+              selectionReason: '分段语义识别',
+            },
+          ],
+        };
+      });
     const service = createProductionMediaEvidenceService({
       generateJson,
       semanticModel: 'semantic-model',
@@ -59,14 +122,24 @@ describe('production media evidence runtime', () => {
     });
 
     expect(generateJson).toHaveBeenCalledTimes(2);
-    expect(result.moments.map(({ startMs, endMs }) => ({ startMs, endMs }))).toEqual([
+    expect(
+      result.moments.map(({ startMs, endMs }) => ({ startMs, endMs })),
+    ).toEqual([
       { startMs: 0, endMs: 10_000 },
       { startMs: 10_000, endMs: 20_000 },
     ]);
     for (const call of generateJson.mock.calls) {
       expect(call[1]).toBe(0);
-      const request = call[0] as { userPrompt: string };
-      const payload = JSON.parse(request.userPrompt) as { transcript: unknown[] };
+      const request = call[0] as { userPrompt: string; systemPrompt: string };
+      expect(request.systemPrompt).toContain(
+        'importance 必须是 0 到 1 之间的数字',
+      );
+      expect(request.systemPrompt).toContain(
+        'confidence 必须是 0 到 1 之间的数字',
+      );
+      const payload = JSON.parse(request.userPrompt) as {
+        transcript: unknown[];
+      };
       expect(payload.transcript).toHaveLength(1);
     }
   });
@@ -144,8 +217,7 @@ describe('production media evidence runtime', () => {
     });
 
     expect(createSignedGetGrant).toHaveBeenCalledWith({
-      objectKey:
-        'skill-sessions/101/jobs/703/attempt-1/frames/frame-001.png',
+      objectKey: 'skill-sessions/101/jobs/703/attempt-1/frames/frame-001.png',
     });
     expect(generateMultimodalJson).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -166,6 +238,7 @@ describe('production media evidence runtime', () => {
           candidateId: 'frame-001',
           score: 0.93,
           reason: '完整呈现定义与板书关系',
+          visualObservation:{visibleText:[],uncertainties:['模型未提供可见内容摘录，待人工核对。']},
         },
       ],
       model: 'kimi-k2.5',
@@ -183,6 +256,7 @@ describe('production media evidence runtime', () => {
           candidateId: 'frame-001',
           score: 0.96,
           reason: '画面展示函数定义',
+          visualObservation:{visibleText:['f(x) 的定义域为实数集。'],uncertainties:[]},
         },
       ],
     });
@@ -253,6 +327,7 @@ describe('production media evidence runtime', () => {
           candidateId: 'frame-001',
           score: 0.96,
           reason: '画面展示函数定义',
+          visualObservation:{visibleText:['f(x) 的定义域为实数集。'],uncertainties:[]},
         },
       ],
       model: 'kimi-k2.5',

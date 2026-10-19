@@ -4,6 +4,7 @@ import {
   type MultimodalSessionState,
 } from '@educlaw/shared';
 import { GuidedCreationError } from './guided-creation-service.js';
+import { RiaContentError } from './ria-skill-markdown.js';
 import {
   createMultimodalPipelineOrchestrator,
   type MultimodalPipelineSnapshot,
@@ -675,6 +676,11 @@ describe('multimodal pipeline orchestrator', () => {
     expect(built.mediaStage).toBe('arena_testing');
     expect(noop.mediaStage).toBe('arena_testing');
     expect(sessionService.buildRiaSkills).toHaveBeenCalledTimes(1);
+    const failedStore=makeStore({loadSessionSnapshot:vi.fn().mockResolvedValue(building),persistPipelineFailure:vi.fn().mockResolvedValue({...building,mediaStage:'failed'}),persistCandidateSkills:vi.fn()});
+    const incomplete=createMultimodalPipelineOrchestrator({store:failedStore,sessionService:{...sessionService,buildRiaSkills:vi.fn().mockRejectedValue(new RiaContentError('source_uncertain'))}});
+    await expect(incomplete.runSkillBuildPipeline({authUserId:'user-1',sessionId:'101'})).rejects.toMatchObject({message:expect.stringContaining('来源画面'),retryable:true});
+    expect(failedStore.persistCandidateSkills).not.toHaveBeenCalled();
+    expect(failedStore.persistPipelineFailure).toHaveBeenCalledWith(expect.objectContaining({expectedStage:'building_skills',error:expect.objectContaining({resumeStage:'building_skills',retryable:true,message:expect.stringContaining('草稿已保留')})}));
   });
 
   it('persists bounded failed state on H errors without leaking raw secrets and preserves CAS conflicts', async () => {

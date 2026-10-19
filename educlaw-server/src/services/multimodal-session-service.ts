@@ -30,6 +30,7 @@ import {
   type ValidatedCandidateResult,
 } from '@educlaw/shared';
 import { getLogger } from '../lib/request-context.js';
+import { RiaContentError } from './ria-skill-markdown.js';
 import {
   assertMediaStageGate,
   type MediaConfirmationStage,
@@ -394,7 +395,7 @@ function withStableError<T>(operation: () => Promise<T>): Promise<T> {
       },
       'multimodal.session_service_failed',
     );
-    if (error instanceof MultimodalSessionServiceError) {
+    if (error instanceof MultimodalSessionServiceError || error instanceof RiaContentError) {
       throw error;
     }
     throw new MultimodalSessionServiceError();

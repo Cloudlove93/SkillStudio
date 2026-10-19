@@ -14,6 +14,7 @@ import type {
   GuidedCreationDocument,
   GuidedCreationSession,
   GuidedCreationSessionDetail,
+  StructuredGuidedInput,
 } from '@educlaw/shared';
 import { toast } from 'sonner';
 import { liteApi, type GuidedCreationSseEvent } from '../api/lite-api';
@@ -737,7 +738,10 @@ function SkillFirstWorkspaceContent() {
     }
   };
 
-  const start = (content: string) => {
+  const start = (
+    content: string,
+    structured_fields?: StructuredGuidedInput,
+  ) => {
     openInspector({ owner: 'guided', view: 'summary', title: '需求摘要' });
     const clientMessageId = createRequestId('message');
     setPendingGuidedMessage(
@@ -752,6 +756,7 @@ function SkillFirstWorkspaceContent() {
               content,
               client_message_id: clientMessageId,
               documents,
+              ...(structured_fields ? { structured_fields } : {}),
             },
             onEvent,
           ),
@@ -814,6 +819,25 @@ function SkillFirstWorkspaceContent() {
               revision_no: session.revision_no,
               request_id: requestId,
             },
+            onEvent,
+          ),
+        sessionId,
+      );
+    lastActionRef.current = action;
+    void action();
+  };
+
+  const summarize = () => {
+    if (!session) return;
+    openInspector({ owner: 'guided', view: 'summary', title: '需求摘要' });
+    const sessionId = session.id;
+    const revisionNo = session.revision_no;
+    const action = () =>
+      runStream(
+        (onEvent) =>
+          liteApi.summarizeGuidedCreationStream(
+            token,
+            { session_id: sessionId, revision_no: revisionNo },
             onEvent,
           ),
         sessionId,
@@ -1503,6 +1527,7 @@ function SkillFirstWorkspaceContent() {
                   error={error}
                   onSend={send}
                   onConfirm={confirm}
+                  onSummarize={summarize}
                   onRetry={() => lastActionRef.current?.()}
                   onFiles={(files) => void addFiles(files)}
                   onRemoveDocument={(index) =>
@@ -1538,7 +1563,7 @@ function SkillFirstWorkspaceContent() {
                 <StructuredSkillCreationPanel
                   documents={documents}
                   busy={busy}
-                  onSubmit={send}
+                  onSubmit={(content, fields) => start(content, fields)}
                   onFiles={(files) => void addFiles(files)}
                   onRemoveDocument={(index) =>
                     setDocuments((current) =>
@@ -1557,6 +1582,7 @@ function SkillFirstWorkspaceContent() {
                   error={error}
                   onSend={send}
                   onConfirm={confirm}
+                  onSummarize={summarize}
                   onRetry={() => lastActionRef.current?.()}
                   onFiles={(files) => void addFiles(files)}
                   onRemoveDocument={(index) =>

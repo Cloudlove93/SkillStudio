@@ -62,14 +62,16 @@ function isValidMultimodalImageUrl(value: string): boolean {
 export class LlmInvalidJsonError extends Error {
   constructor(message: string, options?: ErrorOptions) {
     super(message, options);
-    this.name = "LlmInvalidJsonError";
+    this.name = 'LlmInvalidJsonError';
   }
 }
 
 export class LlmOutputTruncatedError extends Error {
-  constructor(message = "LLM output token limit was exhausted before usable content was returned") {
+  constructor(
+    message = 'LLM output token limit was exhausted before usable content was returned',
+  ) {
     super(message);
-    this.name = "LlmOutputTruncatedError";
+    this.name = 'LlmOutputTruncatedError';
   }
 }
 
@@ -214,19 +216,22 @@ async function fetchWithNetworkRetry(
       return await fetch(url, init);
     } catch (error) {
       lastError = error;
-      if (error instanceof Error && error.name === "AbortError") {
+      if (error instanceof Error && error.name === 'AbortError') {
         llmLogger().error({
-          event: "llm.request.timeout",
+          event: 'llm.request.timeout',
           ...context,
           timeoutMs: config.llmTimeoutMs,
           error: safeError(error),
         });
-        throw new Error(`LLM request timed out after ${Math.round(config.llmTimeoutMs / 1000)} seconds`, { cause: error });
+        throw new Error(
+          `LLM request timed out after ${Math.round(config.llmTimeoutMs / 1000)} seconds`,
+          { cause: error },
+        );
       }
 
       const retryable = shouldRetryFetchFailure(error);
       llmLogger().warn({
-        event: "llm.request.retry",
+        event: 'llm.request.retry',
         ...context,
         attempt: attempt + 1,
         retries,
@@ -240,7 +245,9 @@ async function fetchWithNetworkRetry(
     }
   }
 
-  throw new Error(`LLM network request failed: ${describeFetchFailure(lastError)}. Please verify LLM_BASE_URL, LLM_MODEL, and network connectivity.`);
+  throw new Error(
+    `LLM network request failed: ${describeFetchFailure(lastError)}. Please verify LLM_BASE_URL, LLM_MODEL, and network connectivity.`,
+  );
 }
 
 export function supportsExplicitThinking(model?: string): boolean {
@@ -263,23 +270,29 @@ function buildChatCompletionBody(
   };
 
   if (supportsModelExplicitThinking(model)) {
-    body.thinking = { type: thinkingMode ?? "disabled" };
+    body.thinking = { type: thinkingMode ?? 'disabled' };
     return body;
   }
 
   body.temperature = temperature ?? 0.3;
+  if (/^qwen3\.5(?:-|$)/i.test(model)) {
+    body.chat_template_kwargs = { enable_thinking: thinkingMode === 'enabled' };
+  }
   return body;
 }
 
-async function createChatResponse(input: ChatRequestInput, stream: boolean): Promise<Response> {
+async function createChatResponse(
+  input: ChatRequestInput,
+  stream: boolean,
+): Promise<Response> {
   if (!config.llmApiKey) {
-    throw new Error("LLM_API_KEY is not configured");
+    throw new Error('LLM_API_KEY is not configured');
   }
 
   const messages = buildMessages(input);
   const model = input.model || config.llmModel;
   logLlmRequestStart(
-    "prompt",
+    'prompt',
     messages,
     model,
     stream,
@@ -290,25 +303,32 @@ async function createChatResponse(input: ChatRequestInput, stream: boolean): Pro
   const response = await fetchWithNetworkRetry(
     `${config.llmBaseUrl}/chat/completions`,
     {
-      method: "POST",
+      method: 'POST',
       headers: {
         Authorization: `Bearer ${config.llmApiKey}`,
-        "Content-Type": "application/json",
+        'Content-Type': 'application/json',
       },
-      body: JSON.stringify(buildChatCompletionBody(
-        model,
-        messages,
-        stream,
-        input.temperature,
-        input.maxTokens,
-        input.thinkingMode,
-      )),
-      signal: input.signal ? AbortSignal.any([input.signal, AbortSignal.timeout(config.llmTimeoutMs)]) : createAbortSignal(config.llmTimeoutMs),
+      body: JSON.stringify(
+        buildChatCompletionBody(
+          model,
+          messages,
+          stream,
+          input.temperature,
+          input.maxTokens,
+          input.thinkingMode,
+        ),
+      ),
+      signal: input.signal
+        ? AbortSignal.any([
+            input.signal,
+            AbortSignal.timeout(config.llmTimeoutMs),
+          ])
+        : createAbortSignal(config.llmTimeoutMs),
     },
-    { kind: "prompt", model, stream },
+    { kind: 'prompt', model, stream },
   );
 
-  logLlmResponseMeta("prompt", model, response);
+  logLlmResponseMeta('prompt', model, response);
 
   if (!response.ok) {
     await response.body?.cancel().catch(() => undefined);
@@ -318,29 +338,36 @@ async function createChatResponse(input: ChatRequestInput, stream: boolean): Pro
   return response;
 }
 
-async function createChatResponseMessages(messages: ChatMessage[], model?: string, temperature?: number, stream = false): Promise<Response> {
+async function createChatResponseMessages(
+  messages: ChatMessage[],
+  model?: string,
+  temperature?: number,
+  stream = false,
+): Promise<Response> {
   if (!config.llmApiKey) {
-    throw new Error("LLM_API_KEY is not configured");
+    throw new Error('LLM_API_KEY is not configured');
   }
 
   const resolvedModel = model || config.llmModel;
-  logLlmRequestStart("messages", messages, resolvedModel, stream);
+  logLlmRequestStart('messages', messages, resolvedModel, stream);
 
   const response = await fetchWithNetworkRetry(
     `${config.llmBaseUrl}/chat/completions`,
     {
-      method: "POST",
+      method: 'POST',
       headers: {
         Authorization: `Bearer ${config.llmApiKey}`,
-        "Content-Type": "application/json",
+        'Content-Type': 'application/json',
       },
-      body: JSON.stringify(buildChatCompletionBody(resolvedModel, messages, stream, temperature)),
+      body: JSON.stringify(
+        buildChatCompletionBody(resolvedModel, messages, stream, temperature),
+      ),
       signal: createAbortSignal(config.llmTimeoutMs),
     },
-    { kind: "messages", model: resolvedModel, stream },
+    { kind: 'messages', model: resolvedModel, stream },
   );
 
-  logLlmResponseMeta("messages", resolvedModel, response);
+  logLlmResponseMeta('messages', resolvedModel, response);
 
   if (!response.ok) {
     await response.body?.cancel().catch(() => undefined);
@@ -355,7 +382,7 @@ async function readChatParts(response: Response): Promise<{
   reasoningContent: string;
   finishReason?: string;
 }> {
-  const json = await response.json() as {
+  const json = (await response.json()) as {
     choices?: Array<{
       finish_reason?: string;
       message?: { content?: string | null; reasoning_content?: string | null };
@@ -363,8 +390,8 @@ async function readChatParts(response: Response): Promise<{
   };
   const choice = json.choices?.[0];
   return {
-    content: choice?.message?.content?.trim() || "",
-    reasoningContent: choice?.message?.reasoning_content?.trim() || "",
+    content: choice?.message?.content?.trim() || '',
+    reasoningContent: choice?.message?.reasoning_content?.trim() || '',
     finishReason: choice?.finish_reason,
   };
 }
@@ -543,14 +570,20 @@ export async function generateJson<T>(
         return parseJsonObject<T>(raw);
       } catch (parseError) {
         llmLogger().warn({
-          event: "llm.response.invalid_json",
+          event: 'llm.response.invalid_json',
           model: jsonInput.model || config.llmModel,
           attempt: attempt + 1,
-          error: parseError instanceof Error ? parseError.message : String(parseError),
-          preview: jsonInput.hidePromptContentInLogs ? "[redacted]" : truncateForLog(raw, 500),
+          error: jsonInput.hidePromptContentInLogs
+            ? 'JSON_SYNTAX_INVALID'
+            : parseError instanceof Error
+              ? parseError.message
+              : String(parseError),
+          preview: jsonInput.hidePromptContentInLogs
+            ? '[redacted]'
+            : truncateForLog(raw, 500),
         });
         if (!repairInvalidJson) {
-          throw new LlmInvalidJsonError("Model returned invalid JSON", {
+          throw new LlmInvalidJsonError('Model returned invalid JSON', {
             cause: parseError,
           });
         }
@@ -567,24 +600,25 @@ export async function generateJson<T>(
     }
   }
   if (lastError instanceof LlmInvalidJsonError) throw lastError;
-  throw new Error(`JSON generation failed: ${lastError?.message || "model did not return parseable JSON"}`);
+  throw new Error(
+    `JSON generation failed: ${lastError?.message || 'model did not return parseable JSON'}`,
+  );
 }
 
 export async function generateMultimodalJson<T>(
   input: MultimodalJsonRequestInput,
 ): Promise<T> {
   if (!config.llmApiKey) {
-    throw new Error("LLM_API_KEY is not configured");
+    throw new Error('LLM_API_KEY is not configured');
   }
   if (input.images.length < 1 || input.images.length > 16) {
-    throw new Error("Multimodal image count is invalid");
+    throw new Error('Multimodal image count is invalid');
   }
   for (const image of input.images) {
     if (!isValidMultimodalImageUrl(image.imageUrl)) {
-      throw new Error("Multimodal image URL is invalid");
+      throw new Error('Multimodal image URL is invalid');
     }
   }
-
   const model = input.model || config.llmModel;
   const userText = [
     input.userPrompt,
@@ -613,8 +647,8 @@ export async function generateMultimodalJson<T>(
   ];
 
   llmLogger().info({
-    event: "llm.request.start",
-    kind: "multimodal-json",
+    event: 'llm.request.start',
+    kind: 'multimodal-json',
     model,
     stream: false,
     maxTokens: input.maxTokens,
@@ -622,7 +656,7 @@ export async function generateMultimodalJson<T>(
     messageCount: messages.length,
     imageCount: input.images.length,
     baseUrl: config.llmBaseUrl,
-    messages: "[redacted]",
+    messages: '[redacted]',
   });
 
   const body: Record<string, unknown> = {
@@ -632,34 +666,36 @@ export async function generateMultimodalJson<T>(
     ...(input.maxTokens ? { max_tokens: input.maxTokens } : {}),
   };
   if (supportsModelExplicitThinking(model)) {
-    body.thinking = { type: "disabled" };
+    body.thinking = { type: 'disabled' };
   } else {
     body.temperature = 0;
+    if (/^qwen3\.5(?:-|$)/i.test(model))
+      body.chat_template_kwargs = { enable_thinking: false };
   }
 
   const response = await fetchWithNetworkRetry(
     `${config.llmBaseUrl}/chat/completions`,
     {
-      method: "POST",
+      method: 'POST',
       headers: {
         Authorization: `Bearer ${config.llmApiKey}`,
-        "Content-Type": "application/json",
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify(body),
       signal: createAbortSignal(config.llmTimeoutMs),
     },
-    { kind: "multimodal-json", model, stream: false },
+    { kind: 'multimodal-json', model, stream: false },
   );
-  logLlmResponseMeta("multimodal-json", model, response);
+  logLlmResponseMeta('multimodal-json', model, response);
   if (!response.ok) {
     throw new Error(`LLM multimodal request failed: ${response.status}`);
   }
   const raw = await readChatText(response);
-  logLlmTextResult("multimodal-json", model, raw, true);
+  logLlmTextResult('multimodal-json', model, raw, true);
   try {
     return parseJsonObject<T>(raw);
   } catch (error) {
-    throw new LlmInvalidJsonError("Model returned invalid multimodal JSON", {
+    throw new LlmInvalidJsonError('Model returned invalid multimodal JSON', {
       cause: error,
     });
   }
@@ -683,26 +719,29 @@ async function repairJsonOutput<T>(
     temperature: 0,
     maxTokens: input.maxTokens,
     systemPrompt: [
-      "You repair invalid JSON.",
-      "Return one strict JSON object only.",
-      "Do not add Markdown fences, comments, or explanation.",
-      "Preserve the original keys and content.",
-      "Escape all newlines, quotes, and backslashes inside string values.",
+      'You repair invalid JSON.',
+      'Return one strict JSON object only.',
+      'Do not add Markdown fences, comments, or explanation.',
+      'Preserve the original keys and content.',
+      'Escape all newlines, quotes, and backslashes inside string values.',
       STRICT_JSON_CONTRACT,
-    ].join("\n"),
+    ].join('\n'),
     userPrompt: [
-      "The following model output was expected to be JSON, but JSON.parse failed.",
+      'The following model output was expected to be JSON, but JSON.parse failed.',
       `Parse error: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
-      "",
-      "Repair it into strict JSON:",
+      '',
+      'Repair it into strict JSON:',
       raw,
-    ].join("\n"),
+    ].join('\n'),
     hidePromptContentInLogs: input.hidePromptContentInLogs,
   });
 
   try {
     return parseJsonObject<T>(repaired);
   } catch (repairError) {
-    throw new Error(`Model returned invalid JSON and automatic repair also failed: ${repairError instanceof Error ? repairError.message : String(repairError)}`, { cause: repairError });
+    throw new Error(
+      `Model returned invalid JSON and automatic repair also failed: ${repairError instanceof Error ? repairError.message : String(repairError)}`,
+      { cause: repairError },
+    );
   }
 }

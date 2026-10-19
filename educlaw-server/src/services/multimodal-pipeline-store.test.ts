@@ -139,8 +139,12 @@ describe('multimodal pipeline store', () => {
 
     expect(result).toEqual({ acquired: true, result: 'done' });
     expect(work).toHaveBeenCalledOnce();
-    expect(String(connectionQuery.mock.calls[0]?.[0])).toContain('pg_try_advisory_lock');
-    expect(String(connectionQuery.mock.calls[1]?.[0])).toContain('pg_advisory_unlock');
+    expect(String(connectionQuery.mock.calls[0]?.[0])).toContain(
+      'pg_try_advisory_lock',
+    );
+    expect(String(connectionQuery.mock.calls[1]?.[0])).toContain(
+      'pg_advisory_unlock',
+    );
     expect(connectionQuery.mock.calls[0]?.[1]).toEqual([
       'educlaw:multimodal-pipeline:101',
     ]);
@@ -220,11 +224,15 @@ describe('multimodal pipeline store', () => {
       withTransaction: vi.fn(),
     });
 
-    await expect(store.scanRunnableSessions({ limit: 0 })).rejects.toMatchObject({
+    await expect(
+      store.scanRunnableSessions({ limit: 0 }),
+    ).rejects.toMatchObject({
       code: 'INVALID_ARGUMENT',
       statusCode: 422,
     });
-    await expect(store.scanRunnableSessions({ limit: 1 })).rejects.toMatchObject({
+    await expect(
+      store.scanRunnableSessions({ limit: 1 }),
+    ).rejects.toMatchObject({
       code: 'MULTIMODAL_PIPELINE_FAILED',
       statusCode: 500,
     });
@@ -387,7 +395,9 @@ describe('multimodal pipeline store', () => {
     expect(updateSql).toContain('and revision_no = $9');
     expect(updateSql).toContain('and media_stage = $10');
     expect(updateSql).toContain('error_json = null');
-    expect(snapshot.mediaState.candidatePassMeta?.frameworks.model).toBe('framework-model');
+    expect(snapshot.mediaState.candidatePassMeta?.frameworks.model).toBe(
+      'framework-model',
+    );
   });
 
   it('rejects invalid store inputs before SQL and keeps direct-write invariants', async () => {
@@ -436,30 +446,37 @@ describe('multimodal pipeline store', () => {
     expect(query).not.toHaveBeenCalled();
   });
 
-  it('persists bounded pipeline failures with FOR UPDATE and CAS guards', async () => {
-    const db = {
-      query: vi
-        .fn()
-        .mockResolvedValueOnce({ rows: [makeRow()] })
-        .mockResolvedValueOnce({
-          rowCount: 1,
-          rows: [
-            makeRow({
-              media_stage: 'failed',
-              status: 'failed',
-              revision_no: 4,
-              updated_at: '2026-08-21T10:01:00.000Z',
-              error_json: {
-                code: 'MULTIMODAL_PIPELINE_FAILED',
-                stage: 'extracting_candidates',
-                retryable: true,
-                message: '候选提取失败，请稍后重试',
-                resumeStage: 'extracting_candidates',
-              },
-            }),
-          ],
-        }),
-    };
+  it.each([
+    'building_semantic_windows',
+    'building_evidence',
+    'building_adler',
+    'extracting_candidates',
+  ] as const)(
+    'persists bounded %s failures with FOR UPDATE and CAS guards',
+    async (stage) => {
+      const db = {
+        query: vi
+          .fn()
+          .mockResolvedValueOnce({ rows: [makeRow({ media_stage: stage })] })
+          .mockResolvedValueOnce({
+            rowCount: 1,
+            rows: [
+              makeRow({
+                media_stage: 'failed',
+                status: 'failed',
+                revision_no: 4,
+                updated_at: '2026-08-21T10:01:00.000Z',
+                error_json: {
+                  code: 'MULTIMODAL_PIPELINE_FAILED',
+                  stage: stage,
+                  retryable: true,
+                  message: '候选提取失败，请稍后重试',
+                  resumeStage: stage,
+                },
+              }),
+            ],
+          }),
+      };
     const withTransaction = vi.fn(async (callback) => callback(db));
     const store = createMultimodalPipelineStore({
       query: vi.fn(),
@@ -467,28 +484,29 @@ describe('multimodal pipeline store', () => {
       now: () => new Date('2026-08-21T10:01:00.000Z'),
     });
 
-    const snapshot = await store.persistPipelineFailure({
-      authUserId: 'user-1',
-      sessionId: '101',
-      expectedRevisionNo: 3,
-      expectedStage: 'extracting_candidates',
-      error: {
-        code: 'MULTIMODAL_PIPELINE_FAILED',
-        stage: 'extracting_candidates',
-        retryable: true,
-        message: '候选提取失败，请稍后重试',
-        resumeStage: 'extracting_candidates',
-      },
-    });
+      const snapshot = await store.persistPipelineFailure({
+        authUserId: 'user-1',
+        sessionId: '101',
+        expectedRevisionNo: 3,
+        expectedStage: stage,
+        error: {
+          code: 'MULTIMODAL_PIPELINE_FAILED',
+          stage: stage,
+          retryable: true,
+          message: '候选提取失败，请稍后重试',
+          resumeStage: stage,
+        },
+      });
 
-    expect(snapshot.mediaStage).toBe('failed');
+      expect(snapshot.mediaStage).toBe('failed');
     const [selectSql] = db.query.mock.calls[0]!;
     const [updateSql] = db.query.mock.calls[1]!;
-    expect(selectSql).toContain('for update');
-    expect(updateSql).toContain('error_json = $5::jsonb');
-    expect(updateSql).toContain('and revision_no = $9');
-    expect(updateSql).toContain('and media_stage = $10');
-  });
+      expect(selectSql).toContain('for update');
+      expect(updateSql).toContain('error_json = $5::jsonb');
+      expect(updateSql).toContain('and revision_no = $9');
+      expect(updateSql).toContain('and media_stage = $10');
+    },
+  );
 
   it('resumes a retryable session-level pipeline failure with state-machine and CAS guards', async () => {
     const failedError = {

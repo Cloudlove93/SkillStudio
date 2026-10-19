@@ -45,7 +45,10 @@ function mergeDegradations(
 ): MediaEvidenceDegradation[] {
   const unique = new Map<string, MediaEvidenceDegradation>();
   for (const item of groups.flat()) {
-    unique.set(`${item.code}\u0000${item.message}\u0000${item.semanticMomentId ?? ''}`, item);
+    unique.set(
+      `${item.code}\u0000${item.message}\u0000${item.semanticMomentId ?? ''}`,
+      item,
+    );
   }
   return [...unique.values()];
 }
@@ -84,6 +87,25 @@ export function createMultimodalDistillationPipelineOrchestrator(
   const store = dependencies.store ?? createMultimodalDistillationPipelineStore();
   const evidence = dependencies.mediaEvidenceService;
   const sessionService = dependencies.sessionService;
+
+  async function assertActive(
+    authUserId: string,
+    snapshot: MultimodalPipelineSnapshot,
+  ) {
+    const current = await store.loadSnapshot({
+      authUserId,
+      sessionId: snapshot.sessionId,
+    });
+    if (
+      current.mediaStage !== snapshot.mediaStage ||
+      current.revisionNo !== snapshot.revisionNo
+    )
+      fail(
+        'SESSION_REVISION_CONFLICT',
+        '会话状态已更新，停止后续模型调用',
+        409,
+      );
+  }
 
   async function loadPrepare(snapshot: MultimodalPipelineSnapshot) {
     const job = await store.loadLatestJob({
@@ -126,12 +148,16 @@ export function createMultimodalDistillationPipelineOrchestrator(
         fail('MULTIMODAL_PIPELINE_FAILED', '转录结果损坏', 500);
       }
     }
+    await assertActive(authUserId, snapshot);
     const transcriptCorrection = await evidence.correctTranscript({
+      beforeModelCall: () => assertActive(authUserId, snapshot),
       transcript: snapshot.mediaState.transcript,
     });
     const transcript =
       transcriptCorrection?.transcript ?? snapshot.mediaState.transcript;
+    await assertActive(authUserId, snapshot);
     const semantic = await evidence.generateSemanticMoments({
+      beforeModelCall: () => assertActive(authUserId, snapshot),
       primarySource,
       durationMs: prepare.durationMs,
       transcript,
@@ -240,11 +266,14 @@ export function createMultimodalDistillationPipelineOrchestrator(
     }
     let frameOutput;
     try {
-      frameOutput = parseFrameMaterializeOutputManifest(frameJob.outputManifest);
+      frameOutput = parseFrameMaterializeOutputManifest(
+        frameJob.outputManifest,
+      );
     } catch {
       fail('MULTIMODAL_PIPELINE_FAILED', '视频抽帧结果损坏', 500);
     }
     const ranked = await evidence.rankVisualCandidates({
+      beforeModelCall: () => assertActive(authUserId, snapshot),
       sourceKind: primarySource.kind,
       durationMs: prepare.durationMs,
       semanticMoments: snapshot.mediaState.semanticMoments,
@@ -301,7 +330,10 @@ export function createMultimodalDistillationPipelineOrchestrator(
     snapshot: MultimodalPipelineSnapshot,
   ) {
     const primarySource = snapshot.mediaState.primarySource;
-    if (!primarySource || snapshot.mediaState.evidenceTimeline.evidenceItems.length < 1) {
+    if (
+      !primarySource ||
+      snapshot.mediaState.evidenceTimeline.evidenceItems.length < 1
+    ) {
       fail('MULTIMODAL_PIPELINE_FAILED', 'Adler 生成前置证据损坏', 500);
     }
     const hasFrameEvidence = snapshot.mediaState.evidenceTimeline.evidenceItems.some(
@@ -317,6 +349,7 @@ export function createMultimodalDistillationPipelineOrchestrator(
     ) {
       return runEvidence(authUserId, snapshot, { repairBuildingAdler: true });
     }
+    await assertActive(authUserId, snapshot);
     const adlerOverview = await sessionService.generateAdlerOverview({
       primarySource,
       transcript: snapshot.mediaState.transcript,

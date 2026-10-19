@@ -23,6 +23,17 @@ import {
 } from '@educlaw/shared';
 
 describe('multimodal contract', () => {
+  it('round-trips bounded visual excerpts while old frame and audio evidence stay readable', () => {
+    const frame={evidenceId:'frame-e1',kind:'frame',source:{primarySourceId:'video-1'},timeRange:{startMs:21000,endMs:21001},text:'旧画面说明',assetRef:{objectKey:'skill-sessions/1/frames/a.png',mimeType:'image/png',sizeBytes:100,sha256:'a'.repeat(64)},provenance:{method:'vision_soft_ranking',processorVersion:'v1',editedByUser:false},claimType:'modelInference',selectionReason:'清晰'};
+    expect(parseEvidenceCard(frame).text).toBe('旧画面说明');
+    const observed={...frame,visualObservation:{visibleText:['连续3次全对才撤架；否则再做5道复核题。'],uncertainties:[]}};
+    expect(parseEvidenceCard(observed)).toMatchObject({visualObservation:{visibleText:['连续3次全对才撤架；否则再做5道复核题。'],uncertainties:[]}});
+    expect(()=>parseEvidenceCard({...observed,visualObservation:{visibleText:Array(5).fill('一条'),uncertainties:[]}})).toThrow();
+    expect(()=>parseEvidenceCard({...observed,visualObservation:{visibleText:['甲'.repeat(201)],uncertainties:[]}})).toThrow();
+    expect(()=>parseEvidenceCard({...observed,visualObservation:{visibleText:[],uncertainties:[]}})).toThrow();
+    expect(()=>parseEvidenceCard({...observed,kind:'audio_segment'})).toThrow();
+    expect(parseEvidenceCard({...frame,kind:'audio_segment'}).kind).toBe('audio_segment');
+  });
   it('exports shared media stage contracts for both server and web consumers', () => {
     expect(MEDIA_STAGES).toContain('ready_to_publish');
     expect(MEDIA_STAGES).toContain('published');

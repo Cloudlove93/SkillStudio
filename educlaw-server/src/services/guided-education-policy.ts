@@ -77,13 +77,30 @@ export interface GuidedEducationEvaluation {
   ready_for_confirmation: boolean;
 }
 
+// Whitespace and punctuation are noise here: the model frequently re-types the
+// same words with different punctuation, which previously dropped user evidence
+// to `inferred` and made the interview re-ask the same dimension forever.
+const EVIDENCE_NOISE = /[\s\u3000，。！？、；：,!?;:"'“”‘’]/g;
+
 function normalizeEvidence(value: string): string {
-  return value.normalize('NFKC').toLocaleLowerCase().replace(/\s+/g, '');
+  return value
+    .normalize('NFKC')
+    .toLocaleLowerCase()
+    .replace(EVIDENCE_NOISE, '');
 }
 
-function isQuotedByUser(userMessage: string, quote: string | undefined): boolean {
+function isQuotedByUser(
+  userMessage: string,
+  quote: string | undefined,
+): boolean {
   if (!quote?.trim()) return false;
-  return normalizeEvidence(userMessage).includes(normalizeEvidence(quote));
+  const evidence = normalizeEvidence(quote);
+  if (!evidence) return false;
+  // Require a complete source sentence/line. A substring can drop a negation,
+  // subject or numeric qualifier; fuzzy character overlap proves no provenance.
+  return [userMessage, ...userMessage.split(/[。！？!?；;\n]+/u)].some(
+    (sentence) => normalizeEvidence(sentence) === evidence,
+  );
 }
 
 function assertDimension(
@@ -117,18 +134,36 @@ export function sanitizeEducationOperations(
         ? operation.op
         : 'set';
 
-    // remove 操作由用户主动撤回，不需要 content/source；但不能撤回不存在的维度。
+    // A model cannot withdraw user-owned evidence without a verified request.
     if (op === 'remove') {
       if (!currentDraft[operation.dimension]?.content) continue;
+      const quote = operation.quote?.trim() ?? '';
+      if (
+        !isQuotedByUser(userMessage, quote) ||
+        !/(?:删除|移除|撤回|取消|去掉|清空)/u.test(quote) ||
+        /(?:不|别|不要|无需)(?:再)?(?:删除|移除|撤回|取消|去掉|清空)/u.test(
+          quote,
+        ) ||
+        !quote.includes(GUIDED_EDUCATION_LABELS[operation.dimension])
+      )
+        continue;
       accepted.push({ ...operation, op, content: '' });
       continue;
     }
 
+    if (operation.source === 'conflicted' && !operation.content?.trim()) {
+      if (currentDraft[operation.dimension]?.content)
+        accepted.push({ ...operation, op, content: '' });
+      continue;
+    }
     if (!operation.content?.trim()) continue;
 
     let source = operation.source;
+    // Adoption is established only by the server against the existing step,
+    // never by attaching "好的" to a new model-authored conclusion.
+    if (source === 'user_adopted') source = 'inferred';
     if (
-      (source === 'user_explicit' || source === 'user_adopted') &&
+      source === 'user_explicit' &&
       !isQuotedByUser(userMessage, operation.quote)
     ) {
       source = 'inferred';
@@ -136,13 +171,11 @@ export function sanitizeEducationOperations(
 
     const existing = currentDraft[operation.dimension];
     // replace 必须由用户主动纠正，降级为 inferred 时不再视为替换，避免后端误覆盖。
-    if (
-      op === 'replace' &&
-      source !== 'user_explicit' &&
-      source !== 'user_adopted'
-    ) {
+    if (op === 'replace' && source !== 'user_explicit') {
       // 推测不能覆盖用户已有内容，跳过该操作。
-      if (existing?.evidence.some((item) => USER_OWNED_SOURCES.has(item.source))) {
+      if (
+        existing?.evidence.some((item) => USER_OWNED_SOURCES.has(item.source))
+      ) {
         continue;
       }
     }
@@ -156,7 +189,12 @@ export function sanitizeEducationOperations(
     accepted.push({
       ...operation,
       op,
-      content: operation.content.trim(),
+      // The verified quotation is authoritative; a model paraphrase can reverse
+      // its meaning even while attaching a correct source quote.
+      content:
+        source === 'user_explicit'
+          ? operation.quote!.trim()
+          : operation.content.trim(),
       source,
     });
   }
@@ -326,7 +364,15 @@ export function buildEducationConfirmationCard(
     sections: GUIDED_EDUCATION_DIMENSIONS.map((dimension) => ({
       key: dimension,
       title: GUIDED_EDUCATION_LABELS[dimension],
-      content: draft[dimension]?.content?.trim() || '待确认',
+      content: !draft[dimension]?.content?.trim()
+        ? '待确认'
+        : draft[dimension]!.evidence.some(
+              (item) => item.source === 'conflicted',
+            )
+          ? `${draft[dimension]!.content}（存在冲突，待澄清）`
+          : !hasUserEvidence(draft, dimension)
+            ? `${draft[dimension]!.content}（推断，待确认）`
+            : draft[dimension]!.content.trim(),
     })),
   };
 }

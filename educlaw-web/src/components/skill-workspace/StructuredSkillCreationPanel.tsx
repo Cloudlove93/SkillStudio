@@ -14,7 +14,7 @@ import { useWorkspaceInspector } from './WorkspaceInspectorProvider';
 type Props = {
   documents: GuidedCreationDocument[];
   busy: boolean;
-  onSubmit: (content: string) => void;
+  onSubmit: (content: string, fields: StructuredSkillDraft) => void;
   onFiles: (files: FileList) => void;
   onRemoveDocument: (index: number) => void;
 };
@@ -55,7 +55,7 @@ export function StructuredSkillCreationPanel({
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (busy || !hasStructuredSkillInput(draft)) return;
-    onSubmit(formatStructuredSkillRequest(draft));
+    onSubmit(formatStructuredSkillRequest(draft), draft);
   };
 
   return (

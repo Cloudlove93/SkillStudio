@@ -8,6 +8,7 @@ import type {
 } from '@educlaw/shared';
 import { GuidedCreationError } from './guided-creation-service.js';
 import { getLogger } from '../lib/request-context.js';
+import { RiaContentError } from './ria-skill-markdown.js';
 import {
   createMultimodalPipelineStore,
   type MultimodalPipelineSnapshot,
@@ -219,7 +220,7 @@ function normalizePipelineFailure(
   thrown: MultimodalPipelineOrchestratorError;
 } {
   const retryable = isGuidedCreationError(error) ? error.retryable : true;
-  const message =
+  const message = error instanceof RiaContentError ? error.message :
     stage === 'extracting_candidates'
       ? '候选提取未完成'
       : stage === 'validating_candidates'

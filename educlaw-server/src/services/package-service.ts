@@ -1,4 +1,5 @@
 import AdmZip, { type IZipEntry } from 'adm-zip';
+import { classifyGenerationFailure } from './generation-failure.js';
 import type {
   AgentPackageDetail,
   AgentPackageSnapshot,
@@ -225,15 +226,17 @@ function getMarkdownHeadingLevel(line: string): number | null {
 }
 
 function normalizeSectionHeading(line: string): string {
-  return line
-    .trim()
-    .replace(/^#{1,6}\s*/, '')
-    .replace(/^[\d.\-()（）一二三四五六七八九十、\s]+/, '')
-    // 剥掉末尾的括号副标题，如 "评价准则（基于智能体输出的评价维度）" → "评价准则"
-    .replace(/\s*[（(][^（）()]*[)）]\s*$/, '')
-    .replace(/[:：]\s*$/, '')
-    .trim()
-    .toLowerCase();
+  return (
+    line
+      .trim()
+      .replace(/^#{1,6}\s*/, '')
+      .replace(/^[\d.\-()（）一二三四五六七八九十、\s]+/, '')
+      // 剥掉末尾的括号副标题，如 "评价准则（基于智能体输出的评价维度）" → "评价准则"
+      .replace(/\s*[（(][^（）()]*[)）]\s*$/, '')
+      .replace(/[:：]\s*$/, '')
+      .trim()
+      .toLowerCase()
+  );
 }
 
 function isRubricSectionHeading(line: string): boolean {
@@ -450,7 +453,12 @@ function extractRubricSectionFromText(content: string): string {
   if (!normalizedContent) return '';
 
   const lines = normalizedContent.split(/\r?\n/);
-  const candidates: Array<{ startIndex: number; endIndex: number; extracted: string; score: number }> = [];
+  const candidates: Array<{
+    startIndex: number;
+    endIndex: number;
+    extracted: string;
+    score: number;
+  }> = [];
 
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index] ?? '';
@@ -477,7 +485,11 @@ function extractRubricSectionFromText(content: string): string {
   if (candidates.length > 0) {
     // 按文档出现顺序排序，合并重叠/相邻的段落
     candidates.sort((left, right) => left.startIndex - right.startIndex);
-    const merged: Array<{ startIndex: number; endIndex: number; extracted: string }> = [];
+    const merged: Array<{
+      startIndex: number;
+      endIndex: number;
+      extracted: string;
+    }> = [];
     for (const cand of candidates) {
       const last = merged[merged.length - 1];
       if (last && cand.startIndex <= last.endIndex + 2) {
@@ -508,7 +520,10 @@ function extractRubricSectionFromText(content: string): string {
         });
       }
     }
-    return merged.map((m) => m.extracted).join('\n\n').trim();
+    return merged
+      .map((m) => m.extracted)
+      .join('\n\n')
+      .trim();
   }
 
   for (let index = 0; index < lines.length; index += 1) {
@@ -584,7 +599,10 @@ function reconstructDocxFlatTable(content: string): string {
    * 允许单元格之间有 1 个空行间隔（mammoth 常见输出格式）。
    * 遇到 markdown 标题、编号章节标题、或 2+ 连续空行时停止。
    */
-  function collectFlatCells(startIdx: number): { cells: string[]; nextIdx: number } {
+  function collectFlatCells(startIdx: number): {
+    cells: string[];
+    nextIdx: number;
+  } {
     const cells: string[] = [];
     let j = startIdx;
     let lastBlank = false;
@@ -594,7 +612,11 @@ function reconstructDocxFlatTable(content: string): string {
         // 连续 2 个空行 → 结束
         if (lastBlank) break;
         // 空行后还有内容 → 允许跳过 1 个空行
-        if (j + 1 < lines.length && (lines[j + 1] ?? '').trim() && cells.length > 0) {
+        if (
+          j + 1 < lines.length &&
+          (lines[j + 1] ?? '').trim() &&
+          cells.length > 0
+        ) {
           lastBlank = true;
           j += 1;
           continue;
@@ -635,7 +657,7 @@ function reconstructDocxFlatTable(content: string): string {
 
   while (i < lines.length) {
     const line = lines[i] ?? '';
-    const trimmed = line.trim();
+  const trimmed = line.trim();
 
     // 检测表头起点：短行命中 HEADER_SIGNAL_WORDS
     if (trimmed && trimmed.length <= 30 && HEADER_SIGNAL_WORDS.test(trimmed)) {
@@ -1805,42 +1827,43 @@ function getBaseOutputSchemaPrompt(): string {
   ].join('\n');
 }
 
+export function extractExplicitSkillName(
+  instruction: string,
+): string | undefined {
+  return (
+    instruction
+      .match(
+        /(?:^|\n)\s*Skill\s*名称[：:]\s*([^\n。！？]{1,80})(?=[\n。！？]|$)/i,
+      )?.[1]
+      ?.trim() || undefined
+  );
+}
+
 function createFallbackBase(
   instruction: string,
   documents?: Array<{ name: string; content: string }>,
-): PackageBaseGenerationResult {
+): PackageBaseGenerationResult | null {
   const firstDocumentName = documents?.[0]?.name
     ?.replace(/\.[^.]+$/, '')
     .trim();
-  const source =
-    instruction.trim() ||
-    documents
-      ?.map((document) => document.content)
-      .join('\n')
-      .trim() ||
-    '';
-  const compact = source.replace(/\s+/g, ' ').slice(0, 28).trim();
-  const name = firstDocumentName || (compact ? `${compact}助手` : '智能体助手');
-  const description = compact
-    ? `用于根据“${compact}”相关需求完成分析、生成与答疑任务。`
-    : '用于根据用户需求和上传资料完成分析、生成与答疑任务。';
+  const explicitName = extractExplicitSkillName(instruction);
+  const task = instruction
+    .match(/(?:^|\n)\s*(?:教育目标|希望完成的任务|任务)[：:]\s*([^\n]+)/)?.[1]
+    ?.trim();
+  const title =
+    explicitName || task || firstDocumentName?.replace(/^上传材料[-_ ]*/, '');
+  if (!title || /^(?:未明确|待确认)$/.test(title)) return null;
+  const name = explicitName || `${truncateByCodePoints(title, 17)}（待核对）`;
+  const description = `用于完成${title}相关任务；名称生成降级，请核对标题与内容。`;
 
   return {
-    name: sanitizeGeneratedPackageName(name),
+    name,
     description,
     skills: [
       {
         dirName: 'core-task',
-        name: '核心任务处理',
-        description:
-          '用于当用户提出核心任务时，分析需求并生成结构化、高质量的回答。',
-      },
-      {
-        dirName: documents?.length ? 'document-grounding' : 'quality-review',
-        name: documents?.length ? '资料理解与引用' : '质量检查',
-        description: documents?.length
-          ? '用于遇到上传资料时，提取关键信息并基于资料完成回答。'
-          : '用于在输出前检查内容的准确性、完整性和表达质量。',
+        name,
+        description,
       },
     ],
   };
@@ -1848,17 +1871,37 @@ function createFallbackBase(
 
 function normalizeBaseMetadataJson(
   parsed: Partial<PackageBaseGenerationResult>,
-  fallback: PackageBaseGenerationResult,
 ): PackageBaseGenerationResult {
+  if (
+    !parsed ||
+    typeof parsed !== 'object' ||
+    typeof parsed.name !== 'string' ||
+    !parsed.name.trim() ||
+    typeof parsed.description !== 'string' ||
+    !parsed.description.trim() ||
+    !Array.isArray(parsed.skills) ||
+    parsed.skills.length === 0 ||
+    parsed.skills.some(
+      (skill) =>
+        !skill ||
+        ['dirName', 'name', 'description'].some(
+          (key) =>
+            typeof skill[key as keyof typeof skill] !== 'string' ||
+            !String(skill[key as keyof typeof skill]).trim(),
+        ),
+    )
+  ) {
+    throw new Error('BASE_METADATA_FIELDS_MISSING');
+  }
   return {
     name:
       typeof parsed.name === 'string' && parsed.name.trim()
         ? sanitizeGeneratedPackageName(parsed.name)
-        : sanitizeGeneratedPackageName(fallback.name),
+        : '',
     description:
       typeof parsed.description === 'string' && parsed.description.trim()
         ? parsed.description
-        : fallback.description,
+        : '',
     skills:
       Array.isArray(parsed.skills) && parsed.skills.length > 0
         ? parsed.skills.map((skill, index) => ({
@@ -1875,7 +1918,7 @@ function normalizeBaseMetadataJson(
                 ? skill.description
                 : `用于当用户需要技能 ${index + 1} 时提供支持。`,
           }))
-        : fallback.skills,
+        : [],
   };
 }
 
@@ -2354,11 +2397,19 @@ export async function buildGeneratedPackageSnapshot(input: {
   });
 
   const fallbackBase = createFallbackBase(instruction, documents);
+  const explicitName = extractExplicitSkillName(instruction);
   let base: PackageBaseGenerationResult;
   try {
     const baseJson = await generateJson<Partial<PackageBaseGenerationResult>>({
       model,
-      systemPrompt: buildBaseMetadataSystemPrompt(),
+      systemPrompt: [
+        buildBaseMetadataSystemPrompt(),
+        ...(maxSkills === 1
+          ? [
+              '本次只生成一个完整教学任务的 Skill，skills 数组恰好一项；将材料中的诊断、设计、支架与复核组织为同一工作流程，不要拆分成多个 Skill。',
+            ]
+          : []),
+      ].join('\n'),
       userPrompt: buildBaseMetadataUserPrompt({
         hasInstruction,
         instruction,
@@ -2367,14 +2418,30 @@ export async function buildGeneratedPackageSnapshot(input: {
       }),
       temperature: 0.4,
       maxTokens: 2000,
+      hidePromptContentInLogs: true,
     });
-    base = normalizeBaseMetadataJson(baseJson, fallbackBase);
+    base = normalizeBaseMetadataJson(baseJson);
   } catch (error) {
     getLogger({ component: 'package-generation' }).warn({
       event: 'packages.generate.base.fallback',
-      error: safeError(error),
+      model,
+      ...classifyGenerationFailure(error),
+      reason:
+        error instanceof Error &&
+        error.message === 'BASE_METADATA_FIELDS_MISSING'
+          ? 'fields_missing'
+          : classifyGenerationFailure(error).reason,
+      fallbackAvailable: Boolean(fallbackBase),
     });
+    if (!fallbackBase)
+      throw new Error('名称生成未完成，请填写明确的 Skill 名称或任务后重试', {
+        cause: error,
+      });
     base = fallbackBase;
+  }
+  if (explicitName) {
+    base.name = explicitName;
+    if (maxSkills === 1) base.skills[0].name = explicitName;
   }
 
   validateBaseGenerationResult(base);
@@ -2399,6 +2466,7 @@ export async function buildGeneratedPackageSnapshot(input: {
         }),
         temperature: 0.35,
         maxTokens: 3500,
+        hidePromptContentInLogs: true,
       },
       (delta) => onPreviewDelta?.({ type: 'agent', name: 'agent.md', delta }),
     ),
@@ -2450,6 +2518,7 @@ export async function buildGeneratedPackageSnapshot(input: {
           }),
           temperature: 0.35,
           maxTokens: 4000,
+          hidePromptContentInLogs: true,
         },
         (delta) =>
           onPreviewDelta?.({ type: 'skill', name: skillMeta.name, delta }),
@@ -2500,6 +2569,7 @@ export async function buildGeneratedPackageSnapshot(input: {
   validateGenerationResult(generated);
 
   const snapshot = normalizeSnapshot(generated);
+  if (explicitName) snapshot.name = explicitName;
   onPreview?.({
     type: 'json',
     name: 'snapshot.json',
@@ -2519,6 +2589,7 @@ export async function generatePackage(
   documents?: Array<{ name: string; content: string }>,
   onPreview?: (preview: PackageGeneratePreview) => void,
   onPreviewDelta?: (delta: PackageGeneratePreviewDelta) => void,
+  maxSkills?: number,
 ) {
   const snapshot = await buildGeneratedPackageSnapshot({
     instruction,
@@ -2526,6 +2597,7 @@ export async function generatePackage(
     documents,
     onPreview,
     onPreviewDelta,
+    max_skills: maxSkills,
   });
   return createPackageWithSnapshot(userId, snapshot, 'generated');
 }
