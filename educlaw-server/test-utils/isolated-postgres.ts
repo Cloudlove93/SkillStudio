@@ -7,7 +7,9 @@ export async function isolatedPostgres() {
   const business = new URL(config.databaseUrl);
   if (business.hostname === 'educlaw-db') {
     business.hostname = '127.0.0.1';
-    business.port = '5435';
+    // Published host port of the compose database. config.ts loads .env, so
+    // POSTGRES_PORT is available here; fall back to the standard 5432 mapping.
+    business.port = process.env.POSTGRES_PORT ?? '5432';
   }
   if (!['127.0.0.1', 'localhost'].includes(business.hostname))
     throw new Error('Isolation fixture requires the existing local PostgreSQL instance');

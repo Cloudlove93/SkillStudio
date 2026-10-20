@@ -27,6 +27,19 @@ pnpm lint
 pnpm format
 ```
 
+### 可选：PostgreSQL 并发回归测试
+
+并发写守卫的回归用例（`package-manual-edit.concurrency.test.ts`、`skill-history.concurrency.test.ts`）需要真实 PostgreSQL，且会在本机实例上临时创建并删除自己的随机库，因此默认跳过。需要覆盖这部分并发保证时显式开启：
+
+```bash
+# bash / zsh
+HARDENING_POSTGRES_TESTS=1 pnpm --filter educlaw-server test
+# Windows PowerShell
+$env:HARDENING_POSTGRES_TESTS='1'; pnpm --filter educlaw-server test
+```
+
+连接沿用 `DATABASE_URL`：容器内主机名会被映射到宿主机 `127.0.0.1`，端口取 `POSTGRES_PORT`（缺省 `5432`，即 compose 的 `"${POSTGRES_PORT:-5432}:5432"`）。默认的 `pnpm test` 不覆盖这部分并发保证。
+
 ## 环境变量
 
 最少需要准备这些变量：

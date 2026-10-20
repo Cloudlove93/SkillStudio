@@ -70,3 +70,11 @@ it.runIf(enabled).each(['agent','rubric','skill'] as const)('saves a matching %s
  expect((await db.pool.query('select count(*)::int as n from agent_package_versions where package_id=$1',[ids.packageId])).rows[0].n).toBe(2);
  expect(result.snapshot.skills[1].skillMd).toBe(md('two'));
 });
+
+it.runIf(enabled)('trims a whitespace-padded version id before comparing',async()=>{
+ const client=await db.pool.connect();let ids;
+ try{await client.query('begin');ids=await service.createPackageWithSnapshotTx(client,'owner',snapshot(),'manual');await client.query('commit');}finally{client.release();}
+ const result=await service.applyManualMarkdownEdit('owner',String(ids.packageId),{target:'agent',content:'# Padded',expectedPackageVersionId:` ${ids.packageVersionId} `} as Parameters<typeof service.applyManualMarkdownEdit>[2]);
+ expect(result.versionNumber).toBe(2);
+ expect((await db.pool.query('select count(*)::int as n from agent_package_versions where package_id=$1',[ids.packageId])).rows[0].n).toBe(2);
+});

@@ -4,6 +4,15 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const applyManualMarkdownEditMock = vi.fn();
 const generatePackageMock = vi.fn();
+const repairPackageRubricMock = vi.fn();
+const optimizePackageRubricMock = vi.fn();
+
+/** Version conflicts carry the shared code; routes must not match message text. */
+const versionConflict = () =>
+  Object.assign(new Error('PACKAGE_VERSION_CONFLICT'), {
+    code: 'PACKAGE_VERSION_CONFLICT',
+    status: 409,
+  });
 
 async function createApp() {
   vi.resetModules();
@@ -18,6 +27,8 @@ async function createApp() {
     listPackages: vi.fn(),
     listVersions: vi.fn(),
     renamePackage: vi.fn(),
+    repairPackageRubric: repairPackageRubricMock,
+    optimizePackageRubric: optimizePackageRubricMock,
     updateVersionNote: vi.fn(),
   }));
   vi.doMock('../services/optimization-service.js', () => ({
@@ -65,6 +76,8 @@ afterEach(() => {
   vi.doUnmock('../services/interactive-optimization-service.js');
   applyManualMarkdownEditMock.mockReset();
   generatePackageMock.mockReset();
+  repairPackageRubricMock.mockReset();
+  optimizePackageRubricMock.mockReset();
 });
 
 it('passes the document single-Skill requirement to generation', async () => {
@@ -135,7 +148,7 @@ describe('POST /packages/:packageId/manual-edit', () => {
 });
 
 it.each([['missing',{},422],['conflict',{expectedPackageVersionId:'old'},409]])('preserves the %s precondition error contract',async (_name,extra,status)=>{
-  applyManualMarkdownEditMock.mockRejectedValue(new Error('PACKAGE_VERSION_CONFLICT'));
+  applyManualMarkdownEditMock.mockRejectedValue(versionConflict());
   const {server,url}=await listen(await createApp());
   try{
     const response=await fetch(`${url}/packages/1/manual-edit`,{method:'POST',headers:{'X-User-Id':'owner','Content-Type':'application/json'},body:JSON.stringify({target:'agent',content:'# Changed',...extra})});
@@ -143,4 +156,48 @@ it.each([['missing',{},422],['conflict',{expectedPackageVersionId:'old'},409]])(
     if(status===409)expect(await response.json()).toMatchObject({code:'PACKAGE_VERSION_CONFLICT'});
     else expect(applyManualMarkdownEditMock).not.toHaveBeenCalled();
   }finally{await close(server);}
+});
+
+describe('package version conflict contract', () => {
+  it.each([
+    ['/packages/1/rubric/repair', repairPackageRubricMock],
+    ['/packages/1/rubric/optimize', optimizePackageRubricMock],
+  ])('%s answers 409 with the shared code', async (path, mock) => {
+    mock.mockRejectedValue(versionConflict());
+    const { server, url } = await listen(await createApp());
+    try {
+      const response = await fetch(`${url}${path}`, {
+        method: 'POST',
+        headers: { 'X-User-Id': 'owner', 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      expect(response.status).toBe(409);
+      expect(await response.json()).toMatchObject({
+        code: 'PACKAGE_VERSION_CONFLICT',
+      });
+    } finally {
+      await close(server);
+    }
+  });
+
+  it('does not treat an unrelated error with the same message as a conflict', async () => {
+    applyManualMarkdownEditMock.mockRejectedValue(
+      new Error('PACKAGE_VERSION_CONFLICT'),
+    );
+    const { server, url } = await listen(await createApp());
+    try {
+      const response = await fetch(`${url}/packages/1/manual-edit`, {
+        method: 'POST',
+        headers: { 'X-User-Id': 'owner', 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          target: 'agent',
+          content: '# Changed',
+          expectedPackageVersionId: '12',
+        }),
+      });
+      expect(response.status).toBe(400);
+    } finally {
+      await close(server);
+    }
+  });
 });

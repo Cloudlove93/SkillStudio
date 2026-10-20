@@ -2256,6 +2256,20 @@ export async function createPackageWithSnapshotTx(
   };
 }
 
+/**
+ * Raised when the caller's expected package head is no longer current.
+ * Carries the shared `PACKAGE_VERSION_CONFLICT` code so HTTP layers can map
+ * it to 409 without matching on message text.
+ */
+export class PackageVersionConflictError extends Error {
+  readonly code = 'PACKAGE_VERSION_CONFLICT';
+  readonly status = 409;
+  constructor() {
+    super('PACKAGE_VERSION_CONFLICT');
+    this.name = 'PackageVersionConflictError';
+  }
+}
+
 export async function createPackageVersionWithSnapshotTx(
   client: Queryable,
   input: {
@@ -2274,15 +2288,17 @@ export async function createPackageVersionWithSnapshotTx(
   );
   const pkg = packageResult.rows[0];
   if (!pkg) throw new Error('智能体不存在');
-  if (String(pkg.current_version_id) !== String(input.expectedPackageVersionId)) {
-    throw new Error('PACKAGE_VERSION_CONFLICT');
+  if (
+    String(pkg.current_version_id) !== String(input.expectedPackageVersionId).trim()
+  ) {
+    throw new PackageVersionConflictError();
   }
   const currentVersionResult = await client.query<DbRowPackageVersion>(
     'select * from agent_package_versions where id = $1 and package_id = $2',
     [input.expectedPackageVersionId, input.packageId],
   );
   const currentVersion = currentVersionResult.rows[0];
-  if (!currentVersion) throw new Error('PACKAGE_VERSION_CONFLICT');
+  if (!currentVersion) throw new PackageVersionConflictError();
   const currentSnapshot = parseDbJson<AgentPackageSnapshot>(
     currentVersion.snapshot_json,
     emptyPackageSnapshot(),
@@ -2997,14 +3013,18 @@ export async function applyManualMarkdownEdit(
     note?: string;
   },
 ) {
-  if (typeof input.expectedPackageVersionId !== 'string' || !input.expectedPackageVersionId.trim()) {
+  const expectedPackageVersionId =
+    typeof input.expectedPackageVersionId === 'string'
+      ? input.expectedPackageVersionId.trim()
+      : '';
+  if (!expectedPackageVersionId) {
     throw Object.assign(new Error('expectedPackageVersionId is required'), { status: 422, code: 'INVALID_ARGUMENT' });
   }
   const { package: pkg, versionId } = await getPackageWithVersionId(userId, packageId);
-  if (String(versionId) !== input.expectedPackageVersionId) throw new Error('PACKAGE_VERSION_CONFLICT');
+  if (String(versionId) !== expectedPackageVersionId) throw new PackageVersionConflictError();
   const save = async (snapshot: AgentPackageSnapshot, note: string) => {
     await withTransaction(client => createPackageVersionWithSnapshotTx(client, {
-      userId, packageId, expectedPackageVersionId: input.expectedPackageVersionId,
+      userId, packageId, expectedPackageVersionId,
       snapshot, source: 'manual', note,
     }));
     return getPackage(userId, packageId);

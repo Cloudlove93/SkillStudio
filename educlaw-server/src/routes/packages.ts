@@ -48,6 +48,25 @@ const upload = multer({
   limits: { fileSize: config.uploadLimitBytes },
 });
 
+/**
+ * Every writer that guards the package head (manual edit, rubric repair or
+ * optimization, snapshot optimization, interactive drafts) raises the same
+ * `PACKAGE_VERSION_CONFLICT` code. Match the code rather than the message text
+ * so all of them answer with one 409 contract.
+ */
+function respondPackageVersionConflict(res: Response, error: unknown): boolean {
+  const code =
+    typeof error === 'object' && error !== null
+      ? (error as { code?: unknown }).code
+      : undefined;
+  if (code !== 'PACKAGE_VERSION_CONFLICT') return false;
+  res.status(409).json({
+    code: 'PACKAGE_VERSION_CONFLICT',
+    error: '版本已变化，请重新加载后再试',
+  });
+  return true;
+}
+
 router.get(PACKAGE_ROUTES.LIST, requireAuth, async (req, res) => {
   res.json(await listPackages((req as AuthedRequest).userId || ''));
 });
@@ -297,10 +316,7 @@ router.post(
       );
       res.json(result);
     } catch (error) {
-      if (error instanceof Error && error.message === 'PACKAGE_VERSION_CONFLICT') {
-        res.status(409).json({ code: 'PACKAGE_VERSION_CONFLICT', error: '版本已变化，请重新加载后再保存' });
-        return;
-      }
+      if (respondPackageVersionConflict(res, error)) return;
       res.status(400).json({
         error: error instanceof Error ? error.message : '保存手动编辑失败',
       });
@@ -320,6 +336,7 @@ router.post(
       );
       res.json(result);
     } catch (error) {
+      if (respondPackageVersionConflict(res, error)) return;
       res.status(400).json({
         error: error instanceof Error ? error.message : '修复 rubric 失败',
       });
@@ -339,6 +356,7 @@ router.post(
       );
       res.json(result);
     } catch (error) {
+      if (respondPackageVersionConflict(res, error)) return;
       res.status(400).json({
         error: error instanceof Error ? error.message : '优化 rubric 失败',
       });
@@ -356,6 +374,7 @@ router.post('/packages/:packageId/optimize', requireAuth, async (req, res) => {
     );
     res.json(result);
   } catch (error) {
+    if (respondPackageVersionConflict(res, error)) return;
     res
       .status(400)
       .json({ error: error instanceof Error ? error.message : '优化失败' });
@@ -470,6 +489,7 @@ router.post(
       );
       res.json(result);
     } catch (error) {
+      if (respondPackageVersionConflict(res, error)) return;
       res.status(400).json({
         error: error instanceof Error ? error.message : '应用修改失败',
       });
@@ -571,6 +591,7 @@ router.post(
       );
       res.json(result);
     } catch (error) {
+      if (respondPackageVersionConflict(res, error)) return;
       res.status(400).json({
         error: error instanceof Error ? error.message : '保存草稿失败',
       });

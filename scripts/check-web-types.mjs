@@ -3,6 +3,12 @@ import {readFileSync} from 'node:fs';
 import {dirname,resolve,relative,isAbsolute} from 'node:path';
 import {fileURLToPath} from 'node:url';
 const repository=resolve(dirname(fileURLToPath(import.meta.url)),'..');
+/**
+ * Diagnostics are keyed by file/code/message only, deliberately without
+ * line/column: unrelated edits shift positions, which would otherwise register
+ * every baseline error as new. Accepted blind spot: fixing one occurrence while
+ * the same code+message appears elsewhere in the same file cancels out.
+ */
 export function diagnosticMultiset(diagnostics,root){
  const counts=new Map();const prefix=resolve(root).replaceAll('\\','/')+'/';
  for(const item of diagnostics){
