@@ -51,6 +51,23 @@ function emptyOptimizeRunView(): CompatOptimizeRunView {
   };
 }
 
+/**
+ * Legacy optimization runs are read and mutated through this module. Every
+ * lookup is scoped to the owning package so a caller can never read, apply,
+ * reject or delete another tenant's run. A foreign run is reported as missing
+ * on purpose, so ids do not leak across users.
+ */
+async function findOwnedOptimizeRun(userId: string, runId: string) {
+  const result = await query(
+    `select r.*
+       from optimization_runs r
+       join agent_packages p on p.id = r.package_id
+      where r.id = $1 and p.user_id = $2`,
+    [runId, userId],
+  );
+  return result.rows[0];
+}
+
 function calcTurnIndex(messages: Array<{ side: string; role: string; created_at?: string; createdAt?: string }>) {
   let turn = 0;
   const result: number[] = [];
@@ -564,17 +581,17 @@ router.get("/optimize/runs", requireAuth, async (req, res) => {
 
 router.get("/optimize/runs/:runId", requireAuth, async (req, res) => {
   try {
-    const result = await query("select * from optimization_runs where id = $1", [req.params.runId as string]);
-    if (!result.rows[0]) { notFound(res); return; }
-    ok(res, parseDbJson<unknown>(result.rows[0].result_json, {}));
+    const row = await findOwnedOptimizeRun(pickUserId(req), String(req.params.runId));
+    if (!row) { notFound(res); return; }
+    ok(res, parseDbJson<unknown>(row.result_json, {}));
   } catch (e) { bad(res, e instanceof Error ? e.message : "Failed"); }
 });
 
 router.post("/optimize/runs/:runId/apply", requireAuth, async (req, res) => {
   try {
-    const result = await query("select * from optimization_runs where id = $1", [req.params.runId as string]);
-    if (!result.rows[0]) { notFound(res); return; }
-    const runView = parseDbJson<CompatOptimizeRunView>(result.rows[0].result_json, emptyOptimizeRunView());
+    const row = await findOwnedOptimizeRun(pickUserId(req), String(req.params.runId));
+    if (!row) { notFound(res); return; }
+    const runView = parseDbJson<CompatOptimizeRunView>(row.result_json, emptyOptimizeRunView());
     const key = req.body?.suggestionKey;
     if (key) {
       if (!runView.applied_keys.includes(key)) runView.applied_keys.push(key);
@@ -584,16 +601,16 @@ router.post("/optimize/runs/:runId/apply", requireAuth, async (req, res) => {
       runView.rejected_keys = [];
     }
     runView.run.status = "applied";
-    await query("update optimization_runs set result_json = $1, status = $2, updated_at = $3 where id = $4", [JSON.stringify(runView), "applied", new Date().toISOString(), req.params.runId as string]);
+    await query("update optimization_runs set result_json = $1, status = $2, updated_at = $3 where id = $4 and package_id = $5", [JSON.stringify(runView), "applied", new Date().toISOString(), req.params.runId as string, row.package_id]);
     ok(res, runView);
   } catch (e) { bad(res, e instanceof Error ? e.message : "Failed"); }
 });
 
 router.post("/optimize/runs/:runId/reject", requireAuth, async (req, res) => {
   try {
-    const result = await query("select * from optimization_runs where id = $1", [req.params.runId as string]);
-    if (!result.rows[0]) { notFound(res); return; }
-    const runView = parseDbJson<CompatOptimizeRunView>(result.rows[0].result_json, emptyOptimizeRunView());
+    const row = await findOwnedOptimizeRun(pickUserId(req), String(req.params.runId));
+    if (!row) { notFound(res); return; }
+    const runView = parseDbJson<CompatOptimizeRunView>(row.result_json, emptyOptimizeRunView());
     const key = req.body?.suggestionKey;
     if (key) {
       if (!runView.rejected_keys.includes(key)) runView.rejected_keys.push(key);
@@ -603,14 +620,19 @@ router.post("/optimize/runs/:runId/reject", requireAuth, async (req, res) => {
       runView.applied_keys = [];
     }
     runView.run.status = "rejected";
-    await query("update optimization_runs set result_json = $1, status = $2, updated_at = $3 where id = $4", [JSON.stringify(runView), "rejected", new Date().toISOString(), req.params.runId as string]);
+    await query("update optimization_runs set result_json = $1, status = $2, updated_at = $3 where id = $4 and package_id = $5", [JSON.stringify(runView), "rejected", new Date().toISOString(), req.params.runId as string, row.package_id]);
     ok(res, runView);
   } catch (e) { bad(res, e instanceof Error ? e.message : "Failed"); }
 });
 
 router.post("/optimize/runs/:runId/delete", requireAuth, async (req, res) => {
   try {
-    await query("delete from optimization_runs where id = $1", [String(req.params.runId)]);
+    await query(
+      `delete from optimization_runs r
+        using agent_packages p
+       where r.package_id = p.id and r.id = $1 and p.user_id = $2`,
+      [String(req.params.runId), pickUserId(req)],
+    );
     ok(res, { ok: true });
   } catch (e) { bad(res, e instanceof Error ? e.message : "Failed"); }
 });
