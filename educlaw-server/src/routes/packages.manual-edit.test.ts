@@ -180,6 +180,35 @@ describe('package version conflict contract', () => {
     }
   });
 
+  it('answers 422 with validation details when SKILL.md violates identity rules', async () => {
+    const message = 'dirName "one" 与 frontmatter name "two" 不一致';
+    applyManualMarkdownEditMock.mockRejectedValue(
+      Object.assign(new Error(message), {
+        code: 'INVALID_SKILL_MD',
+        status: 422,
+        validationErrors: [message],
+      }),
+    );
+    const { server, url } = await listen(await createApp());
+    try {
+      const response = await fetch(`${url}/packages/1/manual-edit`, {
+        method: 'POST',
+        headers: { 'X-User-Id': 'owner', 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          target: 'skill',
+          skillId: 'one',
+          content: '---\nname: two\ndescription: When used\n---\n# Body',
+          expectedPackageVersionId: '12',
+        }),
+      });
+      expect(response.status).toBe(422);
+      const body = await response.json();
+      expect(body).toMatchObject({ code: 'INVALID_SKILL_MD', validationErrors: [message] });
+    } finally {
+      await close(server);
+    }
+  });
+
   it('does not treat an unrelated error with the same message as a conflict', async () => {
     applyManualMarkdownEditMock.mockRejectedValue(
       new Error('PACKAGE_VERSION_CONFLICT'),

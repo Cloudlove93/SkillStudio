@@ -36,6 +36,7 @@ import { parseDbJson } from '../utils/json.js';
 import { syncPackageVersionSkillsFromSnapshot } from './skill-version-service.js';
 import {
   extractSkillFrontmatterValue,
+  validateSkillIdentity,
   validateSkillMdStandard,
 } from './skill-markdown-validation.js';
 export { validateSkillMdStandard } from './skill-markdown-validation.js';
@@ -3074,15 +3075,26 @@ export async function applyManualMarkdownEdit(
   );
   if (skillIndex === -1) throw new Error('技能不存在');
 
-  const fmName = extractSkillFrontmatterValue(content, 'name');
-  const fmDescription = extractSkillFrontmatterValue(content, 'description');
-  if (!content.startsWith('---') || !fmName || !fmDescription) {
-    throw new Error(
-      'SKILL.md 必须保留 YAML frontmatter，并包含 name 和 description',
-    );
+  const currentSkill = nextSnapshot.skills[skillIndex]!;
+  // This legacy edit path is also used to repair Skills created before the
+  // section template and naming conventions existed, so it enforces the
+  // structural identity rules (frontmatter block, name, bounded description)
+  // but not the directory slug or quality sections that
+  // `skill.version.manual-edit` requires.
+  const identityErrors = validateSkillIdentity(
+    content,
+    currentSkill.dirName,
+  );
+  if (identityErrors.length > 0) {
+    throw Object.assign(new Error(identityErrors.join('\n')), {
+      code: 'INVALID_SKILL_MD',
+      status: 422,
+      validationErrors: identityErrors,
+    });
   }
 
-  const currentSkill = nextSnapshot.skills[skillIndex]!;
+  const fmName = extractSkillFrontmatterValue(content, 'name')!;
+  const fmDescription = extractSkillFrontmatterValue(content, 'description')!;
   const normalizedContent = content.replace(/\r\n/g, '\n');
   if (normalizedContent === currentSkill.skillMd.trim())
     throw new Error('内容没有变化，无需保存新版本');

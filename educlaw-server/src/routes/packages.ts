@@ -317,6 +317,19 @@ router.post(
       res.json(result);
     } catch (error) {
       if (respondPackageVersionConflict(res, error)) return;
+      // Share the versioned edit contract: identity violations are 422 with
+      // the same code and field list, not a generic 400.
+      const invalid = error as { code?: unknown; validationErrors?: unknown };
+      if (invalid?.code === 'INVALID_SKILL_MD') {
+        res.status(422).json({
+          code: 'INVALID_SKILL_MD',
+          error: error instanceof Error ? error.message : 'SKILL.md 不符合要求',
+          validationErrors: Array.isArray(invalid.validationErrors)
+            ? invalid.validationErrors
+            : [],
+        });
+        return;
+      }
       res.status(400).json({
         error: error instanceof Error ? error.message : '保存手动编辑失败',
       });

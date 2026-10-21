@@ -37,7 +37,7 @@ it.runIf(enabled).each(['agent','rubric','skill'] as const)('rejects a stale %s 
   finally { seed.release(); }
   const entered=barrier(), resume=barrier();
   beforeTransaction=async()=>{entered.release();await resume.promise;};
-  const stale=service.applyManualMarkdownEdit('owner',String(ids.packageId),{target,skillId:'one',content:target==='skill'?md('changed'):'# Changed',expectedPackageVersionId:String(ids.packageVersionId)} as Parameters<typeof service.applyManualMarkdownEdit>[2]);
+  const stale=service.applyManualMarkdownEdit('owner',String(ids.packageId),{target,skillId:'one',content:target==='skill'?md('one').replace('Use the rule.','Stale probe body.'):'# Changed',expectedPackageVersionId:String(ids.packageVersionId)} as Parameters<typeof service.applyManualMarkdownEdit>[2]);
   const outcome=stale.then(()=>null,e=>e);
   await entered.promise;
   const writer=await db.pool.connect();
@@ -45,7 +45,7 @@ it.runIf(enabled).each(['agent','rubric','skill'] as const)('rejects a stale %s 
   try {
     await writer.query('begin');
     expect((await writer.query('select pg_backend_pid() as pid')).rows[0].pid).not.toBe(readerPid);
-    const updated=snapshot();updated.skills[1].skillMd=md('writer-wins');
+    const updated=snapshot();updated.skills[1].skillMd=md('two').replace('Use the rule.','writer-wins');
     next=await service.createPackageVersionWithSnapshotTx(writer,{userId:'owner',packageId:ids.packageId,expectedPackageVersionId:ids.packageVersionId,snapshot:updated,source:'manual'});
     await writer.query('commit');
   } finally {writer.release();resume.release();}
@@ -65,10 +65,28 @@ it.runIf(enabled)('rejects missing preconditions and a different owner without w
 it.runIf(enabled).each(['agent','rubric','skill'] as const)('saves a matching %s edit as exactly one new version',async target=>{
  const client=await db.pool.connect();let ids;
  try{await client.query('begin');ids=await service.createPackageWithSnapshotTx(client,'owner',snapshot(),'manual');await client.query('commit');}finally{client.release();}
- const result=await service.applyManualMarkdownEdit('owner',String(ids.packageId),{target,skillId:'one',content:target==='skill'?md('edited'):'# Edited',expectedPackageVersionId:String(ids.packageVersionId)});
+ const result=await service.applyManualMarkdownEdit('owner',String(ids.packageId),{target,skillId:'one',content:target==='skill'?md('one').replace('Use the rule.','Edited body.'):'# Edited',expectedPackageVersionId:String(ids.packageVersionId)});
  expect(result.versionNumber).toBe(2);
  expect((await db.pool.query('select count(*)::int as n from agent_package_versions where package_id=$1',[ids.packageId])).rows[0].n).toBe(2);
  expect(result.snapshot.skills[1].skillMd).toBe(md('two'));
+});
+
+it.runIf(enabled)('rejects a Skill edit without a frontmatter description and writes nothing',async()=>{
+ const client=await db.pool.connect();let ids;
+ try{await client.query('begin');ids=await service.createPackageWithSnapshotTx(client,'owner',snapshot(),'manual');await client.query('commit');}finally{client.release();}
+ await expect(service.applyManualMarkdownEdit('owner',String(ids.packageId),{target:'skill',skillId:'one',content:'---\nname: one\n---\n# Steps\nNo description.',expectedPackageVersionId:String(ids.packageVersionId)} as Parameters<typeof service.applyManualMarkdownEdit>[2]))
+   .rejects.toMatchObject({code:'INVALID_SKILL_MD',status:422});
+ expect((await db.pool.query('select count(*)::int as n from agent_package_versions where package_id=$1',[ids.packageId])).rows[0].n).toBe(1);
+});
+
+it.runIf(enabled)('still repairs a legacy Skill whose frontmatter name is a display name',async()=>{
+ const client=await db.pool.connect();let ids;
+ try{await client.query('begin');ids=await service.createPackageWithSnapshotTx(client,'owner',snapshot(),'manual');await client.query('commit');}finally{client.release();}
+ const content='---\nname: 作文批改\ndescription: Teaching procedure\n---\n# Steps\nLegacy Chinese body.';
+ const result=await service.applyManualMarkdownEdit('owner',String(ids.packageId),{target:'skill',skillId:'one',content,expectedPackageVersionId:String(ids.packageVersionId)});
+ expect(result.versionNumber).toBe(2);
+ expect(result.snapshot.skills[0].name).toBe('作文批改');
+ expect((await db.pool.query('select count(*)::int as n from agent_package_versions where package_id=$1',[ids.packageId])).rows[0].n).toBe(2);
 });
 
 it.runIf(enabled)('trims a whitespace-padded version id before comparing',async()=>{
