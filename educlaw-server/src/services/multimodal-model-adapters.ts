@@ -55,7 +55,7 @@ export const MULTIMODAL_PROMPT_VERSIONS = {
     terms: 'multimodal-candidates-terms-v3-zh',
   } as const,
   validation: 'multimodal-validation-v2-zh',
-  ria: 'multimodal-ria-v5-assembled-parameters-zh',
+  ria: 'multimodal-ria-v6-grounded-parameters-zh',
   fused: 'multimodal-fused-candidates-v1-zh',
 } as const;
 
@@ -1198,6 +1198,8 @@ export function createProductionMultimodalModelAdapters(options?: {
               'Candidate summaries are model proposals, not source evidence. Recheck their claims against the supplied evidence; correct unsupported generalizations even if they appear in a candidate title, summary or reusableRule. Retain the exact logical subjects of source conditions instead of replacing them with broader assessment dimensions.',
               'Do not add correctness dimensions, difficulty escalation or automation to the source example or executable method unless the supplied evidence explicitly requires them. An inferred pedagogical extension is not a source fact; omit it from required execution and sourceExample. Preserve the source branch for every non-satisfied condition, including an insufficient success streak, without inventing a different trigger.',
               'A repeated-success requirement cannot become immediate action after one success. Do not swap conditions before/after removing support. When audio and visual evidence conflict, retain the separate claims and stop for confirmation instead of silently reconciling them.',
+              'Every number in sourceExample must appear verbatim in the bound source evidence (visualObservation.visibleText or transcript text). Never round, rescale or invent a quantity.',
+              'Write every source-case quantity, threshold and count as a {参数名} placeholder in description, mechanism, futureApplicability and all execution fields, and declare each parameter with its source value in execution.input. A bare source-case number in those fields fails the build.',
               'sourceEvidenceIds must bind to readable evidence. Frames with empty visualObservation.visibleText or unresolved uncertainties cannot support a confirmed source example; leave uncertain material as a draft rather than inventing it.',
             ].join('\n'),
             MULTIMODAL_PROMPT_VERSIONS.ria,
