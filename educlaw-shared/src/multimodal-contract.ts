@@ -15,6 +15,8 @@ const MAX_CANDIDATES_PER_PASS = 24;
 const MAX_CANDIDATE_EVIDENCE_IDS = 16;
 const MAX_VALIDATED_CANDIDATES = 120;
 const MAX_RIA_SKILL_DRAFTS = 16;
+const MAX_RIA_SOURCE_FACTS = 8;
+const MAX_RIA_SOURCE_QUOTE_LENGTH = 500;
 const MAX_OPERATION_RECEIPTS = 64;
 const MAX_REUSABLE_CONTEXTS = 8;
 const MAX_DIFFERENTIATORS = 8;
@@ -348,6 +350,13 @@ export interface ValidatedCandidateResult {
   disposition: CandidateDisposition;
 }
 
+export interface RiaSourceFact {
+  /** Evidence the quote was copied from; must be one of `ria.sourceEvidenceIds`. */
+  evidenceId: string;
+  /** Verbatim excerpt of the bound evidence text; never a paraphrase. */
+  quote: string;
+}
+
 export interface RiaSkillDraft {
   candidateId: string;
   id: string;
@@ -357,8 +366,11 @@ export interface RiaSkillDraft {
   skillMd: string;
   ria: {
     sourceEvidenceIds: string[];
+    /** Verbatim source excerpts; the assembled case section is rendered from these. */
+    sourceFacts?: RiaSourceFact[];
+    /** Legacy free-form case narrative; drafts created before verbatim quotes only. */
+    sourceExample?: string;
     mechanism: string;
-    sourceExample: string;
     futureApplicability: string;
     execution: {
       input: string;
@@ -1865,8 +1877,9 @@ export function parseRiaSkillDrafts(
     const riaRecord = readRecord(record.ria, `${itemPath}.ria`);
     ensureExactKeys(riaRecord, `${itemPath}.ria`, [
       'sourceEvidenceIds',
-      'mechanism',
+      'sourceFacts',
       'sourceExample',
+      'mechanism',
       'futureApplicability',
       'execution',
       'boundaries',
@@ -1923,6 +1936,32 @@ export function parseRiaSkillDrafts(
         `${itemPath}.ria.sourceEvidenceIds must stay within candidate evidence`,
       );
     }
+    const sourceFacts =
+      riaRecord.sourceFacts === undefined
+        ? undefined
+        : readDenseArray(riaRecord.sourceFacts, `${itemPath}.ria.sourceFacts`, {
+            minLength: 1,
+            maxLength: MAX_RIA_SOURCE_FACTS,
+          }).map((fact, factIndex): RiaSourceFact => {
+            const factPath = `${itemPath}.ria.sourceFacts[${factIndex}]`;
+            const factRecord = readRecord(fact, factPath);
+            ensureExactKeys(factRecord, factPath, ['evidenceId', 'quote']);
+            const evidenceId = readSafeId(
+              factRecord.evidenceId,
+              `${factPath}.evidenceId`,
+            );
+            if (!sourceEvidenceIds.includes(evidenceId)) {
+              fail(`${factPath}.evidenceId must belong to ria.sourceEvidenceIds`);
+            }
+            return {
+              evidenceId,
+              quote: readString(
+                factRecord.quote,
+                `${factPath}.quote`,
+                MAX_RIA_SOURCE_QUOTE_LENGTH,
+              ),
+            };
+          });
 
     const manifestRecord = readRecord(record.manifest, `${itemPath}.manifest`);
     ensureExactKeys(manifestRecord, `${itemPath}.manifest`, [
@@ -1944,14 +1983,19 @@ export function parseRiaSkillDrafts(
       skillMd: readString(record.skillMd, `${itemPath}.skillMd`, 50_000),
       ria: {
         sourceEvidenceIds,
+        ...(sourceFacts ? { sourceFacts } : {}),
+        ...(riaRecord.sourceExample === undefined
+          ? {}
+          : {
+              sourceExample: readString(
+                riaRecord.sourceExample,
+                `${itemPath}.ria.sourceExample`,
+                MAX_TEXT_LENGTH,
+              ),
+            }),
         mechanism: readString(
           riaRecord.mechanism,
           `${itemPath}.ria.mechanism`,
-          MAX_TEXT_LENGTH,
-        ),
-        sourceExample: readString(
-          riaRecord.sourceExample,
-          `${itemPath}.ria.sourceExample`,
           MAX_TEXT_LENGTH,
         ),
         futureApplicability: readString(

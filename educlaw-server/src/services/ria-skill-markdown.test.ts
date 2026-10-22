@@ -36,10 +36,15 @@ function skill(overrides: Partial<RiaSkillDraft['ria']> = {}): Skill {
     name: '自适应支架',
     description: '根据<连续成功次数>调整支架',
     sourceEvidenceIds: ['ev-frame'],
+    sourceFacts: [
+      {
+        evidenceId: 'ev-frame',
+        quote: '连续 3 次全对才撤架；否则再做 5 道复核题。',
+      },
+    ],
     evidenceIds: ['ev-frame'],
     relations: [],
     mechanism: '根据{连续成功次数}调整支架。',
-    sourceExample: '原案例：连续3次全对才撤架，否则再做5道复核题。',
     futureApplicability: '新任务重新确认参数。',
     execution: {
       input: '需确认{连续成功次数}与{复核题数量}',
@@ -70,23 +75,55 @@ describe('ria skill markdown assembly', () => {
 
   it('accepts parameter placeholders and leaves source numbers in the case section', () => {
     const body = assembleRiaSkillMarkdown(skill(), grounded());
-    expect(body).toContain('连续3次全对才撤架');
+    expect(body).toContain('- “连续 3 次全对才撤架；否则再做 5 道复核题。”（来源 [ev-frame]）');
     expect(body).toContain('{连续成功次数}');
   });
 
-  it('rejects a source example with a quantity absent from the bound evidence', () => {
+  it('rejects a source fact whose quote is not verbatim in the bound evidence', () => {
+    const mismatched = {
+      sourceFacts: [{ evidenceId: 'ev-frame', quote: '连续 9 次全对才撤架。' }],
+    };
     expect(() =>
-      assembleRiaSkillMarkdown(
-        skill({ sourceExample: '原案例：连续9次全对才撤架。' }),
-        grounded(),
-      ),
-    ).toThrowError(/绑定证据中没有的数字/);
+      assembleRiaSkillMarkdown(skill(mismatched), grounded()),
+    ).toThrowError(/原文不一致/);
     expect(() =>
-      assertRiaSemanticGrounding(
-        skill({ sourceExample: '原案例：连续9次全对才撤架。' }),
-        grounded(),
-      ),
+      assertRiaSemanticGrounding(skill(mismatched), grounded()),
     ).toThrow(RiaContentError);
+  });
+
+  it('allows execution.input to declare parameter values taken from the case', () => {
+    const body = assembleRiaSkillMarkdown(
+      skill({
+        execution: {
+          input:
+            '1. {连续成功次数}（原案例为 3 次）；2. {复核题数量}（原案例为 5 道）。',
+          steps: ['连续{连续成功次数}次全对后撤架。'],
+          output: '支架状态',
+          completionCriteria: '连续{连续成功次数}次达标。',
+          stopCriteria: '参数缺失时停止。',
+        },
+      }),
+      grounded(),
+    );
+    expect(body).toContain('原案例为 3 次');
+    expect(body).toContain('原案例为 5 道');
+  });
+
+  it('allows parenthetical illustrations of parameter values', () => {
+    const body = assembleRiaSkillMarkdown(
+      skill({
+        futureApplicability:
+          '新任务可调整{连续成功次数}（如从 3 次改为 5 次以提高标准）。',
+      }),
+      grounded(),
+    );
+    expect(body).toContain('如从 3 次改为 5 次');
+  });
+
+  it('rejects a draft without verbatim source facts', () => {
+    expect(() =>
+      assembleRiaSkillMarkdown(skill({ sourceFacts: [] }), grounded()),
+    ).toThrowError(/缺少逐字引用/);
   });
 
   it('rejects a bare source-case number promoted into an executable field', () => {

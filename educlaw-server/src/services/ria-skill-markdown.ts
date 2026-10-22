@@ -1,4 +1,8 @@
-import type { MultimodalEvidence, RiaSkillDraft } from '@educlaw/shared';
+import type {
+  MultimodalEvidence,
+  RiaSkillDraft,
+  RiaSourceFact,
+} from '@educlaw/shared';
 
 type RiaContent = Pick<
   RiaSkillDraft,
@@ -9,7 +13,8 @@ type RiaContent = Pick<
 export type RiaContentFailureReason =
   | 'source_binding'
   | 'source_uncertain'
-  | 'source_ungrounded'
+  | 'source_quote_missing'
+  | 'source_quote_mismatch'
   | 'parameter_leak'
   | 'body_bound';
 
@@ -17,8 +22,10 @@ const FAILURE_MESSAGES: Record<RiaContentFailureReason, string> = {
   source_binding: '来源引用未能对应，请重新确认候选；草稿已保留。',
   source_uncertain:
     '来源画面仍有不确定内容，请核对来源或选择可读画面后重试；草稿已保留。',
-  source_ungrounded:
-    '来源案例出现了绑定证据中没有的数字，请核对来源或重新构建；草稿已保留。',
+  source_quote_missing:
+    '来源案例缺少逐字引用，请重新构建并逐条摘录来源原文；草稿已保留。',
+  source_quote_mismatch:
+    '来源引用与绑定证据的原文不一致，请改为逐字摘录后重试；草稿已保留。',
   parameter_leak:
     '执行步骤把来源案例的具体数字写成了固定规则，请改用 {参数名} 并在输入中声明；草稿已保留。',
   body_bound: '来源内容超出正文上限，请缩小构建范围后重试；草稿已保留。',
@@ -26,17 +33,34 @@ const FAILURE_MESSAGES: Record<RiaContentFailureReason, string> = {
 
 export class RiaContentError extends Error {
   readonly code = 'RIA_CONTENT_INCOMPLETE';
-  constructor(readonly reason: RiaContentFailureReason) {
-    super(FAILURE_MESSAGES[reason]);
+  constructor(
+    readonly reason: RiaContentFailureReason,
+    readonly detail?: string,
+  ) {
+    super(detail ? `${FAILURE_MESSAGES[reason]}${detail}` : FAILURE_MESSAGES[reason]);
     this.name = 'RiaContentError';
   }
 }
 
 const NUMBER_PATTERN = /[0-9]+(?:\.[0-9]+)?/g;
 const PARAMETER_WRAPPER = /\{[^{}]*\}/g;
+const PARENTHETICAL_EXAMPLE = /（[^（）]*）|\([^()]*\)/g;
+const MIN_QUOTE_LENGTH = 4;
 
 function numbersIn(value: string): string[] {
   return value.match(NUMBER_PATTERN) ?? [];
+}
+
+/**
+ * Compare quotes and source text after folding width, case and punctuation so
+ * that ASR spacing or full-width marks cannot turn a verbatim copy into a
+ * false mismatch. Digits and Chinese characters stay significant.
+ */
+function normalizeForQuote(value: string): string {
+  return value
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[\s\p{P}\p{S}]+/gu, '');
 }
 
 /**
@@ -61,48 +85,104 @@ function groundedText(
     .join('\n');
 }
 
-function withoutParameterWrappers(value: string): string {
-  return value.replace(PARAMETER_WRAPPER, ' ');
+/**
+ * Numbers only count as hard-coded rules when they sit in the operative text.
+ * Parameter placeholders and parenthetical illustrations ("如从 3 次改为 5 次")
+ * are the two sanctioned places for literal source values, so both are removed
+ * before scanning.
+ */
+function withoutIllustrativeValues(value: string): string {
+  return value
+    .replace(PARAMETER_WRAPPER, ' ')
+    .replace(PARENTHETICAL_EXAMPLE, ' ');
+}
+
+/**
+ * Every source fact must be a verbatim copy of the evidence it names. The
+ * assembled case section is rendered from these verified quotes instead of a
+ * model-written narrative, which is how paraphrased conditions and invented
+ * dimensions used to reach the published Skill body.
+ */
+function verifiedSourceFacts(
+  skill: RiaContent,
+  evidence: readonly MultimodalEvidence[],
+): RiaSourceFact[] {
+  const facts = skill.sourceFacts ?? [];
+  if (facts.length === 0) throw new RiaContentError('source_quote_missing');
+  const byId = new Map(evidence.map((item) => [item.evidenceId, item]));
+  const allowed = new Set(skill.sourceEvidenceIds);
+  return facts.map((fact, factIndex) => {
+    const label = `第 ${factIndex + 1} 条来源引用`;
+    if (!allowed.has(fact.evidenceId) || !byId.has(fact.evidenceId)) {
+      throw new RiaContentError(
+        'source_binding',
+        `（${label}的 evidenceId ${fact.evidenceId} 不在 sourceEvidenceIds 中）`,
+      );
+    }
+    const quote = normalizeForQuote(fact.quote);
+    if (quote.length < MIN_QUOTE_LENGTH) {
+      throw new RiaContentError(
+        'source_quote_mismatch',
+        `（${label}过短，请摘录完整的一小句原文）`,
+      );
+    }
+    if (
+      !normalizeForQuote(groundedText(evidence, [fact.evidenceId])).includes(quote)
+    ) {
+      throw new RiaContentError(
+        'source_quote_mismatch',
+        `（${label}在证据 ${fact.evidenceId} 中找不到对应原文，请逐字复制）`,
+      );
+    }
+    return fact;
+  });
+}
+
+function assertGroundedParameters(
+  skill: RiaContent,
+  facts: readonly RiaSourceFact[],
+): void {
+  const sourceNumbers = new Set(facts.flatMap((fact) => numbersIn(fact.quote)));
+  // `execution.input` is the parameter declaration itself: it is expected to
+  // name each parameter together with its source value, so numbers there are
+  // not fixed rules. Every other executable field must use `{参数名}` instead.
+  const executable: Array<readonly [string, string]> = [
+    ['描述', skill.description],
+    ['可迁移机制', skill.mechanism],
+    ['未来适用条件', skill.futureApplicability],
+    ...skill.execution.steps.map(
+      (step, index) => [`执行步骤 ${index + 1}`, step] as const,
+    ),
+    ['执行输出', skill.execution.output],
+    ['完成条件', skill.execution.completionCriteria],
+    ['停止条件', skill.execution.stopCriteria],
+  ];
+  for (const [label, field] of executable) {
+    const bare = withoutIllustrativeValues(field);
+    const leaked = numbersIn(bare).find((number) => sourceNumbers.has(number));
+    if (leaked) {
+      throw new RiaContentError(
+        'parameter_leak',
+        `（字段“${label}”含来源数字 ${leaked}，请改写为 {参数名} 或删除该固定值）`,
+      );
+    }
+  }
 }
 
 /**
  * Deterministic guard for the failure mode observed in real video runs:
  * the model paraphrased a source rule and then promoted the source case's
  * thresholds into fixed execution rules. Two rules are enforced:
- * 1. every number in the source example must exist in the bound evidence;
- * 2. numbers taken from the source case may not appear bare in the
- *    executable fields — they must be `{参数名}` placeholders.
+ * 1. every source fact must be verbatim text of its bound evidence;
+ * 2. numbers taken from the source facts may not appear bare in the
+ *    operative fields — they must be `{参数名}` placeholders or parenthetical
+ *    illustrations declared alongside them.
  */
 export function assertRiaSemanticGrounding(
   skill: RiaContent,
   evidence: readonly MultimodalEvidence[],
 ): void {
-  const sourceText = groundedText(evidence, skill.sourceEvidenceIds);
-  const groundedNumbers = new Set(numbersIn(sourceText));
-  const sourceNumbers = new Set(numbersIn(skill.sourceExample));
-
-  for (const number of sourceNumbers) {
-    if (!groundedNumbers.has(number)) {
-      throw new RiaContentError('source_ungrounded');
-    }
-  }
-
-  const executable = [
-    skill.description,
-    skill.mechanism,
-    skill.futureApplicability,
-    skill.execution.input,
-    ...skill.execution.steps,
-    skill.execution.output,
-    skill.execution.completionCriteria,
-    skill.execution.stopCriteria,
-  ];
-  for (const field of executable) {
-    const bare = withoutParameterWrappers(field);
-    if (numbersIn(bare).some((number) => sourceNumbers.has(number))) {
-      throw new RiaContentError('parameter_leak');
-    }
-  }
+  assertGroundedParameters(skill, verifiedSourceFacts(skill, evidence));
 }
 
 /** YAML frontmatter must stay single-line and free of XML angle brackets. */
@@ -134,7 +214,8 @@ export function assembleRiaSkillMarkdown(
       throw new RiaContentError('source_uncertain');
     }
   }
-  assertRiaSemanticGrounding(skill, evidence);
+  const facts = verifiedSourceFacts(skill, evidence);
+  assertGroundedParameters(skill, facts);
 
   const bullets = (items: readonly string[]) =>
     items.map((item) => `- ${item}`).join('\n');
@@ -156,6 +237,9 @@ export function assembleRiaSkillMarkdown(
   const sourceRefs = skill.sourceEvidenceIds
     .map((id) => `[${id}]`)
     .join('、');
+  const sourceCases = facts
+    .map((fact) => `- “${fact.quote}”（来源 [${fact.evidenceId}]）`)
+    .join('\n');
   const body = [
     frontmatter,
     `# ${skill.name}`,
@@ -163,8 +247,8 @@ export function assembleRiaSkillMarkdown(
     '## 可迁移机制',
     skill.mechanism,
     '## 原始案例与参数',
-    '以下是本资源中的案例和有来源的参数，不是适用于所有未来教学任务的统一标准。迁移时先确定新任务参数；原案例中的否定、条件、例外及先后顺序仍须保留。',
-    skill.sourceExample,
+    '以下是本资源来源原文的逐字摘录和有来源的参数，不是适用于所有未来教学任务的统一标准。迁移时先确定新任务参数；原摘录中的否定、条件、例外及先后顺序仍须保留。',
+    sourceCases,
     '## 未来适用条件',
     skill.futureApplicability,
     '## 执行流程',

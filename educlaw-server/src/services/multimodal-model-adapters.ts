@@ -10,6 +10,7 @@ import {
   type MultimodalPrimarySource,
   type MultimodalTranscript,
   type RiaSkillDraft,
+  type RiaSourceFact,
 } from '@educlaw/shared';
 import { config } from '../config.js';
 import { getLogger } from '../lib/request-context.js';
@@ -39,6 +40,8 @@ const MAX_VALIDATION_LIST = 8;
 const MAX_EXECUTION_STEPS = 16;
 const MAX_BOUNDARY_ITEMS = 8;
 const MAX_RELATIONS = 16;
+const MAX_SOURCE_FACTS = 8;
+const MAX_SOURCE_QUOTE = 500;
 const MIN_MULTIMODAL_MODEL_MAX_TOKENS = 256;
 const MAX_MULTIMODAL_MODEL_MAX_TOKENS = 65_536;
 
@@ -55,7 +58,7 @@ export const MULTIMODAL_PROMPT_VERSIONS = {
     terms: 'multimodal-candidates-terms-v3-zh',
   } as const,
   validation: 'multimodal-validation-v2-zh',
-  ria: 'multimodal-ria-v6-grounded-parameters-zh',
+  ria: 'multimodal-ria-v7-verbatim-quotes-zh',
   fused: 'multimodal-fused-candidates-v1-zh',
 } as const;
 
@@ -377,7 +380,7 @@ const RIA_PROMPT_SCHEMA = [
   'Return exactly one JSON object with the exact top-level key "skills".',
   `"skills" must be a dense array with 1..${MAX_RIA_SKILLS} items when at least one selected candidate is provided.`,
   'The output candidateId set must exactly equal the input selected candidateId set: one skill per input candidate, no extras, no duplicates, no omissions.',
-  'Each skill must be an object with exact keys: "candidateId", "id", "dirName", "name", "description", "sourceEvidenceIds", "mechanism", "sourceExample", "futureApplicability", "execution", "boundaries", "evidenceIds", "relations".',
+  'Each skill must be an object with exact keys: "candidateId", "id", "dirName", "name", "description", "sourceEvidenceIds", "sourceFacts", "mechanism", "futureApplicability", "execution", "boundaries", "evidenceIds", "relations".',
   `"candidateId" must match ${SAFE_ID}.`,
   `"id" must match ${SAFE_ID}.`,
   'Each output "id" must exactly equal the skillId for its candidateId in the supplied Pack skillDirectory.',
@@ -387,7 +390,11 @@ const RIA_PROMPT_SCHEMA = [
   'Do not generate skillMd. The server assembles the Skill body locally from these structured fields and source evidence.',
   `"sourceEvidenceIds" and "evidenceIds" must each be dense arrays of 1..${MAX_EVIDENCE_PER_ITEM} unique evidence IDs from the input candidate.evidenceIds.`,
   '"sourceEvidenceIds" must be a subset of "evidenceIds".',
-  `"mechanism", "sourceExample", and "futureApplicability" must each be non-empty strings up to ${MAX_TEXT} characters.`,
+  `"sourceFacts" must be a dense array of 1..${MAX_SOURCE_FACTS} objects with exact keys: "evidenceId", "quote".`,
+  '"sourceFacts[].evidenceId" must be one of "sourceEvidenceIds".',
+  `"sourceFacts[].quote" must be a verbatim excerpt of up to ${MAX_SOURCE_QUOTE} characters copied character-for-character from that evidence "text" or "visualObservation.visibleText". Do not paraphrase, summarize, translate, merge separate lines, or add ellipses, explanations or numbers that the evidence does not contain.`,
+  'The Skill case section is rendered only from these quotes; anything not quoted from the bound evidence will not appear in the Skill body.',
+  `"mechanism" and "futureApplicability" must each be non-empty strings up to ${MAX_TEXT} characters.`,
   '"execution" must be an object with exact keys: "input", "steps", "output", "completionCriteria", "stopCriteria".',
   `"execution.input", "execution.output", "execution.completionCriteria", and "execution.stopCriteria" must each be non-empty strings up to ${MAX_SHORT_TEXT} characters.`,
   `"execution.steps" must be a dense array with 1..${MAX_EXECUTION_STEPS} non-empty strings up to ${MAX_SHORT_TEXT} characters each.`,
@@ -1193,13 +1200,13 @@ export function createProductionMultimodalModelAdapters(options?: {
               RIA_PROMPT_SCHEMA,
               'The skill body must realize R/I/A1/A2/E/B: source evidence, mechanism, source example, future applicability, execution, and boundaries.',
               'Audio-only sources are valid. Do not require frame evidence unless the selected candidate itself asserts visual content.',
-              'Separate the transferable method from the original sourceExample. Preserve the original case quantities, units, negations, repeated-success conditions, order and otherwise/exception branches in sourceExample; do not promote case numbers into universal standards.',
-              'Use named task parameters in mechanism, description and execution for source-specific quantities and thresholds. Define each parameter in execution.input and require confirmation for the new task before execution; missing parameters are a stop condition. Keep original literal values and their meanings in sourceExample, explicitly labelled as this source case only. The same separation applies to completionCriteria, stopCriteria and boundaries; do not embed unqualified source-case defaults there.',
+              'Separate the transferable method from the original source case. Express the source case only as verbatim quotes in sourceFacts, preserving the original quantities, units, negations, repeated-success conditions, order and otherwise/exception branches; do not promote case numbers into universal standards.',
+              'Use named task parameters in mechanism, description and execution for source-specific quantities and thresholds. Define each parameter in execution.input and require confirmation for the new task before execution; missing parameters are a stop condition. execution.input may name each parameter together with its original source value; keep original literal values and their meanings only there and inside the verbatim sourceFacts quotes, explicitly labelled as this source case only. The same separation applies to completionCriteria, stopCriteria and boundaries; do not embed unqualified source-case defaults there.',
               'Candidate summaries are model proposals, not source evidence. Recheck their claims against the supplied evidence; correct unsupported generalizations even if they appear in a candidate title, summary or reusableRule. Retain the exact logical subjects of source conditions instead of replacing them with broader assessment dimensions.',
-              'Do not add correctness dimensions, difficulty escalation or automation to the source example or executable method unless the supplied evidence explicitly requires them. An inferred pedagogical extension is not a source fact; omit it from required execution and sourceExample. Preserve the source branch for every non-satisfied condition, including an insufficient success streak, without inventing a different trigger.',
+              'Do not add correctness dimensions, difficulty escalation or automation to the source case or executable method unless the supplied evidence explicitly requires them. An inferred pedagogical extension is not a source fact; omit it from required execution and sourceFacts. Preserve the source branch for every non-satisfied condition, including an insufficient success streak, without inventing a different trigger.',
               'A repeated-success requirement cannot become immediate action after one success. Do not swap conditions before/after removing support. When audio and visual evidence conflict, retain the separate claims and stop for confirmation instead of silently reconciling them.',
-              'Every number in sourceExample must appear verbatim in the bound source evidence (visualObservation.visibleText or transcript text). Never round, rescale or invent a quantity.',
-              'Write every source-case quantity, threshold and count as a {参数名} placeholder in description, mechanism, futureApplicability and all execution fields, and declare each parameter with its source value in execution.input. A bare source-case number in those fields fails the build.',
+              'Every sourceFacts quote must be copied verbatim from the evidence named by its evidenceId. Never paraphrase, reorder, translate, round, rescale or invent conditions, dimensions or quantities; the server rejects any quote that does not appear word-for-word in that evidence.',
+              'Write every source-case quantity, threshold and count as a {参数名} placeholder in description, mechanism, futureApplicability and every execution field except execution.input; declare each parameter with its source value in execution.input. A bare source-case number in those fields fails the build.',
               'sourceEvidenceIds must bind to readable evidence. Frames with empty visualObservation.visibleText or unresolved uncertainties cannot support a confirmed source example; leave uncertain material as a draft rather than inventing it.',
             ].join('\n'),
             MULTIMODAL_PROMPT_VERSIONS.ria,
@@ -1278,8 +1285,8 @@ export function createProductionMultimodalModelAdapters(options?: {
                 'description',
                 'skillMd',
                 'sourceEvidenceIds',
+                'sourceFacts',
                 'mechanism',
-                'sourceExample',
                 'futureApplicability',
                 'execution',
                 'boundaries',
@@ -1354,6 +1361,40 @@ export function createProductionMultimodalModelAdapters(options?: {
                   `RIA contract skill ${candidateId} cites evidence outside its candidate evidenceIds`,
                 );
               }
+              const sourceFactItems = readDenseArray(
+                record.sourceFacts,
+                MAX_SOURCE_FACTS,
+              );
+              if (sourceFactItems.length === 0) {
+                fail(
+                  `RIA contract skill ${candidateId} must provide at least one sourceFacts quote`,
+                );
+              }
+              const sourceFacts = sourceFactItems.map(
+                (fact, factIndex): RiaSourceFact => {
+                  const factPath = `skills[${index}].sourceFacts[${factIndex}]`;
+                  const factRecord = readRecord(fact);
+                  ensureExactKeys(factRecord, ['evidenceId', 'quote']);
+                  const evidenceId = readRiaString(
+                    factRecord.evidenceId,
+                    `${factPath}.evidenceId`,
+                    128,
+                  );
+                  if (!sourceEvidenceIds.includes(evidenceId)) {
+                    fail(
+                      `RIA contract ${factPath}.evidenceId must belong to sourceEvidenceIds`,
+                    );
+                  }
+                  return {
+                    evidenceId,
+                    quote: readRiaString(
+                      factRecord.quote,
+                      `${factPath}.quote`,
+                      MAX_SOURCE_QUOTE,
+                    ),
+                  };
+                },
+              );
               const execution = readRecord(record.execution);
               ensureExactKeys(execution, [
                 'input',
@@ -1410,13 +1451,10 @@ export function createProductionMultimodalModelAdapters(options?: {
                   MAX_SHORT_TEXT,
                 ),
                 sourceEvidenceIds,
+                sourceFacts,
                 mechanism: readRiaString(
                   record.mechanism,
                   `skills[${index}].mechanism`,
-                ),
-                sourceExample: readRiaString(
-                  record.sourceExample,
-                  `skills[${index}].sourceExample`,
                 ),
                 futureApplicability: readRiaString(
                   record.futureApplicability,
@@ -1528,6 +1566,7 @@ export function createProductionMultimodalModelAdapters(options?: {
                 systemPrompt,
                 'This is the single bounded contract-repair attempt for the whole RIA response.',
                 'Regenerate the complete response from the original request. Preserve every requested candidateId and do not add extra keys.',
+                'Fix the exact defect reported in validationIssues: rewrite only the named field or quote, and keep every other field unchanged.',
               ].join('\n'),
               canonicalJson({
                 originalRequest: JSON.parse(userPrompt) as unknown,

@@ -131,14 +131,14 @@ describe('multimodal model adapters', () => {
       candidateId:'framework-c1',id:'skill-1',dirName:'skill-1',name:'按条件调整支架',description:'教学方法与来源案例分开说明',
       ...(legacyBody ? {skillMd:'# 丢失来源的旧自由正文\n一次全对即撤去支架。'} : {}),
       sourceEvidenceIds:['ev-transcript'],mechanism:'根据持续表现调整支架，保留条件与先后次序。',
-      sourceExample:'原案例：紫色菱形先画图再做18道；青色圆形先列式再做27道；连续3次全对才撤架，否则再做5道复核题。',
+      sourceFacts:[{evidenceId:'ev-transcript',quote:'原案例：先画图再做18道，先列式再做27道；连续3次全对才撤架，否则再做5道复核题。'}],
       futureApplicability:'新任务由教师选择参数，不把原案例题量当通用标准。',
       execution:{input:'学生任务与原案例参数',steps:['先核对画图和列式是否均正确。','连续达标后才撤去支架；否则保留提示并复核。'],output:'复核结论与支架状态',completionCriteria:'连续达标且条件全部满足才撤去支架。',stopCriteria:'读不清、条件冲突或单位不明时停止并请教师确认。'},
       boundaries:{counterexamples:['不得因一次全对就撤去支架。'],failureModes:['将次数或题量误当普遍标准。'],limits:['原案例3次和5道仅是有来源的参数。'],confusions:['无支架后的表现不等同于撤架前的复核。']},evidenceIds:['ev-transcript'],relations:[]
     }]});
     const result=await createProductionMultimodalModelAdapters({generateJson,models:{ria:'ria-test'}}).riaAdapter.buildSkills({candidates:[candidate],evidenceTimeline:makeEvidenceTimeline('source-audio'),skillDirectory:makeSkillDirectory(candidate.candidateId,candidate.title,candidate.summary)});
     const body=result.skills[0].skillMd;
-    expect(body).toContain('原案例：紫色菱形先画图再做18道；青色圆形先列式再做27道；连续3次全对才撤架，否则再做5道复核题。');
+    expect(body).toContain('原案例：先画图再做18道，先列式再做27道；连续3次全对才撤架，否则再做5道复核题。');
     expect(body).toContain('连续达标后才撤去支架；否则保留提示并复核。');
     expect(body).toContain('连续达标且条件全部满足才撤去支架。');
     expect(body).toContain('读不清、条件冲突或单位不明时停止并请教师确认。');
@@ -150,22 +150,22 @@ describe('multimodal model adapters', () => {
     expect(prompt).toContain('Use named task parameters in mechanism, description and execution');
     expect(prompt).toContain('Candidate summaries are model proposals, not source evidence');
     expect(prompt).toContain('Do not add correctness dimensions, difficulty escalation or automation');
-    expect(prompt).toContain('Every number in sourceExample must appear verbatim in the bound source evidence');
+    expect(prompt).toContain('Every sourceFacts quote must be copied verbatim from the evidence named by its evidenceId');
     expect(body.startsWith('---\nname: skill-1\ndescription: ')).toBe(true);
   });
 
-  it('rejects a source example whose quantity is absent from the bound evidence', async () => {
+  it('rejects a source fact whose quote is not verbatim in the bound evidence', async () => {
     const candidate={candidateId:'framework-c1',passKey:'frameworks' as const,title:'按条件调整支架',summary:'保留条件与原案例',reusableRule:'先复核条件再调整',evidenceIds:['ev-transcript'],claimType:'sourceFact' as const,visualAssertion:false};
     const generateJson=vi.fn().mockResolvedValue({skills:[{
       candidateId:'framework-c1',id:'skill-1',dirName:'skill-1',name:'按条件调整支架',description:'教学方法与来源案例分开说明',
       sourceEvidenceIds:['ev-transcript'],mechanism:'根据持续表现调整支架，保留条件与先后次序。',
-      sourceExample:'原案例：先画图再做30道，连续9次全对才撤架。',
+      sourceFacts:[{evidenceId:'ev-transcript',quote:'原案例：先画图再做30道，连续9次全对才撤架。'}],
       futureApplicability:'新任务由教师选择参数，不把原案例题量当通用标准。',
       execution:{input:'学生任务与原案例参数',steps:['先核对画图和列式是否均正确。'],output:'复核结论与支架状态',completionCriteria:'连续达标且条件全部满足才撤去支架。',stopCriteria:'读不清、条件冲突或单位不明时停止并请教师确认。'},
       boundaries:{counterexamples:['不得因一次全对就撤去支架。'],failureModes:['将次数或题量误当普遍标准。'],limits:['原案例参数仅来源于素材。'],confusions:['无支架后的表现不等同于撤架前的复核。']},evidenceIds:['ev-transcript'],relations:[]
     }]});
     const adapter=createProductionMultimodalModelAdapters({generateJson,models:{ria:'ria-test'}}).riaAdapter;
-    await expect(adapter.buildSkills({candidates:[candidate],evidenceTimeline:makeEvidenceTimeline('source-audio'),skillDirectory:makeSkillDirectory(candidate.candidateId,candidate.title,candidate.summary)})).rejects.toMatchObject({code:'RIA_CONTENT_INCOMPLETE',reason:'source_ungrounded'});
+    await expect(adapter.buildSkills({candidates:[candidate],evidenceTimeline:makeEvidenceTimeline('source-audio'),skillDirectory:makeSkillDirectory(candidate.candidateId,candidate.title,candidate.summary)})).rejects.toMatchObject({code:'RIA_CONTENT_INCOMPLETE',reason:'source_quote_mismatch'});
   });
 
   it('rejects source-case numbers hard-coded in executable fields', async () => {
@@ -173,7 +173,7 @@ describe('multimodal model adapters', () => {
     const generateJson=vi.fn().mockResolvedValue({skills:[{
       candidateId:'framework-c1',id:'skill-1',dirName:'skill-1',name:'按条件调整支架',description:'教学方法与来源案例分开说明',
       sourceEvidenceIds:['ev-transcript'],mechanism:'根据持续表现调整支架，保留条件与先后次序。',
-      sourceExample:'原案例：先画图再做18道，连续3次全对才撤架，否则再做5道复核题。',
+      sourceFacts:[{evidenceId:'ev-transcript',quote:'连续3次全对才撤架，否则再做5道复核题。'}],
       futureApplicability:'新任务由教师选择参数，不把原案例题量当通用标准。',
       execution:{input:'学生任务与原案例参数',steps:['连续3次全对后才撤去支架。'],output:'复核结论与支架状态',completionCriteria:'连续达标且条件全部满足才撤去支架。',stopCriteria:'读不清、条件冲突或单位不明时停止并请教师确认。'},
       boundaries:{counterexamples:['不得因一次全对就撤去支架。'],failureModes:['将次数或题量误当普遍标准。'],limits:['原案例3次和5道仅是有来源的参数。'],confusions:['无支架后的表现不等同于撤架前的复核。']},evidenceIds:['ev-transcript'],relations:[]
@@ -187,7 +187,7 @@ describe('multimodal model adapters', () => {
     const generateJson=vi.fn().mockResolvedValue({skills:[{
       candidateId:'framework-c1',id:'skill-1',dirName:'skill-1',name:'按条件调整支架',description:'教学方法与来源案例分开说明',
       sourceEvidenceIds:['ev-transcript'],mechanism:'根据{连续成功次数}调整支架，保留条件与先后次序。',
-      sourceExample:'原案例：先画图再做18道，连续3次全对才撤架，否则再做5道复核题。',
+      sourceFacts:[{evidenceId:'ev-transcript',quote:'连续3次全对才撤架，否则再做5道复核题。'}],
       futureApplicability:'新任务由教师选择参数，不把原案例题量当通用标准。',
       execution:{input:'学生任务与原案例参数（连续成功次数、复核题数量）',steps:['连续{连续成功次数}次全对后才撤去支架。','未达标时追加{复核题数量}道复核题。'],output:'复核结论与支架状态',completionCriteria:'连续{连续成功次数}次达标且条件全部满足才撤去支架。',stopCriteria:'读不清、条件冲突或单位不明时停止并请教师确认。'},
       boundaries:{counterexamples:['不得因一次全对就撤去支架。'],failureModes:['将次数或题量误当普遍标准。'],limits:['原案例3次和5道仅是有来源的参数。'],confusions:['无支架后的表现不等同于撤架前的复核。']},evidenceIds:['ev-transcript'],relations:[]
@@ -198,7 +198,7 @@ describe('multimodal model adapters', () => {
   });
   it('keeps an uncertain visual source unpublishable after the existing single RIA repair', async () => {
     const candidate={candidateId:'framework-c1',passKey:'frameworks' as const,title:'规则',summary:'规则来源',reusableRule:'核对来源',evidenceIds:['ev-frame'],claimType:'modelInference' as const,visualAssertion:true};
-    const generateJson=vi.fn().mockResolvedValue({skills:[{candidateId:'framework-c1',id:'skill-1',dirName:'skill-1',name:'规则',description:'规则',skillMd:'# 猜测',sourceEvidenceIds:['ev-frame'],mechanism:'机制',sourceExample:'猜测的规则',futureApplicability:'未来条件',execution:{input:'输入',steps:['执行'],output:'输出',completionCriteria:'完成',stopCriteria:'停止'},boundaries:{counterexamples:['反例'],failureModes:['失败'],limits:['限制'],confusions:['混淆']},evidenceIds:['ev-frame'],relations:[]}]});
+    const generateJson=vi.fn().mockResolvedValue({skills:[{candidateId:'framework-c1',id:'skill-1',dirName:'skill-1',name:'规则',description:'规则',skillMd:'# 猜测',sourceEvidenceIds:['ev-frame'],sourceFacts:[{evidenceId:'ev-frame',quote:'猜测的规则'}],mechanism:'机制',futureApplicability:'未来条件',execution:{input:'输入',steps:['执行'],output:'输出',completionCriteria:'完成',stopCriteria:'停止'},boundaries:{counterexamples:['反例'],failureModes:['失败'],limits:['限制'],confusions:['混淆']},evidenceIds:['ev-frame'],relations:[]}]});
     const frame=makeEvidenceTimeline().find(e=>e.kind==='frame')!;
     const adapter=createProductionMultimodalModelAdapters({generateJson,models:{ria:'ria-test'}}).riaAdapter;
     await expect(adapter.buildSkills({candidates:[candidate],evidenceTimeline:[{...frame,visualObservation:{visibleText:[],uncertainties:['关键次数无法读清，不得猜测。']}}],skillDirectory:makeSkillDirectory(candidate.candidateId,candidate.title,candidate.summary)})).rejects.toMatchObject({code:'RIA_CONTENT_INCOMPLETE',reason:'source_uncertain'});
@@ -263,7 +263,7 @@ describe('multimodal model adapters', () => {
             skillMd: '# skill',
             sourceEvidenceIds: ['ev-transcript'],
             mechanism: 'mechanism',
-            sourceExample: 'example',
+            sourceFacts: [{ evidenceId: 'ev-transcript', quote: '原案例：先画图再做18道，先列式再做27道' }],
             futureApplicability: 'future',
             execution: {
               input: 'input',
@@ -469,7 +469,7 @@ describe('multimodal model adapters', () => {
       skillMd: '# skill',
       sourceEvidenceIds: ['ev-transcript'],
       mechanism: 'mechanism',
-      sourceExample: 'example',
+      sourceFacts: [{ evidenceId: 'ev-transcript', quote: '原案例：先画图再做18道，先列式再做27道' }],
       futureApplicability: 'future',
       execution: {
         input: 'input',
@@ -538,7 +538,7 @@ describe('multimodal model adapters', () => {
       skillMd: '# skill',
       sourceEvidenceIds: ['ev-transcript'],
       mechanism: 'mechanism',
-      sourceExample: 'example',
+      sourceFacts: [{ evidenceId: 'ev-transcript', quote: '原案例：先画图再做18道，先列式再做27道' }],
       futureApplicability: 'future',
       execution: {
         input: 'input',
@@ -790,7 +790,7 @@ describe('multimodal model adapters', () => {
             skillMd: '# skill',
             sourceEvidenceIds: ['ev-transcript'],
             mechanism: 'mechanism',
-            sourceExample: 'example',
+            sourceFacts: [{ evidenceId: 'ev-transcript', quote: '原案例：先画图再做18道，先列式再做27道' }],
             futureApplicability: 'future',
             execution: {
               input: 'input',
@@ -968,7 +968,7 @@ describe('multimodal model adapters', () => {
             skillMd: '# skill',
             sourceEvidenceIds: ['ev-transcript'],
             mechanism: 'mechanism',
-            sourceExample: 'example',
+            sourceFacts: [{ evidenceId: 'ev-transcript', quote: '原案例：先画图再做18道，先列式再做27道' }],
             futureApplicability: 'future',
             execution: {
               input: 'input',
@@ -1068,7 +1068,7 @@ describe('multimodal model adapters', () => {
 
     expect(riaPrompt).toContain('1..16 items when at least one selected candidate is provided');
     expect(riaPrompt).toContain('"name" and "description" must each be non-empty strings up to 512 characters.');
-    expect(riaPrompt).toContain('"mechanism", "sourceExample", and "futureApplicability" must each be non-empty strings up to 2000 characters.');
+    expect(riaPrompt).toContain('"mechanism" and "futureApplicability" must each be non-empty strings up to 2000 characters.');
     expect(riaPrompt).toContain('Do not generate skillMd.');
     expect(riaPrompt).toContain('1..8 non-empty strings');
   });
@@ -1200,7 +1200,7 @@ describe('multimodal model adapters', () => {
               skillMd: '# skill',
               sourceEvidenceIds: ['ev-transcript'],
               mechanism: 'mechanism',
-              sourceExample: 'example',
+              sourceFacts: [{ evidenceId: 'ev-transcript', quote: '原案例：先画图再做18道，先列式再做27道' }],
               futureApplicability: 'future',
               execution: {
                 input: 'input',
@@ -1482,7 +1482,7 @@ describe('multimodal model adapters', () => {
               skillMd: '# skill',
               sourceEvidenceIds: ['ev-transcript'],
               mechanism: 'mechanism',
-              sourceExample: 'example',
+              sourceFacts: [{ evidenceId: 'ev-transcript', quote: '原案例：先画图再做18道，先列式再做27道' }],
               futureApplicability: 'future',
               execution: {
                 input: 'input',

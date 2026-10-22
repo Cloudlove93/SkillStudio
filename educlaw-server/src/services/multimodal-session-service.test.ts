@@ -955,7 +955,7 @@ describe('multimodal session service', () => {
             skillMd: '# skill',
             sourceEvidenceIds: ['ev-transcript'],
             mechanism: '先定义规则，再给例证',
-            sourceExample: '原视频中的定义片段',
+            sourceFacts: [{ evidenceId: 'ev-transcript', quote: '原视频中的定义片段' }],
             futureApplicability: '适用于错题讲评',
             execution: {
               input: '教师目标与学生困惑',
@@ -993,7 +993,7 @@ describe('multimodal session service', () => {
             skillMd: '# support',
             sourceEvidenceIds: ['ev-transcript'],
             mechanism: '先对齐术语',
-            sourceExample: '视频中的术语定义',
+            sourceFacts: [{ evidenceId: 'ev-transcript', quote: '视频中的术语定义' }],
             futureApplicability: '适用于新单元导入',
             execution: {
               input: '术语混乱的课堂片段',
@@ -1216,7 +1216,7 @@ describe('multimodal session service', () => {
               skillMd: '# skill',
               sourceEvidenceIds: ['ev-transcript'],
               mechanism: '先定义规则，再给例证',
-              sourceExample: '原视频中的定义片段',
+              sourceFacts: [{ evidenceId: 'ev-transcript', quote: '原视频中的定义片段' }],
               futureApplicability: '适用于错题讲评',
               execution: {
                 input: '教师目标与学生困惑',
@@ -1426,7 +1426,7 @@ describe('multimodal session service', () => {
               skillMd: '# bad',
               sourceEvidenceIds: ['ev-transcript'],
               mechanism: 'bad',
-              sourceExample: 'bad',
+              sourceFacts: [{ evidenceId: 'ev-transcript', quote: 'bad' }],
               futureApplicability: 'bad',
               execution: {
                 input: 'bad',
@@ -1459,7 +1459,7 @@ describe('multimodal session service', () => {
               skillMd: '# dup',
               sourceEvidenceIds: ['ev-transcript'],
               mechanism: 'dup',
-              sourceExample: 'dup',
+              sourceFacts: [{ evidenceId: 'ev-transcript', quote: 'dup' }],
               futureApplicability: 'dup',
               execution: {
                 input: 'dup',
@@ -1623,7 +1623,7 @@ describe('multimodal session service', () => {
               skillMd: '# one',
               sourceEvidenceIds: ['ev-transcript'],
               mechanism: 'one',
-              sourceExample: 'one',
+              sourceFacts: [{ evidenceId: 'ev-transcript', quote: 'one' }],
               futureApplicability: 'one',
               execution: {
                 input: 'one',
@@ -1653,7 +1653,7 @@ describe('multimodal session service', () => {
               skillMd: '# two',
               sourceEvidenceIds: ['ev-transcript'],
               mechanism: 'two',
-              sourceExample: 'two',
+              sourceFacts: [{ evidenceId: 'ev-transcript', quote: 'two' }],
               futureApplicability: 'two',
               execution: {
                 input: 'two',
@@ -1792,7 +1792,7 @@ describe('multimodal session service', () => {
           skillMd: '# skill',
           sourceEvidenceIds: ['ev-transcript'],
           mechanism: 'mechanism',
-          sourceExample: 'example',
+          sourceFacts: [{ evidenceId: 'ev-transcript', quote: 'example' }],
           futureApplicability: 'future',
           execution: {
             input: 'input',
@@ -2252,7 +2252,7 @@ describe('multimodal session service', () => {
               skillMd: '# skill',
               sourceEvidenceIds: ['ev-audio'],
               mechanism: 'mechanism',
-              sourceExample: 'source example',
+              sourceFacts: [{ evidenceId: 'ev-audio', quote: 'source example' }],
               futureApplicability: 'future',
               execution: {
                 input: 'input',
