@@ -120,6 +120,27 @@ describe('ria skill markdown assembly', () => {
     expect(body).toContain('如从 3 次改为 5 次');
   });
 
+  it('ignores ordered-list markers that reuse a source number', () => {
+    const body = assembleRiaSkillMarkdown(
+      skill({
+        mechanism:
+          '1. 判定双维标准。\n2. 追踪连续达标。\n3. 达到{连续成功次数}次后撤架。',
+      }),
+      grounded(),
+    );
+    expect(body).toContain('3. 达到{连续成功次数}次后撤架。');
+  });
+
+  it('folds line breaks inside a verbatim quote into one list line', () => {
+    const body = assembleRiaSkillMarkdown(
+      skill({
+        sourceFacts: [{ evidenceId: 'ev-frame', quote: '第一行\n第二行' }],
+      }),
+      [evidence(['第一行\n第二行'])],
+    );
+    expect(body).toContain('- “第一行 第二行”（来源 [ev-frame]）');
+  });
+
   it('rejects a draft without verbatim source facts', () => {
     expect(() =>
       assembleRiaSkillMarkdown(skill({ sourceFacts: [] }), grounded()),

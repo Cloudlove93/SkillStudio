@@ -45,6 +45,7 @@ export class RiaContentError extends Error {
 const NUMBER_PATTERN = /[0-9]+(?:\.[0-9]+)?/g;
 const PARAMETER_WRAPPER = /\{[^{}]*\}/g;
 const PARENTHETICAL_EXAMPLE = /（[^（）]*）|\([^()]*\)/g;
+const LIST_MARKER = /(^|\s)\d{1,2}[.、)）]/gm;
 const MIN_QUOTE_LENGTH = 4;
 
 function numbersIn(value: string): string[] {
@@ -87,14 +88,15 @@ function groundedText(
 
 /**
  * Numbers only count as hard-coded rules when they sit in the operative text.
- * Parameter placeholders and parenthetical illustrations ("如从 3 次改为 5 次")
- * are the two sanctioned places for literal source values, so both are removed
+ * Parameter placeholders, parenthetical illustrations ("如从 3 次改为 5 次")
+ * and ordered-list markers ("1. … 3. …") are sanctioned, so they are removed
  * before scanning.
  */
 function withoutIllustrativeValues(value: string): string {
   return value
     .replace(PARAMETER_WRAPPER, ' ')
-    .replace(PARENTHETICAL_EXAMPLE, ' ');
+    .replace(PARENTHETICAL_EXAMPLE, ' ')
+    .replace(LIST_MARKER, ' ');
 }
 
 /**
@@ -238,7 +240,10 @@ export function assembleRiaSkillMarkdown(
     .map((id) => `[${id}]`)
     .join('、');
   const sourceCases = facts
-    .map((fact) => `- “${fact.quote}”（来源 [${fact.evidenceId}]）`)
+    .map(
+      (fact) =>
+        `- “${fact.quote.replace(/\s+/g, ' ').trim()}”（来源 [${fact.evidenceId}]）`,
+    )
     .join('\n');
   const body = [
     frontmatter,

@@ -511,9 +511,18 @@ describe('multimodal model adapters', () => {
     expect(generateJson.mock.calls[1]?.[0].systemPrompt).toContain(
       'single bounded contract-repair attempt',
     );
+    expect(generateJson.mock.calls[1]?.[0].systemPrompt).toContain(
+      'CORRECTION MODE',
+    );
+    expect(generateJson.mock.calls[1]?.[0].temperature).toBe(0.3);
     expect(generateJson.mock.calls[1]?.[0].userPrompt).toContain(
       'previousInvalidPayload',
     );
+    expect(
+      String(generateJson.mock.calls[1]?.[0].userPrompt).startsWith(
+        'CORRECTION REQUIRED:',
+      ),
+    ).toBe(true);
   });
 
   it('accepts a relation to a Skill in another RIA batch through the Pack directory', async () => {

@@ -47,6 +47,12 @@ const MAX_MULTIMODAL_MODEL_MAX_TOKENS = 65_536;
 
 export const MULTIMODAL_GENERATOR_VERSION = 'multimodal-text-adapters-v2';
 export const MULTIMODAL_MODEL_TEMPERATURE = 0 as const;
+/**
+ * Repairs run with a small amount of sampling. At temperature 0 the observed
+ * provider repeated the rejected first draft byte-for-byte, so the correction
+ * turn must not stay deterministic.
+ */
+export const MULTIMODAL_REPAIR_TEMPERATURE = 0.3;
 export const MULTIMODAL_MODEL_MAX_TOKENS_DEFAULT = 8192;
 export const MULTIMODAL_PROMPT_VERSIONS = {
   adler: 'multimodal-adler-v3-zh',
@@ -58,12 +64,12 @@ export const MULTIMODAL_PROMPT_VERSIONS = {
     terms: 'multimodal-candidates-terms-v3-zh',
   } as const,
   validation: 'multimodal-validation-v2-zh',
-  ria: 'multimodal-ria-v7-verbatim-quotes-zh',
+  ria: 'multimodal-ria-v8-verbatim-quotes-zh',
   fused: 'multimodal-fused-candidates-v1-zh',
 } as const;
 
 export interface MultimodalModelRequestParameters {
-  temperature: typeof MULTIMODAL_MODEL_TEMPERATURE;
+  temperature: number;
   maxTokens: number;
 }
 
@@ -911,12 +917,14 @@ function createJsonRequester(
   generateJsonImpl: GenerateJsonFunction,
   model: string,
   requestParameters: MultimodalModelRequestParameters,
+  temperatureOverride?: number,
 ) {
+  const temperature = temperatureOverride ?? requestParameters.temperature;
   return async <T>(systemPrompt: string, userPrompt: string): Promise<T> =>
     generateJsonImpl<T>(
       {
         model,
-        temperature: requestParameters.temperature,
+        temperature,
         maxTokens: requestParameters.maxTokens,
         hidePromptContentInLogs: true,
         systemPrompt,
@@ -1194,6 +1202,12 @@ export function createProductionMultimodalModelAdapters(options?: {
             models.ria,
             requestParameters,
           );
+          const repairRequest = createJsonRequester(
+            generateJsonImpl,
+            models.ria,
+            requestParameters,
+            MULTIMODAL_REPAIR_TEMPERATURE,
+          );
           const systemPrompt = multimodalSystemPrompt(
             [
               COMMON_PROMPT_RULES,
@@ -1206,6 +1220,7 @@ export function createProductionMultimodalModelAdapters(options?: {
               'Do not add correctness dimensions, difficulty escalation or automation to the source case or executable method unless the supplied evidence explicitly requires them. An inferred pedagogical extension is not a source fact; omit it from required execution and sourceFacts. Preserve the source branch for every non-satisfied condition, including an insufficient success streak, without inventing a different trigger.',
               'A repeated-success requirement cannot become immediate action after one success. Do not swap conditions before/after removing support. When audio and visual evidence conflict, retain the separate claims and stop for confirmation instead of silently reconciling them.',
               'Every sourceFacts quote must be copied verbatim from the evidence named by its evidenceId. Never paraphrase, reorder, translate, round, rescale or invent conditions, dimensions or quantities; the server rejects any quote that does not appear word-for-word in that evidence.',
+              'Never invent numeric thresholds for stopCriteria, completionCriteria or boundaries. A stop or completion rule may only reuse a condition quoted in sourceFacts; otherwise describe the signal qualitatively without a count, streak or round limit.',
               'Write every source-case quantity, threshold and count as a {参数名} placeholder in description, mechanism, futureApplicability and every execution field except execution.input; declare each parameter with its source value in execution.input. A bare source-case number in those fields fails the build.',
               'sourceEvidenceIds must bind to readable evidence. Frames with empty visualObservation.visibleText or unresolved uncertainties cannot support a confirmed source example; leave uncertain material as a draft rather than inventing it.',
             ].join('\n'),
@@ -1561,21 +1576,25 @@ export function createProductionMultimodalModelAdapters(options?: {
               event: 'multimodal.ria.contract_repair_started',
               validationIssue: firstValidationIssue,
             });
-            payload = await requestJson<unknown>(
+            payload = await repairRequest<unknown>(
               [
+                'CORRECTION MODE: the previous response failed contract validation and must be regenerated.',
+                `Reported defect: ${firstValidationIssue}`,
+                'Fix only that defect. Keep every field that was already valid, keep every requested candidateId, and do not add extra keys.',
                 systemPrompt,
                 'This is the single bounded contract-repair attempt for the whole RIA response.',
-                'Regenerate the complete response from the original request. Preserve every requested candidateId and do not add extra keys.',
-                'Fix the exact defect reported in validationIssues: rewrite only the named field or quote, and keep every other field unchanged.',
               ].join('\n'),
-              canonicalJson({
-                originalRequest: JSON.parse(userPrompt) as unknown,
-                previousInvalidPayload: payload,
-                validationIssues: [
-                  firstValidationIssue,
-                  'Recheck every key, nested object, array bound, identifier, candidateId, evidence ID, and relation target.',
-                ],
-              }),
+              [
+                `CORRECTION REQUIRED: ${firstValidationIssue}`,
+                canonicalJson({
+                  originalRequest: JSON.parse(userPrompt) as unknown,
+                  previousInvalidPayload: payload,
+                  validationIssues: [
+                    firstValidationIssue,
+                    'Recheck every key, nested object, array bound, identifier, candidateId, evidence ID, and relation target.',
+                  ],
+                }),
+              ].join('\n'),
             );
             try {
               return { skills: parseSkills(payload) };
