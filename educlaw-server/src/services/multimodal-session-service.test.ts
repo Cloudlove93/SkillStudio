@@ -952,7 +952,7 @@ describe('multimodal session service', () => {
             dirName: 'skill-rule-1',
             name: '先定义再例证',
             description: '帮助老师结构化讲解',
-            skillMd: '# skill',
+            skillMd: '---\nname: model-chosen-name\n---\n\n# skill',
             sourceEvidenceIds: ['ev-transcript'],
             mechanism: '先定义规则，再给例证',
             sourceFacts: [{ evidenceId: 'ev-transcript', quote: '原视频中的定义片段' }],
@@ -990,7 +990,7 @@ describe('multimodal session service', () => {
             dirName: 'skill-rule-2',
             name: '术语先行',
             description: '先统一术语',
-            skillMd: '# support',
+            skillMd: '---\nname: model-chosen-name\n---\n\n# support',
             sourceEvidenceIds: ['ev-transcript'],
             mechanism: '先对齐术语',
             sourceFacts: [{ evidenceId: 'ev-transcript', quote: '视频中的术语定义' }],
@@ -1199,6 +1199,9 @@ describe('multimodal session service', () => {
     expect(
       result.skills.some((skill) => skill.candidateId === 'candidate-failed'),
     ).toBe(false);
+    for (const skill of result.skills) {
+      expect(skill.skillMd.split('\n')[1]).toBe(`name: ${skill.dirName}`);
+    }
 
     const unrelatedEvidenceService = createMultimodalSessionService({
       adlerAdapter: { generate: vi.fn() },

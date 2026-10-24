@@ -97,6 +97,17 @@ function assignServerOwnedRiaIdentities(skills: unknown[]): unknown[] {
       ...skill,
       id: serverIdentity.id,
       dirName: serverIdentity.dirName,
+      // The body was assembled before identity assignment, so its frontmatter
+      // still carries the model's directory name. Keep `name` equal to the
+      // server-owned dirName or the Skill fails the SKILL.md identity check.
+      ...(typeof skill.skillMd === 'string'
+        ? {
+            skillMd: skill.skillMd.replace(
+              /^---\nname:[^\n]*\n/,
+              `---\nname: ${serverIdentity.dirName}\n`,
+            ),
+          }
+        : {}),
     };
   });
 }
