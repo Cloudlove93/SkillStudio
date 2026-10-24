@@ -141,6 +141,41 @@ describe('ria skill markdown assembly', () => {
     expect(body).toContain('- “第一行 第二行”（来源 [ev-frame]）');
   });
 
+  it('ignores bare counters such as "加 1" even when the case counts 1', () => {
+    const body = assembleRiaSkillMarkdown(
+      skill({
+        sourceFacts: [{ evidenceId: 'ev-frame', quote: '每完成 1 次任务后计数器归零。' }],
+        execution: {
+          input: '需确认{连续成功次数}与{复核题数量}',
+          steps: ['学生完成一题后计数器加 1。'],
+          output: '支架状态',
+          completionCriteria: '连续{连续成功次数}次达标。',
+          stopCriteria: '参数缺失时停止。',
+        },
+      }),
+      [evidence(['每完成 1 次任务后计数器归零。'])],
+    );
+    expect(body).toContain('计数器加 1');
+  });
+
+  it('rejects a large case quantity written bare without a unit', () => {
+    expect(() =>
+      assembleRiaSkillMarkdown(
+        skill({
+          sourceFacts: [{ evidenceId: 'ev-frame', quote: '再完成 18 道练习。' }],
+          execution: {
+            input: '需确认{练习数量}',
+            steps: ['学生完成 18 练习题。'],
+            output: '支架状态',
+            completionCriteria: '连续{连续成功次数}次达标。',
+            stopCriteria: '参数缺失时停止。',
+          },
+        }),
+        [evidence(['再完成 18 道练习。'])],
+      ),
+    ).toThrowError(/来源数字 18/);
+  });
+
   it('rejects a draft without verbatim source facts', () => {
     expect(() =>
       assembleRiaSkillMarkdown(skill({ sourceFacts: [] }), grounded()),

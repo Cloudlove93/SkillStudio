@@ -64,7 +64,7 @@ export const MULTIMODAL_PROMPT_VERSIONS = {
     terms: 'multimodal-candidates-terms-v3-zh',
   } as const,
   validation: 'multimodal-validation-v2-zh',
-  ria: 'multimodal-ria-v8-verbatim-quotes-zh',
+  ria: 'multimodal-ria-v9-verbatim-quotes-zh',
   fused: 'multimodal-fused-candidates-v1-zh',
 } as const;
 
@@ -1220,6 +1220,7 @@ export function createProductionMultimodalModelAdapters(options?: {
               'Do not add correctness dimensions, difficulty escalation or automation to the source case or executable method unless the supplied evidence explicitly requires them. An inferred pedagogical extension is not a source fact; omit it from required execution and sourceFacts. Preserve the source branch for every non-satisfied condition, including an insufficient success streak, without inventing a different trigger.',
               'A repeated-success requirement cannot become immediate action after one success. Do not swap conditions before/after removing support. When audio and visual evidence conflict, retain the separate claims and stop for confirmation instead of silently reconciling them.',
               'Every sourceFacts quote must be copied verbatim from the evidence named by its evidenceId. Never paraphrase, reorder, translate, round, rescale or invent conditions, dimensions or quantities; the server rejects any quote that does not appear word-for-word in that evidence.',
+              'sourceFacts quotes are the only exception to the ASR correction rule: copy the evidence characters exactly as stored, including spacing, punctuation and any ASR misspelling. Never "fix" a quote. Corrected terminology belongs in description, mechanism, execution and boundaries, not inside a quote.',
               'Never invent numeric thresholds for stopCriteria, completionCriteria or boundaries. A stop or completion rule may only reuse a condition quoted in sourceFacts; otherwise describe the signal qualitatively without a count, streak or round limit.',
               'Write every source-case quantity, threshold and count as a {参数名} placeholder in description, mechanism, futureApplicability and every execution field except execution.input; declare each parameter with its source value in execution.input. A bare source-case number in those fields fails the build.',
               'sourceEvidenceIds must bind to readable evidence. Frames with empty visualObservation.visibleText or unresolved uncertainties cannot support a confirmed source example; leave uncertain material as a draft rather than inventing it.',

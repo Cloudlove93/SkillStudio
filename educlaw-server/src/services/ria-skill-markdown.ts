@@ -43,13 +43,22 @@ export class RiaContentError extends Error {
 }
 
 const NUMBER_PATTERN = /[0-9]+(?:\.[0-9]+)?/g;
+const QUANTITY_UNIT =
+  '次|道|轮|遍|题|分钟|秒|小时|天|周|%|％|倍|个|张|页|篇|分';
+const QUANTITY_PATTERN = new RegExp(
+  `([0-9]+(?:\\.[0-9]+)?)\\s*(?:${QUANTITY_UNIT})`,
+  'g',
+);
+const QUANTITY_UNIT_SUFFIX = new RegExp(`^\\s*(?:${QUANTITY_UNIT})`);
 const PARAMETER_WRAPPER = /\{[^{}]*\}/g;
 const PARENTHETICAL_EXAMPLE = /（[^（）]*）|\([^()]*\)/g;
 const LIST_MARKER = /(^|\s)\d{1,2}[.、)）]/gm;
 const MIN_QUOTE_LENGTH = 4;
+const LARGE_NUMBER = 10;
 
-function numbersIn(value: string): string[] {
-  return value.match(NUMBER_PATTERN) ?? [];
+/** Numbers that carry a unit, i.e. the ones that can be a case threshold. */
+function quantitiesIn(value: string): string[] {
+  return [...value.matchAll(QUANTITY_PATTERN)].map((match) => match[1]);
 }
 
 /**
@@ -144,7 +153,11 @@ function assertGroundedParameters(
   skill: RiaContent,
   facts: readonly RiaSourceFact[],
 ): void {
-  const sourceNumbers = new Set(facts.flatMap((fact) => numbersIn(fact.quote)));
+  // Only case thresholds ("3 次", "18 道") matter here. Bare counters and
+  // ordinals such as "加 1" or "1.1 函数" are ubiquitous and must not block.
+  const sourceQuantities = new Set(
+    facts.flatMap((fact) => quantitiesIn(fact.quote)),
+  );
   // `execution.input` is the parameter declaration itself: it is expected to
   // name each parameter together with its source value, so numbers there are
   // not fixed rules. Every other executable field must use `{参数名}` instead.
@@ -161,7 +174,17 @@ function assertGroundedParameters(
   ];
   for (const [label, field] of executable) {
     const bare = withoutIllustrativeValues(field);
-    const leaked = numbersIn(bare).find((number) => sourceNumbers.has(number));
+    let leaked: string | undefined;
+    for (const match of bare.matchAll(NUMBER_PATTERN)) {
+      const number = match[0];
+      if (!sourceQuantities.has(number)) continue;
+      const rest = bare.slice((match.index ?? 0) + number.length);
+      const hasUnit = QUANTITY_UNIT_SUFFIX.test(rest);
+      if (hasUnit || Number(number) >= LARGE_NUMBER) {
+        leaked = number;
+        break;
+      }
+    }
     if (leaked) {
       throw new RiaContentError(
         'parameter_leak',
