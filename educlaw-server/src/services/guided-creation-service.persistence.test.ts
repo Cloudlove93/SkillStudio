@@ -516,11 +516,14 @@ describe('guided creation persistence and retry', () => {
     });
 
     expect(continued.status).toBe('collecting');
-    expect(continued.completed_steps).toEqual(['intent_context']);
-    expect(continued.current_step).toBe('teacher_experience');
+    // Supplying the missing detail is not the same as confirming the whole
+    // stage. The user must explicitly choose a confirmation option first.
+    expect(continued.completed_steps).toEqual([]);
+    expect(continued.current_step).toBe('intent_context');
     expect(continued.confirmation).toBeNull();
+    expect(continued.messages.at(-1)?.content).toContain('这个方向准确吗');
     expect(continued.messages.at(-1)?.metadata.focus_step).toBe(
-      'teacher_experience',
+      'intent_context',
     );
   });
 

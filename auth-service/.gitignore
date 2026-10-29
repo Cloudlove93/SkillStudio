@@ -1,0 +1,11 @@
+node_modules
+dist
+dist-frontend
+.env
+.env.local
+.pnpm-store
+*.log
+test-results
+CLAUDE.md
+.claude
+AGENTS.md

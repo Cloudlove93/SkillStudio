@@ -2,7 +2,6 @@ import { useMemo, useRef, useState } from 'react';
 import type {
   GuidedCreationDocument,
   GuidedCreationSessionDetail,
-  GuidedCreationStep,
   GuidedCreationStage,
 } from '@educlaw/shared';
 import {
@@ -27,6 +26,10 @@ import {
 import { ConversationTurnNavigation } from './ConversationTurnNavigation';
 import { collectConversationTurns } from './conversation-turn-navigation';
 import { MarkdownContent } from '../lite/lite-rendering';
+import {
+  deriveGuidedCreationProgress,
+  GUIDED_CREATION_STEP_DEFINITIONS,
+} from './guided-creation-progress';
 
 type Props = {
   session: GuidedCreationSessionDetail | null;
@@ -58,23 +61,6 @@ const guidedStageLabels: Record<GuidedCreationStage, string> = {
   evidence_scope: '确定参考依据',
   boundaries_completion: '补充边界与完成标准',
 };
-
-const guidedStepLabels: Record<GuidedCreationStep, string> = {
-  intent_context: '教育意图',
-  teacher_experience: '教师经验',
-  strategy_co_creation: '教育策略',
-  action_adjustment: '行动调整',
-  evidence_review: '效果复核',
-};
-
-const guidedInterviewSteps: Array<{ key: GuidedCreationStep; label: string }> =
-  [
-    { key: 'intent_context', label: '目标与对象' },
-    { key: 'teacher_experience', label: '经验与依据' },
-    { key: 'strategy_co_creation', label: '教学策略' },
-    { key: 'action_adjustment', label: '行动与边界' },
-    { key: 'evidence_review', label: '效果与证据' },
-  ];
 
 export function GuidedSkillCreationPanel(props: Props) {
   const [input, setInput] = useState('');
@@ -115,29 +101,19 @@ export function GuidedSkillCreationPanel(props: Props) {
     props.session.status === 'collecting'
       ? props.session.next_stage
       : null;
-  const guidedStep =
+  const educationProgress =
     props.session &&
-    props.session.flow_version >= 3 &&
-    props.session.status === 'collecting'
-      ? props.session.current_step
+    (props.session.flow_version >= 3 || Boolean(props.session.education_draft))
+      ? deriveGuidedCreationProgress(props.session)
       : null;
-  const guidedProgress =
-    guidedStep && props.session
+  const guidedStageProgress =
+    guidedStage && props.session
       ? {
-          label: guidedStepLabels[guidedStep],
-          current: Math.min(
-            (props.session.completed_steps?.length ?? 0) + 1,
-            5,
-          ),
-          total: 5,
+          completed: props.session.confirmed_stages.length,
+          total: 6,
+          currentLabel: guidedStageLabels[guidedStage],
         }
-      : guidedStage && props.session
-        ? {
-            label: guidedStageLabels[guidedStage],
-            current: props.session.confirmed_stages.length + 1,
-            total: 6,
-          }
-        : null;
+      : null;
 
   const send = () => {
     const value = input.trim();
@@ -341,7 +317,15 @@ export function GuidedSkillCreationPanel(props: Props) {
                         ? `guided-turn-${message.id}`
                         : undefined
                     }
-                    onOption={(option) => setInput(option)}
+                    onOption={(option) => {
+                      if (educationProgress) {
+                        if (!props.busy) props.onSend(option);
+                      } else {
+                        // Preserve the legacy V1/V2 option behavior: users can
+                        // edit a suggested answer before sending it.
+                        setInput(option);
+                      }
+                    }}
                   />
                 ))}
                 {showPendingMessage && props.pendingMessage && (
@@ -369,25 +353,44 @@ export function GuidedSkillCreationPanel(props: Props) {
         )}
 
         <div className="skill-composer-wrap">
-          {guidedProgress && (
+          {educationProgress ? (
             <div className="skill-guided-progress" aria-label="共创进度">
               <span>共创进度</span>
-              <strong>{guidedProgress.label}</strong>
+              <strong>
+                已完成 {educationProgress.completedStepCount}/
+                {educationProgress.totalStepCount}
+              </strong>
               <small>
-                {guidedProgress.current} / {guidedProgress.total}
+                {educationProgress.currentStepLabel
+                  ? `当前环节：${educationProgress.currentStepLabel}`
+                  : educationProgress.completedStepCount ===
+                      educationProgress.totalStepCount
+                    ? '全部步骤已完成'
+                    : '等待确认下一步'}
               </small>
             </div>
-          )}
-          {guidedStep && props.session && (
+          ) : guidedStageProgress ? (
+            <div className="skill-guided-progress" aria-label="共创进度">
+              <span>共创进度</span>
+              <strong>
+                已完成 {guidedStageProgress.completed}/{guidedStageProgress.total}
+              </strong>
+              <small>
+                当前：{guidedStageProgress.currentLabel}
+              </small>
+            </div>
+          ) : null}
+          {educationProgress && props.session && (
             <nav className="skill-interview-steps" aria-label="Skill 引导阶段">
-              {guidedInterviewSteps.map((step, index) => {
-                const completed =
-                  props.session?.completed_steps?.includes(step.key) ?? false;
-                const active = step.key === guidedStep;
+              {GUIDED_CREATION_STEP_DEFINITIONS.map((step, index) => {
+                const progressStep = educationProgress?.steps[index];
+                const completed = progressStep?.status === 'completed';
+                const active = educationProgress.currentStep === step.key;
+                const conflicted = progressStep?.status === 'conflicted';
                 return (
                   <span
                     key={step.key}
-                    className={`skill-interview-step ${completed ? 'is-complete' : ''} ${active ? 'is-active' : ''}`}
+                    className={`skill-interview-step ${completed ? 'is-complete' : ''} ${active ? 'is-active' : ''} ${conflicted ? 'is-conflicted' : ''}`}
                     aria-current={active ? 'step' : undefined}
                   >
                     <i>{completed ? <Check size={11} /> : index + 1}</i>

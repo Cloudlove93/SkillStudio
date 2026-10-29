@@ -848,6 +848,134 @@
   flex-direction: column;
   gap: 3px;
 }
+.skill-context-progress.is-guided {
+  margin-bottom: 14px;
+  border: 1px solid var(--workspace-border);
+  border-radius: var(--workspace-radius-md);
+  background: color-mix(in srgb, var(--workspace-primary) 5%, transparent);
+}
+.skill-context-progress.is-guided .skill-context-progress-track {
+  background: var(--workspace-border);
+}
+.skill-context-progress.is-guided .skill-context-progress-track span {
+  background: var(--workspace-primary);
+}
+.skill-context-progress.is-guided > p {
+  margin: 7px 0 0;
+  color: var(--workspace-muted);
+  font-size: var(--workspace-text-xs);
+  line-height: 1.5;
+}
+.skill-guided-summary-groups {
+  display: grid;
+  gap: 8px;
+  padding-bottom: 8px;
+}
+.skill-guided-summary-group {
+  min-width: 0;
+  border: 1px solid var(--workspace-border);
+  border-radius: var(--workspace-radius-md);
+  background: var(--workspace-surface);
+}
+.skill-guided-summary-group > header {
+  display: grid;
+  grid-template-columns: 25px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  padding: 9px 10px;
+}
+.skill-guided-summary-step-icon {
+  display: inline-grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 1px solid var(--workspace-border);
+  border-radius: 50%;
+  color: var(--workspace-muted);
+  font-size: var(--workspace-text-xs);
+  font-weight: 650;
+}
+.skill-guided-summary-group > header > div {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.skill-guided-summary-group > header strong {
+  min-width: 0;
+  color: var(--workspace-ink);
+  font-size: var(--workspace-text-sm);
+  font-weight: 620;
+}
+.skill-guided-summary-group > header small {
+  flex: 0 0 auto;
+  color: var(--workspace-muted);
+  font-size: var(--workspace-text-xs);
+  font-variant-numeric: tabular-nums;
+}
+.skill-guided-summary-group.is-active {
+  border-color: color-mix(in srgb, var(--workspace-primary) 38%, var(--workspace-border));
+}
+.skill-guided-summary-group.is-active .skill-guided-summary-step-icon {
+  border-color: color-mix(in srgb, var(--workspace-primary) 42%, var(--workspace-border));
+  background: color-mix(in srgb, var(--workspace-primary) 9%, transparent);
+  color: var(--workspace-primary);
+}
+.skill-guided-summary-group.is-completed .skill-guided-summary-step-icon {
+  border-color: color-mix(in srgb, var(--success) 32%, var(--workspace-border));
+  background: var(--success-soft);
+  color: var(--success);
+}
+.skill-guided-summary-group.is-conflicted {
+  border-color: color-mix(in srgb, var(--destructive) 32%, var(--workspace-border));
+}
+.skill-guided-summary-group.is-conflicted .skill-guided-summary-step-icon {
+  border-color: color-mix(in srgb, var(--destructive) 38%, var(--workspace-border));
+  background: var(--destructive-soft);
+  color: var(--destructive);
+}
+.skill-guided-summary-dimensions {
+  display: grid;
+  padding: 0 10px 3px 43px;
+}
+.skill-guided-summary-dimensions article {
+  min-width: 0;
+  border-top: 1px solid var(--workspace-border);
+  padding: 7px 0;
+}
+.skill-guided-summary-dimensions article > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.skill-guided-summary-dimensions article strong {
+  min-width: 0;
+  color: var(--workspace-ink);
+  font-size: var(--workspace-text-xs);
+  font-weight: 580;
+}
+.skill-guided-summary-dimensions article p {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 4px 0 0;
+  color: var(--workspace-muted);
+  font-size: var(--workspace-text-xs);
+  line-height: 1.55;
+  white-space: pre-line;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+.skill-guided-dimension-status {
+  flex: 0 0 auto;
+  color: var(--workspace-muted);
+  font-size: var(--workspace-text-xs);
+  line-height: 1.35;
+}
+.skill-guided-dimension-status.is-confirmed { color: var(--success); }
+.skill-guided-dimension-status.is-pending { color: var(--workspace-primary); }
+.skill-guided-dimension-status.is-conflicted { color: var(--destructive); }
 .skill-context-sections details {
   border-bottom: 1px solid var(--border);
 }

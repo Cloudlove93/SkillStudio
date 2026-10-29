@@ -1,11 +1,14 @@
 import type {
   GuidedCreationSessionDetail,
-  GuidedEducationDimension,
   SkillVersionDetail,
 } from '@educlaw/shared';
 import { lazy, Suspense } from 'react';
 import { Check, ChevronRight, GitBranch, Sparkles } from 'lucide-react';
 import type { AnswerOptimizationSelection } from './answer-optimization-selection';
+import {
+  deriveGuidedCreationProgress,
+  type GuidedDimensionStatus,
+} from './guided-creation-progress';
 import type { SkillWorkspaceView } from './skill-workspace-state';
 import type { InspectorDescriptor } from './workspace-inspector-state';
 
@@ -15,16 +18,12 @@ const SkillAnswerOptimizationPanel = lazy(() =>
   })),
 );
 
-const EDUCATION_DIMENSIONS: { key: GuidedEducationDimension; title: string }[] =
-  [
-    { key: 'educational_goal', title: '教育目标' },
-    { key: 'audience_context', title: '对象与情境' },
-    { key: 'input_evidence', title: '输入与依据' },
-    { key: 'teaching_strategy', title: '教育策略' },
-    { key: 'action_adaptation', title: '行动与调整' },
-    { key: 'boundaries_responsibility', title: '边界与责任' },
-    { key: 'completion_evidence', title: '完成与证据' },
-  ];
+const guidedDimensionStatusLabels: Record<GuidedDimensionStatus, string> = {
+  confirmed: '已确认',
+  pending: 'AI 已整理，待确认',
+  conflicted: '需要澄清',
+  missing: '等待补充',
+};
 
 type Props = {
   descriptor: InspectorDescriptor | null;
@@ -209,33 +208,24 @@ function RequirementSummary({
     );
   }
 
-  const isEducationFlow =
-    session.flow_version === 3 || Boolean(session.education_draft);
-  const sections = isEducationFlow
-    ? EDUCATION_DIMENSIONS.map((dimension) => ({
-        key: dimension.key,
-        title: dimension.title,
-        content:
-          session.education_draft?.[dimension.key]?.content?.trim() || '',
-      }))
-    : (session.confirmation?.sections ??
-      fallbackTopics.map((topic) => ({
-        key: topic.key,
-        title: topic.title,
-        content: topic.fields
-          .map((field) => session.draft[field] || '')
-          .filter(Boolean)
-          .join('\n'),
-      })));
+  if (session.flow_version >= 3 || Boolean(session.education_draft)) {
+    return <GuidedRequirementSummary session={session} />;
+  }
 
-  const completedCount = isEducationFlow
-    ? EDUCATION_DIMENSIONS.filter((dimension) =>
-        session.education_draft?.[dimension.key]?.content?.trim(),
-      ).length
-    : Object.values(session.field_states).filter(
-        (state) => state !== 'missing' && state !== 'conflicted',
-      ).length;
-  const totalCount = isEducationFlow ? EDUCATION_DIMENSIONS.length : 11;
+  const sections =
+    session.confirmation?.sections ??
+    fallbackTopics.map((topic) => ({
+      key: topic.key,
+      title: topic.title,
+      content: topic.fields
+        .map((field) => session.draft[field] || '')
+        .filter(Boolean)
+        .join('\n'),
+    }));
+  const completedCount = Object.values(session.field_states).filter(
+    (state) => state !== 'missing' && state !== 'conflicted',
+  ).length;
+  const totalCount = 11;
 
   return (
     <div className="skill-context-scroll">
@@ -274,6 +264,87 @@ function RequirementSummary({
             </details>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function GuidedRequirementSummary({
+  session,
+}: {
+  session: GuidedCreationSessionDetail;
+}) {
+  const progress = deriveGuidedCreationProgress(session);
+  const progressPercent = Math.round(
+    (progress.completedStepCount / progress.totalStepCount) * 100,
+  );
+
+  return (
+    <div className="skill-context-scroll skill-guided-summary">
+      <div className="skill-context-progress is-guided">
+        <div>
+          <span>需求完整度</span>
+          <strong>
+            已完成 {progress.completedStepCount}/{progress.totalStepCount}
+          </strong>
+        </div>
+        <div
+          className="skill-context-progress-track"
+          role="progressbar"
+          aria-label="需求共创完成进度"
+          aria-valuemin={0}
+          aria-valuemax={progress.totalStepCount}
+          aria-valuenow={progress.completedStepCount}
+        >
+          <span style={{ width: `${progressPercent}%` }} />
+        </div>
+        <p>
+          {progress.currentStepLabel
+            ? `当前环节：${progress.currentStepLabel}`
+            : progress.completedStepCount === progress.totalStepCount
+              ? '五个共创环节均已确认'
+              : '等待进入下一个共创环节'}
+        </p>
+      </div>
+
+      <div className="skill-guided-summary-groups">
+        {progress.steps.map((step, index) => (
+          <section
+            key={step.key}
+            className={`skill-guided-summary-group is-${step.status}`}
+            aria-current={progress.currentStep === step.key ? 'step' : undefined}
+          >
+            <header>
+              <span className="skill-guided-summary-step-icon">
+                {step.status === 'completed' ? <Check size={13} /> : index + 1}
+              </span>
+              <div>
+                <strong>{step.label}</strong>
+                <small>
+                  已确认 {step.confirmedDimensionCount}/{step.dimensions.length}
+                </small>
+              </div>
+            </header>
+            <div className="skill-guided-summary-dimensions">
+              {step.dimensions.map((dimension) => (
+                <article
+                  key={dimension.key}
+                  className={`is-${dimension.status}`}
+                >
+                  <div>
+                    <strong>{dimension.label}</strong>
+                    <span
+                      className={`skill-guided-dimension-status is-${dimension.status}`}
+                    >
+                      {guidedDimensionStatusLabels[dimension.status]}
+                    </span>
+                  </div>
+                  <p>{dimension.content || '尚未收集到相关内容'}</p>
+                </article>
+              ))}
+            </div>
+          </section>
+        ))}
       </div>
     </div>
   );

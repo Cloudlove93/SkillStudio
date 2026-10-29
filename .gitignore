@@ -2,6 +2,7 @@
 
 # Dependencies
 node_modules/
+.pnpm-store/
 
 # Build output
 dist/
@@ -15,6 +16,7 @@ educlaw-server/public/
 .env.development
 .env.test
 .env.docker
+auth-service/.env
 
 # IDE
 .vscode/

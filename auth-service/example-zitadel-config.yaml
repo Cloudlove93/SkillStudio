@@ -1,0 +1,46 @@
+# All possible options and their defaults: https://github.com/zitadel/zitadel/blob/main/cmd/defaults.yaml
+Log:
+  Level: 'info' # info, debug 增加日志详细程度
+
+# Make ZITADEL accessible over HTTP, not HTTPS
+# 部署到其他设备时，请直接修改这个文件中的 ExternalDomain / ExternalPort / ExternalSecure
+# 例如：auth.educlaw.local 或 auth.yourdomain.com
+
+# 必须填写浏览器实际访问 Zitadel 子域名的域名，不能写容器内地址 `zitadel`
+# 本地开发默认通过 Kong 的 auth.localhost:80 对外暴露
+ExternalDomain: 'auth.localhost'
+ExternalPort: 80
+ExternalSecure: false
+
+# 这些地址原先通过 docker-compose 环境变量传入，现统一放在配置文件中维护。
+# 修改域名、端口或协议时，请同步更新下面这些 URL。
+DefaultInstance:
+  Features:
+    LoginV2:
+      Required: true
+
+# If not using the docker compose example, adjust these values for connecting ZITADEL to your PostgreSQL
+Database:
+  postgres:
+    Host: 'postgres' # 修改为宿主机的IP地址
+    Port: 5432 # 宿主机PostgreSQL的端口
+    Database: 'zitadel'
+    Password: 'replace-from-environment'
+    User:
+      Username: 'zitadel'
+      Password: 'replace-from-environment'
+      SSL:
+        Mode: 'disable'
+    Admin:
+      Username: 'zitadel'
+      Password: 'replace-from-environment'
+      SSL:
+        Mode: 'disable'
+
+# ─── SMS 配置 ─────────────────────────────────────────────────────────────────
+# 通过 auth-service 的 /sms/send 端点发送阿里云短信
+Notifications:
+  SMS:
+    HTTP:
+      Endpoint: 'http://auth-backend:3000/sms/send'
+      Method: 'POST'

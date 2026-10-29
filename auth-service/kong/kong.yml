@@ -1,0 +1,114 @@
+_format_version: "3.0"
+
+services:
+  - name: zitadel
+    url: http://zitadel:8080
+    routes:
+      - name: zitadel-routes
+        hosts:
+          - __KONG_AUTH_HOST__
+        paths:
+          - /
+        strip_path: false
+        preserve_host: true
+
+  - name: zitadel-login
+    url: http://zitadel-login:3000
+    routes:
+      - name: zitadel-login-ui
+        hosts:
+          - __KONG_AUTH_HOST__
+        paths:
+          - /ui/v2/login
+        strip_path: false
+        preserve_host: true
+
+  - name: auth-backend-api
+    url: http://auth-backend:3000
+    routes:
+      - name: auth-service-api
+        hosts:
+          - __KONG_AUTH_HOST__
+          - __KONG_APP_HOST__
+        paths:
+          - /auth
+          - /sms/send
+        strip_path: false
+        preserve_host: true
+        plugins:
+          - name: oidc-jwt-auth
+            config:
+              require_token: false
+              expected_issuer: "__ZITADEL_ISSUER__"
+              expected_audience: "__ZITADEL_CLIENT_ID__"
+
+  - name: auth-frontend-pages
+    url: http://auth-frontend:80
+    routes:
+      - name: auth-service-html
+        hosts:
+          - __KONG_AUTH_HOST__
+        paths:
+          - /login
+          - /register
+          - /nav
+          - /portal
+          - /assets
+        strip_path: false
+        preserve_host: true
+
+  - name: educlaw-api
+    url: http://educlaw-server:3000
+    routes:
+      - name: educlaw-protected
+        hosts:
+          - __KONG_APP_HOST__
+        paths:
+          - /agents
+          - /profiles
+          - /api
+          - /llm
+          - /events
+        strip_path: false
+        plugins:
+          - name: oidc-jwt-auth
+            config:
+              require_token: true
+              expected_issuer: "__ZITADEL_ISSUER__"
+              expected_audience: "__ZITADEL_CLIENT_ID__"
+
+  - name: educlaw-web
+    url: http://educlaw-web:80
+    routes:
+      - name: educlaw-web-root
+        hosts:
+          - __KONG_APP_HOST__
+        paths:
+          - /
+        strip_path: false
+
+  - name: edunex-api
+    url: http://edunex-server:4000
+    routes:
+      - name: edunex-protected
+        hosts:
+          - __KONG_EDUNEX_HOST__
+        paths:
+          - /api
+        strip_path: false
+        plugins:
+          - name: oidc-jwt-auth
+            config:
+              require_token: true
+              expected_issuer: "__ZITADEL_ISSUER__"
+              expected_audience: "__ZITADEL_CLIENT_ID__"
+
+  - name: edunex-web
+    url: http://edunex-web:80
+    routes:
+      - name: edunex-web-root
+        hosts:
+          - __KONG_EDUNEX_HOST__
+        paths:
+          - /
+        strip_path: false

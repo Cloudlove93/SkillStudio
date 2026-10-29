@@ -479,10 +479,14 @@
   font-weight: 580;
 }
 .skill-guided-progress small {
+  overflow: hidden;
+  max-width: 45%;
   margin-left: auto;
   color: var(--muted-foreground);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .skill-interview-steps {
   display: grid;
@@ -550,6 +554,14 @@
   background: var(--primary);
   color: var(--primary-foreground);
   box-shadow: 0 0 0 3px var(--ring);
+}
+.skill-interview-step.is-conflicted {
+  color: var(--destructive);
+}
+.skill-interview-step.is-conflicted i {
+  border-color: color-mix(in srgb, var(--destructive) 42%, var(--border));
+  background: var(--destructive-soft);
+  color: var(--destructive);
 }
 .skill-interview-step.is-complete::before {
   background: color-mix(in srgb, var(--primary) 42%, var(--border));

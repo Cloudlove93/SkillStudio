@@ -22,10 +22,12 @@ services:
     image: educlaw-server:latest
     command: node dist/educlaw-server/src/scripts/init-db.js
     environment:
+      - NODE_ENV=${NODE_ENV:-development}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
       - DATABASE_URL=${DATABASE_URL}
-      - LLM_BASE_URL=${LLM_BASE_URL:-https://dpc8aj58eeh5cmccj9e9mdg9gecep8pb.openapi-qb-ai.sii.edu.cn/v1}
+      - LLM_BASE_URL=${LLM_BASE_URL:-}
       - LLM_API_KEY=${LLM_API_KEY}
-      - LLM_MODEL=${LLM_MODEL:-qwen3.5-397b-a17b}
+      - LLM_MODEL=${LLM_MODEL:-}
       - LLM_BASELINE_MODEL=${LLM_BASELINE_MODEL}
       - MEDIA_UPLOAD_TOKEN_SECRET=${MEDIA_UPLOAD_TOKEN_SECRET}
       - INTERNAL_WORKER_TOKENS=${INTERNAL_WORKER_TOKENS}
@@ -41,18 +43,20 @@ services:
       dockerfile: educlaw-server/Dockerfile
     image: educlaw-server:latest
     environment:
+      - NODE_ENV=${NODE_ENV:-development}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
       - DATABASE_URL=${DATABASE_URL}
-      - LLM_BASE_URL=${LLM_BASE_URL:-https://dpc8aj58eeh5cmccj9e9mdg9gecep8pb.openapi-qb-ai.sii.edu.cn/v1}
+      - LLM_BASE_URL=${LLM_BASE_URL:-}
       - LLM_API_KEY=${LLM_API_KEY}
-      - LLM_MODEL=${LLM_MODEL:-qwen3.5-397b-a17b}
+      - LLM_MODEL=${LLM_MODEL:-}
       - LLM_BASELINE_MODEL=${LLM_BASELINE_MODEL}
       - PI_HARNESS_SKILL_RUN_ENABLED=${PI_HARNESS_SKILL_RUN_ENABLED:-true}
       - PI_HARNESS_MAX_CONCURRENT_RUNS=${PI_HARNESS_MAX_CONCURRENT_RUNS:-4}
-      - MULTIMODAL_ADLER_MODEL=${MULTIMODAL_ADLER_MODEL:-qwen3.5-397b-a17b}
-      - MULTIMODAL_CANDIDATE_MODEL=${MULTIMODAL_CANDIDATE_MODEL:-qwen3.5-397b-a17b}
-      - MULTIMODAL_VALIDATION_MODEL=${MULTIMODAL_VALIDATION_MODEL:-qwen3.5-397b-a17b}
-      - MULTIMODAL_RIA_MODEL=${MULTIMODAL_RIA_MODEL:-qwen3.5-397b-a17b}
-      - MULTIMODAL_VISION_MODEL=${MULTIMODAL_VISION_MODEL:-qwen3.5-397b-a17b}
+      - MULTIMODAL_ADLER_MODEL=${MULTIMODAL_ADLER_MODEL:-}
+      - MULTIMODAL_CANDIDATE_MODEL=${MULTIMODAL_CANDIDATE_MODEL:-}
+      - MULTIMODAL_VALIDATION_MODEL=${MULTIMODAL_VALIDATION_MODEL:-}
+      - MULTIMODAL_RIA_MODEL=${MULTIMODAL_RIA_MODEL:-}
+      - MULTIMODAL_VISION_MODEL=${MULTIMODAL_VISION_MODEL:-}
       - MULTIMODAL_MODEL_MAX_TOKENS=${MULTIMODAL_MODEL_MAX_TOKENS:-8192}
       - MULTIMODAL_ASR_CHUNK_DURATION_MS=${MULTIMODAL_ASR_CHUNK_DURATION_MS:-1200000}
       - MULTIMODAL_UPLOAD_MAX_MB=${MULTIMODAL_UPLOAD_MAX_MB:-1024}
@@ -64,14 +68,14 @@ services:
       - MULTIMODAL_PIPELINE_RUNNER_BATCH_LIMIT=${MULTIMODAL_PIPELINE_RUNNER_BATCH_LIMIT:-8}
       - MULTIMODAL_PIPELINE_RUNNER_CONCURRENCY=${MULTIMODAL_PIPELINE_RUNNER_CONCURRENCY:-2}
       - INTERNAL_WORKER_TOKENS=${INTERNAL_WORKER_TOKENS}
-      - OBJECT_STORAGE_ENDPOINT=${OBJECT_STORAGE_ENDPOINT:-http://eduskill.localhost:9000}
+      - OBJECT_STORAGE_ENDPOINT=${OBJECT_STORAGE_ENDPOINT:-http://app.localhost:9000}
       - OBJECT_STORAGE_REGION=${OBJECT_STORAGE_REGION:-us-east-1}
       - OBJECT_STORAGE_BUCKET=${OBJECT_STORAGE_BUCKET:-educlaw-media}
-      - OBJECT_STORAGE_ACCESS_KEY_ID=${MINIO_ROOT_USER:-educlawlocal}
-      - OBJECT_STORAGE_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD:-educlaw-local-minio-password}
+      - OBJECT_STORAGE_ACCESS_KEY_ID=${OBJECT_STORAGE_ACCESS_KEY_ID:-educlawlocal}
+      - OBJECT_STORAGE_SECRET_ACCESS_KEY=${OBJECT_STORAGE_SECRET_ACCESS_KEY:-educlaw-local-minio-password}
       - OBJECT_STORAGE_FORCE_PATH_STYLE=true
       - OBJECT_STORAGE_SIGNED_URL_TTL_SECONDS=${OBJECT_STORAGE_SIGNED_URL_TTL_SECONDS:-300}
-      - APP_ORIGIN=${APP_ORIGIN:-http://eduskill.localhost}
+      - APP_ORIGIN=${APP_ORIGIN:-http://app.localhost}
       - PORT=3000
     depends_on:
       educlaw-db-init:
@@ -79,7 +83,7 @@ services:
       educlaw-minio-init:
         condition: service_completed_successfully
     extra_hosts:
-      - "eduskill.localhost:host-gateway"
+      - "app.localhost:host-gateway"
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/readyz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
       interval: 5s
@@ -111,40 +115,36 @@ services:
           - educlaw-web
 
   educlaw-minio:
-    image: quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z
-    command: server /data --console-address ":9001"
+    image: ghcr.io/chrislusf/seaweedfs:4.51
+    command:
+      - mini
+      - -dir=/data
+      - -bucket=${OBJECT_STORAGE_BUCKET:-educlaw-media}
+      - -master.telemetry=false
+      - -s3.allowedOrigins=${APP_ORIGIN:-http://app.localhost}
+      - -admin.allowInsecureBind
     environment:
-      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-educlawlocal}
-      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-educlaw-local-minio-password}
-      - MINIO_API_CORS_ALLOW_ORIGIN=${APP_ORIGIN:-http://eduskill.localhost}
+      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER:-educlawlocal}
+      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD:-educlaw-local-minio-password}
+      - S3_BUCKET=${OBJECT_STORAGE_BUCKET:-educlaw-media}
     ports:
-      - "${MINIO_API_PORT:-9000}:9000"
-      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+      - "${MINIO_API_PORT:-9000}:8333"
+      - "${MINIO_CONSOLE_PORT:-9001}:12535"
     volumes:
       - minio-data:/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: ["CMD-SHELL", "netstat -ltn | grep -q ':8333 '"]
       interval: 5s
       timeout: 5s
       retries: 30
     restart: unless-stopped
 
   educlaw-minio-init:
-    image: quay.io/minio/mc:RELEASE.2025-04-16T18-13-26Z
+    image: ghcr.io/chrislusf/seaweedfs:4.51
     depends_on:
       educlaw-minio:
         condition: service_healthy
-    entrypoint:
-      - /bin/sh
-      - -ec
-      - |
-        mc alias set local http://educlaw-minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}"
-        mc mb --ignore-existing "local/$${OBJECT_STORAGE_BUCKET}"
-        mc anonymous set none "local/$${OBJECT_STORAGE_BUCKET}"
-    environment:
-      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-educlawlocal}
-      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-educlaw-local-minio-password}
-      - OBJECT_STORAGE_BUCKET=${OBJECT_STORAGE_BUCKET:-educlaw-media}
+    entrypoint: ["/bin/true"]
     restart: "no"
 
   educlaw-media-quality-worker:
@@ -169,7 +169,7 @@ services:
       educlaw-minio-init:
         condition: service_completed_successfully
     extra_hosts:
-      - "eduskill.localhost:host-gateway"
+      - "app.localhost:host-gateway"
     deploy:
       replicas: 2
     restart: unless-stopped
@@ -194,6 +194,7 @@ services:
       - MEDIA_WORKER_ASR_MANIFEST_MODEL_ID=${MEDIA_WORKER_ASR_MANIFEST_MODEL_ID:-faster-whisper-small}
       - MEDIA_WORKER_ASR_DEVICE=${MEDIA_WORKER_ASR_DEVICE:-cpu}
       - MEDIA_WORKER_ASR_COMPUTE_TYPE=${MEDIA_WORKER_ASR_COMPUTE_TYPE:-int8}
+      - MEDIA_WORKER_ASR_LANGUAGE=${MEDIA_WORKER_ASR_LANGUAGE:-zh}
       - MEDIA_WORKER_ASR_BEAM_SIZE=${MEDIA_WORKER_ASR_BEAM_SIZE:-3}
     depends_on:
       educlaw-server:
@@ -201,7 +202,7 @@ services:
       educlaw-minio-init:
         condition: service_completed_successfully
     extra_hosts:
-      - "eduskill.localhost:host-gateway"
+      - "app.localhost:host-gateway"
     deploy:
       replicas: 2
     restart: unless-stopped

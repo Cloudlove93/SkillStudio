@@ -1,4 +1,4 @@
-FROM node:22-slim AS builder
+FROM m.daocloud.io/docker.io/library/node:22-slim AS builder
 
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
@@ -21,8 +21,10 @@ COPY educlaw-web ./educlaw-web
 
 RUN pnpm --filter @educlaw/shared build
 RUN pnpm --filter educlaw-web build
+COPY educlaw-web/nginx/sso-bootstrap.js /app/educlaw-web/dist/sso-bootstrap.js
+RUN sed -i 's#</head>#<script src="/sso-bootstrap.js"></script></head>#' /app/educlaw-web/dist/index.html
 
-FROM nginx:1.27-alpine AS runner
+FROM m.daocloud.io/docker.io/library/nginx:1.27-alpine AS runner
 
 COPY --from=builder /app/educlaw-web/dist /usr/share/nginx/html
 COPY educlaw-web/nginx/default.conf.template /etc/nginx/templates/default.conf.template

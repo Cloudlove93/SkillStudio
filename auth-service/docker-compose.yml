@@ -1,0 +1,168 @@
+name: auth-service-local
+
+services:
+
+  zitadel:
+    container_name: educlaw-zitadel
+    restart: always
+    image: "ghcr.io/zitadel/zitadel:${ZITADEL_VERSION:-v4.13.1}"
+    user: "0"
+    command: 'start-from-init --config /zitadel-config.yaml --steps /zitadel-init-steps.yaml --masterkey "${ZITADEL_MASTERKEY}" --tlsMode disabled'
+    environment:
+      - ZITADEL_MASTERKEY=${ZITADEL_MASTERKEY}
+      - ZITADEL_DATABASE_POSTGRES_DATABASE=zitadel
+      - ZITADEL_DATABASE_POSTGRES_HOST=postgres
+      - ZITADEL_DATABASE_POSTGRES_PORT=5432
+      - ZITADEL_DATABASE_POSTGRES_USER_USERNAME=zitadel
+      - ZITADEL_DATABASE_POSTGRES_USER_PASSWORD=${ZITADEL_DB_PASSWORD}
+      - ZITADEL_DATABASE_POSTGRES_ADMIN_USERNAME=zitadel
+      - ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD=${ZITADEL_DB_PASSWORD}
+      - ZITADEL_FIRSTINSTANCE_ORG_HUMAN_USERNAME=zitadel-admin
+      - ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD=${ZITADEL_ADMIN_PASSWORD}
+      - ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORDCHANGEREQUIRED=false
+      - ZITADEL_TLS_ENABLED=false
+    networks:
+      - internal-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./example-zitadel-config.yaml:/zitadel-config.yaml:ro
+      - ./example-zitadel-init-steps.yaml:/zitadel-init-steps.yaml:ro
+      - zitadel-bootstrap:/zitadel/bootstrap
+    healthcheck:
+      test: ["CMD", "/app/zitadel", "ready"]
+      interval: 10s
+      timeout: 30s
+      retries: 18
+      start_period: 30s
+
+  zitadel-login:
+    container_name: educlaw-zitadel-login
+    restart: unless-stopped
+    image: "ghcr.io/zitadel/zitadel-login:${ZITADEL_VERSION:-latest}"
+    user: "0"
+    environment:
+      - ZITADEL_API_URL=http://zitadel:8080
+      - NEXT_PUBLIC_BASE_PATH=/ui/v2/login
+      - ZITADEL_SERVICE_USER_TOKEN_FILE=/zitadel/bootstrap/login-client.pat
+      - CUSTOM_REQUEST_HEADERS=Host:auth.localhost,X-Forwarded-Proto:http
+    depends_on:
+      zitadel:
+        condition: service_healthy
+    networks:
+      - internal-net
+    volumes:
+      - zitadel-bootstrap:/zitadel/bootstrap:ro
+    healthcheck:
+      test: ["CMD", "node", "/app/healthcheck.mjs", "http://localhost:3000/ui/v2/login/healthy"]
+      interval: 10s
+      timeout: 30s
+      retries: 12
+      start_period: 20s
+
+  postgres:
+    container_name: educlaw-auth-postgres
+    image: m.daocloud.io/docker.io/library/postgres:17
+    environment:
+      POSTGRES_DB: zitadel
+      POSTGRES_USER: zitadel
+      POSTGRES_PASSWORD: ${ZITADEL_DB_PASSWORD}
+    ports:
+      - "${PG_PORT:-5434}:5432"
+    volumes:
+      - auth-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zitadel -d zitadel"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - internal-net
+
+  kong:
+    container_name: educlaw-auth-gateway
+    image: m.daocloud.io/docker.io/library/kong:3.6
+    environment:
+      - KONG_DATABASE=off
+      - KONG_PLUGINS=bundled,oidc-jwt-auth
+      - KONG_DECLARATIVE_CONFIG=/tmp/kong.yml
+      - KONG_PROXY_LISTEN=0.0.0.0:80, 0.0.0.0:8000
+      - KONG_APP_HOST=${KONG_APP_HOST:-app.localhost}
+      - KONG_AUTH_HOST=${KONG_AUTH_HOST:-auth.localhost}
+      - KONG_EDUNEX_HOST=${KONG_EDUNEX_HOST:-edunex.localhost}
+      - ZITADEL_ISSUER=${ZITADEL_ISSUER}
+      - ZITADEL_CLIENT_ID=${ZITADEL_CLIENT_ID}
+    command: >-
+      sh -c 'awk
+      "{gsub(/__KONG_APP_HOST__/,\"$$KONG_APP_HOST\");
+      gsub(/__KONG_AUTH_HOST__/,\"$$KONG_AUTH_HOST\");
+      gsub(/__KONG_EDUNEX_HOST__/,\"$$KONG_EDUNEX_HOST\");
+      gsub(/__ZITADEL_ISSUER__/,\"$$ZITADEL_ISSUER\");
+      gsub(/__ZITADEL_CLIENT_ID__/,\"$$ZITADEL_CLIENT_ID\"); print}"
+      /etc/kong/kong.yml > /tmp/kong.yml
+      && exec /docker-entrypoint.sh kong docker-start'
+    volumes:
+      - ./kong/kong.yml:/etc/kong/kong.yml:ro
+      - ./kong/plugins/oidc-jwt-auth:/usr/local/share/lua/5.1/kong/plugins/oidc-jwt-auth:ro
+    ports:
+      - "${KONG_PROXY_PORT:-80}:80"
+      - "${KONG_ADMIN_PORT:-8001}:8001"  # Kong Admin API，仅用于调试，生产环境可移除
+    networks:
+      internal-net:
+        aliases:
+          - app.localhost
+          - auth.localhost
+          - edunex.localhost
+    restart: unless-stopped
+    depends_on:
+      zitadel:
+        condition: service_healthy
+      zitadel-login:
+        condition: service_healthy
+
+  auth-backend:
+    container_name: educlaw-auth-service
+    build:
+      context: .
+      dockerfile: auth-backend/Dockerfile
+    image: auth-backend:latest
+    env_file:
+      - .env
+    environment:
+      - HOST=0.0.0.0
+      - PORT=3000
+      - ZITADEL_SERVICE_PAT_FILE=/zitadel/bootstrap/admin.pat
+    volumes:
+      - zitadel-bootstrap:/zitadel/bootstrap:ro
+    networks:
+      - internal-net
+    depends_on:
+      zitadel:
+        condition: service_healthy
+    restart: unless-stopped
+
+  auth-frontend:
+    container_name: educlaw-auth-web
+    build:
+      context: .
+      dockerfile: auth-frontend/Dockerfile
+      args:
+        - VITE_API_BASE=${VITE_API_BASE:-}
+    image: auth-frontend:latest
+    environment:
+      - API_UPSTREAM=http://auth-backend:3000
+    depends_on:
+      - auth-backend
+    networks:
+      - internal-net
+    restart: unless-stopped
+
+volumes:
+  zitadel-bootstrap:
+  auth-postgres-data:
+
+networks:
+  internal-net:
+    name: auth-service_internal-net
+    external: true

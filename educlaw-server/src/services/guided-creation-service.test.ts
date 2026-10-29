@@ -1,4 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import type {
+  GuidedCreationStep,
+  GuidedEducationDraft,
+} from '@educlaw/shared';
 import {
   buildEducationSummarizeTurn,
   buildGuidedAssistantTurnV3,
@@ -11,7 +15,7 @@ import {
 } from './guided-creation-service.js';
 
 describe('guided creation conversation service', () => {
-  it('does not re-ask later steps whose conclusions are already user-owned', () => {
+  it('does not auto-complete later steps whose conclusions are already user-owned', () => {
     const draft = Object.fromEntries(
       [
         'educational_goal',
@@ -41,7 +45,10 @@ describe('guided creation conversation service', () => {
       },
       phrasing: null,
     });
-    expect(turn.status).toBe('ready_for_confirmation');
+    expect(turn.status).toBe('collecting');
+    expect(turn.completed_steps).toEqual(['intent_context', 'teacher_experience']);
+    expect(turn.current_step).toBe('strategy_co_creation');
+    expect(turn.content).toContain('教学策略');
   });
   it('includes the final sanitized extraction in a round-limit confirmation', () => {
     const turn = buildEducationSummarizeTurn({
@@ -187,7 +194,7 @@ describe('guided creation conversation service', () => {
     expect(turn.suggested_options).not.toContain('理解关键概念');
   });
 
-  it('moves from role and context to teacher experience instead of ending', () => {
+  it('asks for confirmation after collecting the missing intent detail', () => {
     const turn = buildGuidedAssistantTurnV3({
       current_draft: {
         educational_goal: {
@@ -213,9 +220,9 @@ describe('guided creation conversation service', () => {
       phrasing: null,
     });
 
-    expect(turn.completed_steps).toEqual(['intent_context']);
-    expect(turn.current_step).toBe('teacher_experience');
-    expect(turn.content).toContain('实际教学时');
+    expect(turn.completed_steps).toEqual([]);
+    expect(turn.current_step).toBe('intent_context');
+    expect(turn.content).toContain('这个方向准确吗？');
     expect(turn.status).toBe('collecting');
   });
 
@@ -270,9 +277,31 @@ describe('guided creation conversation service', () => {
       phrasing: null,
     });
 
-    expect(turn.status).toBe('ready_for_confirmation');
-    expect(turn.completed_steps).toHaveLength(5);
-    expect(turn.confirmation?.sections).toHaveLength(7);
+    expect(turn.status).toBe('collecting');
+    expect(turn.completed_steps).toEqual([
+      'intent_context',
+      'teacher_experience',
+      'strategy_co_creation',
+      'action_adjustment',
+    ]);
+    expect(turn.current_step).toBe('evidence_review');
+    expect(turn.confirmation).toBeNull();
+
+    const confirmed = buildGuidedAssistantTurnV3({
+      current_draft: turn.education_draft ?? {},
+      completed_steps: turn.completed_steps ?? [],
+      current_step: turn.current_step,
+      user_message: '准确，继续',
+      extraction: {
+        operations: [],
+        step_complete: false,
+        acknowledgement: '好的',
+      },
+      phrasing: null,
+    });
+    expect(confirmed.status).toBe('ready_for_confirmation');
+    expect(confirmed.completed_steps).toHaveLength(5);
+    expect(confirmed.confirmation?.sections).toHaveLength(7);
   });
 
   it('keeps materials and teacher responsibility open until the teacher confirms them', () => {
@@ -423,6 +452,187 @@ describe('guided creation conversation service', () => {
         expect.objectContaining({ source: 'user_adopted' }),
       ]),
     );
+  });
+
+  it('accepts an explicit no-more-additions confirmation', () => {
+    const turn = buildGuidedAssistantTurnV3({
+      current_draft: {
+        educational_goal: {
+          content: '学生能解释浮沉',
+          evidence: [{ source: 'inferred' }],
+        },
+        audience_context: {
+          content: '初二实验课',
+          evidence: [{ source: 'inferred' }],
+        },
+      },
+      completed_steps: [],
+      current_step: 'intent_context',
+      user_message: '不需要补充，继续',
+      extraction: {
+        operations: [],
+        step_complete: false,
+        acknowledgement: '好的',
+      },
+      phrasing: null,
+    });
+
+    expect(turn.completed_steps).toEqual(['intent_context']);
+    expect(turn.current_step).toBe('teacher_experience');
+    expect(turn.education_draft?.educational_goal?.evidence).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ source: 'user_adopted' }),
+      ]),
+    );
+  });
+
+  it.each([
+    '准确，不需要补充',
+    '没有要补充的了，确认，准确',
+    '无需补充',
+    '确定，继续',
+  ])('advances the experience step for the confirmation phrase: %s', (userMessage) => {
+    const turn = buildGuidedAssistantTurnV3({
+      current_draft: {
+        educational_goal: {
+          content: '学生能解释浮沉',
+          evidence: [{ source: 'user_explicit' }],
+        },
+        audience_context: {
+          content: '初二实验课',
+          evidence: [{ source: 'user_explicit' }],
+        },
+        input_evidence: {
+          content: '教材要求和学生已有作业',
+          evidence: [{ source: 'inferred' }],
+        },
+      },
+      completed_steps: ['intent_context'],
+      current_step: 'teacher_experience',
+      user_message: userMessage,
+      extraction: {
+        operations: [],
+        step_complete: false,
+        acknowledgement: '好的，我记下了。',
+      },
+      phrasing: null,
+    });
+
+    expect(turn.completed_steps).toEqual([
+      'intent_context',
+      'teacher_experience',
+    ]);
+    expect(turn.current_step).toBe('strategy_co_creation');
+    expect(turn.content).not.toContain('这些材料和已有做法');
+  });
+
+  it.each(['我想补充', '还需要补充一些经验', '需要调整', '不准确，需要调整'])(
+    'keeps the experience step open for a non-confirmation: %s',
+    (userMessage) => {
+      const turn = buildGuidedAssistantTurnV3({
+        current_draft: {
+          educational_goal: {
+            content: '学生能解释浮沉',
+            evidence: [{ source: 'user_explicit' }],
+          },
+          audience_context: {
+            content: '初二实验课',
+            evidence: [{ source: 'user_explicit' }],
+          },
+          input_evidence: {
+            content: '教材要求和学生已有作业',
+            evidence: [{ source: 'inferred' }],
+          },
+        },
+        completed_steps: ['intent_context'],
+        current_step: 'teacher_experience',
+        user_message: userMessage,
+        extraction: {
+          operations: [],
+          step_complete: false,
+          acknowledgement: '我继续听你补充。',
+        },
+        phrasing: null,
+      });
+
+      expect(turn.completed_steps).toEqual(['intent_context']);
+      expect(turn.current_step).toBe('teacher_experience');
+    },
+  );
+
+  it('advances through all five education steps without re-confirming a completed step', () => {
+    let draft: GuidedEducationDraft = {
+      educational_goal: { content: '学生能完成任务', evidence: [{ source: 'inferred' }] },
+      audience_context: { content: '融合教育课堂', evidence: [{ source: 'inferred' }] },
+      input_evidence: { content: '教材、学情和课堂观察', evidence: [{ source: 'inferred' }] },
+      teaching_strategy: { content: '按学生表现提供分层支持', evidence: [{ source: 'inferred' }] },
+      action_adaptation: { content: '卡住时降低任务难度', evidence: [{ source: 'inferred' }] },
+      boundaries_responsibility: { content: '关键调整由教师确认', evidence: [{ source: 'inferred' }] },
+      completion_evidence: { content: '学生能独立完成并说明理由', evidence: [{ source: 'inferred' }] },
+    };
+    let completedSteps: GuidedCreationStep[] = [];
+    let currentStep: GuidedCreationStep | null = 'intent_context';
+    const confirmations = [
+      '准确，不需要补充',
+      '没有要补充的经验了，确认，准确',
+      '确认，没问题',
+      '无需补充，继续',
+      '准确，继续',
+    ];
+    const expectedNextSteps: Array<GuidedCreationStep | null> = [
+      'teacher_experience',
+      'strategy_co_creation',
+      'action_adjustment',
+      'evidence_review',
+      null,
+    ];
+
+    confirmations.forEach((userMessage, index) => {
+      const turn = buildGuidedAssistantTurnV3({
+        current_draft: draft,
+        completed_steps: completedSteps,
+        current_step: currentStep,
+        user_message: userMessage,
+        extraction: {
+          operations: [],
+          step_complete: false,
+          acknowledgement: '好的',
+        },
+        phrasing: null,
+      });
+      draft = turn.education_draft ?? draft;
+      completedSteps = turn.completed_steps ?? completedSteps;
+      currentStep = turn.current_step ?? null;
+
+      expect(completedSteps).toHaveLength(index + 1);
+      expect(currentStep).toBe(expectedNextSteps[index]);
+    });
+  });
+
+  it('keeps the experience-and-basis answer separate from teaching strategy', () => {
+    const turn = buildGuidedAssistantTurnV3({
+      current_draft: {},
+      completed_steps: ['intent_context'],
+      current_step: 'teacher_experience',
+      user_message: '我会先看教材要求和学生已有作业',
+      extraction: {
+        operations: [
+          {
+            dimension: 'input_evidence',
+            content: '我会先看教材要求和学生已有作业',
+            source: 'user_explicit',
+            quote: '我会先看教材要求和学生已有作业',
+          },
+        ],
+        step_complete: false,
+        acknowledgement: '我记下了你会参考的材料。',
+      },
+      phrasing: null,
+    });
+
+    expect(turn.education_draft?.input_evidence?.content).toContain('教材');
+    expect(turn.education_draft?.teaching_strategy).toBeUndefined();
+    expect(turn.completed_steps).toEqual(['intent_context']);
   });
 
   it('summarizes at the round limit without fabricating user evidence', () => {

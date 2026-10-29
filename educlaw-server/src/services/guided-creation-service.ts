@@ -145,6 +145,12 @@ const FALLBACK_OPTIONS: Partial<Record<GuidedDraftField, string[]>> = {
 };
 
 const STAGE_CONFIRMATION_OPTIONS = ['准确，继续', '我想补充', '需要调整'];
+const EDUCATION_CONFIRMATION_OPTIONS = [
+  '准确，继续',
+  '不需要补充，继续',
+  '我想补充',
+  '需要调整',
+];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -430,6 +436,36 @@ function isClearStageConfirmation(value: string): boolean {
   );
 }
 
+// Education V3 accepts natural combinations such as “准确，不需要补充”
+// without broadening the legacy V2 confirmation grammar. Keep correction and
+// supplement requests out of this path so they remain on the current step.
+function isEducationStepConfirmation(value: string): boolean {
+  const normalized = value
+    .normalize('NFKC')
+    .toLocaleLowerCase()
+    .replace(/[\s，,。.!！、；;：:\/]+/g, '');
+  if (isClearStageConfirmation(normalized)) return true;
+  if (!normalized) return false;
+
+  // A request to revise always wins, even when the same sentence also says
+  // “确认” or “准确”. This prevents mixed correction messages from advancing.
+  const asksForChange =
+    /(?:不准确|不正确|不确认|不确定|不对|有误|需要调整|要调整|想调整|需要修改|要修改|想修改|需要纠正|要纠正|想纠正|我想补充|我要补充|我需要补充|还要补充|还需要补充|仍要补充|仍需补充|仍然需要补充|继续补充|再补充)/.test(
+      normalized,
+    );
+  if (asksForChange) return false;
+
+  const hasNoAddition =
+    /(?:不需要|无需|不用)(?:再|继续|额外)?补充|(?:没有|没)(?:什么|任何|更多|其他|额外)?(?:内容|经验|材料|做法|信息|地方|东西)?(?:需要|要|可以)?补充(?:的)?(?:内容|经验|材料|做法|信息|地方|东西)?(?:了)?|无(?:需|要)?(?:再|继续|额外)?补充/.test(
+      normalized,
+    );
+  const hasAffirmation =
+    /(?:准确|正确|确认|确定|没问题|没有问题|没错|可以|好的|好|行|继续|下一步|就是这样|就这样|按这个来|按你说的来|ok)/.test(
+      normalized,
+    );
+  return hasNoAddition || hasAffirmation;
+}
+
 function isDelegatedStageAnswer(value: string): boolean {
   const normalized = value.normalize('NFKC').replace(/\s+/g, '');
   return /^(?:你决定|你来决定|都可以|都行|随便|随你|你看着办|无所谓|不知道|不清楚|不确定|暂时不知道|按默认)(?:就行|即可|吧)?[。.!！]?$/.test(
@@ -581,7 +617,7 @@ const STEP_DIMENSIONS: Record<
   readonly GuidedEducationDimension[]
 > = {
   intent_context: ['educational_goal', 'audience_context'],
-  teacher_experience: ['input_evidence', 'teaching_strategy', 'action_adaptation'],
+  teacher_experience: ['input_evidence'],
   strategy_co_creation: ['teaching_strategy'],
   action_adjustment: ['action_adaptation', 'boundaries_responsibility'],
   evidence_review: ['completion_evidence'],
@@ -609,11 +645,16 @@ const STEP_FALLBACK_OPTIONS: Record<GuidedCreationStep, string[]> = {
 };
 
 const STEP_CONFIRMATION_QUESTIONS: Record<GuidedCreationStep, string> = {
-  intent_context: '我先确认一下：目标和使用对象这样理解准确吗？',
-  teacher_experience: '我先确认一下：这些材料和已有做法，确实是你希望保留的经验吗？',
-  strategy_co_creation: '我先确认一下：这就是你希望采用的教学策略吗？',
-  action_adjustment: '我先确认一下：观察、调整和教师负责的边界这样安排合适吗？',
-  evidence_review: '我先确认一下：这些表现可以作为有效完成的依据吗？',
+  intent_context:
+    '我先确认一下：目标和使用对象这样理解准确吗？需要补充的地方可以直接告诉我。',
+  teacher_experience:
+    '我先确认一下：这些材料和已有做法，确实是你希望保留的经验吗？需要补充的地方可以直接告诉我。',
+  strategy_co_creation:
+    '我先确认一下：这就是你希望采用的教学策略吗？需要补充的地方可以直接告诉我。',
+  action_adjustment:
+    '我先确认一下：观察、调整和教师负责的边界这样安排合适吗？需要补充的地方可以直接告诉我。',
+  evidence_review:
+    '我先确认一下：这些表现可以作为有效完成的依据吗？需要补充的地方可以直接告诉我。',
 };
 
 function hasUserOwnedEvidence(
@@ -646,8 +687,8 @@ function parseEducationPhrasing(
         ? `${blockedContent.slice(0, 48)}…`
         : blockedContent;
     return {
-      question: `我理解「${GUIDED_EDUCATION_LABELS[blockedDimension]}」为“${concise}”，这个理解准确吗？`,
-      suggested_options: STAGE_CONFIRMATION_OPTIONS,
+      question: `我理解「${GUIDED_EDUCATION_LABELS[blockedDimension]}」为“${concise}”，这个理解准确吗？如果需要补充，直接告诉我。`,
+      suggested_options: EDUCATION_CONFIRMATION_OPTIONS,
     };
   }
   const candidate = phrasing?.question?.replace(/\s+/g, ' ').trim() ?? '';
@@ -664,7 +705,7 @@ function parseEducationPhrasing(
   );
   const question = stepHasContent
     ? step === 'intent_context'
-      ? intentFallback
+      ? `${intentFallback}需要补充的地方可以直接告诉我。`
       : STEP_CONFIRMATION_QUESTIONS[step]
     : usesExpectedStep && firstQuestion.length > 0 && firstQuestion.length <= 180
     ? firstQuestion.replace(/\?$/, '？')
@@ -683,7 +724,7 @@ function parseEducationPhrasing(
       candidateOptions.length >= 2
         ? candidateOptions
         : stepHasContent
-          ? STAGE_CONFIRMATION_OPTIONS
+          ? EDUCATION_CONFIRMATION_OPTIONS
           : STEP_FALLBACK_OPTIONS[step],
   };
 }
@@ -724,38 +765,24 @@ export function buildGuidedAssistantTurnV3(input: {
   const completedSteps = [...input.completed_steps];
 
   if (input.current_step) {
-    const relevantDimensions = STEP_DIMENSIONS[input.current_step];
-    const participated = operations.some(
-      (operation) =>
-        relevantDimensions.includes(operation.dimension) &&
-        (operation.source === 'user_explicit' ||
-          operation.source === 'user_adopted'),
-    );
     const userDelegated = isDelegatedStageAnswer(input.user_message);
-    if (isClearStageConfirmation(input.user_message) || userDelegated) {
+    const confirmedByUser =
+      isEducationStepConfirmation(input.user_message) || userDelegated;
+    if (confirmedByUser) {
       draft = addUserAdoption(draft, input.current_step, input.user_message);
     }
     const requiredDimensions = STEP_DIMENSIONS[input.current_step];
     const hasRequiredEvidence = requiredDimensions.every((dimension) =>
       hasUserOwnedEvidence(draft, dimension),
     );
-    const confirmedExisting =
-      isClearStageConfirmation(input.user_message) &&
-      STEP_DIMENSIONS[input.current_step].some(
-        (dimension) => Boolean(draft[dimension]?.content),
-      );
     const hasConflictedInStep = requiredDimensions.some(
       (dimension) =>
         Boolean(draft[dimension]?.evidence.some(
           (item) => item.source === 'conflicted',
         )),
     );
-    const hasAccumulatedEvidence = hasRequiredEvidence && !hasConflictedInStep;
     if (
-      (participated ||
-        confirmedExisting ||
-        hasAccumulatedEvidence ||
-        userDelegated) &&
+      confirmedByUser &&
       hasRequiredEvidence &&
       !hasConflictedInStep &&
       !completedSteps.includes(input.current_step)
@@ -764,24 +791,8 @@ export function buildGuidedAssistantTurnV3(input: {
     }
   }
 
-  // Do not silently fill education dimensions with platform defaults. The
-  // teacher must express or explicitly adopt materials and responsibility.
-  if (input.current_step && completedSteps.includes(input.current_step)) {
-    for (const step of GUIDED_CREATION_STEPS) {
-      if (completedSteps.includes(step)) continue;
-      if (
-        !STEP_DIMENSIONS[step].every(
-          (dimension) =>
-            hasUserOwnedEvidence(draft, dimension) &&
-            !draft[dimension]?.evidence.some(
-              (item) => item.source === 'conflicted',
-            ),
-        )
-      )
-        break;
-      completedSteps.push(step);
-    }
-  }
+  // Keep the interview strictly sequential. Content that was supplied early
+  // is still shown as pending until its own step is presented and confirmed.
   const platformDefaultsEnabled = false;
   if (platformDefaultsEnabled) {
     const defaults: EducationDraftOperation[] = [];
@@ -1274,7 +1285,7 @@ function extractionPromptV3(input: {
 
   return {
     systemPrompt:
-      '你负责通过自然对话帮助教师把真实教育经验提炼为可执行的 Skill。只返回 JSON。一次回答可以更新多个教育维度，但不得把 AI 推测冒充成用户意见。source=user_explicit 或 user_adopted 时，quote 必须逐字复制本轮用户消息的完整句子或整行（保留字段标签、否定词、数字、主体，不可只截取其中短语）；用户没有表达或采纳的候选经验只能帮助你提出更好的问题，绝不能写入 operations。不要重复询问草案中已经明确的内容。如果本轮已经回答当前步骤，question 应自然进入下一个步骤；信息含糊或冲突时才针对当前步骤补问一次。每轮只提出一个最有价值的问题，question 只能有一个问号，suggested_options 提供 2 到 4 个贴合当前情境的方向并允许用户自由表达。step_complete 只是辅助判断，后端会依据证据独立决定是否推进。\noperations 每项可带 op 字段：补充新信息用 set（默认，追加合并）；用户明确纠正或否定先前说法时用 replace（覆盖该维度 content 与证据，必须配 source=user_explicit/user_adopted）；用户明确撤回某个维度内容时用 remove（不需要 content/source，但 quote 必须完整引用含该维度名称与撤回意图的原句）。不要用 replace 覆盖你推测出来的内容。\n当本轮用户说法与草案已有内容明显冲突（例如对象从「小学生」改成「中学生」）且用户未明确表示纠正时，用 source=conflicted 标记该维度，content 留空，并在 question 中向用户确认真实意图；不要直接合并矛盾内容。',
+      '你负责通过自然对话帮助教师把真实教育经验提炼为可执行的 Skill。只返回 JSON。一次回答可以更新多个教育维度，但不得把 AI 推测冒充成用户意见。source=user_explicit 或 user_adopted 时，quote 必须逐字复制本轮用户消息的完整句子或整行（保留字段标签、否定词、数字、主体，不可只截取其中短语）；用户没有表达或采纳的候选经验只能帮助你提出更好的问题，绝不能写入 operations。不要重复询问草案中已经明确的内容。五个共创步骤必须逐个处理：先整理当前步骤，再明确询问“这样准确吗？需要补充吗？”，只有用户明确确认、表示准确或表示不需要补充后，才能进入下一步骤；如果用户刚补充了信息但没有确认，继续围绕当前步骤请求确认。信息含糊或冲突时才针对当前步骤补问一次。每轮只提出一个最有价值的问题，question 只能有一个问号，suggested_options 提供 2 到 4 个贴合当前情境的方向并允许用户自由表达。step_complete 只是辅助判断，后端会依据用户确认独立决定是否推进。\noperations 每项可带 op 字段：补充新信息用 set（默认，追加合并）；用户明确纠正或否定先前说法时用 replace（覆盖该维度 content 与证据，必须配 source=user_explicit/user_adopted）；用户明确撤回某个维度内容时用 remove（不需要 content/source，但 quote 必须完整引用含该维度名称与撤回意图的原句）。不要用 replace 覆盖你推测出来的内容。\n当本轮用户说法与草案已有内容明显冲突（例如对象从「小学生」改成「中学生」）且用户未明确表示纠正时，用 source=conflicted 标记该维度，content 留空，并在 question 中向用户确认真实意图；不要直接合并矛盾内容。',
     userPrompt: `七个维度：${GUIDED_EDUCATION_DIMENSIONS.map((dimension) => `${dimension}（${GUIDED_EDUCATION_LABELS[dimension]}）`).join('，')}\n当前共创步骤：${input.currentStep ?? '尚未开始；先吸收初始需求，再从教育意图开始'}\n当前草案：${JSON.stringify(input.draft)}\n对话：\n${history}\n本轮用户消息：${input.content}\n参考材料：\n${documentSummary || '无'}\n最多两条内部候选经验（只用于启发追问）：${JSON.stringify(candidateContext)}\nSkill 转化提醒：${GUIDED_SKILL_CONVERSION_RULES.join('；')}\n返回：{"operations":[{"dimension":"educational_goal","op":"set","content":"提炼后的结论","source":"user_explicit","quote":"本轮用户原话"}],"step_complete":false,"acknowledgement":"一句具体承接，不要重复用户整句话","question":"下一步唯一的问题？","suggested_options":["方向1","方向2"]}`,
     maxTokens: 4_096,
   };
@@ -1382,7 +1393,7 @@ function fallbackEducationExtraction(input: {
     } else {
       const dimension: Record<GuidedCreationStep, GuidedEducationDimension> = {
         intent_context: 'educational_goal',
-        teacher_experience: 'teaching_strategy',
+        teacher_experience: 'input_evidence',
         strategy_co_creation: 'teaching_strategy',
         action_adjustment: 'action_adaptation',
         evidence_review: 'completion_evidence',

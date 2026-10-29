@@ -147,18 +147,22 @@ describe('Skill-first workspace UI contract', () => {
 
   it('shows the current co-creation stage without adding another content layer', () => {
     const source = read('./GuidedSkillCreationPanel.tsx');
+    const inspector = read('./SkillInspectorContent.tsx');
     const css = workspaceCss();
 
     expect(source).toContain('skill-guided-progress');
-    expect(source).toContain('提炼你的做法');
-    expect(source).toContain('教师经验');
-    expect(source).toContain('教育策略');
-    expect(source).toContain('行动调整');
-    expect(source).toContain('效果复核');
+    expect(source).toContain('deriveGuidedCreationProgress(props.session)');
+    expect(source).toContain('educationProgress.completedStepCount');
+    expect(source).toContain('educationProgress.totalStepCount');
+    expect(source).toContain('`当前环节：${educationProgress.currentStepLabel}`');
     expect(source).toContain('props.session.flow_version >= 3');
-    expect(source).toContain('props.session.completed_steps?.length');
-    expect(source).toContain('props.session.confirmed_stages.length + 1');
-    expect(source).toContain('total: 5');
+    expect(source).toContain('props.session.confirmed_stages.length');
+    expect(source).toContain('total: 6');
+    expect(inspector).toContain('deriveGuidedCreationProgress(session)');
+    expect(inspector).toContain('progress.completedStepCount');
+    expect(inspector).toContain('progress.totalStepCount');
+    expect(inspector).toContain('需求完整度');
+    expect(inspector).toContain('skill-guided-summary-groups');
     expect(css).toMatch(/\.skill-guided-progress\s*\{[^}]*display:\s*flex;/s);
     expect(css).not.toContain('.skill-guided-stage-card');
   });

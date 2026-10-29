@@ -1,0 +1,25 @@
+# All possible options and their defaults: https://github.com/zitadel/zitadel/blob/main/cmd/setup/steps.yaml
+FirstInstance:
+  PatPath: '/zitadel/bootstrap/admin.pat'
+  LoginClientPatPath: '/zitadel/bootstrap/login-client.pat'
+  Org:
+    Human:
+      # 登录名: zitadel@zitadel.auth.localhost
+      # （格式：username@<org-domain>.<ExternalDomain>，默认 org 名为 ZITADEL）
+      # 你的超级管理员用户名和密码，密码需要含有数字大小写和字符
+      Username: 'zitadel-admin'
+      Password: 'replace-from-environment'
+      PasswordChangeRequired: false
+    Machine:
+      Machine:
+        Username: 'zitadel-admin-sa'
+        Name: 'EduSkill Local IAM Admin'
+      Pat:
+        ExpirationDate: '2099-01-01T00:00:00Z'
+    LoginClient:
+      Machine:
+        Username: 'login-client'
+        Name: 'Automatically Initialized IAM_LOGIN_CLIENT'
+      Pat:
+        # 原先由 docker-compose 中的 ZITADEL_LOGIN_CLIENT_PAT_EXPIRATION 传入，这里改为配置文件维护。
+        ExpirationDate: '2099-01-01T00:00:00Z'
