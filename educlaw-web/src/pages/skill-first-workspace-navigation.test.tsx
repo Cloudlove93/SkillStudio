@@ -7,6 +7,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const api = vi.hoisted(() => ({
   listRepositorySkills: vi.fn(),
   listGuidedCreations: vi.fn(),
+  getGuidedCreationDetail: vi.fn(),
   listThreadPage: vi.fn(),
   listSkillVersions: vi.fn(),
   recoverArenaRun: vi.fn(),
@@ -64,6 +65,46 @@ const version = {
   },
   createdAt: '2026-10-16T00:00:00Z',
 };
+const unfinishedGuidedDraft = {
+  id: 'guided-draft-1',
+  display_name: '课堂教学设计',
+  deleted_at: null,
+  status: 'ready_for_confirmation',
+  model: null,
+  documents: [],
+  draft: {},
+  field_states: {},
+  education_draft: {
+    educational_goal: {
+      content: '创建课堂教学设计 Skill',
+      evidence: [{ source: 'user_explicit' }],
+    },
+  },
+  flow_version: 3,
+  confirmed_stages: [],
+  next_stage: null,
+  completed_steps: ['intent_context'],
+  current_step: 'teacher_experience',
+  confirmation: {
+    title: '确认内容',
+    sections: [
+      {
+        key: 'educational_goal',
+        title: '教育目标',
+        content: '创建课堂教学设计 Skill',
+      },
+    ],
+  },
+  revision_no: 3,
+  package_id: null,
+  skill_id: null,
+  skill_version_id: null,
+  error: null,
+  created_at: '2026-10-16T00:00:00Z',
+  updated_at: '2026-10-16T00:00:00Z',
+  completed_at: null,
+  messages: [],
+};
 let root: Root;
 let container: HTMLDivElement;
 function RouteEvidence() {
@@ -92,6 +133,7 @@ beforeEach(() => {
     nextCursor: null,
   });
   api.listGuidedCreations.mockResolvedValue({ items: [] });
+  api.getGuidedCreationDetail.mockResolvedValue(unfinishedGuidedDraft);
   api.listThreadPage.mockResolvedValue({ items: threads, nextCursor: null });
   api.listSkillVersions.mockResolvedValue({
     items: [version],
@@ -121,6 +163,201 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => root.unmount());
   container.remove();
+});
+
+function draftButton() {
+  return container.querySelector<HTMLButtonElement>(
+    '.skill-session-item',
+  );
+}
+
+async function configureUnfinishedDraft() {
+  api.listGuidedCreations.mockResolvedValue({
+    items: [unfinishedGuidedDraft],
+  });
+  api.getGuidedCreationDetail.mockResolvedValue(unfinishedGuidedDraft);
+  await Promise.all([
+    import('../components/skill-workspace/GuidedSkillCreationPanel'),
+    import('../components/skill-workspace/SkillInspectorContent'),
+  ]);
+}
+
+it.each([
+  '/?view=create',
+  '/?view=run&skill=7%3A11&conversation=91',
+])(
+  'resumes an unfinished guided draft with one click from %s',
+  async (initialEntry) => {
+    await configureUnfinishedDraft();
+    await act(async () =>
+      root.render(
+        <MemoryRouter initialEntries={[initialEntry]}>
+          <SkillFirstWorkspace />
+          <RouteEvidence />
+        </MemoryRouter>,
+      ),
+    );
+
+    await vi.waitFor(async () => {
+      await act(async () => {});
+      expect(draftButton()).not.toBeNull();
+    });
+
+    await act(async () => draftButton()!.click());
+
+    await vi.waitFor(async () => {
+      await act(async () => {});
+      expect(api.getGuidedCreationDetail).toHaveBeenCalledWith(
+        'test-token',
+        { session_id: unfinishedGuidedDraft.id },
+      );
+      expect(container.textContent).toContain('确认这个 Skill 的工作方式');
+      const params = new URLSearchParams(
+        container.querySelector('[data-route]')!.textContent!,
+      );
+      expect(params.get('view')).toBe('create');
+    });
+  },
+);
+
+it('resumes an unfinished guided draft after switching to another Skill conversation', async () => {
+  await configureUnfinishedDraft();
+  await Promise.all([
+    import('../components/skill-workspace/SkillDetailWorkspace'),
+    import('../components/skill-workspace/SkillVersionWorkspace'),
+    import('../components/skill-workspace/SkillRunWorkspace'),
+  ]);
+  await act(async () =>
+    root.render(
+      <MemoryRouter
+        initialEntries={['/?view=run&skill=7%3A11&conversation=91']}
+      >
+        <SkillFirstWorkspace />
+        <RouteEvidence />
+      </MemoryRouter>,
+    ),
+  );
+
+  await vi.waitFor(async () => {
+    await act(async () => {});
+    expect(button('使用 Conversation 92')).toBeDefined();
+    expect(draftButton()).not.toBeNull();
+  });
+
+  await act(async () => button('使用 Conversation 92')!.click());
+  await vi.waitFor(async () => {
+    await act(async () => {});
+    expect(
+      new URLSearchParams(
+        container.querySelector('[data-route]')!.textContent!,
+      ).get('conversation'),
+    ).toBe('92');
+  });
+
+  await act(async () => draftButton()!.click());
+  await vi.waitFor(async () => {
+    await act(async () => {});
+    expect(container.textContent).toContain('确认这个 Skill 的工作方式');
+    expect(
+      new URLSearchParams(
+        container.querySelector('[data-route]')!.textContent!,
+      ).get('view'),
+    ).toBe('create');
+  });
+});
+
+it('resumes an unfinished guided draft after entering a Skill conversation from the home view', async () => {
+  await configureUnfinishedDraft();
+  await Promise.all([
+    import('../components/skill-workspace/SkillDetailWorkspace'),
+    import('../components/skill-workspace/SkillVersionWorkspace'),
+    import('../components/skill-workspace/SkillRunWorkspace'),
+  ]);
+  await act(async () =>
+    root.render(
+      <MemoryRouter initialEntries={['/?view=create']}>
+        <SkillFirstWorkspace />
+        <RouteEvidence />
+      </MemoryRouter>,
+    ),
+  );
+
+  await vi.waitFor(async () => {
+    await act(async () => {});
+    expect(button('Fixture')).toBeDefined();
+    expect(draftButton()).not.toBeNull();
+  });
+
+  await act(async () => button('Fixture')!.click());
+  await vi.waitFor(async () => {
+    await act(async () => {});
+    expect(
+      new URLSearchParams(
+        container.querySelector('[data-route]')!.textContent!,
+      ).get('view'),
+    ).toBe('run');
+    expect(button('使用 Conversation 92')).toBeDefined();
+  });
+  await act(async () => button('使用 Conversation 92')!.click());
+
+  await vi.waitFor(async () => {
+    await act(async () => {});
+    expect(
+      new URLSearchParams(
+        container.querySelector('[data-route]')!.textContent!,
+      ).get('conversation'),
+    ).toBe('92');
+  });
+
+  await act(async () => draftButton()!.click());
+  await vi.waitFor(async () => {
+    await act(async () => {});
+    expect(container.textContent).toContain('确认这个 Skill 的工作方式');
+    expect(
+      new URLSearchParams(
+        container.querySelector('[data-route]')!.textContent!,
+      ).get('view'),
+    ).toBe('create');
+  });
+});
+
+it('resumes an unfinished guided draft after opening the Skill repository', async () => {
+  await configureUnfinishedDraft();
+  await import('../components/skill-workspace/SkillRepositoryWorkspace');
+  await act(async () =>
+    root.render(
+      <MemoryRouter initialEntries={['/?view=create']}>
+        <SkillFirstWorkspace />
+        <RouteEvidence />
+      </MemoryRouter>,
+    ),
+  );
+
+  await vi.waitFor(async () => {
+    await act(async () => {});
+    expect(button('Skill 仓库')).toBeDefined();
+  });
+  await act(async () => button('Skill 仓库')!.click());
+  await vi.waitFor(async () => {
+    await act(async () => {});
+    expect(
+      new URLSearchParams(
+        container.querySelector('[data-route]')!.textContent!,
+      ).get('view'),
+    ).toBe('repository');
+    expect(draftButton()).not.toBeNull();
+  });
+
+  await act(async () => draftButton()!.click());
+  await vi.waitFor(async () => {
+    await act(async () => {});
+    expect(container.textContent).toContain('确认这个 Skill 的工作方式');
+    expect(
+      new URLSearchParams(
+        container.querySelector('[data-route]')!.textContent!,
+      ).get('view'),
+    ).toBe('create');
+  });
 });
 
 it.each(['run', 'test'] as const)(

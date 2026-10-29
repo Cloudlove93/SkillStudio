@@ -221,6 +221,10 @@ function SkillFirstWorkspaceContent() {
   >(new Set());
   const lastActionRef = useRef<(() => void) | null>(null);
   const selectedRef = useRef<string | null>(null);
+  const openingSessionRef = useRef<{
+    id: string;
+    search: string;
+  } | null>(null);
   const activeRunRef = useRef<string | null>(null);
   const activeSkill: SkillDetailSelection | null =
     selectedRepositorySkill ??
@@ -336,6 +340,16 @@ function SkillFirstWorkspaceContent() {
   useEffect(() => {
     selectedRef.current = selectedSessionId;
   }, [selectedSessionId]);
+
+  const cancelOpeningSession = useCallback(() => {
+    const openingSession = openingSessionRef.current;
+    if (!openingSession) return;
+    openingSessionRef.current = null;
+    if (selectedRef.current !== openingSession.id) return;
+    selectedRef.current = null;
+    setSelectedSessionId(null);
+    setSession(null);
+  }, []);
 
   useEffect(() => {
     try {
@@ -535,6 +549,20 @@ function SkillFirstWorkspaceContent() {
     );
     if (!repositoryReady) return;
 
+    const openingSession = openingSessionRef.current;
+    if (openingSession) {
+      const selectedOpeningSession =
+        selectedRef.current === openingSession.id;
+      const reachedCreateView = route.view === 'create' && !route.skillKey;
+      if (selectedOpeningSession && reachedCreateView) {
+        openingSessionRef.current = null;
+      } else if (openingSession.search !== location.search) {
+        cancelOpeningSession();
+      } else if (route.skillKey) {
+        return;
+      }
+    }
+
     if (route.skillKey) {
       const restoredSkill = repositorySkills.find(
         (skill) => skill.key === route.skillKey,
@@ -563,14 +591,18 @@ function SkillFirstWorkspaceContent() {
 
     setSelectedRepositorySkill(null);
     if (route.view === 'create') {
-      setSession(null);
-      setSelectedSessionId(null);
-      selectedRef.current = null;
+      // Explicit "new Skill" actions clear session state themselves. Route
+      // synchronization must not erase a draft that openSession just loaded.
       dispatchWorkspace({ type: 'navigate', view: 'create' });
       return;
     }
     dispatchWorkspace({ type: 'navigate', view: 'repository' });
-  }, [location.search, repositoryReady, repositorySkills]);
+  }, [
+    cancelOpeningSession,
+    location.search,
+    repositoryReady,
+    repositorySkills,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -848,6 +880,7 @@ function SkillFirstWorkspaceContent() {
 
   const openSession = async (summary: GuidedCreationSession) => {
     activeRunRef.current = null;
+    openingSessionRef.current = { id: summary.id, search: location.search };
     setPendingGuidedMessage(null);
     setSelectedRepositorySkill(null);
     setSelectedSessionId(summary.id);
@@ -883,6 +916,7 @@ function SkillFirstWorkspaceContent() {
           );
       }
       if (detail.status === 'completed') {
+        openingSessionRef.current = null;
         closeInspector({ force: true });
         navigateWorkspaceView(
           'run',
@@ -893,9 +927,17 @@ function SkillFirstWorkspaceContent() {
         );
         dispatchWorkspace({ type: 'dismiss-update' });
       } else {
+        if (
+          parseSkillWorkspaceSearch(location.search).view === 'create' &&
+          !parseSkillWorkspaceSearch(location.search).skillKey
+        ) {
+          openingSessionRef.current = null;
+        }
         navigateWorkspaceView('create', null);
       }
     } catch (loadError) {
+      if (openingSessionRef.current?.id === summary.id)
+        openingSessionRef.current = null;
       toast.error(
         loadError instanceof Error ? loadError.message : '内容加载失败',
       );
@@ -964,6 +1006,7 @@ function SkillFirstWorkspaceContent() {
       return;
     }
     setImportOpen(false);
+    cancelOpeningSession();
     activeRunRef.current = null;
     setPendingGuidedMessage(null);
     setCreateMode(mode);
@@ -986,6 +1029,7 @@ function SkillFirstWorkspaceContent() {
   };
 
   const openRepository = () => {
+    cancelOpeningSession();
     closeInspector({ force: true });
     navigateWorkspaceView('repository', null, true);
     dispatchWorkspace({ type: 'dismiss-update' });
@@ -1069,6 +1113,7 @@ function SkillFirstWorkspaceContent() {
   };
 
   const handleConversationSelect = (id: string) => {
+    cancelOpeningSession();
     setSelectedConversationId(id);
     closeInspector({ force: true });
     navigateWorkspaceView('run', activeSkillKey, true);
@@ -1203,6 +1248,7 @@ function SkillFirstWorkspaceContent() {
   };
 
   const openRepositorySkill = (skill: RepositorySkill) => {
+    cancelOpeningSession();
     activeRunRef.current = null;
     setPendingGuidedMessage(null);
     setSelectedRepositorySkill(skill);
