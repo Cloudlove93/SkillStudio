@@ -19,6 +19,7 @@ import {
   readThinkingPreference,
   writeThinkingPreference,
 } from './skill-thinking-preference';
+import { useConversationAutoScroll } from './use-conversation-auto-scroll';
 
 type Props = {
   token: string;
@@ -85,6 +86,24 @@ export function SkillRunWorkspace({
       ),
     [purpose, state.messages],
   );
+  const latestMessage = state.messages.at(-1);
+  const conversationScrollKey = [
+    selectedThreadId ?? 'new',
+    historyLoading ? 'loading' : 'ready',
+    state.messages.length,
+    latestMessage?.role ?? '',
+    latestMessage?.messageId ?? '',
+    latestMessage?.content.length ?? 0,
+    latestMessage?.content.slice(-32) ?? '',
+    state.streaming.length,
+    state.streaming.slice(-32),
+    state.streamingReasoning.length,
+    state.streamingReasoning.slice(-32),
+    state.thinkingNotice ?? '',
+    state.stopped ? 'stopped' : 'running',
+    state.error ?? '',
+  ].join('|');
+  useConversationAutoScroll(messageListRef, conversationScrollKey);
 
   const send = () => sendContent(state.draft, thinkingPreference);
 

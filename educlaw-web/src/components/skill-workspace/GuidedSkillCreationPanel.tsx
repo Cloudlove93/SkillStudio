@@ -30,6 +30,7 @@ import {
   deriveGuidedCreationProgress,
   GUIDED_CREATION_STEP_DEFINITIONS,
 } from './guided-creation-progress';
+import { useConversationAutoScroll } from './use-conversation-auto-scroll';
 
 type Props = {
   session: GuidedCreationSessionDetail | null;
@@ -95,6 +96,19 @@ export function GuidedSkillCreationPanel(props: Props) {
       ]),
     [props.pendingMessage, props.session?.messages, showPendingMessage],
   );
+  const latestMessage = props.session?.messages.at(-1);
+  const conversationScrollKey = [
+    props.session?.id ?? 'new',
+    props.session?.messages.length ?? 0,
+    latestMessage?.id ?? '',
+    latestMessage?.content.length ?? 0,
+    latestMessage?.content.slice(-32) ?? '',
+    showPendingMessage ? props.pendingMessage?.clientMessageId ?? 'pending' : '',
+    showPendingMessage ? props.pendingMessage?.content.length ?? 0 : 0,
+    props.busy ? 'busy' : 'idle',
+    showConversation ? 'conversation' : 'summary',
+  ].join('|');
+  useConversationAutoScroll(messageListRef, conversationScrollKey);
   const guidedStage =
     props.session &&
     props.session.flow_version === 2 &&
