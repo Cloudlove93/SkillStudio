@@ -32,7 +32,7 @@ type CreateSignedGetGrant = (input: {
 type ReadFrameDataUrl = (assetRef: MultimodalAssetRef) => Promise<string>;
 type OpenReadStream = ReturnType<typeof createObjectStorageService>['openReadStream'];
 
-const PROMPT_VERSION = 'semantic-moments-v4-chunked-zh';
+const PROMPT_VERSION = 'semantic-moments-v5-bounded-zh';
 const DEFAULT_SEMANTIC_CHUNK_CHAR_BUDGET = 48_000;
 const MAX_INLINE_FRAME_BYTES = 8 * 1024 * 1024;
 const ALLOWED_TYPES = [
@@ -385,6 +385,10 @@ export function createProductionMediaEvidenceService(options?: {
               {
                 systemPrompt: [
                   '你是教学视频的语义时刻识别器。只输出 JSON。',
+                  '顶层必须是 {"moments":[...]}，最多 8 个 moment；优先合并相近内容，不为凑数量拆分。',
+                  '简洁输出：summary 不超过 80 字，selectionReason、visualTarget 各不超过 40 字，证据 text 只摘录关键短句且不超过 80 字；同一转录证据只放 transcriptEvidence，audioEvidence 无独立声音依据时为 null。',
+                  '完整结构示例（时间仅示意，实际必须来自当前 analysisWindow）：',
+                  '{"moments":[{"startMs":0,"endMs":1000,"importance":0.8,"type":"concept","summary":"核心定义","visualTarget":null,"audioEvidence":null,"transcriptEvidence":null,"selectionReason":"后续步骤的基础"}]}',
                   `type 只能是：${ALLOWED_TYPES.join(', ')}。`,
                   'moments 必须按时间递增、互不重叠；每项严格包含 startMs,endMs,importance,type,summary,visualTarget,audioEvidence,transcriptEvidence,selectionReason。',
                   'importance 必须是 0 到 1 之间的数字（例如 0.8），不是百分数、等级或字符串；confidence 必须是 0 到 1 之间的数字。',

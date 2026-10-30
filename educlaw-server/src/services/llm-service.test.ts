@@ -161,6 +161,61 @@ afterEach(() => {
 });
 
 describe('llm-service', () => {
+  it.each(['{"ok":true', '{"ok":true}'])('rejects structured length responses before repair: %s', async (content) => {
+    const fetchMock = vi.fn().mockImplementation(async () => new Response(JSON.stringify({
+      choices: [{ finish_reason: 'length', message: { content, reasoning_content: 'PRIVATE_REASONING' } }],
+      usage: { prompt_tokens: 30, completion_tokens: 100, total_tokens: 130, completion_tokens_details: { reasoning_tokens: 80 }, secret: 'PRIVATE_USAGE' },
+    })));
+    vi.stubGlobal('fetch', fetchMock);
+    const { service, logger } = await loadServiceWithLogger();
+    await expect(service.generateJson({ systemPrompt: 'PRIVATE_PROMPT', userPrompt: 'PRIVATE_INPUT', hidePromptContentInLogs: true }, 2)).rejects.toBeInstanceOf(service.LlmOutputTruncatedError);
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(logger.info).toHaveBeenCalledWith(expect.objectContaining({
+      event: 'llm.response.completion', finishReason: 'length', truncated: true,
+      usage: { promptTokens: 30, completionTokens: 100, totalTokens: 130, reasoningTokens: 80 },
+    }));
+    expect(JSON.stringify(logger.info.mock.calls)).not.toMatch(/PRIVATE_|test-api-key/);
+  });
+
+  it('rejects a truncated image JSON response and a truncated repair response', async () => {
+    const truncated = () => new Response(JSON.stringify({ choices: [{ finish_reason: 'length', message: { content: '{"ok":true' } }] }));
+    const fetchMock = vi.fn().mockImplementation(truncated);
+    vi.stubGlobal('fetch', fetchMock);
+    const service = await loadService();
+    await expect(service.generateMultimodalJson({ systemPrompt: 'JSON', userPrompt: 'test', images: [{imageUrl:'data:image/png;base64,YQ=='}] })).rejects.toBeInstanceOf(service.LlmOutputTruncatedError);
+    fetchMock.mockResolvedValueOnce(mockChatResponse('{"a":1,,bad}'));
+    await expect(service.generateJson({ systemPrompt: 'JSON', userPrompt: 'test' })).rejects.toBeInstanceOf(service.LlmOutputTruncatedError);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('preserves ordinary partial text in nonstream, SSE, and JSON stream fallback responses', async () => {
+    const truncated = () => new Response(JSON.stringify({ choices: [{ finish_reason: 'length', message: { content: 'partial answer' } }] }));
+    const fetchMock = vi.fn().mockImplementation(truncated);
+    vi.stubGlobal('fetch', fetchMock);
+    const service = await loadService();
+    const input = {systemPrompt:'system',userPrompt:'question'};
+    expect(await service.generateText(input)).toBe('partial answer');
+    for (const stream of [service.streamText(input), service.streamChat([{role:'user',content:'question'}])]) {
+      const parts=[]; for await(const part of stream) parts.push(part);
+      expect(parts.join('')).toBe('partial answer');
+    }
+    fetchMock.mockImplementation(() => mockStreamResponse(['data: {"choices":[{"delta":{"content":"partial answer"}}]}\n\n', 'data: {"choices":[{"delta":{},"finish_reason":"length"}]}\n\n','data: [DONE]\n\n']));
+    for (const stream of [service.streamText(input), service.streamChat([{role:'user',content:'question'}])]) {
+      const parts=[]; for await(const part of stream) parts.push(part);
+      expect(parts.join('')).toBe('partial answer');
+    }
+  });
+
+  it('uses the verified SII DeepSeek V4.1 template toggle for text and image JSON only on that model', async () => {
+    const fetchMock = vi.fn().mockImplementation(async () => mockChatResponse('{"ok":true}'));
+    vi.stubGlobal('fetch', fetchMock);
+    const service = await loadService({llmModel:'DeepSeek-V4.1-Flash-1017'});
+    await service.generateJson({systemPrompt:'JSON',userPrompt:'test'});
+    await service.generateMultimodalJson({systemPrompt:'JSON',userPrompt:'test',images:[{imageUrl:'data:image/png;base64,YQ=='}]});
+    for (const call of fetchMock.mock.calls) expect(JSON.parse(call[1].body).chat_template_kwargs).toEqual({thinking:false});
+    await service.generateText({systemPrompt:'text',userPrompt:'test',model:'other-deepseek'});
+    expect(JSON.parse(fetchMock.mock.calls[2]![1].body).chat_template_kwargs).toBeUndefined();
+  });
   it('streamText falls back to a normal JSON response when the response is not SSE', async () => {
     vi.stubGlobal(
       'fetch',

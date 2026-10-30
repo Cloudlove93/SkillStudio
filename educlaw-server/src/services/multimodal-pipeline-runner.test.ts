@@ -13,6 +13,7 @@ describe('multimodal pipeline runner', () => {
     ['LLM request failed: 401', 1],
     ['LLM request failed: 404', 1],
     ['LLM request failed: 503', 3],
+    ['LLM output was truncated because the output token limit was exhausted', 1],
   ])(
     'stops bounded attempts for %s and persists a safe failure',
     async (message, limit) => {
@@ -66,6 +67,9 @@ describe('multimodal pipeline runner', () => {
           }),
         }),
       );
+      if (message.includes('truncated')) {
+        expect(persistPipelineFailure.mock.calls[0]![0].error.message).toContain('模型输出被截断');
+      }
     },
   );
   it('does not call a model for a cancelled session returned by a stale scan', async () => {

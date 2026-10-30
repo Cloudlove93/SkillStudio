@@ -38,7 +38,7 @@ describe('bounded generation diagnostics', () => {
     [
       'JSON generation failed: LLM output token limit was exhausted before usable content was returned',
       'truncated',
-      true,
+      false,
     ],
     [
       'Model returned invalid JSON and automatic repair also failed',

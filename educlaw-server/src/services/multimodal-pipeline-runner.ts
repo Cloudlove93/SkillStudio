@@ -257,9 +257,11 @@ export function createMultimodalPipelineRunner(
               // A failed stage is excluded from automatic scans. The user may
               // explicitly resume it after fixing configuration or input.
               retryable: true,
-              message: diagnostic.retryable
-                ? '处理多次未完成，请检查后明确重试'
-                : '模型配置或输入契约不可用，请修正后重新处理',
+              message: diagnostic.reason === 'truncated'
+                ? '模型输出被截断，输出额度已耗尽；请缩短材料或调整模型后重新处理'
+                : diagnostic.retryable
+                  ? '处理多次未完成，请检查后明确重试'
+                  : '模型配置或输入契约不可用，请修正后重新处理',
             },
           });
         } catch (persistError) {

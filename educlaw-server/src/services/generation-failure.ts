@@ -64,9 +64,10 @@ export function classifyGenerationFailure(
     retryable = false;
   } else if (status === 429) reason = 'rate_limit';
   else if (status && status >= 500) reason = 'provider_unavailable';
-  else if (/Truncated|token limit|finish_reason.*length/i.test(text))
+  else if (/Truncated|token limit|finish_reason.*length/i.test(text)) {
     reason = 'truncated';
-  else if (/InvalidJson|invalid JSON|JSON syntax|SyntaxError/i.test(text))
+    retryable = false;
+  } else if (/InvalidJson|invalid JSON|JSON syntax|SyntaxError/i.test(text))
     reason = 'json_syntax';
   else if (/OUT_OF_WINDOW|out of range|timeRange|overlap/i.test(text)) {
     reason = 'time_bounds';

@@ -137,6 +137,10 @@ describe('production media evidence runtime', () => {
       expect(request.systemPrompt).toContain(
         'confidence 必须是 0 到 1 之间的数字',
       );
+      expect(request.systemPrompt).toContain('最多 8 个');
+      expect(request.systemPrompt).toContain('不超过 80 字');
+      const example = request.systemPrompt.split('\n').find((line) => line.startsWith('{"moments":'));
+      expect(JSON.parse(example!).moments[0]).toMatchObject({selectionReason: expect.any(String), transcriptEvidence: null});
       const payload = JSON.parse(request.userPrompt) as {
         transcript: unknown[];
       };

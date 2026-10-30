@@ -68,7 +68,7 @@ export class LlmInvalidJsonError extends Error {
 
 export class LlmOutputTruncatedError extends Error {
   constructor(
-    message = 'LLM output token limit was exhausted before usable content was returned',
+    message = 'LLM output was truncated because the output token limit was exhausted',
   ) {
     super(message);
     this.name = 'LlmOutputTruncatedError';
@@ -278,6 +278,10 @@ function buildChatCompletionBody(
   if (/^qwen3\.5(?:-|$)/i.test(model)) {
     body.chat_template_kwargs = { enable_thinking: thinkingMode === 'enabled' };
   }
+  // Verified on the SII deployment; its top-level thinking toggle is ignored.
+  if (model.toLowerCase() === 'deepseek-v4.1-flash-1017') {
+    body.chat_template_kwargs = { thinking: thinkingMode === 'enabled' };
+  }
   return body;
 }
 
@@ -377,18 +381,39 @@ async function createChatResponseMessages(
   return response;
 }
 
-async function readChatParts(response: Response): Promise<{
+async function readChatParts(response: Response, model = config.llmModel): Promise<{
   content: string;
   reasoningContent: string;
   finishReason?: string;
 }> {
   const json = (await response.json()) as {
+    usage?: {
+      prompt_tokens?: unknown;
+      completion_tokens?: unknown;
+      total_tokens?: unknown;
+      completion_tokens_details?: { reasoning_tokens?: unknown };
+    };
     choices?: Array<{
       finish_reason?: string;
       message?: { content?: string | null; reasoning_content?: string | null };
     }>;
   };
   const choice = json.choices?.[0];
+  const tokenCount = (value: unknown) =>
+    typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
+      ? value : undefined;
+  llmLogger().info({
+    event: 'llm.response.completion',
+    model,
+    finishReason: choice?.finish_reason,
+    truncated: choice?.finish_reason === 'length',
+    usage: {
+      promptTokens: tokenCount(json.usage?.prompt_tokens),
+      completionTokens: tokenCount(json.usage?.completion_tokens),
+      totalTokens: tokenCount(json.usage?.total_tokens),
+      reasoningTokens: tokenCount(json.usage?.completion_tokens_details?.reasoning_tokens),
+    },
+  });
   return {
     content: choice?.message?.content?.trim() || '',
     reasoningContent: choice?.message?.reasoning_content?.trim() || '',
@@ -396,18 +421,22 @@ async function readChatParts(response: Response): Promise<{
   };
 }
 
-async function readChatText(response: Response): Promise<string> {
-  const result = await readChatParts(response);
+async function readChatText(response: Response, model: string, requireComplete = false): Promise<string> {
+  const result = await readChatParts(response, model);
   const content = result.content;
-  if (!content && result.finishReason === "length") {
+  if ((!content || requireComplete) && result.finishReason === "length") {
     throw new LlmOutputTruncatedError();
   }
   return content;
 }
 
 export async function generateText(input: ChatRequestInput) {
+  return generateTextResult(input);
+}
+
+async function generateTextResult(input: ChatRequestInput, requireComplete = false) {
   const response = await createChatResponse(input, false);
-  const text = await readChatText(response);
+  const text = await readChatText(response, input.model || config.llmModel, requireComplete);
   logLlmTextResult("prompt", input.model || config.llmModel, text, input.hidePromptContentInLogs);
   return text;
 }
@@ -420,7 +449,7 @@ export async function* streamTextParts(
   const output: string[] = [];
 
   if (!contentType.includes("text/event-stream") || !response.body) {
-    const result = await readChatParts(response);
+    const result = await readChatParts(response, input.model || config.llmModel);
     if (!result.content && result.finishReason === "length") {
       throw new LlmOutputTruncatedError();
     }
@@ -500,7 +529,7 @@ export async function* streamText(input: ChatRequestInput): AsyncGenerator<strin
 
 export async function generateChat(messages: ChatMessage[], model?: string, temperature?: number): Promise<string> {
   const response = await createChatResponseMessages(messages, model, temperature, false);
-  const text = await readChatText(response);
+  const text = await readChatText(response, model || config.llmModel);
   logLlmTextResult("messages", model || config.llmModel, text);
   return text;
 }
@@ -511,7 +540,7 @@ export async function* streamChat(messages: ChatMessage[], model?: string, tempe
   const output: string[] = [];
 
   if (!contentType.includes("text/event-stream") || !response.body) {
-    const text = await readChatText(response);
+    const text = await readChatText(response, model || config.llmModel);
     if (text) {
       output.push(text);
       yield text;
@@ -565,7 +594,7 @@ export async function generateJson<T>(
   const jsonInput = withStrictJsonContract(input);
   for (let attempt = 0; attempt <= retries; attempt += 1) {
     try {
-      const raw = await generateText(jsonInput);
+      const raw = await generateTextResult(jsonInput, true);
       try {
         return parseJsonObject<T>(raw);
       } catch (parseError) {
@@ -671,6 +700,8 @@ export async function generateMultimodalJson<T>(
     body.temperature = 0;
     if (/^qwen3\.5(?:-|$)/i.test(model))
       body.chat_template_kwargs = { enable_thinking: false };
+    if (model.toLowerCase() === 'deepseek-v4.1-flash-1017')
+      body.chat_template_kwargs = { thinking: false };
   }
 
   const response = await fetchWithNetworkRetry(
@@ -690,7 +721,7 @@ export async function generateMultimodalJson<T>(
   if (!response.ok) {
     throw new Error(`LLM multimodal request failed: ${response.status}`);
   }
-  const raw = await readChatText(response);
+  const raw = await readChatText(response, model, true);
   logLlmTextResult('multimodal-json', model, raw, true);
   try {
     return parseJsonObject<T>(raw);
@@ -714,7 +745,7 @@ async function repairJsonOutput<T>(
   raw: string,
   parseError: unknown,
 ): Promise<T> {
-  const repaired = await generateText({
+  const repaired = await generateTextResult({
     model: input.model,
     temperature: 0,
     maxTokens: input.maxTokens,
@@ -734,7 +765,7 @@ async function repairJsonOutput<T>(
       raw,
     ].join('\n'),
     hidePromptContentInLogs: input.hidePromptContentInLogs,
-  });
+  }, true);
 
   try {
     return parseJsonObject<T>(repaired);
