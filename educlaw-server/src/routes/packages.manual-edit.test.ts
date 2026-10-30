@@ -109,6 +109,30 @@ it('passes the document single-Skill requirement to generation', async () => {
   }
 });
 
+it('rejects meaningless document text before generating a Skill', async () => {
+  const { server, url } = await listen(await createApp());
+  try {
+    const response = await fetch(`${url}/packages/generate/stream`, {
+      method: 'POST',
+      headers: { 'X-User-Id': 'user-1', 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        instruction: '',
+        documents: [{ name: 'a.md', content: '68fjjfy4mi夫57' }],
+        singleSkill: true,
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error:
+        'a.md：未识别到有意义的文字，无法生成 Skill，请上传包含明确内容的文档',
+    });
+    expect(generatePackageMock).not.toHaveBeenCalled();
+  } finally {
+    await close(server);
+  }
+});
+
 describe('POST /packages/:packageId/manual-edit', () => {
   it('passes the rubric target through to the package service', async () => {
     applyManualMarkdownEditMock.mockResolvedValue({ ok: true });

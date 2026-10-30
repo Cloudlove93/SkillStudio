@@ -1,4 +1,8 @@
 import { useRef, useState } from 'react';
+import {
+  DOCUMENT_CONTENT_QUALITY_ERROR,
+  hasMeaningfulDocumentContent,
+} from '@educlaw/shared';
 import { FileUp, Loader2, Sparkles } from 'lucide-react';
 import { liteApi } from '../../api/lite-api';
 import {
@@ -256,6 +260,9 @@ async function readDocument(file: File): Promise<DocumentSource> {
     content = (await file.text()).trim();
   }
   if (!content) throw new Error('没有读取到可用文本');
+  if (!hasMeaningfulDocumentContent(content)) {
+    throw new Error(DOCUMENT_CONTENT_QUALITY_ERROR);
+  }
   return { name: file.name, content };
 }
 

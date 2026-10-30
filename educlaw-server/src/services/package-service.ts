@@ -8,6 +8,10 @@ import type {
   PackageVersion,
 } from '@educlaw/shared';
 import {
+  DOCUMENT_CONTENT_QUALITY_ERROR,
+  hasMeaningfulDocumentContent,
+} from '@educlaw/shared';
+import {
   generateChat,
   generateJson,
   generateText,
@@ -2392,6 +2396,20 @@ export async function buildGeneratedPackageSnapshot(input: {
     MAX_GENERATED_SKILLS,
     Math.max(1, Math.trunc(input.max_skills ?? MAX_GENERATED_SKILLS)),
   );
+  if (maxSkills === 1 && documents?.length) {
+    const invalidDocument = documents.find(
+      (document) =>
+        !hasMeaningfulDocumentContent(String(document?.content || '')),
+    );
+    if (invalidDocument) {
+      const name = String(invalidDocument?.name || '上传文档').trim();
+      throw new Error(
+        name
+          ? `${name}：${DOCUMENT_CONTENT_QUALITY_ERROR}`
+          : DOCUMENT_CONTENT_QUALITY_ERROR,
+      );
+    }
+  }
   const startedAt = Date.now();
   const docParts = buildDocumentContext(documents, MAX_BASE_DOCUMENT_CHARS);
   const skillDocParts = buildDocumentContext(

@@ -300,6 +300,23 @@ afterEach(() => {
 });
 
 describe('generatePackage', () => {
+  it('rejects meaningless single-Skill document content before model calls or persistence', async () => {
+    const { buildGeneratedPackageSnapshot } = await loadService();
+
+    await expect(
+      buildGeneratedPackageSnapshot({
+        instruction: '',
+        documents: [{ name: 'a.md', content: '68fjjfy4mi夫57' }],
+        max_skills: 1,
+      }),
+    ).rejects.toThrow(
+      'a.md：未识别到有意义的文字，无法生成 Skill，请上传包含明确内容的文档',
+    );
+    expect(generateJsonMock).not.toHaveBeenCalled();
+    expect(streamTextMock).not.toHaveBeenCalled();
+    expect(queryMock).not.toHaveBeenCalled();
+  });
+
   it('fails visibly when parsed metadata is incomplete and no task title is available', async () => {
     generateJsonMock.mockResolvedValue({});
 

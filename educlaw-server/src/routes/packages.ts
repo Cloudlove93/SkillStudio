@@ -1,7 +1,11 @@
 import { createTrackedRouter } from '../services/http-drain.js';
 import multer from 'multer';
 import { Router, type Request, type Response } from 'express';
-import { PACKAGE_ROUTES } from '@educlaw/shared';
+import {
+  DOCUMENT_CONTENT_QUALITY_ERROR,
+  PACKAGE_ROUTES,
+  hasMeaningfulDocumentContent,
+} from '@educlaw/shared';
 import type { AuthedRequest } from '../types.js';
 import { config } from '../config.js';
 import { getLogger } from '../lib/request-context.js';
@@ -98,10 +102,25 @@ router.post(
       res.status(400).json({ error: 'singleSkill must be a boolean' });
       return;
     }
-    initSse(res);
-    const startedAt = Date.now();
     const documents: Array<{ name: string; content: string }> | undefined =
       Array.isArray(req.body?.documents) ? req.body.documents : undefined;
+    if (req.body?.singleSkill === true && documents?.length) {
+      const invalidDocument = documents.find(
+        (document) =>
+          !hasMeaningfulDocumentContent(String(document?.content || '')),
+      );
+      if (invalidDocument) {
+        const name = String(invalidDocument?.name || '上传文档').trim();
+        res.status(400).json({
+          error: name
+            ? `${name}：${DOCUMENT_CONTENT_QUALITY_ERROR}`
+            : DOCUMENT_CONTENT_QUALITY_ERROR,
+        });
+        return;
+      }
+    }
+    initSse(res);
+    const startedAt = Date.now();
     getLogger({ component: 'packages-route' }).info({
       event: 'packages.generate.stream.start',
       userId: (req as AuthedRequest).userId || '',
