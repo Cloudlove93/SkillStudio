@@ -69,3 +69,34 @@ it('cancels a stale scheduled scroll when newer content arrives', async () => {
 
   expect(window.cancelAnimationFrame).toHaveBeenCalledWith(17);
 });
+
+it('does not pull the user back after they scroll away from the latest content', async () => {
+  await act(async () => root.render(<Probe changeKey="first" />));
+  const viewport = container.querySelector<HTMLDivElement>(
+    '[data-testid="conversation"]',
+  )!;
+  const scrollTo = vi.fn();
+  Object.defineProperties(viewport, {
+    scrollHeight: { configurable: true, value: 720 },
+    clientHeight: { configurable: true, value: 200 },
+    scrollTop: { configurable: true, value: 100, writable: true },
+  });
+  viewport.scrollTo = scrollTo;
+  await act(async () => nextFrame?.(0));
+  scrollTo.mockClear();
+
+  viewport.dispatchEvent(new Event('scroll'));
+  nextFrame = null;
+  await act(async () => root.render(<Probe changeKey="streaming-update" />));
+  expect(nextFrame).toBeNull();
+  expect(scrollTo).not.toHaveBeenCalled();
+
+  viewport.scrollTop = 520;
+  viewport.dispatchEvent(new Event('scroll'));
+  await act(async () => root.render(<Probe changeKey="next-delta" />));
+  await act(async () => nextFrame?.(16));
+  expect(scrollTo).toHaveBeenCalledWith({
+    top: 720,
+    behavior: 'smooth',
+  });
+});

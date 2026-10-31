@@ -1,4 +1,4 @@
-import { useEffect, type RefObject } from 'react';
+import { useEffect, useRef, type RefObject } from 'react';
 
 function scrollToLatest(container: HTMLElement) {
   const top = container.scrollHeight;
@@ -9,17 +9,44 @@ function scrollToLatest(container: HTMLElement) {
   container.scrollTop = top;
 }
 
-/** Keeps a conversation viewport following content appended at its bottom. */
+const FOLLOW_THRESHOLD_PX = 72;
+
+function isNearLatest(container: HTMLElement) {
+  return (
+    container.scrollHeight - container.scrollTop - container.clientHeight <=
+    FOLLOW_THRESHOLD_PX
+  );
+}
+
+/** Follows appended content while the user remains near the conversation bottom. */
 export function useConversationAutoScroll<T extends HTMLElement>(
   containerRef: RefObject<T | null>,
   changeKey: string,
+  scopeKey?: string,
 ) {
+  const followLatestRef = useRef(true);
+
   useEffect(() => {
-    if (!containerRef.current) return undefined;
+    followLatestRef.current = true;
+  }, [scopeKey]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return undefined;
+
+    const handleScroll = () => {
+      followLatestRef.current = isNearLatest(container);
+    };
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [containerRef]);
+
+  useEffect(() => {
+    if (!containerRef.current || !followLatestRef.current) return undefined;
 
     const update = () => {
       const container = containerRef.current;
-      if (container) scrollToLatest(container);
+      if (container && followLatestRef.current) scrollToLatest(container);
     };
 
     if (typeof window.requestAnimationFrame !== 'function') {

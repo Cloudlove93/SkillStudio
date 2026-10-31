@@ -113,8 +113,9 @@ describe('resumable arena runs', () => {
     );
     await expect(service.start(input)).resolves.toMatchObject({ threadId: 91 });
   });
-  it('keeps execution alive after detach and replays one cumulative snapshot', async () => {
+  it('publishes cumulative text revisions before completion and survives detach', async () => {
     const hold = barrier();
+    const finish = barrier();
     const { service, executions } = setup(async function* () {
       yield {
         event: 'shared',
@@ -123,6 +124,7 @@ describe('resumable arena runs', () => {
       yield { event: 'delta', data: { side: 'enhanced', delta: 'first' } };
       await hold.promise;
       yield { event: 'delta', data: { side: 'enhanced', delta: ' second' } };
+      await finish.promise;
       yield {
         event: 'done',
         data: {
@@ -137,9 +139,19 @@ describe('resumable arena runs', () => {
     const start = await service.start(input);
     await tick();
     const subscription = await service.subscribe('owner', 91, start.runId);
-    expect((await subscription.next()).value.content).toBe('first');
+    const first = (await subscription.next()).value;
+    expect(first.content).toBe('first');
+    expect(first.status).toBe('running');
     await subscription.return();
     hold.release();
+    await tick();
+    const second = await service.get('owner', 91, start.runId);
+    expect(second).toMatchObject({
+      status: 'running',
+      content: 'first second',
+    });
+    expect(second.revision).toBeGreaterThan(first.revision);
+    finish.release();
     await tick();
     const recovered = await service.get('owner', 91, start.runId);
     expect(recovered).toMatchObject({

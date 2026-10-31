@@ -60,14 +60,17 @@ describe("locked Pi SDK HTTP boundary", () => {
     expect(result.evidence.cleanupCompleted).toBe(true);
   });
 
-  it("does not publish buffered text as success after a provider stream error", async () => {
+  it("keeps provider text partial and never publishes success after a stream error", async () => {
     const fixture = sdkFixture({ failAfterReasoning: true });
     const events: HarnessEvent[] = [];
     const result = await fixture.run(request("kimi-k2.6", "medium"), (event) => { events.push(event); });
     expect(fixture.nativeEvents).toContain("thinking_delta");
     expect(fixture.nativeEvents).toContain("text_delta");
     expect(result.status).toBe("failed");
-    expect(events.some((event) => event.type === "text_delta")).toBe(false);
+    expect(result.text).toBe("");
+    expect(events.filter((event) => event.type === "text_delta")).toEqual([{
+      type: "text_delta", runId: "sdk-regression", delta: "SDK final answer",
+    }]);
     expect(events.filter((event) => event.type === "run_finished")).toEqual([expect.objectContaining({ status: "failed" })]);
     expect(result.evidence.cleanupCompleted).toBe(true);
   });

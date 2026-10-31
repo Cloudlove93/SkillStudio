@@ -4,7 +4,13 @@ import type {
   ArenaThread,
   SkillVersionDetail,
 } from '@educlaw/shared';
-import { ArrowUp, Play, Sparkles, Square, WandSparkles } from 'lucide-react';
+import {
+  ArrowUp,
+  Play,
+  Sparkles,
+  Square,
+  WandSparkles,
+} from 'lucide-react';
 import { useSkillRun } from './use-skill-run';
 import type {
   AnswerOptimizationRerunRequest,
@@ -40,6 +46,24 @@ type Props = {
   rerunRequest?: AnswerOptimizationRerunRequest | null;
   onRerunHandled?: (requestId: string) => void;
 };
+
+function SkillRunActivityStatus({ label }: { label: string }) {
+  return (
+    <div
+      className="skill-run-activity"
+      role="status"
+      aria-live="polite"
+      data-skill-run-activity
+    >
+      <span>{label}</span>
+      <span className="skill-run-activity-dots" aria-hidden="true">
+        <span />
+        <span />
+        <span />
+      </span>
+    </div>
+  );
+}
 
 export function SkillRunWorkspace({
   token,
@@ -103,7 +127,11 @@ export function SkillRunWorkspace({
     state.stopped ? 'stopped' : 'running',
     state.error ?? '',
   ].join('|');
-  useConversationAutoScroll(messageListRef, conversationScrollKey);
+  useConversationAutoScroll(
+    messageListRef,
+    conversationScrollKey,
+    selectedThreadId ?? 'new',
+  );
 
   const send = () => sendContent(state.draft, thinkingPreference);
 
@@ -257,7 +285,7 @@ export function SkillRunWorkspace({
               ),
             )
           )}
-          {(state.streaming || state.streamingReasoning) && (
+          {(state.busy || state.streaming || state.streamingReasoning) && (
             <div className="skill-assistant-block">
               <div className="skill-assistant-avatar">
                 <Sparkles size={14} />
@@ -272,6 +300,12 @@ export function SkillRunWorkspace({
                   <div className="skill-assistant-message">
                     <MarkdownContent content={state.streaming} />
                   </div>
+                ) : null}
+                {state.busy &&
+                (!state.streamingReasoning || state.streaming) ? (
+                  <SkillRunActivityStatus
+                    label={state.streaming ? '正在生成…' : '正在思考…'}
+                  />
                 ) : null}
               </div>
             </div>

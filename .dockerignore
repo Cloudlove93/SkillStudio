@@ -9,3 +9,7 @@ dist
 .codex_tmp
 coverage
 *.log
+.env
+.env.*
+**/.env
+**/.env.*

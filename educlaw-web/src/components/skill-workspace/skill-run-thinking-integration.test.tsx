@@ -214,6 +214,128 @@ describe('resumable Skill run lifecycle', () => {
         ?.click(),
     );
   }
+  it('moves one activity status below streaming text and removes it on success', async () => {
+    api.startArenaRun.mockResolvedValue(
+      run({ content: '', reasoningContent: '' }),
+    );
+    await render();
+    await send();
+
+    expect(container.textContent).toContain('正在思考…');
+    expect(
+      container.querySelectorAll('[data-skill-run-activity]'),
+    ).toHaveLength(1);
+
+    await act(async () => {
+      receive(
+        run({
+          revision: 2,
+          content: '第一段真实回答',
+          reasoningContent: '',
+        }),
+      );
+    });
+    expect(container.textContent).toContain('第一段真实回答');
+    expect(container.textContent).not.toContain('正在思考…');
+    expect(container.textContent).toContain('正在生成…');
+    expect(
+      container.querySelectorAll('[data-skill-run-activity]'),
+    ).toHaveLength(1);
+
+    await act(async () => {
+      receive(
+        run({
+          revision: 3,
+          content: '第一段真实回答，第二段继续生成',
+          reasoningContent: '',
+        }),
+      );
+    });
+    expect(container.textContent).toContain('第二段继续生成');
+    expect(
+      container.querySelectorAll('[data-skill-run-activity]'),
+    ).toHaveLength(1);
+
+    await act(async () => {
+      receive(
+        run({
+          revision: 4,
+          status: 'succeeded',
+          content: '第一段真实回答，第二段继续生成',
+          reasoningContent: '',
+          messages: [
+            question,
+            {
+              ...answer,
+              content: '第一段真实回答，第二段继续生成',
+              reasoningContent: null,
+            },
+          ],
+        }),
+      );
+    });
+    expect(container.textContent).toContain('第一段真实回答，第二段继续生成');
+    expect(
+      container.querySelector('[data-skill-run-activity]'),
+    ).toBeNull();
+  });
+  it.each([
+    ['cancelled', null],
+    ['failed', 'model failed'],
+  ] as const)('removes activity status when a run becomes %s', async (status, error) => {
+    api.startArenaRun.mockResolvedValue(
+      run({ content: '', reasoningContent: '' }),
+    );
+    await render();
+    await send();
+    expect(container.querySelector('[data-skill-run-activity]')).not.toBeNull();
+
+    await act(async () => {
+      receive(
+        run({
+          revision: 2,
+          status,
+          content: '已收到的部分回答',
+          reasoningContent: '',
+          error,
+        }),
+      );
+    });
+    expect(container.textContent).toContain('已收到的部分回答');
+    expect(container.querySelector('[data-skill-run-activity]')).toBeNull();
+  });
+  it('uses the real reasoning block without duplicating the thinking status', async () => {
+    api.startArenaRun.mockResolvedValue(
+      run({ content: '', reasoningContent: '' }),
+    );
+    await render();
+    await send();
+
+    await act(async () => {
+      receive(
+        run({
+          revision: 2,
+          content: '',
+          reasoningContent: '真实 reasoning 事件',
+        }),
+      );
+    });
+    expect(container.textContent).toContain('真实 reasoning 事件');
+    expect(container.querySelector('[data-skill-run-activity]')).toBeNull();
+    expect(
+      container.querySelectorAll('[aria-label="正在思考"]'),
+    ).toHaveLength(1);
+  });
+  it('does not show activity status for completed history', async () => {
+    api.recoverArenaRun.mockResolvedValue({
+      detail: { thread, messages: [question, answer] },
+      run: null,
+    });
+    await render();
+
+    expect(container.textContent).toContain('saved-answer');
+    expect(container.querySelector('[data-skill-run-activity]')).toBeNull();
+  });
   it('recovers active snapshots without starting another model execution', async () => {
     api.recoverArenaRun.mockResolvedValue({
       detail: { thread, messages: [question] },

@@ -71,6 +71,7 @@ interface MutableRunState {
   modelRequestAttemptCount: number;
   modelRequestCount: number;
   skillInjected: boolean;
+  streamedText: string;
   terminalOutcome: RunOutcome | null;
   terminalEmitted: boolean;
   toolCallCount: number;
@@ -81,6 +82,7 @@ interface MutableRunState {
 interface RunOutcome {
   status: HarnessRunStatus;
   text: string;
+  streamText: string;
   providerRegistryId: string | null;
   responseModelId: string | null;
   error: HarnessRunError | null;
@@ -105,6 +107,7 @@ function failedOutcome(error: HarnessRunError): RunOutcome {
   return {
     status: error.code === "RUN_CANCELLED" ? "cancelled" : "failed",
     text: "",
+    streamText: "",
     providerRegistryId: null,
     responseModelId: null,
     error,
@@ -270,6 +273,7 @@ function createRunState(): MutableRunState {
     modelRequestAttemptCount: 0,
     modelRequestCount: 0,
     skillInjected: false,
+    streamedText: "",
     terminalOutcome: null,
     terminalEmitted: false,
     toolCallCount: 0,
@@ -318,6 +322,20 @@ async function handleAgentEvent(
 ): Promise<void> {
   recordAgentEvent(state, event);
   if (state.abortCause !== null || request.signal?.aborted || state.terminalOutcome) return;
+  if (
+    event.type === "message_update"
+    && event.assistantMessageEvent.type === "text_delta"
+    && event.assistantMessageEvent.delta
+  ) {
+    const delta = event.assistantMessageEvent.delta;
+    await emitRequiredEvent(
+      { type: "text_delta", runId: request.runId, delta },
+      state,
+      emit,
+      logger,
+    );
+    state.streamedText += delta;
+  }
   if (
     event.type === "message_update"
     && event.assistantMessageEvent.type === "thinking_delta"
@@ -438,7 +456,8 @@ function classifyFinalMessage(
         runtime,
       );
   }
-  const text = assistantText(message).trim();
+  const streamText = assistantText(message);
+  const text = streamText.trim();
   if (!text) {
     return failedMessageOutcome(
       runError("EMPTY_RESPONSE", "模型没有返回有效正文，请重试。", true),
@@ -449,10 +468,62 @@ function classifyFinalMessage(
   return {
     status: "completed",
     text,
+    streamText,
     providerRegistryId: message.provider || runtime.providerRegistryId,
     responseModelId: message.responseModel ?? message.model ?? runtime.requestedModelId,
     error: null,
   };
+}
+
+async function reconcileCompletedText(
+  request: HarnessRunRequest,
+  state: MutableRunState,
+  outcome: RunOutcome,
+  emit: HarnessEventEmitter,
+  logger: Logger,
+): Promise<RunOutcome> {
+  if (
+    outcome.status !== "completed"
+    || request.signal?.aborted
+    || state.abortCause !== null
+  ) {
+    return outcome;
+  }
+
+  let missingText: string;
+  if (!state.streamedText) {
+    missingText = outcome.text;
+  } else if (state.streamedText === outcome.streamText) {
+    return outcome;
+  } else if (outcome.streamText.startsWith(state.streamedText)) {
+    missingText = outcome.streamText.slice(state.streamedText.length);
+  } else {
+    logger.error({
+      event: "pi_harness.stream_text_mismatch",
+      streamedChars: state.streamedText.length,
+      finalChars: outcome.streamText.length,
+    });
+    return {
+      ...failedOutcome(runError(
+        "RUN_FAILED",
+        "模型流式内容与最终回答不一致，请重试。",
+        true,
+      )),
+      providerRegistryId: outcome.providerRegistryId,
+      responseModelId: outcome.responseModelId,
+    };
+  }
+
+  if (missingText) {
+    await emitRequiredEvent(
+      { type: "text_delta", runId: request.runId, delta: missingText },
+      state,
+      emit,
+      logger,
+    );
+    state.streamedText += missingText;
+  }
+  return outcome;
 }
 
 function unexpectedFailure(state: MutableRunState, error: unknown): RunOutcome {
@@ -663,17 +734,10 @@ async function runWithDependencies(
   state.cleanupCompleted = state.agent
     ? !state.agent.state.isStreaming && state.agent.signal === undefined
     : true;
-  if (outcome.status === "completed" && !request.signal?.aborted && state.abortCause === null) {
-    try {
-      await emitRequiredEvent(
-        { type: "text_delta", runId: request.runId, delta: outcome.text },
-        state,
-        emit,
-        logger,
-      );
-    } catch (error) {
-      outcome = unexpectedFailure(state, error);
-    }
+  try {
+    outcome = await reconcileCompletedText(request, state, outcome, emit, logger);
+  } catch (error) {
+    outcome = unexpectedFailure(state, error);
   }
   outcome = lockTerminalOutcome(request, state, outcome);
   const durationMs = dependencies.now() - startedAt;

@@ -57,6 +57,7 @@ interface FakeAgentScenario {
   promptError?: Error;
   waitForAbort?: boolean;
   extraEvents?: AgentEvent[];
+  pauseAfterExtraEvents?: Promise<void>;
   prepareRequestCount?: number;
 }
 
@@ -115,6 +116,7 @@ class FakeAgent implements PiAgentHandle {
       for (const event of this.scenario.extraEvents ?? []) {
         await this.emit(event);
       }
+      await this.scenario.pauseAfterExtraEvents;
       if (!this.scenario.omitFinalMessage) {
         const message = this.scenario.finalMessage
           ?? (this.signal?.aborted ? assistant("late text", "aborted") : assistant("final answer"));
@@ -146,6 +148,20 @@ class FakeAgent implements PiAgentHandle {
     this.state.isStreaming = false;
     this.signal = undefined;
   }
+}
+
+function textDelta(delta: string, partialText = delta): AgentEvent {
+  const partial = assistant(partialText, "pending");
+  return {
+    type: "message_update",
+    message: partial,
+    assistantMessageEvent: {
+      type: "text_delta",
+      contentIndex: 0,
+      delta,
+      partial,
+    },
+  };
 }
 
 function request(overrides: Partial<HarnessRunRequest> = {}): HarnessRunRequest {
@@ -224,6 +240,89 @@ function testAdapter(
 }
 
 describe("Pi Core adapter", () => {
+  it("forwards body deltas before prompt settles and does not repeat the final text", async () => {
+    let releasePrompt: (() => void) | undefined;
+    const promptGate = new Promise<void>((resolve) => {
+      releasePrompt = resolve;
+    });
+    const harness = testAdapter({
+      extraEvents: [
+        textDelta("Hello", "Hello"),
+        textDelta(", streamed ", "Hello, streamed "),
+        textDelta("answer", "Hello, streamed answer"),
+      ],
+      pauseAfterExtraEvents: promptGate,
+      finalMessage: assistant("Hello, streamed answer"),
+    });
+    const events: HarnessEvent[] = [];
+    let settled = false;
+    const pending = harness.run(request(), (event) => events.push(event));
+    void pending.finally(() => {
+      settled = true;
+    });
+
+    await vi.waitFor(() => {
+      expect(events.filter((event) => event.type === "text_delta")).toHaveLength(3);
+    });
+    expect(settled).toBe(false);
+    expect(events.filter((event) => event.type === "text_delta")).toEqual([
+      { type: "text_delta", runId: "run-001", delta: "Hello" },
+      { type: "text_delta", runId: "run-001", delta: ", streamed " },
+      { type: "text_delta", runId: "run-001", delta: "answer" },
+    ]);
+
+    releasePrompt?.();
+    const result = await pending;
+    expect(result).toMatchObject({ status: "completed", text: "Hello, streamed answer" });
+    expect(events.filter((event) => event.type === "text_delta")).toHaveLength(3);
+  });
+
+  it("falls back to the authoritative final text when the provider emits no body deltas", async () => {
+    const harness = testAdapter({ finalMessage: assistant("fallback answer") });
+    const events: HarnessEvent[] = [];
+
+    const result = await harness.run(request(), (event) => events.push(event));
+
+    expect(result).toMatchObject({ status: "completed", text: "fallback answer" });
+    expect(events.filter((event) => event.type === "text_delta")).toEqual([
+      { type: "text_delta", runId: "run-001", delta: "fallback answer" },
+    ]);
+  });
+
+  it("only sends the missing suffix when streamed text is a final-text prefix", async () => {
+    const harness = testAdapter({
+      extraEvents: [textDelta("prefix", "prefix")],
+      finalMessage: assistant("prefix and suffix"),
+    });
+    const events: HarnessEvent[] = [];
+
+    const result = await harness.run(request(), (event) => events.push(event));
+
+    expect(result.status).toBe("completed");
+    expect(events.filter((event) => event.type === "text_delta")).toEqual([
+      { type: "text_delta", runId: "run-001", delta: "prefix" },
+      { type: "text_delta", runId: "run-001", delta: " and suffix" },
+    ]);
+  });
+
+  it("fails closed instead of appending a conflicting authoritative final text", async () => {
+    const harness = testAdapter({
+      extraEvents: [textDelta("first attempt", "first attempt")],
+      finalMessage: assistant("replacement answer"),
+    });
+    const events: HarnessEvent[] = [];
+
+    const result = await harness.run(request(), (event) => events.push(event));
+
+    expect(result.status).toBe("failed");
+    expect(result.text).toBe("");
+    expect(result.error?.code).toBe("RUN_FAILED");
+    expect(events.filter((event) => event.type === "text_delta")).toEqual([
+      { type: "text_delta", runId: "run-001", delta: "first attempt" },
+    ]);
+    expect(events.at(-1)).toMatchObject({ type: "run_finished", status: "failed" });
+  });
+
   it("drops late thinking deltas after cancellation even if the Agent still emits them", async () => {
     const partial = assistant("");
     const thinking = (delta: string): AgentEvent => ({
@@ -245,6 +344,32 @@ describe("Pi Core adapter", () => {
     expect(result.status).toBe("cancelled");
     expect(events.filter((event) => event.type === "run_finished")).toHaveLength(1);
     expect(events.some((event) => event.type === "text_delta")).toBe(false);
+  });
+
+  it("stops forwarding body deltas as soon as the run is cancelled", async () => {
+    const controller = new AbortController();
+    const harness = testAdapter({
+      extraEvents: [
+        textDelta("visible before stop", "visible before stop"),
+        textDelta("late after stop", "visible before stoplate after stop"),
+      ],
+    });
+    const events: HarnessEvent[] = [];
+
+    const result = await harness.run(
+      request({ signal: controller.signal }),
+      (event) => {
+        events.push(event);
+        if (event.type === "text_delta") controller.abort();
+      },
+    );
+
+    expect(result.status).toBe("cancelled");
+    expect(result.text).toBe("");
+    expect(events.filter((event) => event.type === "text_delta")).toEqual([
+      { type: "text_delta", runId: "run-001", delta: "visible before stop" },
+    ]);
+    expect(events.at(-1)).toMatchObject({ type: "run_finished", status: "cancelled" });
   });
 
   it("injects the fixed Skill, keeps history separate, and adds the current question once", async () => {
