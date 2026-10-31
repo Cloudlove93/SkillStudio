@@ -13,7 +13,16 @@ import type { HarnessModelRequest } from "./contracts.js";
 const PROVIDER_ID = "educlaw-configured";
 const DEFAULT_CONTEXT_WINDOW = 128_000;
 const DEFAULT_MAX_OUTPUT_TOKENS = 8_192;
-const PROVIDER_MAX_RETRIES = 0;
+const MAX_PROVIDER_RETRIES = 3;
+
+export function resolveProviderMaxRetries(
+  value: unknown = config.llmNetworkRetries,
+): number {
+  const parsed = typeof value === "number" && Number.isFinite(value)
+    ? Math.trunc(value)
+    : 2;
+  return Math.min(MAX_PROVIDER_RETRIES, Math.max(0, parsed));
+}
 
 export interface PiProviderRuntime {
   model: Model<"openai-completions">;
@@ -89,12 +98,16 @@ export function createPiProviderRuntime(
   const models = createModels();
   models.setProvider(provider);
   const streamSimple = models.streamSimple.bind(models);
+  const providerMaxRetries = resolveProviderMaxRetries();
   const streamFn: StreamFn = (selectedModel, context, options) => streamSimple(
     selectedModel,
     context,
     {
       ...options,
-      maxRetries: PROVIDER_MAX_RETRIES,
+      // The Pi SDK retries only transport failures plus 408/409/429/5xx.
+      // It also honors AbortSignal while waiting between attempts, so user
+      // cancellation and the outer run timeout remain authoritative.
+      maxRetries: providerMaxRetries,
       onPayload: async (payload, model) => {
         const transformed = await options?.onPayload?.(payload, model) ?? payload;
         if (!supportsModelExplicitThinking(model.id)) return transformed;

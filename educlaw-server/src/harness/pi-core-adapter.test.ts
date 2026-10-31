@@ -325,6 +325,25 @@ describe("Pi Core adapter", () => {
     expect(events.filter((event) => event.type === "run_finished")).toHaveLength(1);
   });
 
+  it("logs only allow-listed provider failure metadata", async () => {
+    const finalMessage: AssistantMessage = {
+      ...assistant("", "error"),
+      errorMessage: "Request failed with status 503: private provider detail",
+    };
+    const harness = testAdapter({ finalMessage });
+
+    const result = await harness.run(request(), () => undefined);
+
+    expect(result.error?.code).toBe("MODEL_UNAVAILABLE");
+    expect(harness.logEntries).toContainEqual(expect.objectContaining({
+      event: "pi_harness.model_unavailable",
+      modelStopReason: "error",
+      providerStatus: 503,
+      providerFailureCategory: "provider_5xx",
+    }));
+    expect(JSON.stringify(harness.logEntries)).not.toContain("private provider detail");
+  });
+
   it.each([
     ["pending", "pending", "failed", "RUN_FAILED"],
     ["toolUse", "toolUse", "failed", "TOOL_DENIED"],

@@ -2059,6 +2059,9 @@ export async function* streamMessage(
             temperature: 0.3,
             thinkingLevel: thinkingActive ? "medium" : "off",
           },
+          limits: {
+            timeoutMs: config.piHarnessRunTimeoutMs,
+          },
           signal,
         };
         piHarnessLogger.info({

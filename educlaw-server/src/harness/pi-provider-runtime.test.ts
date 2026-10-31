@@ -1,8 +1,23 @@
 import { describe, expect, it, vi } from "vitest";
-vi.mock("../config.js", () => ({ config: { llmApiKey: "fixture-only-key", llmBaseUrl: "https://provider.invalid/v1" } }));
-import { createPiProviderRuntime } from "./pi-provider-runtime.js";
+vi.mock("../config.js", () => ({ config: {
+  llmApiKey: "fixture-only-key",
+  llmBaseUrl: "https://provider.invalid/v1",
+  llmNetworkRetries: 2,
+} }));
+import {
+  createPiProviderRuntime,
+  resolveProviderMaxRetries,
+} from "./pi-provider-runtime.js";
 
 describe("Pi provider runtime", () => {
+  it("uses the shared network retry setting with a defensive upper bound", () => {
+    expect(resolveProviderMaxRetries()).toBe(2);
+    expect(resolveProviderMaxRetries(-2)).toBe(0);
+    expect(resolveProviderMaxRetries(1.9)).toBe(1);
+    expect(resolveProviderMaxRetries(99)).toBe(3);
+    expect(resolveProviderMaxRetries(Number.NaN)).toBe(2);
+  });
+
   it.each(["off", "medium"] as const)("keeps Kimi capability independent of the requested %s mode", (thinkingLevel) => {
     const runtime = createPiProviderRuntime({ modelId: "kimi-k2.6", thinkingLevel }, {
       apiKey: "test-key", baseUrl: "https://api.moonshot.ai/v1",

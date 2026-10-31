@@ -215,6 +215,50 @@ function assistantText(message: AssistantMessage | undefined): string {
     .join("") ?? "";
 }
 
+type ProviderFailureCategory =
+  | "missing_response"
+  | "rate_limited"
+  | "provider_timeout"
+  | "provider_conflict"
+  | "provider_5xx"
+  | "transport_or_stream"
+  | "provider_error";
+
+function safeProviderFailureMetadata(message: AssistantMessage | undefined): {
+  modelStopReason: AssistantMessage["stopReason"] | "missing";
+  providerStatus: number | null;
+  providerFailureCategory: ProviderFailureCategory;
+} {
+  if (!message) {
+    return {
+      modelStopReason: "missing",
+      providerStatus: null,
+      providerFailureCategory: "missing_response",
+    };
+  }
+
+  // The provider message may contain response bodies, so never log it. Only
+  // derive a small allow-listed diagnostic classification from the text.
+  const detail = message.errorMessage || "";
+  const statusMatch = detail.match(/\b(408|409|429|5\d{2})\b/u);
+  const providerStatus = statusMatch ? Number(statusMatch[1]) : null;
+  let providerFailureCategory: ProviderFailureCategory = "provider_error";
+  if (providerStatus === 429) providerFailureCategory = "rate_limited";
+  else if (providerStatus === 408 || /tim(?:e|ed)\s*out/iu.test(detail)) {
+    providerFailureCategory = "provider_timeout";
+  } else if (providerStatus === 409) providerFailureCategory = "provider_conflict";
+  else if (providerStatus !== null && providerStatus >= 500) {
+    providerFailureCategory = "provider_5xx";
+  } else if (/network|fetch|socket|econn|stream ended|connection/iu.test(detail)) {
+    providerFailureCategory = "transport_or_stream";
+  }
+  return {
+    modelStopReason: message.stopReason,
+    providerStatus,
+    providerFailureCategory,
+  };
+}
+
 function createRunState(): MutableRunState {
   return {
     abortCause: null,
@@ -564,7 +608,15 @@ async function executeAgentRun(
     await agent.prompt(request.currentInput);
     await agent.waitForIdle();
     const currentRunMessages = agent.state.messages.slice(messageCountBeforePrompt);
-    return classifyFinalMessage(finalAssistant(currentRunMessages), state, runtime);
+    const finalMessage = finalAssistant(currentRunMessages);
+    const outcome = classifyFinalMessage(finalMessage, state, runtime);
+    if (outcome.error?.code === "MODEL_UNAVAILABLE") {
+      logger.warn({
+        event: "pi_harness.model_unavailable",
+        ...safeProviderFailureMetadata(finalMessage),
+      });
+    }
+    return outcome;
   } finally {
     clearTimeout(timeout);
     request.signal?.removeEventListener("abort", externalAbort);

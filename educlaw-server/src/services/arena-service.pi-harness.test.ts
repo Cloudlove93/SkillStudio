@@ -14,6 +14,7 @@ const supportsThinkingMock = vi.fn(() => false);
 const configMock = {
   piHarnessSkillRunEnabled: true,
   piHarnessMaxConcurrentRuns: 4,
+  piHarnessRunTimeoutMs: 300_000,
 };
 
 async function collectEvents(

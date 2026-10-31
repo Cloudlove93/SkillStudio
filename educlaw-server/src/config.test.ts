@@ -13,6 +13,7 @@ const CONFIG_ENV_KEYS = [
   "LLM_API_KEY",
   "LLM_MODEL",
   "LLM_NETWORK_RETRIES",
+  "PI_HARNESS_RUN_TIMEOUT_MS",
   "LLM_BASELINE_MODEL",
   "MULTIMODAL_ADLER_MODEL",
   "MULTIMODAL_CANDIDATE_MODEL",
@@ -104,6 +105,7 @@ describe("config", () => {
     expect(config.llmApiKey).toBe("");
     expect(config.llmModel).toBe("gpt-4.1-mini");
     expect(config.llmNetworkRetries).toBe(2);
+    expect(config.piHarnessRunTimeoutMs).toBe(300_000);
     expect(config.llmBaselineModel).toBe("");
     expect(config.multimodalAdlerModel).toBe("");
     expect(config.multimodalCandidateModel).toBe("");
@@ -131,6 +133,7 @@ describe("config", () => {
         UPLOAD_LIMIT_MB: "3",
         LLM_BASE_URL: "https://llm.example.test/v1///",
         LLM_NETWORK_RETRIES: "5",
+        PI_HARNESS_RUN_TIMEOUT_MS: "600000",
         MULTIMODAL_ADLER_MODEL: "adler-model",
         MULTIMODAL_CANDIDATE_MODEL: "candidate-model",
         MULTIMODAL_VALIDATION_MODEL: "validation-model",
@@ -155,6 +158,7 @@ describe("config", () => {
     expect(config.uploadLimitBytes).toBe(3 * 1024 * 1024);
     expect(config.llmBaseUrl).toBe("https://llm.example.test/v1");
     expect(config.llmNetworkRetries).toBe(5);
+    expect(config.piHarnessRunTimeoutMs).toBe(600_000);
     expect(config.multimodalAdlerModel).toBe("adler-model");
     expect(config.multimodalCandidateModel).toBe("candidate-model");
     expect(config.multimodalValidationModel).toBe("validation-model");
@@ -179,6 +183,7 @@ describe("config", () => {
       env: {
         PORT: "not-a-number",
         LLM_TIMEOUT_MS: "NaN",
+        PI_HARNESS_RUN_TIMEOUT_MS: "1000",
         UPLOAD_LIMIT_MB: "bad",
         MULTIMODAL_MODEL_MAX_TOKENS: "0",
         MULTIMODAL_UPLOAD_MAX_MB: "0",
@@ -192,6 +197,7 @@ describe("config", () => {
 
     expect(config.port).toBe(3001);
     expect(config.llmTimeoutMs).toBe(300_000);
+    expect(config.piHarnessRunTimeoutMs).toBe(300_000);
     expect(config.uploadLimitBytes).toBe(25 * 1024 * 1024);
     expect(config.multimodalModelMaxTokens).toBe(8192);
     expect(config.multimodalUploadMaxBytes).toBe(1024 * 1024 * 1024);

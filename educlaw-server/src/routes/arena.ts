@@ -126,6 +126,14 @@ router.get(
       return;
     }
     initSse(res);
+    const heartbeat = startSseHeartbeat(
+      res,
+      Number(
+        process.env.ARENA_RUN_STREAM_HEARTBEAT_MS ||
+          process.env.ARENA_STREAM_HEARTBEAT_MS ||
+          '15000',
+      ),
+    );
     try {
       for await (const snapshot of subscription) {
         if (res.destroyed || res.writableEnded) break;
@@ -134,6 +142,7 @@ router.get(
         await writeArenaRunSnapshot(res, snapshot);
       }
     } finally {
+      stopSseHeartbeat(heartbeat);
       detach();
       res.removeListener('close', detach);
       if (!res.destroyed && !res.writableEnded) res.end();

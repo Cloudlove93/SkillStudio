@@ -58,9 +58,11 @@ afterEach(async () => {
   vi.doUnmock('../services/arena-run-service.js');
   vi.doUnmock('../services/arena-service.js');
   vi.doUnmock('../services/answer-skill-optimization-service.js');
+  vi.unstubAllEnvs();
 });
 
 it('authenticates every endpoint, detaches SSE without abort, and stops the exact run', async () => {
+  vi.stubEnv('ARENA_RUN_STREAM_HEARTBEAT_MS', '5');
   const url = await app();
   const path = `${url}/arena/threads/91/runs`;
   const response = await fetch(path, {
@@ -106,8 +108,13 @@ it('authenticates every endpoint, detaches SSE without abort, and stops the exac
     signal: controller.signal,
   });
   const reader = events.body!.getReader();
-  const chunk = new TextDecoder().decode((await reader.read()).value);
-  expect(chunk).toContain('event: snapshot');
+  const decoder = new TextDecoder();
+  let chunks = decoder.decode((await reader.read()).value);
+  expect(chunks).toContain('event: snapshot');
+  for (let index = 0; index < 5 && !chunks.includes('event: ping'); index++) {
+    chunks += decoder.decode((await reader.read()).value);
+  }
+  expect(chunks).toContain('event: ping');
   controller.abort();
   await new Promise((resolve) => setTimeout(resolve, 10));
   expect(signal.aborted).toBe(false);

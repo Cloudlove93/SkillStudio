@@ -6,6 +6,7 @@ import type {
   ArenaThreadDetail,
 } from '@educlaw/shared';
 import type { ArenaChatStreamEvent } from './arena-service.js';
+import { config } from '../config.js';
 import {
   isSkillRunTestThread,
   reserveArenaThread,
@@ -432,8 +433,8 @@ export class ArenaRunService {
 }
 
 export const arenaRunService = new ArenaRunService({
-  getMaxConcurrent: async () =>
-    (await import('../config.js')).config.piHarnessMaxConcurrentRuns,
+  getMaxConcurrent: async () => config.piHarnessMaxConcurrentRuns,
+  timeoutMs: (config.piHarnessRunTimeoutMs ?? 300_000) + 5_000,
   getDetail: async (userId, threadId) =>
     (await import('./arena-service.js')).getThreadDetail(
       userId,

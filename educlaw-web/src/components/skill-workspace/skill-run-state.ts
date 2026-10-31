@@ -27,6 +27,7 @@ export type SkillRunState = {
 export type SkillRunEvent =
   | { type: 'restore'; state: SkillRunState }
   | { type: 'connection_error'; message: string }
+  | { type: 'connection_restored' }
   | { type: 'draft'; value: string }
   | { type: 'submit'; content: string; thinkingRequested?: boolean }
   | { type: 'delta'; side: 'baseline' | 'enhanced'; delta: string }
@@ -74,6 +75,7 @@ export function createSkillRunState(): SkillRunState {
 export function skillRunReducer(state: SkillRunState, event: SkillRunEvent): SkillRunState {
   if (event.type === 'restore') return { ...event.state, draft: state.draft };
   if (event.type === 'connection_error') return { ...state, error: event.message };
+  if (event.type === 'connection_restored') return { ...state, error: null };
   if (event.type === 'reset') return createSkillRunState();
   if (event.type === 'hydrate') {
     return { ...createSkillRunState(), messages: event.messages };

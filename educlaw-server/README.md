@@ -56,6 +56,8 @@ $env:HARDENING_POSTGRES_TESTS='1'; pnpm --filter educlaw-server test
 | `LLM_NETWORK_RETRIES` | 模型网络重试次数 | `2` |
 | `PI_HARNESS_SKILL_RUN_ENABLED` | Skill Run/Test 是否启用进程内 Pi Core Adapter | `true` |
 | `PI_HARNESS_MAX_CONCURRENT_RUNS` | 单个 Server 进程允许的并发 Pi Run/Test 数 | `4` |
+| `PI_HARNESS_RUN_TIMEOUT_MS` | Skill Run/Test 单次生成超时 | `300000` |
+| `ARENA_RUN_STREAM_HEARTBEAT_MS` | Skill Run/Test 状态流心跳间隔 | `15000` |
 | `APP_ORIGIN` | 前端来源白名单 | `http://localhost:4173` |
 | `BODY_LIMIT` | 请求体大小限制 | `100mb` |
 | `UPLOAD_LIMIT_MB` | 上传文件大小限制 | `25` |

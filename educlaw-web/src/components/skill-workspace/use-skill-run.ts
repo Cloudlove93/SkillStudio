@@ -37,7 +37,10 @@ type Context = {
   hydratedTerminal?: string;
   pendingStop?: boolean;
   reportedStatus?: ArenaRunSnapshot['status'];
+  recoveryFailureStartedAt?: number;
+  connectionWarningVisible?: boolean;
 };
+const CONNECTION_WARNING_GRACE_MS = 10_000;
 function requestId() {
   return crypto.randomUUID();
 }
@@ -81,6 +84,11 @@ export function useSkillRun(options: Options) {
     function applySnapshot(context: Context, snapshot: ArenaRunSnapshot) {
       if (!current(context) || String(snapshot.threadId) !== context.threadId)
         return;
+      context.recoveryFailureStartedAt = undefined;
+      if (context.connectionWarningVisible) {
+        context.connectionWarningVisible = false;
+        dispatch({ type: 'connection_restored' });
+      }
       if (
         context.run &&
         (context.run.runId !== snapshot.runId ||
@@ -194,11 +202,9 @@ export function useSkillRun(options: Options) {
             context.controller.signal,
           );
         } catch {
-          if (current(context))
-            dispatch({
-              type: 'connection_error',
-              message: '连接中断，正在恢复生成…',
-            });
+          // Execution is owned by the server. A transient subscription reset
+          // must not be presented as a generation failure; the authoritative
+          // snapshot check below decides whether recovery is actually needed.
         }
         if (!current(context) || !context.run || !isArenaRunActive(context.run))
           break;
@@ -253,11 +259,21 @@ export function useSkillRun(options: Options) {
             }
           }
           // A lost connection never asserts that execution succeeded or failed.
-          if (current(context))
+          if (current(context)) {
+            context.recoveryFailureStartedAt ??= Date.now();
+          }
+          if (
+            current(context) &&
+            !context.connectionWarningVisible &&
+            Date.now() - context.recoveryFailureStartedAt! >=
+              CONNECTION_WARNING_GRACE_MS
+          ) {
+            context.connectionWarningVisible = true;
             dispatch({
               type: 'connection_error',
               message: '暂时无法连接服务端，正在重试恢复…',
             });
+          }
         }
       }
     },

@@ -681,6 +681,23 @@ describe('resumable Skill run lifecycle', () => {
     expect(api.subscribeArenaRun).toHaveBeenCalledTimes(2);
     expect(api.startArenaRun).not.toHaveBeenCalled();
   });
+  it('silently recovers a transient stream reset while generation is still running', async () => {
+    vi.useFakeTimers();
+    api.recoverArenaRun.mockResolvedValue({
+      detail: { thread, messages: [question] },
+      run: run(),
+    });
+    api.subscribeArenaRun.mockRejectedValueOnce(new TypeError('stream reset'));
+    api.getArenaRun.mockResolvedValue(
+      run({ revision: 3, content: 'still-generating' }),
+    );
+    await render();
+    await act(async () => vi.advanceTimersByTimeAsync(750));
+    expect(container.textContent).toContain('still-generating');
+    expect(container.textContent).not.toContain('连接中断');
+    expect(container.textContent).not.toContain('暂时无法连接服务端');
+    expect(api.startArenaRun).not.toHaveBeenCalled();
+  });
   it('blocks duplicate admission after history fails until a fresh recovery confirms state', async () => {
     api.recoverArenaRun.mockRejectedValueOnce(new Error('unavailable'));
     await render();
