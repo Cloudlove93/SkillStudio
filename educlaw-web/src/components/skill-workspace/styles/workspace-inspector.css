@@ -1100,6 +1100,14 @@
   isolation: isolate;
 }
 
+.workspace-inspector.has-skill-navigation {
+  --workspace-inspector-collapsed: 206px;
+}
+
+.skill-workspace-root:has(.workspace-inspector.has-skill-navigation.is-collapsed) {
+  --skill-context-current: 206px !important;
+}
+
 .skill-workspace-root.is-context-open .workspace-inspector {
   flex-basis: var(--workspace-inspector-width);
   width: var(--workspace-inspector-width);
@@ -1144,6 +1152,54 @@
 
 .skill-function-launcher-root {
   position: relative;
+}
+
+.skill-function-launcher-trigger {
+  display: inline-flex;
+  width: 156px;
+  height: 34px;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 7px;
+  border: 1px solid var(--workspace-border);
+  border-radius: 9px;
+  background: var(--workspace-surface);
+  color: var(--workspace-muted);
+  padding: 0 9px;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--workspace-ink) 5%, transparent);
+  cursor: pointer;
+}
+
+.skill-function-launcher-trigger:hover,
+.skill-function-launcher-trigger.is-active {
+  border-color: color-mix(in srgb, var(--primary) 34%, var(--workspace-border));
+  background: color-mix(in srgb, var(--primary) 6%, var(--workspace-surface));
+  color: var(--primary);
+}
+
+.skill-function-launcher-trigger:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--primary) 55%, transparent);
+  outline-offset: 2px;
+}
+
+.skill-function-launcher-trigger-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: baseline;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.skill-function-launcher-trigger-copy > span {
+  color: var(--workspace-muted);
+  font-size: var(--workspace-text-xs);
+}
+
+.skill-function-launcher-trigger-copy > strong {
+  color: var(--workspace-ink);
+  font-size: var(--workspace-text-xs);
+  font-weight: 650;
 }
 
 .skill-function-launcher {
@@ -1291,6 +1347,27 @@
   color: var(--workspace-muted);
   font-size: var(--workspace-text-xs);
   line-height: 1.35;
+}
+
+@media (max-width: 900px) {
+  .workspace-inspector.has-skill-navigation {
+    --workspace-inspector-collapsed: 92px;
+  }
+
+  .skill-workspace-root:has(.workspace-inspector.has-skill-navigation.is-collapsed) {
+    --skill-context-current: 92px !important;
+  }
+
+  .skill-function-launcher-trigger {
+    width: 34px;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .skill-function-launcher-trigger-copy,
+  .skill-function-launcher-trigger > svg:last-child {
+    display: none;
+  }
 }
 
 .workspace-inspector-panel {

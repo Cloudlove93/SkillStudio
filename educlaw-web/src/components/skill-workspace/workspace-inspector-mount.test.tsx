@@ -204,6 +204,10 @@ describe('workspace inspector mount stability', () => {
 
     expect(container.querySelector('[aria-label="切换到 使用"]')).not.toBeNull();
     expect(container.querySelector('[aria-label="切换到 测试"]')).toBeNull();
+    expect(
+      container.querySelector<HTMLButtonElement>('[aria-label="功能切换，当前：使用"]')
+        ?.textContent,
+    ).toContain('使用');
 
     await act(async () => {
       container
@@ -215,6 +219,32 @@ describe('workspace inspector mount stability', () => {
     expect(
       container.querySelector('[aria-label="Skill 功能切换"]'),
     ).not.toBeNull();
+  });
+
+  it('shows the active workspace mode on the discoverable launcher button', async () => {
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={['/skills']}>
+          <WorkspaceInspectorProvider>
+            <WorkspaceInspector
+              defaultDescriptor={{
+                owner: 'skill',
+                view: 'summary',
+                title: '当前 Skill',
+              }}
+              skillNavigation={{ activeView: 'versions', onNavigate: vi.fn() }}
+            />
+          </WorkspaceInspectorProvider>
+        </MemoryRouter>,
+      );
+    });
+
+    const trigger = container.querySelector<HTMLButtonElement>(
+      '[aria-label="功能切换，当前：版本"]',
+    );
+    expect(trigger).not.toBeNull();
+    expect(trigger?.textContent).toContain('功能切换');
+    expect(trigger?.textContent).toContain('版本');
   });
 
   it('restores the pinned launcher preference after the workspace remounts', async () => {

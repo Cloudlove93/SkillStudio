@@ -91,6 +91,7 @@ it('consumes an optimization rerun once even after visiting version management a
         onReloadVersions={async () => {}}
         onPublishUpdate={() => {}}
         onNavigate={() => {}}
+        onBackToRepository={() => {}}
         onOptimizeAnswer={() => {}}
         answerRerunRequest={rerun}
         {...{ onRerunHandled: () => setRerun(null) }}

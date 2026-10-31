@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   GitBranch,
+  ChevronDown,
   LayoutGrid,
   Pin,
   PinOff,
@@ -46,6 +47,9 @@ export function SkillFunctionLauncher({
   const rootRef = useRef<HTMLDivElement>(null);
   const [pinned, setPinned] = useState(readPinnedPreference);
   const [open, setOpen] = useState(readPinnedPreference);
+  const activeItem =
+    launcherItems.find((item) => item.view === navigation.activeView) ??
+    launcherItems[0];
 
   useEffect(() => {
     const handlePointerDown = (event: PointerEvent) => {
@@ -80,14 +84,19 @@ export function SkillFunctionLauncher({
   return (
     <div ref={rootRef} className="skill-function-launcher-root">
       <button
-        className={`skill-icon-button ${open ? 'is-active' : ''}`}
+        className={`skill-function-launcher-trigger ${open ? 'is-active' : ''}`}
         type="button"
         onClick={() => setOpen((current) => !current)}
-        aria-label="功能切换"
+        aria-label={`功能切换，当前：${activeItem.label}`}
         aria-expanded={open}
         title="使用、Arena、优化与版本"
       >
         <LayoutGrid size={17} aria-hidden="true" />
+        <span className="skill-function-launcher-trigger-copy">
+          <span>功能切换</span>
+          <strong>{activeItem.label}</strong>
+        </span>
+        <ChevronDown size={14} aria-hidden="true" />
       </button>
       {open ? (
         <nav className="skill-function-launcher" aria-label="Skill 功能切换">

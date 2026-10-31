@@ -79,7 +79,7 @@ export function WorkspaceInspector({
   return (
     <>
     <aside
-      className={`skill-context workspace-inspector ${state.open ? 'is-open' : 'is-collapsed'} ${state.fullscreen ? 'is-fullscreen' : ''}`}
+      className={`skill-context workspace-inspector ${skillNavigation ? 'has-skill-navigation' : ''} ${state.open ? 'is-open' : 'is-collapsed'} ${state.fullscreen ? 'is-fullscreen' : ''}`}
       style={inspectorStyle}
       aria-label={
         state.open ? state.descriptor?.title || '详细信息' : '右侧工具栏'

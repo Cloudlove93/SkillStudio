@@ -1538,6 +1538,7 @@ function SkillFirstWorkspaceContent() {
                   }}
                   versionsLoading={versionsLoading}
                   onNavigate={(view) => navigateWorkspaceView(view)}
+                  onBackToRepository={openRepository}
                   onRunStateChange={handleConversationRunState}
                   onPublishUpdate={publishUpdate}
                   onReloadVersions={reloadSkillVersions}

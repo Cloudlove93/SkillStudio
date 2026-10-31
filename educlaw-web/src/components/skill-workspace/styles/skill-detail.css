@@ -1192,6 +1192,35 @@
   border-bottom: 1px solid var(--border);
   padding-bottom: 22px;
 }
+.skill-version-page-title {
+  display: grid;
+  gap: 18px;
+}
+.skill-version-back-repository {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted-foreground);
+  padding: 5px 7px 5px 0;
+  font-size: var(--workspace-text-xs);
+  cursor: pointer;
+}
+.skill-version-back-repository:hover {
+  color: var(--primary);
+}
+.skill-version-back-repository:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--primary) 55%, transparent);
+  outline-offset: 2px;
+}
+.skill-version-page-tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
 .skill-version-page-head h2 {
   margin: 5px 0 0;
   font-size: 20px;
@@ -1328,6 +1357,12 @@
   background: var(--primary-soft);
   color: var(--primary);
 }
+.skill-version-actions button:disabled {
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: not-allowed;
+  opacity: 0.45;
+}
 .skill-version-compare-head {
   display: flex;
   align-items: center;
@@ -1338,6 +1373,32 @@
 .skill-version-compare-head h2 {
   margin: 4px 0 0;
   font-size: 17px;
+}
+.skill-version-compare-title {
+  display: grid;
+  gap: 5px;
+}
+.skill-version-compare-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--foreground);
+}
+.skill-version-compare-picker strong {
+  font-size: 17px;
+}
+.skill-version-compare-picker > span {
+  color: var(--muted-foreground);
+  font-size: var(--workspace-text-xs);
+}
+.skill-version-compare-picker select {
+  min-width: 104px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--card);
+  color: var(--foreground);
+  padding: 6px 28px 6px 9px;
+  font-size: var(--workspace-text-xs);
 }
 .skill-version-compare-diff {
   padding: 18px 0 0;
@@ -1447,6 +1508,13 @@
 
   .skill-version-row {
     grid-template-columns: minmax(150px, 1fr) auto;
+  }
+
+  .skill-version-page-head,
+  .skill-version-page-tools,
+  .skill-version-compare-head {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .skill-version-row > time,

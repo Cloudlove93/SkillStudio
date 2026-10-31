@@ -60,6 +60,7 @@ async function render(extra: Record<string, unknown> = {}) {
     loading: false,
     onReload: vi.fn(),
     onVersionChanged: vi.fn(),
+    onBackToRepository: vi.fn(),
     ...extra,
   };
   await act(async () =>
@@ -80,6 +81,74 @@ async function click(text: string) {
 function validSkillMd(marker: string) {
   return `---\nname: s\ndescription: 用于课堂教学任务的规则\n---\n# Skill\n## Instructions\n${marker} ${'具体规则。'.repeat(30)}\n## Workflow\n1. 分析\n2. 回答\n## Output Format\n给出结构化答案。\n## Examples\n示例回答。\n## Common Issues\n避免遗漏。`;
 }
+
+function buttonInVersionRow(versionNumber: number, label: string) {
+  const row = Array.from(container.querySelectorAll('article')).find((item) =>
+    item.textContent?.includes(`v${versionNumber}`),
+  );
+  return Array.from(row?.querySelectorAll('button') ?? []).find(
+    (button) => button.textContent?.trim() === label,
+  ) as HTMLButtonElement | undefined;
+}
+
+it('lets every version become the fixed comparison base', async () => {
+  await render();
+
+  expect(buttonInVersionRow(2, '对比')).toBeDefined();
+  expect(buttonInVersionRow(1, '对比')).toBeDefined();
+
+  await act(async () => buttonInVersionRow(2, '对比')?.click());
+  expect(
+    container.querySelector('.skill-version-compare-picker > strong')?.textContent,
+  ).toBe('v2');
+  expect(container.querySelector('select')?.value).toBe('1');
+  expect(container.querySelector('option[value="2"]')).toBeNull();
+});
+
+it('switches the comparison target without changing the selected base', async () => {
+  const third = {
+    ...versions[0],
+    id: '3',
+    versionNumber: 3,
+    skill: { ...versions[0].skill, skillMd: 'v3 target content' },
+  };
+  await render({ versions: [third, ...versions] });
+  await act(async () => buttonInVersionRow(2, '对比')?.click());
+
+  const select = container.querySelector<HTMLSelectElement>(
+    'select[aria-label="选择对比版本"]',
+  )!;
+  expect(select.value).toBe('1');
+  await act(async () => {
+    const setter = Object.getOwnPropertyDescriptor(
+      HTMLSelectElement.prototype,
+      'value',
+    )?.set;
+    setter?.call(select, '3');
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+
+  expect(
+    container.querySelector('.skill-version-compare-picker > strong')?.textContent,
+  ).toBe('v2');
+  expect(select.value).toBe('3');
+  expect(container.textContent).toContain('v3');
+  expect(container.textContent).toContain('target content');
+});
+
+it('disables comparison when only one valid version exists', async () => {
+  await render({ versions: [versions[0]] });
+  const compareButton = buttonInVersionRow(2, '对比');
+  expect(compareButton?.disabled).toBe(true);
+  expect(compareButton?.title).toContain('至少需要两个版本');
+});
+
+it('returns directly to the Skill repository without relying on browser history', async () => {
+  const onBackToRepository = vi.fn();
+  await render({ onBackToRepository });
+  await click('返回 Skill 仓库');
+  expect(onBackToRepository).toHaveBeenCalledOnce();
+});
 it('rolls back against the package head, not the Skill creation package', async () => {
   await render();
   await click('回退');

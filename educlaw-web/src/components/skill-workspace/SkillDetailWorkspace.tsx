@@ -63,6 +63,7 @@ type Props = {
   onPublishUpdate: (update: SkillPinnedUpdate, autoOpen?: boolean) => void;
   onReloadVersions: () => Promise<void>;
   onNavigate: (view: DetailView) => void;
+  onBackToRepository: () => void;
   onRunStateChange?: (
     running: boolean,
     threadId?: string | null,
@@ -314,6 +315,7 @@ export function SkillDetailWorkspace(props: Props) {
               loadingMore={props.versionsLoadingMore}
               onLoadMore={props.onLoadMoreVersions}
               onReload={props.onReloadVersions}
+              onBackToRepository={props.onBackToRepository}
               onVersionChanged={(message) =>
                 props.onPublishUpdate({
                   id: 'version-changed',

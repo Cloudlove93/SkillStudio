@@ -41,6 +41,7 @@ function props(extra: Partial<Props> = {}): Props {
     onPublishUpdate: vi.fn(),
     onReloadVersions: vi.fn(),
     onNavigate: vi.fn(),
+    onBackToRepository: vi.fn(),
     onOptimizeAnswer: vi.fn(),
     conversations: [
       {

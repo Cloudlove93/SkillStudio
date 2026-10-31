@@ -35,6 +35,12 @@ type Props = {
   loading: boolean;
   onReload: () => Promise<void>;
   onVersionChanged: (message: string) => void;
+  onBackToRepository: () => void;
+};
+
+type VersionComparison = {
+  baseVersionId: string;
+  targetVersionId: string;
 };
 
 type PendingAction = {
@@ -62,7 +68,7 @@ const versionDateFormatter = new Intl.DateTimeFormat('zh-CN', {
 export function SkillVersionWorkspace(props: Props) {
   const [includeDiscarded, setIncludeDiscarded] = useState(false);
   const [preview, setPreview] = useState<SkillVersionDetail | null>(null);
-  const [compare, setCompare] = useState<SkillVersionDetail | null>(null);
+  const [comparison, setComparison] = useState<VersionComparison | null>(null);
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [mutating, setMutating] = useState(false);
   const mutationLock = useRef(false);
@@ -83,6 +89,37 @@ export function SkillVersionWorkspace(props: Props) {
   const current =
     props.versions.find((version) => version.id === props.currentVersionId) ??
     null;
+  const comparisonBase = comparison
+    ? visible.find((version) => version.id === comparison.baseVersionId) ?? null
+    : null;
+  const comparisonTarget = comparison
+    ? visible.find((version) => version.id === comparison.targetVersionId) ?? null
+    : null;
+
+  useEffect(() => {
+    if (!comparison) return;
+    const base = visible.find(
+      (version) => version.id === comparison.baseVersionId,
+    );
+    if (!base) {
+      setComparison(null);
+      return;
+    }
+    if (visible.some((version) => version.id === comparison.targetVersionId))
+      return;
+    const target = defaultComparisonTarget(base, visible);
+    setComparison(
+      target
+        ? { baseVersionId: base.id, targetVersionId: target.id }
+        : null,
+    );
+  }, [comparison, visible]);
+
+  const startComparison = (base: SkillVersionDetail) => {
+    const target = defaultComparisonTarget(base, visible);
+    if (!target) return;
+    setComparison({ baseVersionId: base.id, targetVersionId: target.id });
+  };
 
   const mutate = async () => {
     if (!pending || mutationLock.current) return;
@@ -166,29 +203,52 @@ export function SkillVersionWorkspace(props: Props) {
     );
   };
 
-  if (compare && current) {
+  if (comparisonBase && comparisonTarget) {
     const diffText = createPatch(
-      current.skill.name || 'skill.md',
-      compare.skill.skillMd,
-      current.skill.skillMd,
-      `历史版本 · v${compare.versionNumber}`,
-      `当前版本 · v${current.versionNumber}`,
+      comparisonBase.skill.name || 'skill.md',
+      comparisonBase.skill.skillMd,
+      comparisonTarget.skill.skillMd,
+      `基准版本 · v${comparisonBase.versionNumber}`,
+      `对比版本 · v${comparisonTarget.versionNumber}`,
     );
     return (
       <div className="skill-version-page skill-view-enter">
         <header className="skill-version-compare-head">
           <button
             className="skill-text-button"
-            onClick={() => setCompare(null)}
+            onClick={() => setComparison(null)}
           >
             <ArrowLeft size={15} />
             返回版本列表
           </button>
-          <div>
+          <div className="skill-version-compare-title">
             <span className="skill-eyebrow">内容对比</span>
-            <h2>
-              v{current.versionNumber} 与 v{compare.versionNumber}
-            </h2>
+            <div className="skill-version-compare-picker">
+              <strong>v{comparisonBase.versionNumber}</strong>
+              <span>与</span>
+              <label>
+                <span className="sr-only">选择对比版本</span>
+                <select
+                  aria-label="选择对比版本"
+                  value={comparisonTarget.id}
+                  onChange={(event) =>
+                    setComparison({
+                      baseVersionId: comparisonBase.id,
+                      targetVersionId: event.target.value,
+                    })
+                  }
+                >
+                  {visible
+                    .filter((version) => version.id !== comparisonBase.id)
+                    .map((version) => (
+                      <option key={version.id} value={version.id}>
+                        v{version.versionNumber}
+                        {version.id === props.currentVersionId ? '（当前）' : ''}
+                      </option>
+                    ))}
+                </select>
+              </label>
+            </div>
           </div>
         </header>
         <div className="skill-version-compare-diff">
@@ -201,27 +261,39 @@ export function SkillVersionWorkspace(props: Props) {
   return (
     <div className="skill-version-page skill-view-enter">
       <header className="skill-version-page-head">
-        <div>
-          <span className="skill-eyebrow">Skill 生命周期</span>
-          <h2>版本管理</h2>
-          <p>回退会创建新版本，已有内容和历史记录都不会被覆盖。</p>
+        <div className="skill-version-page-title">
+          <button
+            type="button"
+            className="skill-version-back-repository"
+            onClick={props.onBackToRepository}
+          >
+            <ArrowLeft size={15} aria-hidden="true" />
+            返回 Skill 仓库
+          </button>
+          <div>
+            <span className="skill-eyebrow">Skill 生命周期</span>
+            <h2>版本管理</h2>
+            <p>回退会创建新版本，已有内容和历史记录都不会被覆盖。</p>
+          </div>
         </div>
-        <label>
-          <input
-            type="checkbox"
-            name="include-discarded-versions"
-            checked={includeDiscarded}
-            onChange={(event) => setIncludeDiscarded(event.target.checked)}
-          />
-          显示已废弃版本
-        </label>
-        <button
-          className="skill-text-button"
-          disabled={props.loading || mutating}
-          onClick={() => void props.onReload()}
-        >
-          刷新版本
-        </button>
+        <div className="skill-version-page-tools">
+          <label>
+            <input
+              type="checkbox"
+              name="include-discarded-versions"
+              checked={includeDiscarded}
+              onChange={(event) => setIncludeDiscarded(event.target.checked)}
+            />
+            显示已废弃版本
+          </label>
+          <button
+            className="skill-text-button"
+            disabled={props.loading || mutating}
+            onClick={() => void props.onReload()}
+          >
+            刷新版本
+          </button>
+        </div>
       </header>
       {props.loading ? (
         <div className="skill-version-loading">
@@ -269,12 +341,18 @@ export function SkillVersionWorkspace(props: Props) {
                 </time>
                 <div className="skill-version-actions">
                   <button onClick={() => setPreview(version)}>预览</button>
-                  {!isCurrent && (
-                    <button onClick={() => setCompare(version)}>
-                      <GitCompare size={13} />
-                      对比
-                    </button>
-                  )}
+                  <button
+                    disabled={visible.length < 2}
+                    title={
+                      visible.length < 2
+                        ? '至少需要两个版本才能对比'
+                        : `以 v${version.versionNumber} 为基准进行对比`
+                    }
+                    onClick={() => startComparison(version)}
+                  >
+                    <GitCompare size={13} />
+                    对比
+                  </button>
                   {canRollbackSkillVersion(version, props.currentVersionId) && (
                     <button
                       onClick={() =>
@@ -382,4 +460,22 @@ function createRequestId(prefix: string) {
   if (typeof crypto !== 'undefined' && crypto.randomUUID)
     return crypto.randomUUID();
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+export function defaultComparisonTarget(
+  base: SkillVersionDetail,
+  versions: SkillVersionDetail[],
+): SkillVersionDetail | null {
+  const candidates = versions.filter((version) => version.id !== base.id);
+  const previous = candidates
+    .filter((version) => version.versionNumber < base.versionNumber)
+    .sort((left, right) => right.versionNumber - left.versionNumber)[0];
+  if (previous) return previous;
+  return (
+    candidates
+      .filter((version) => version.versionNumber > base.versionNumber)
+      .sort((left, right) => left.versionNumber - right.versionNumber)[0] ??
+    candidates[0] ??
+    null
+  );
 }
