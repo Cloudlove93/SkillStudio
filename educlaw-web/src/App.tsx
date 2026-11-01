@@ -5,6 +5,7 @@ import { ThemeProvider } from '@/components/theme-provider'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { Toaster } from 'sonner'
 import { BASE } from '@/api/client'
+import { PRODUCT_NAME, PRODUCT_WORKSPACE_NAME } from '@/lib/brand'
 import { useAuthStore } from './stores/auth'
 
 const AdminPage = lazy(() => import('./pages/AdminPage'))
@@ -64,10 +65,10 @@ function AppRoutes() {
       <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4">
         <div className="pointer-events-none absolute inset-0 bg-mesh-gradient opacity-80" />
         <div className="card-premium relative z-10 flex w-full max-w-md items-center gap-4 rounded-[20px] px-6 py-5">
-          <img src={`${BASE}/logo.png`} alt="EduSkill" className="size-12 rounded-[14px]" />
+          <img src={`${BASE}/logo.png`} alt={PRODUCT_NAME} className="size-12 rounded-[14px]" />
           <div>
             <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-              EduSkill Workspace
+              {PRODUCT_WORKSPACE_NAME}
             </div>
             <div className="mt-1 text-base font-semibold text-foreground">Loading your workspace...</div>
           </div>

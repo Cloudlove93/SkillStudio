@@ -597,9 +597,11 @@ async function actionRequest<T>(
   action: SkillAction,
   pkgId: string,
   payload: Record<string, unknown> = {},
+  init: Pick<RequestInit, 'signal'> = {},
 ): Promise<T> {
   const response = await apiFetch('/api', {
     method: 'POST',
+    signal: init.signal,
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -1529,16 +1531,23 @@ export const liteApi = {
       model?: string;
       surface?: 'run' | 'test' | 'arena' | 'optimize';
     },
+    signal?: AbortSignal,
   ) =>
-    actionRequest<ArenaThread>(token, 'arena.thread.create', packageId, {
-      arenaKind: 'skill_arena',
-      idempotencyKey: payload.idempotencyKey,
-      basePackageVersionId: payload.basePackageVersionId,
-      left: payload.left,
-      right: payload.right,
-      model: payload.model,
-      surface: payload.surface,
-    }),
+    actionRequest<ArenaThread>(
+      token,
+      'arena.thread.create',
+      packageId,
+      {
+        arenaKind: 'skill_arena',
+        idempotencyKey: payload.idempotencyKey,
+        basePackageVersionId: payload.basePackageVersionId,
+        left: payload.left,
+        right: payload.right,
+        model: payload.model,
+        surface: payload.surface,
+      },
+      { signal },
+    ),
   getThread: (token: string, threadId: string) =>
     request<ArenaThreadDetail>(
       `${ARENA_ROUTES.THREAD_DETAIL}?threadId=${encodeURIComponent(threadId)}`,
@@ -1639,11 +1648,13 @@ export const liteApi = {
     threadId: string,
     model?: string,
     targetSkillDirName?: string,
+    signal?: AbortSignal,
   ) =>
     request<DiagnosisResult & { session?: InteractiveOptimizationSession }>(
       `/packages/${packageId}/optimize/diagnose`,
       {
         method: 'POST',
+        signal,
         body: JSON.stringify({ threadId, model, targetSkillDirName }),
       },
       token,
@@ -1662,11 +1673,13 @@ export const liteApi = {
     adoptedChanges: AdoptedChange[],
     model?: string,
     targetSkillDirName?: string,
+    signal?: AbortSignal,
   ) =>
     request<ChatOptimizeResult>(
       `/packages/${packageId}/optimize/chat`,
       {
         method: 'POST',
+        signal,
         body: JSON.stringify({
           sessionId,
           messages,
@@ -1684,11 +1697,13 @@ export const liteApi = {
     changes: AdoptedChange[],
     note?: string,
     targetSkillDirName?: string,
+    signal?: AbortSignal,
   ) =>
     request<{ versionId: string; versionNumber: number }>(
       `/packages/${packageId}/optimize/apply`,
       {
         method: 'POST',
+        signal,
         body: JSON.stringify({ sessionId, changes, note, targetSkillDirName }),
       },
       token,

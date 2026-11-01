@@ -432,7 +432,7 @@ it('refreshes the repository summary after saving through the actual optimizatio
   });
   api.renameArenaThread.mockResolvedValue({ id: 93 });
   api.chatOptimize.mockResolvedValue({
-    reply: '修改已准备',
+    reply: '',
     newAdoptions: [
       {
         id: 'change',
@@ -441,7 +441,7 @@ it('refreshes the repository summary after saving through the actual optimizatio
         targetName: 'Fixture',
         original: 'Fixture',
         modified: 'Updated',
-        reason: 'test',
+        reason: '补充可执行的处理步骤',
       },
     ],
   });
@@ -481,7 +481,27 @@ it('refreshes the repository summary after saving through the actual optimizatio
       )!
       .click(),
   );
+  await vi.waitFor(async () => {
+    await act(async () => {});
+    expect(button('查看本次改动')).not.toBeUndefined();
+    expect(container.textContent).toContain('修改草稿已生成');
+    expect(
+      [...container.querySelectorAll('.skill-assistant-message')].some(
+        (message) => !message.textContent?.trim(),
+      ),
+    ).toBe(false);
+  });
+  await act(async () => button('查看本次改动')!.click());
+  expect(container.textContent).toContain('本次修改内容');
+  expect(container.textContent).toContain('原始版本 v1');
+  expect(container.textContent).toContain('待保存草稿 · 尚无正式版本号');
+  expect(container.textContent).toContain('补充可执行的处理步骤');
+  expect(container.textContent).toContain('Updated');
+  expect(api.applyInteractiveChanges).not.toHaveBeenCalled();
   await act(async () => button('保存为新版本')!.click());
+  expect(api.applyInteractiveChanges.mock.calls[0]?.[3]?.[0]?.modified).toBe(
+    'Updated',
+  );
   await act(async () => button('Skill 仓库')!.click());
   await vi.waitFor(async () => {
     await act(async () => {});
@@ -490,6 +510,42 @@ it('refreshes the repository summary after saving through the actual optimizatio
     ).toBe('最新版本 v2');
   });
 }, 20000);
+
+it('leaves the optimize loading state after failure and can retry safely', async () => {
+  api.createArenaThread.mockResolvedValue({ id: 93 });
+  api.diagnosePackage
+    .mockRejectedValueOnce(new Error('分析服务暂时不可用'))
+    .mockResolvedValueOnce({
+      issues: [],
+      session: { id: 'session-1' },
+    });
+  await import('../components/skill-workspace/SkillOptimizeWorkspace');
+
+  await act(async () =>
+    root.render(
+      <MemoryRouter initialEntries={['/?view=optimize&skill=7%3A11']}>
+        <SkillFirstWorkspace />
+      </MemoryRouter>,
+    ),
+  );
+
+  await vi.waitFor(async () => {
+    await act(async () => {});
+    expect(container.textContent).toContain('分析服务暂时不可用');
+    expect(container.textContent).not.toContain('正在分析这个 Skill');
+    expect(button('重新分析')).not.toBeUndefined();
+  });
+
+  await act(async () => button('重新分析')!.click());
+  await vi.waitFor(async () => {
+    await act(async () => {});
+    expect(container.textContent).toContain('我已读取当前 v1');
+  });
+  expect(api.createArenaThread).toHaveBeenCalledTimes(1);
+  expect(api.diagnosePackage).toHaveBeenCalledTimes(2);
+  expect(api.createArenaThread.mock.calls[0]?.[3]).toBeInstanceOf(AbortSignal);
+  expect(api.diagnosePackage.mock.calls[0]?.[5]).toBeInstanceOf(AbortSignal);
+});
 
 it('keeps the newest repository summary when refresh responses arrive out of order', async () => {
   const item = (n: number) => ({

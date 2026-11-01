@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuthStore } from '../stores/auth';
 import { BASE } from '../api/client';
+import { PRODUCT_NAME } from '../lib/brand';
 
 type Mode = 'login' | 'register';
 
@@ -25,8 +26,8 @@ export default function LoginPage() {
   const copy = useMemo(
     () => ({
       pageDescription: 'Skill 管理与成长工作台',
-      loginSubtitle: '登录到 EduSkill',
-      registerSubtitle: '创建 EduSkill 账号',
+      loginSubtitle: `登录到 ${PRODUCT_NAME}`,
+      registerSubtitle: `创建 ${PRODUCT_NAME} 账号`,
       loginHint: '登录后继续使用你的工作区。',
       registerHint: '注册后将直接进入工作区。',
       infoWorkspace:
@@ -131,12 +132,12 @@ export default function LoginPage() {
             <div className="mt-8 flex items-center gap-4">
               <img
                 src={`${BASE}/logo.png`}
-                alt="EduSkill"
+                alt={PRODUCT_NAME}
                 className="size-16 rounded-[18px] shadow-[var(--shadow-sm)]"
               />
               <div>
                 <div className="text-[28px] font-semibold tracking-[-0.03em] text-foreground">
-                  EduSkill
+                  {PRODUCT_NAME}
                 </div>
                 <div className="mt-1 text-sm leading-6 text-muted-foreground">
                   {copy.pageDescription}
@@ -177,12 +178,12 @@ export default function LoginPage() {
               <div className="flex items-center gap-3">
                 <img
                   src={`${BASE}/logo.png`}
-                  alt="EduSkill"
+                  alt={PRODUCT_NAME}
                   className="size-12 rounded-[14px] shadow-[var(--shadow-sm)]"
                 />
                 <div>
                   <div className="text-xl font-semibold tracking-[-0.03em] text-foreground">
-                    EduSkill
+                    {PRODUCT_NAME}
                   </div>
                   <div className="text-sm text-muted-foreground">
                     {copy.pageDescription}

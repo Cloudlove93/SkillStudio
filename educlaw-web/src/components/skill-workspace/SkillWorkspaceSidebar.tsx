@@ -23,6 +23,7 @@ import {
   ChevronRight,
   X,
 } from 'lucide-react';
+import { PRODUCT_NAME } from '../../lib/brand';
 import { ThemeToggle } from '../theme-toggle';
 import { SkillConversationList } from './SkillConversationList';
 import { SkillContextMenu } from './SkillContextMenu';
@@ -248,7 +249,7 @@ export function SkillWorkspaceSidebar({
       <div className="skill-sidebar-brand">
         <div className="skill-brand-title">
           <Sparkles size={17} />
-          <strong>EduSkill</strong>
+          <strong>{PRODUCT_NAME}</strong>
         </div>
           <button
             type="button"

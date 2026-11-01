@@ -109,7 +109,7 @@ describe("interactive-optimization-service", () => {
             dirName: "lesson-plan",
             name: "Lesson plan",
             description: "Build a lesson plan",
-            skillMd: "# Skill\nOld lesson workflow",
+            skillMd: "---\nname: lesson-plan\ndescription: Build a lesson plan\n---\n\n# Skill\nOld lesson workflow",
           },
         ],
       },
@@ -141,6 +141,7 @@ describe("interactive-optimization-service", () => {
       target: "skill",
       targetId: "lesson-plan",
     });
+    expect(result.reply).toBe("Updated the selected Skill.");
     expect(generateChatMock.mock.calls[0]?.[0]?.[0]?.content).toContain("lesson-plan");
   });
 
@@ -322,6 +323,117 @@ describe("interactive-optimization-service", () => {
     expect(result.reply).toContain("缩短到 3-5 秒");
   });
 
+  it("returns a controlled visible reply when a valid adoption is structure-only", async () => {
+    getPackageMock.mockResolvedValue({
+      snapshot: {
+        name: "原始智能体",
+        description: "原始 package description",
+        versionLabel: "v1",
+        agentMd: "# Agent",
+        rubricMd: "",
+        skills: [{
+          id: "skill-1",
+          dirName: "immediate-control",
+          name: "即时控场",
+          description: "原始技能描述",
+          skillMd: "---\nname: immediate-control\ndescription: 原始技能描述\n---\n\n# Skill\n原始内容",
+        }],
+      },
+    });
+    generateChatMock.mockResolvedValue([
+      '<MODIFIED target="skill" targetId="immediate-control">',
+      "```markdown",
+      "---",
+      "name: immediate-control",
+      "description: 原始技能描述",
+      "---",
+      "",
+      "# Skill",
+      "更新后的内容",
+      "```",
+      "</MODIFIED>",
+      "[ADOPT:skill:immediate-control:补充处理步骤]",
+    ].join("\n"));
+
+    applyOptimizedSnapshotMock.mockResolvedValue({
+      versionId: "version-2",
+      versionNumber: 2,
+    });
+    listVersionsMock.mockResolvedValue([
+      { id: "version-2", versionNumber: 2 },
+    ]);
+    const { applyInteractiveChanges, chatOptimize } = await loadService();
+    const result = await chatOptimize("user-1", "package-1", {
+      messages: [{ role: "user", content: "采纳" }],
+      adoptedChanges: [],
+      targetSkillDirName: "immediate-control",
+    });
+
+    expect(result.newAdoptions).toHaveLength(1);
+    expect(result.newAdoptions[0]?.modified).toContain("更新后的内容");
+    expect(result.reply).toContain("修改草稿已生成");
+    expect(result.reply.trim()).not.toBe("");
+
+    await applyInteractiveChanges(
+      "user-1",
+      "package-1",
+      result.newAdoptions,
+      undefined,
+      "交互式优化",
+      undefined,
+      "immediate-control",
+    );
+    const savedSnapshot = applyOptimizedSnapshotMock.mock.calls[0]?.[2];
+    expect(savedSnapshot.skills[0].skillMd).toBe(
+      result.newAdoptions[0]?.modified,
+    );
+  });
+
+  it("does not duplicate a structure-only adoption already in the draft", async () => {
+    const original = "---\nname: immediate-control\ndescription: 原始技能描述\n---\n\n# Skill\n原始内容";
+    const modified = "---\nname: immediate-control\ndescription: 原始技能描述\n---\n\n# Skill\n更新后的内容";
+    getPackageMock.mockResolvedValue({
+      snapshot: {
+        name: "原始智能体",
+        description: "原始 package description",
+        versionLabel: "v1",
+        agentMd: "# Agent",
+        rubricMd: "",
+        skills: [{
+          id: "skill-1",
+          dirName: "immediate-control",
+          name: "即时控场",
+          description: "原始技能描述",
+          skillMd: original,
+        }],
+      },
+    });
+    generateChatMock.mockResolvedValue([
+      '<MODIFIED target="skill" targetId="immediate-control">',
+      modified,
+      "</MODIFIED>",
+      "[ADOPT:skill:immediate-control:补充处理步骤]",
+    ].join("\n"));
+
+    const { chatOptimize } = await loadService();
+    const result = await chatOptimize("user-1", "package-1", {
+      messages: [{ role: "user", content: "采纳" }],
+      adoptedChanges: [{
+        id: "existing-change",
+        target: "skill",
+        targetId: "immediate-control",
+        targetName: "即时控场",
+        original,
+        modified,
+        reason: "补充处理步骤",
+      }],
+      targetSkillDirName: "immediate-control",
+    });
+
+    expect(result.newAdoptions).toEqual([]);
+    expect(result.reply).toContain("已经在待保存草稿中");
+  });
+
   it("skips [ADOPT] markers without matching <MODIFIED> blocks", async () => {
     getPackageMock.mockResolvedValue({
       snapshot: {
@@ -338,13 +450,37 @@ describe("interactive-optimization-service", () => {
 
     const { chatOptimize } = await loadService();
 
-    const result = await chatOptimize("user-1", "package-1", {
+    await expect(chatOptimize("user-1", "package-1", {
       messages: [{ role: "user", content: "优化 agent" }],
       adoptedChanges: [],
-    });
+    })).rejects.toThrow("没有生成可用的回复或有效修改草稿");
+  });
 
-    // 没有实际修改内容,不应产生 adoption
-    expect(result.newAdoptions).toHaveLength(0);
+  it("rejects an empty model response instead of persisting a blank assistant message", async () => {
+    getPackageMock.mockResolvedValue({
+      snapshot: {
+        name: "原始智能体",
+        description: "原始 package description",
+        versionLabel: "v1",
+        agentMd: "# Agent",
+        rubricMd: "",
+        skills: [{
+          id: "skill-1",
+          dirName: "immediate-control",
+          name: "即时控场",
+          description: "原始技能描述",
+          skillMd: "# Skill\n原始内容",
+        }],
+      },
+    });
+    generateChatMock.mockResolvedValue("");
+
+    const { chatOptimize } = await loadService();
+    await expect(chatOptimize("user-1", "package-1", {
+      messages: [{ role: "user", content: "采纳" }],
+      adoptedChanges: [],
+      targetSkillDirName: "immediate-control",
+    })).rejects.toThrow("没有生成可用的回复或有效修改草稿");
   });
 
   it("preserves existing skill frontmatter when adopted change only provides body content", async () => {

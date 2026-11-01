@@ -843,6 +843,7 @@ export async function chatOptimize(
   // 跳过没有 <MODIFIED> 块的 [ADOPT] 标记:LLM 偶尔只输出 [ADOPT] 而漏掉内容,
   // 此时 modified 会等于 original,属于无效采纳,不应写入 session.adoptedChanges。
   const newAdoptions: AdoptedChange[] = [];
+  let duplicateAdoptionCount = 0;
   for (const a of parsed.adoptions) {
     const target = a.target as "agent" | "rubric" | "skill";
     if (targetSkillDirName && (target !== "skill" || a.targetId !== targetSkillDirName)) {
@@ -854,8 +855,19 @@ export async function chatOptimize(
     if (a.modifiedContent === undefined) {
       continue;
     }
-    const modified = a.modifiedContent;
+    let modified = a.modifiedContent;
+    if (target === "skill" && a.targetId) {
+      const snapshotSkill = pkg.snapshot.skills.find(
+        (skill) => skill.id === a.targetId || skill.dirName === a.targetId,
+      );
+      if (!snapshotSkill) continue;
+      modified = normalizeAdoptedSkillMarkdown(modified, {
+        ...snapshotSkill,
+        skillMd: original,
+      }).skillMd;
+    }
     if (modified.trim() === original.trim()) {
+      duplicateAdoptionCount += 1;
       continue;
     }
 
@@ -870,9 +882,20 @@ export async function chatOptimize(
     });
   }
 
+  const cleanReply = parsed.cleanReply.trim();
+  const visibleReply = cleanReply || (newAdoptions.length > 0
+    ? "已采纳本次优化建议，修改草稿已生成。你可以点击下方“查看本次改动”检查具体内容，确认后保存为新版本。"
+    : duplicateAdoptionCount > 0
+      ? "这项修改已经在待保存草稿中，无需重复采纳。你可以继续查看改动或保存为新版本。"
+      : "");
+
+  if (!visibleReply) {
+    throw new Error("模型没有生成可用的回复或有效修改草稿，请重试。");
+  }
+
   const persistedMessages = [
     ...input.messages.filter((message) => message.role !== "system"),
-    { role: "assistant" as const, content: parsed.cleanReply },
+    { role: "assistant" as const, content: visibleReply },
   ];
   const persistedAdoptions = [...input.adoptedChanges, ...newAdoptions];
   const session = input.sessionId
@@ -883,7 +906,7 @@ export async function chatOptimize(
     : undefined;
 
   return {
-    reply: parsed.cleanReply,
+    reply: visibleReply,
     newAdoptions,
     newRejections: parsed.rejections.map((r) => `${r.target}-${r.targetId || ""}`),
     isDone: parsed.isDone,
