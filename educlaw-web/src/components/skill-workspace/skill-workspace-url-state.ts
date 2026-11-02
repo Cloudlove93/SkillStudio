@@ -1,6 +1,12 @@
 import type { SkillWorkspaceView } from './skill-workspace-state';
 
 const VIEWS = new Set<SkillWorkspaceView>([
+  'home',
+  'square',
+  'my-skills',
+  'workbench',
+  'pipeline',
+  'review',
   'create',
   'repository',
   'overview',
@@ -44,7 +50,7 @@ export function parseSkillWorkspaceSearch(
   const view =
     rawView && VIEWS.has(rawView as SkillWorkspaceView)
       ? (rawView as SkillWorkspaceView)
-      : 'create';
+      : 'home';
   const rawSkillKey = params.get('skill')?.trim() ?? '';
   const repositoryQuery = (params.get('q') ?? '').trim().slice(0, 120);
   return {

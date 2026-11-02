@@ -248,7 +248,7 @@ export function SkillWorkspaceSidebar({
     <aside className={`skill-sidebar ${collapsed ? 'is-collapsed' : ''}`}>
       <div className="skill-sidebar-brand">
         <div className="skill-brand-title">
-          <Sparkles size={17} />
+          <img src="/innoskill-logo.svg" alt="" aria-hidden="true" />
           <strong>{PRODUCT_NAME}</strong>
         </div>
           <button

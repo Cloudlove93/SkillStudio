@@ -85,7 +85,9 @@ describe('Skill-first workspace UI contract', () => {
     expect(source).toContain('onMouseEnter');
     expect(source).toContain('onDismiss');
     expect(source).toContain('actionLabel');
-    expect(css).toMatch(/\.skill-transient-notification\s*\{\s*position:\s*absolute;/s);
+    expect(css).toMatch(
+      /\.skill-transient-notification\s*\{\s*position:\s*absolute;/s,
+    );
   });
 
   it('expands the desktop context panel inside the grid instead of covering the main stage', () => {
@@ -154,7 +156,9 @@ describe('Skill-first workspace UI contract', () => {
     expect(source).toContain('deriveGuidedCreationProgress(props.session)');
     expect(source).toContain('educationProgress.completedStepCount');
     expect(source).toContain('educationProgress.totalStepCount');
-    expect(source).toContain('`当前环节：${educationProgress.currentStepLabel}`');
+    expect(source).toContain(
+      '`当前环节：${educationProgress.currentStepLabel}`',
+    );
     expect(source).toContain('props.session.flow_version >= 3');
     expect(source).toContain('props.session.confirmed_stages.length');
     expect(source).toContain('total: 6');
@@ -171,7 +175,9 @@ describe('Skill-first workspace UI contract', () => {
     const page = read('../../pages/SkillFirstWorkspace.tsx');
     const panel = read('./GuidedSkillCreationPanel.tsx');
 
-    expect(page).toMatch(/setPendingGuidedMessage\(\s*createPendingGuidedMessage\(/s);
+    expect(page).toMatch(
+      /setPendingGuidedMessage\(\s*createPendingGuidedMessage\(/s,
+    );
     expect(page).toContain('pendingMessage={visiblePendingGuidedMessage}');
     expect(panel).toContain('shouldDisplayPendingGuidedMessage(');
     expect(panel).toContain('props.pendingMessage.content');
@@ -367,7 +373,9 @@ describe('Skill-first workspace UI contract', () => {
       'SkillRepositoryWorkspace',
       'SkillDetailWorkspace',
     ]) {
-      expect(page).toContain(`import('../components/skill-workspace/${moduleName}')`);
+      expect(page).toContain(
+        `import('../components/skill-workspace/${moduleName}')`,
+      );
     }
     expect(detail).toContain("import('./SkillRunWorkspace')");
     expect(detail).toContain("import('./SkillArenaWorkspace')");
@@ -501,7 +509,9 @@ describe('Skill-first workspace UI contract', () => {
     expect(css).toMatch(
       /\.workspace-inspector-outlet \.skill-answer-optimization-panel\s*\{[^}]*min-height:\s*0;[^}]*height:\s*auto;[^}]*flex:\s*1;/s,
     );
-    expect(css).toMatch(/\.skill-answer-optimization-panel \.skill-assistant-message\s*\{[^}]*max-width:\s*100%;/s);
+    expect(css).toMatch(
+      /\.skill-answer-optimization-panel \.skill-assistant-message\s*\{[^}]*max-width:\s*100%;/s,
+    );
     expect(css).not.toContain(
       '.skill-answer-optimization-panel .prose { max-width: 100%; font-size: 10px',
     );
@@ -534,7 +544,9 @@ describe('Skill-first workspace UI contract', () => {
 
     expect(sidebar).toContain("VITE_MULTIMODAL_SKILL_PACK_ENABLED !== 'false'");
     expect(sidebar).toContain('音视频蒸馏');
-    expect(page).toMatch(/lazy\(\(\)\s*=>\s*import\(['"]\.\.\/components\/skill-workspace\/MultimodalSkillCreationPanel['"]\)/s);
+    expect(page).toMatch(
+      /lazy\(\(\)\s*=>\s*import\(['"]\.\.\/components\/skill-workspace\/MultimodalSkillCreationPanel['"]\)/s,
+    );
     expect(page).toContain('label="正在打开音视频蒸馏"');
     expect(page).toContain("createMode === 'multimodal'");
     expect(page).toContain('<MultimodalSkillCreationPanel');
@@ -634,8 +646,12 @@ describe('Skill-first workspace UI contract', () => {
     expect(page).toContain('const deleteRepositorySkills = async');
     expect(page).toContain('liteApi.batchDeleteSkills(token, skillIds)');
     expect(page).toContain('result.deletedSkillIds');
-    expect(page).toMatch(/setRepositorySkills\(\(current\)\s*=>\s*current\.filter/s);
-    expect(page).toMatch(/setWorkspaceSkillKeys\(\(current\)\s*=>\s*current\.filter/s);
+    expect(page).toMatch(
+      /setRepositorySkills\(\(current\)\s*=>\s*current\.filter/s,
+    );
+    expect(page).toMatch(
+      /setWorkspaceSkillKeys\(\(current\)\s*=>\s*current\.filter/s,
+    );
     expect(page).toContain(
       'activeSkill && deletedSkillIds.has(activeSkill.skillId)',
     );
@@ -656,7 +672,7 @@ describe('Skill-first workspace UI contract', () => {
       css.match(/\.skill-repository\s*\{([^}]*)\}/)?.[1] || '';
 
     expect(page).toContain(
-      "workspaceState.activeView === 'repository' ? 'is-repository' : ''",
+      "className={`skill-main-stage ${isRepositoryView ? 'is-repository' : ''}",
     );
     expect(repositoryRule).not.toMatch(/(^|;)\s*height:\s*100%/);
     expect(repositoryRule).not.toContain('overflow-y: auto');

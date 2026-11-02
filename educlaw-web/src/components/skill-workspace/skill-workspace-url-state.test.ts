@@ -30,9 +30,20 @@ describe('Skill workspace URL state', () => {
 
   it('rejects unknown views and malformed Skill identities', () => {
     expect(parseSkillWorkspaceSearch('?view=secret&skill=../../etc')).toEqual({
-      view: 'create',
+      view: 'home',
       skillKey: null,
       repositoryQuery: '',
+    });
+  });
+
+  it('restores the InnoSkill portal pages', () => {
+    expect(parseSkillWorkspaceSearch('?view=workbench').view).toBe('workbench');
+    expect(
+      parseSkillWorkspaceSearch('?view=square&q=%E6%95%99%E5%AD%A6'),
+    ).toEqual({
+      view: 'square',
+      skillKey: null,
+      repositoryQuery: '教学',
     });
   });
 

@@ -13,10 +13,10 @@ const comparisonUpdate: SkillPinnedUpdate = {
 };
 
 describe('Skill workspace navigation state', () => {
-  it('starts on creation without a pinned update', () => {
+  it('starts on the portal home without a pinned update', () => {
     const state = createSkillWorkspaceState();
 
-    expect(state.activeView).toBe('create');
+    expect(state.activeView).toBe('home');
     expect(state.pinnedUpdate).toBeNull();
   });
 

@@ -1,4 +1,10 @@
 export type SkillWorkspaceView =
+  | 'home'
+  | 'square'
+  | 'my-skills'
+  | 'workbench'
+  | 'pipeline'
+  | 'review'
   | 'create'
   | 'repository'
   | 'overview'
@@ -27,7 +33,7 @@ export type SkillWorkspaceEvent =
   | { type: 'dismiss-update' };
 
 export function createSkillWorkspaceState(
-  activeView: SkillWorkspaceView = 'create',
+  activeView: SkillWorkspaceView = 'home',
 ): SkillWorkspaceState {
   return {
     activeView: activeView === 'test' ? 'run' : activeView,
@@ -51,7 +57,7 @@ export function skillWorkspaceReducer(
     return {
       ...state,
       activeView: view,
-      pinnedUpdate: view === 'versions' || view === 'overview' ? null : state.pinnedUpdate,
+      pinnedUpdate: view === 'overview' ? null : state.pinnedUpdate,
     };
   }
   if (event.type === 'publish-update') {

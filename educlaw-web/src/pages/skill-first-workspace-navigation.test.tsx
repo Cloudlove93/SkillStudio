@@ -166,9 +166,7 @@ afterEach(async () => {
 });
 
 function draftButton() {
-  return container.querySelector<HTMLButtonElement>(
-    '.skill-session-item',
-  );
+  return container.querySelector<HTMLButtonElement>('.skill-session-item');
 }
 
 async function configureUnfinishedDraft() {
@@ -182,10 +180,7 @@ async function configureUnfinishedDraft() {
   ]);
 }
 
-it.each([
-  '/?view=create',
-  '/?view=run&skill=7%3A11&conversation=91',
-])(
+it.each(['/?view=create', '/?view=run&skill=7%3A11&conversation=91'])(
   'resumes an unfinished guided draft with one click from %s',
   async (initialEntry) => {
     await configureUnfinishedDraft();
@@ -207,10 +202,9 @@ it.each([
 
     await vi.waitFor(async () => {
       await act(async () => {});
-      expect(api.getGuidedCreationDetail).toHaveBeenCalledWith(
-        'test-token',
-        { session_id: unfinishedGuidedDraft.id },
-      );
+      expect(api.getGuidedCreationDetail).toHaveBeenCalledWith('test-token', {
+        session_id: unfinishedGuidedDraft.id,
+      });
       expect(container.textContent).toContain('确认这个 Skill 的工作方式');
       const params = new URLSearchParams(
         container.querySelector('[data-route]')!.textContent!,
@@ -335,16 +329,16 @@ it('resumes an unfinished guided draft after opening the Skill repository', asyn
 
   await vi.waitFor(async () => {
     await act(async () => {});
-    expect(button('Skill 仓库')).toBeDefined();
+    expect(button('我的 Skill')).toBeDefined();
   });
-  await act(async () => button('Skill 仓库')!.click());
+  await act(async () => button('我的 Skill')!.click());
   await vi.waitFor(async () => {
     await act(async () => {});
     expect(
       new URLSearchParams(
         container.querySelector('[data-route]')!.textContent!,
       ).get('view'),
-    ).toBe('repository');
+    ).toBe('my-skills');
     expect(draftButton()).not.toBeNull();
   });
 
@@ -396,9 +390,7 @@ it.each(['run', 'test'] as const)(
       expect(params.get('conversation')).toBe('92');
       expect(params.has('inspector')).toBe(false);
       expect(
-        container.querySelector(
-          'textarea[aria-label="输入 Skill 使用任务"]',
-        ),
+        container.querySelector('textarea[aria-label="输入 Skill 使用任务"]'),
       ).not.toBeNull();
     });
   },
@@ -502,7 +494,7 @@ it('refreshes the repository summary after saving through the actual optimizatio
   expect(api.applyInteractiveChanges.mock.calls[0]?.[3]?.[0]?.modified).toBe(
     'Updated',
   );
-  await act(async () => button('Skill 仓库')!.click());
+  await act(async () => button('我的 Skill')!.click());
   await vi.waitFor(async () => {
     await act(async () => {});
     expect(
@@ -583,7 +575,7 @@ it('keeps the newest repository summary when refresh responses arrive out of ord
   });
   await act(async () => button('刷新版本')!.click());
   await act(async () => button('刷新版本')!.click());
-  await act(async () => button('Skill 仓库')!.click());
+  await act(async () => button('我的 Skill')!.click());
   await vi.waitFor(async () => {
     await act(async () => {});
     expect(
@@ -692,7 +684,7 @@ it.each(['rollback', 'discard', 'restore'] as const)(
       await act(async () => {});
       expect(container.querySelector('.skill-version-confirm')).toBeNull();
     });
-    await act(async () => button('Skill 仓库')!.click());
+    await act(async () => button('我的 Skill')!.click());
     await vi.waitFor(async () => {
       await act(async () => {});
       expect(
