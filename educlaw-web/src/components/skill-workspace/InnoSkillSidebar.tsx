@@ -2,13 +2,10 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { ArenaThread, GuidedCreationSession } from '@educlaw/shared';
 import {
   AudioLines,
-  BadgeCheck,
   BookOpen,
   ChevronDown,
   FileText,
   FileUp,
-  GitBranch,
-  Grid2X2,
   Home,
   Layers3,
   LogOut,
@@ -31,14 +28,7 @@ import {
   type SkillMenuAction,
 } from './SkillWorkspaceSidebar';
 
-export type InnoSkillNavSection =
-  | 'home'
-  | 'square'
-  | 'my-skills'
-  | 'create'
-  | 'workbench'
-  | 'pipeline'
-  | 'review';
+export type InnoSkillNavSection = 'home' | 'my-skills' | 'create';
 
 type Props = {
   sessions: GuidedCreationSession[];
@@ -148,12 +138,6 @@ export function InnoSkillSidebar(props: Props) {
           icon={<Home />}
           label="主页"
           onClick={() => props.onNavigate('home')}
-        />
-        <NavButton
-          active={props.activeSection === 'square'}
-          icon={<Grid2X2 />}
-          label="Skill 广场"
-          onClick={() => props.onNavigate('square')}
         />
         <NavButton
           active={props.activeSection === 'my-skills'}
@@ -321,29 +305,6 @@ export function InnoSkillSidebar(props: Props) {
           </div>
         ) : null}
 
-        <span className="isk-sidebar-section-label">生产</span>
-        <NavButton
-          active={props.activeSection === 'workbench'}
-          icon={<Layers3 />}
-          label="工作台"
-          onClick={() => props.onNavigate('workbench')}
-        />
-        <NavButton
-          active={props.activeSection === 'pipeline'}
-          icon={<GitBranch />}
-          label="开发管线"
-          onClick={() => props.onNavigate('pipeline')}
-        />
-        <NavButton
-          active={props.activeSection === 'review'}
-          icon={<BadgeCheck />}
-          label="审核中心"
-          badge={
-            drafts.filter((item) => item.status === 'ready_for_confirmation')
-              .length || undefined
-          }
-          onClick={() => props.onNavigate('review')}
-        />
         {props.isAdmin ? (
           <>
             <span className="isk-sidebar-section-label">管理</span>

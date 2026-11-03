@@ -1,10 +1,6 @@
 export type SkillWorkspaceView =
   | 'home'
-  | 'square'
   | 'my-skills'
-  | 'workbench'
-  | 'pipeline'
-  | 'review'
   | 'create'
   | 'repository'
   | 'overview'

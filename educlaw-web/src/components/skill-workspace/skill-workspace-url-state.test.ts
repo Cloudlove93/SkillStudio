@@ -36,12 +36,12 @@ describe('Skill workspace URL state', () => {
     });
   });
 
-  it('restores the InnoSkill portal pages', () => {
-    expect(parseSkillWorkspaceSearch('?view=workbench').view).toBe('workbench');
+  it('falls back to the home view for removed portal pages', () => {
+    expect(parseSkillWorkspaceSearch('?view=workbench').view).toBe('home');
     expect(
       parseSkillWorkspaceSearch('?view=square&q=%E6%95%99%E5%AD%A6'),
     ).toEqual({
-      view: 'square',
+      view: 'home',
       skillKey: null,
       repositoryQuery: '教学',
     });

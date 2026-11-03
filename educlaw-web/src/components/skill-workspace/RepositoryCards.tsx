@@ -47,7 +47,7 @@ export function RepositorySkillCard({
   onRequestRename: () => void;
   onRequestDelete: () => void;
 }) {
-  const cardAction = managing ? onToggleSelection : onPreview;
+  const cardAction = managing ? onToggleSelection : onOpen;
 
   return (
     <article
@@ -57,7 +57,7 @@ export function RepositorySkillCard({
       <button
         type="button"
         className="skill-repository-card-main"
-        aria-label={managing ? `选择${skill.name}` : `查看${skill.name}详情`}
+        aria-label={managing ? `选择${skill.name}` : `打开并使用${skill.name}`}
         aria-pressed={managing ? selected : undefined}
         onClick={cardAction}
       >
@@ -81,7 +81,7 @@ export function RepositorySkillCard({
             更新于 {repositoryDateFormatter.format(new Date(skill.updatedAt))}
           </time>
           <span className="skill-repository-card-open">
-            {managing ? (selected ? '已选择' : '选择') : '查看详情'}
+            {managing ? (selected ? '已选择' : '选择') : '打开并使用'}
             {managing ? (
               <Check size={15} aria-hidden="true" />
             ) : (
@@ -125,7 +125,11 @@ export function RepositorySkillCard({
             <div role="menu" onClick={(event) => event.stopPropagation()}>
               <button type="button" role="menuitem" onClick={onOpen}>
                 <Play size={14} aria-hidden="true" />
-                打开 Skill
+                打开并使用
+              </button>
+              <button type="button" role="menuitem" onClick={onPreview}>
+                <ArrowUpRight size={14} aria-hidden="true" />
+                查看详情
               </button>
               <button
                 type="button"

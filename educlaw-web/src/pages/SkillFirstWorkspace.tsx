@@ -46,10 +46,6 @@ import {
   InnoSkillSidebar,
   type InnoSkillNavSection,
 } from '../components/skill-workspace/InnoSkillSidebar';
-import {
-  InnoSkillPortalPages,
-  type InnoSkillPortalView,
-} from '../components/skill-workspace/InnoSkillPortalPages';
 import { SkillPinnedUpdate } from '../components/skill-workspace/SkillPinnedUpdate';
 import type { SkillDetailSelection } from '../components/skill-workspace/SkillDetailWorkspace';
 import type { RepositorySkill } from '../components/skill-workspace/SkillRepositoryWorkspace';
@@ -115,11 +111,7 @@ type StreamError = { code: string; message: string; retryable: boolean };
 
 const PORTAL_VIEWS = new Set<SkillWorkspaceView>([
   'home',
-  'square',
   'my-skills',
-  'workbench',
-  'pipeline',
-  'review',
   'repository',
 ]);
 
@@ -332,8 +324,7 @@ function SkillFirstWorkspaceContent() {
       setSearch(value);
       if (
         workspaceState.activeView !== 'repository' &&
-        workspaceState.activeView !== 'my-skills' &&
-        workspaceState.activeView !== 'square'
+        workspaceState.activeView !== 'my-skills'
       )
         return;
       const nextSearch = writeSkillWorkspaceSearch(location.search, {
@@ -1064,10 +1055,7 @@ function SkillFirstWorkspaceContent() {
     dispatchWorkspace({ type: 'dismiss-update' });
   };
 
-  const openPortalView = (
-    view: InnoSkillPortalView | 'my-skills',
-    squareQuery?: string,
-  ) => {
+  const openPortalView = (view: 'home' | 'my-skills') => {
     cancelOpeningSession();
     activeRunRef.current = null;
     setPendingGuidedMessage(null);
@@ -1083,8 +1071,7 @@ function SkillFirstWorkspaceContent() {
     setSelectedConversationId(null);
     closeInspector({ force: true });
 
-    const nextQuery = view === 'square' ? (squareQuery ?? '') : '';
-    setSearch(nextQuery);
+    setSearch('');
     dispatchWorkspace({ type: 'navigate', view });
     dispatchWorkspace({ type: 'dismiss-update' });
 
@@ -1096,7 +1083,7 @@ function SkillFirstWorkspaceContent() {
     const nextSearch = writeSkillWorkspaceSearch(baseSearch, {
       view,
       skillKey: null,
-      repositoryQuery: nextQuery,
+      repositoryQuery: '',
     });
     if (nextSearch !== location.search) {
       navigate(
@@ -1489,29 +1476,22 @@ function SkillFirstWorkspaceContent() {
   const workspaceSkills = repositorySkills.filter((skill) =>
     workspaceSkillKeys.includes(skill.key),
   );
-  const portalPageView = (
-    ['home', 'square', 'workbench', 'pipeline', 'review'].includes(
-      workspaceState.activeView,
-    )
-      ? workspaceState.activeView
-      : null
-  ) as InnoSkillPortalView | null;
   const isRepositoryView =
     workspaceState.activeView === 'repository' ||
     workspaceState.activeView === 'my-skills';
-  const isPortalPage = portalPageView !== null;
   const isCreationHome =
-    workspaceState.activeView === 'create' &&
-    !activeSkill &&
-    !session &&
-    createMode === 'conversation' &&
-    !visiblePendingGuidedMessage;
+    workspaceState.activeView === 'home' ||
+    (workspaceState.activeView === 'create' &&
+      !activeSkill &&
+      !session &&
+      createMode === 'conversation' &&
+      !visiblePendingGuidedMessage);
   const activeSidebarSection: InnoSkillNavSection =
     isRepositoryView || activeSkill
       ? 'my-skills'
       : workspaceState.activeView === 'create' || session
         ? 'create'
-        : (portalPageView ?? 'my-skills');
+        : 'home';
 
   const detailView = (
     ['overview', 'run', 'arena', 'optimize', 'versions'].includes(
@@ -1539,7 +1519,7 @@ function SkillFirstWorkspaceContent() {
 
   return (
     <div
-      className={`skill-workspace-root ${leftCollapsed ? 'is-left-collapsed' : ''} ${inspectorState.open ? 'is-context-open' : ''} ${isCreationHome ? 'is-create-home' : ''} ${isPortalPage ? 'is-portal-page' : ''}`}
+      className={`skill-workspace-root ${leftCollapsed ? 'is-left-collapsed' : ''} ${inspectorState.open ? 'is-context-open' : ''} ${isCreationHome ? 'is-create-home' : ''}`}
       style={
         {
           '--skill-context-current': inspectorState.open
@@ -1589,38 +1569,31 @@ function SkillFirstWorkspaceContent() {
           <div
             id="main-content"
             tabIndex={-1}
-            className={`skill-main-stage ${isRepositoryView ? 'is-repository' : ''} ${isPortalPage ? 'is-portal' : ''}`}
+            className={`skill-main-stage ${isRepositoryView ? 'is-repository' : ''}`}
             key={
               isRepositoryView
                 ? 'my-skills'
-                : portalPageView
-                  ? `portal-${portalPageView}`
-                  : activeSkill
-                    ? `skill-${activeSkill.packageId}-${activeSkill.skillId}`
-                    : session?.id || 'new'
+                : activeSkill
+                  ? `skill-${activeSkill.packageId}-${activeSkill.skillId}`
+                  : session?.id || (workspaceState.activeView === 'home' ? 'home' : 'new')
             }
           >
             <Suspense
               fallback={<SkillWorkspaceLoadingState label="正在打开工作区" />}
             >
-              {portalPageView ? (
-                <InnoSkillPortalPages
-                  view={portalPageView}
-                  skills={repositorySkills}
-                  sessions={sessions}
-                  search={search}
-                  onSearch={handleWorkspaceSearch}
-                  onNew={() => newSkill()}
-                  onOpenSquare={(query) => openPortalView('square', query)}
-                  onOpenMySkills={() => openPortalView('my-skills')}
-                  onOpenSkill={openRepositorySkill}
-                  onOpenVersions={(skill) => {
-                    openRepositorySkill(skill);
-                    navigateWorkspaceView('versions', skill.key, true);
-                  }}
-                  onOpenDraft={(item) => void openSession(item)}
-                  onOpenPipeline={() => openPortalView('pipeline')}
-                  onOpenReview={() => openPortalView('review')}
+              {workspaceState.activeView === 'home' ? (
+                <SkillCreationHome
+                  documents={documents}
+                  busy={busy}
+                  onSend={send}
+                  onFiles={(files) => void addFiles(files)}
+                  onRemoveDocument={(index) =>
+                    setDocuments((current) =>
+                      current.filter((_, itemIndex) => itemIndex !== index),
+                    )
+                  }
+                  onOpenMultimodal={() => newSkill('multimodal')}
+                  onOpenManual={() => newSkill('manual')}
                 />
               ) : isRepositoryView ? (
                 <SkillRepositoryWorkspace
@@ -1780,7 +1753,7 @@ function SkillFirstWorkspaceContent() {
           <SkillInspectorContent
             token={token}
             descriptor={inspectorState.descriptor}
-            session={isRepositoryView || isPortalPage ? null : session}
+            session={isRepositoryView ? null : session}
             activeView={workspaceState.activeView}
             versions={versions}
             currentVersionId={currentVersionId}
@@ -1826,7 +1799,7 @@ function SkillFirstWorkspaceContent() {
               : undefined
           }
           defaultDescriptor={
-            isRepositoryView || isPortalPage
+            isRepositoryView
               ? {
                   owner: 'repository',
                   view: 'repository-selection',

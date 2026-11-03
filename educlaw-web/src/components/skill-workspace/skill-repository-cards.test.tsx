@@ -191,17 +191,15 @@ describe('Skill repository cards', () => {
     const { onSelectSkill } = await renderRepository();
     await act(async () => {
       container
-        .querySelector<HTMLButtonElement>('[aria-label="函数概念教学操作"]')
+        .querySelector<HTMLButtonElement>(
+          '[aria-label="打开并使用函数概念教学"]',
+        )
         ?.click();
     });
-    const openButton = [...container.querySelectorAll('[role="menuitem"]')].find(
-      (button) => button.textContent?.includes('打开 Skill'),
-    ) as HTMLButtonElement | undefined;
-    await act(async () => openButton?.click());
     expect(onSelectSkill).toHaveBeenCalledWith(skills[0]);
   });
 
-  it('keeps card detail selection independent from the overflow menu', async () => {
+  it('opens the Skill from the card body and keeps the menu independent', async () => {
     const onPreview = vi.fn();
     const onOpen = vi.fn();
     const onToggleMenu = vi.fn();
@@ -226,11 +224,13 @@ describe('Skill repository cards', () => {
 
     await act(async () => {
       container
-        .querySelector<HTMLButtonElement>('[aria-label="查看函数概念教学详情"]')
+        .querySelector<HTMLButtonElement>(
+          '[aria-label="打开并使用函数概念教学"]',
+        )
         ?.click();
     });
-    expect(onPreview).toHaveBeenCalledTimes(1);
-    expect(onOpen).not.toHaveBeenCalled();
+    expect(onOpen).toHaveBeenCalledTimes(1);
+    expect(onPreview).not.toHaveBeenCalled();
 
     await act(async () => {
       container
@@ -238,8 +238,8 @@ describe('Skill repository cards', () => {
         ?.click();
     });
     expect(onToggleMenu).toHaveBeenCalledTimes(1);
-    expect(onPreview).toHaveBeenCalledTimes(1);
-    expect(onOpen).not.toHaveBeenCalled();
+    expect(onOpen).toHaveBeenCalledTimes(1);
+    expect(onPreview).not.toHaveBeenCalled();
   });
 
   it('renames a Skill from its card menu and closes after saving', async () => {
