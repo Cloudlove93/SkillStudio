@@ -64,6 +64,7 @@ type Props = {
   onReloadVersions: () => Promise<void>;
   onNavigate: (view: DetailView) => void;
   onBackToRepository: () => void;
+  onAttachToAgent?: () => void;
   onRunStateChange?: (
     running: boolean,
     threadId?: string | null,
@@ -193,6 +194,7 @@ export function SkillDetailWorkspace(props: Props) {
     <main className="skill-center skill-detail-workspace">
       {props.view === 'run' && (
         <header className="skill-workspace-topbar">
+          {props.onAttachToAgent && <button type="button" onClick={props.onAttachToAgent}>添加到 Agent 并使用</button>}
           {props.selectedConversationId && (
             <span role="status">
               {boundVersion

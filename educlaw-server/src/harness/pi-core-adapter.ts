@@ -136,6 +136,9 @@ function validateRequest(request: HarnessRunRequest): HarnessRunError | null {
   if (!request.selectedSkill.skillMd.trim()) {
     return runError("SKILL_INVALID", "当前 Skill 版本没有可执行的规则正文。");
   }
+  if (request.additionalSkills?.some(skill => !Number.isSafeInteger(skill.versionId) || skill.versionId < 1 || !skill.skillMd.trim())) {
+    return runError("SKILL_INVALID", "附加 Skill 版本或正文无效。");
+  }
   if (!request.agentInstructions.trim() || !request.model.modelId.trim()) {
     return runError("INVALID_REQUEST", "Agent 指令或模型配置无效。");
   }
@@ -172,6 +175,7 @@ export function buildPiSystemPrompt(request: HarnessRunRequest): string {
     "",
     "<skill-md>",
     request.selectedSkill.skillMd.trim(),
+    ...(request.additionalSkills ?? []).flatMap(skill => ["", `# Fixed Skill Version ${skill.versionId}`, skill.skillMd.trim()]),
     "</skill-md>",
   ].join("\n");
 }

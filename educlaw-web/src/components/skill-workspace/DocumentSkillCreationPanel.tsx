@@ -16,7 +16,7 @@ import { useWorkspaceInspector } from './WorkspaceInspectorProvider';
 
 type Props = {
   token: string;
-  onGenerated: () => Promise<void> | void;
+  onGenerated: (packageIds: string[]) => Promise<void> | void;
 };
 
 const DOCUMENT_ACCEPT =
@@ -81,6 +81,7 @@ export function DocumentSkillCreationPanel({ token, onGenerated }: Props) {
     const plan = createDocumentBatchPlan(documents);
     let nextIndex = 0;
     let successCount = 0;
+    const generatedPackageIds: string[] = [];
     let failureCount = 0;
     setRuns(plan);
     setBusy(true);
@@ -113,6 +114,7 @@ export function DocumentSkillCreationPanel({ token, onGenerated }: Props) {
             document,
           );
           successCount += 1;
+          generatedPackageIds.push(result.packageId);
           updateRun(run.id, {
             status: 'done',
             packageId: result.packageId,
@@ -135,7 +137,7 @@ export function DocumentSkillCreationPanel({ token, onGenerated }: Props) {
         ),
       );
       setNotice(`生成完成：成功 ${successCount} 个，失败 ${failureCount} 个`);
-      if (successCount > 0) await onGenerated();
+      if (successCount > 0) await onGenerated(generatedPackageIds);
     } finally {
       setBusy(false);
     }

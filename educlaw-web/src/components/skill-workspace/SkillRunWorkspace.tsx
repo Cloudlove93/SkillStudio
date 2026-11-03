@@ -33,6 +33,8 @@ type Props = {
   version: SkillVersionDetail | undefined;
   currentPackageVersionId: string | undefined;
   purpose?: 'run' | 'test';
+  showAnswerOptimization?: boolean;
+  agentName?: string;
   onCompleted?: () => void;
   onRunStateChange?: (
     running: boolean,
@@ -71,6 +73,8 @@ export function SkillRunWorkspace({
   version,
   currentPackageVersionId,
   purpose = 'run',
+  showAnswerOptimization = true,
+  agentName,
   onCompleted,
   onRunStateChange,
   onOptimizeAnswer,
@@ -195,7 +199,7 @@ export function SkillRunWorkspace({
             <div className="skill-flat-empty">
               <Play size={24} />
               <h2>
-                {purpose === 'test' ? '试一试当前 Skill' : '开始使用这个 Skill'}
+                {agentName ? `${purpose === 'test' ? '测试' : '开始使用'} ${agentName}` : purpose === 'test' ? '试一试当前 Skill' : '开始使用这个 Skill'}
               </h2>
               <p>
                 {purpose === 'test'
@@ -231,7 +235,7 @@ export function SkillRunWorkspace({
                     <div className="skill-assistant-message">
                       <MarkdownContent content={message.content} />
                     </div>
-                    {message.messageId && (
+                    {message.messageId && showAnswerOptimization && (
                       <div className="skill-answer-tools">
                         <span>
                           由 v
@@ -347,7 +351,7 @@ export function SkillRunWorkspace({
             placeholder={
               purpose === 'test'
                 ? '输入测试任务…'
-                : '输入任务，立即使用这个 Skill…'
+                : agentName ? `输入任务，让 ${agentName} 使用已启用的 Skills…` : '输入任务，立即使用这个 Skill…'
             }
             disabled={historyLoading}
           />

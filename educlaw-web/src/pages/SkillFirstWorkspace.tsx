@@ -744,7 +744,7 @@ function SkillFirstWorkspaceContent() {
             id: 'skill-created',
             title: 'Skill 已创建完成',
             message: '格式校验、保存和重新加载验证均已通过。',
-            actionLabel: '查看 Skill',
+            actionLabel: '添加到 Agent 并使用',
           });
         } else {
           publishUpdate({
@@ -1333,7 +1333,7 @@ function SkillFirstWorkspaceContent() {
       const skills = await refreshRepository();
       const generated = skills.find((skill) => skill.skillId === skillId);
       if (generated) {
-        openRepositorySkill(generated);
+        navigate(`/agents?skillId=${encodeURIComponent(generated.skillId)}`);
         return;
       }
       openRepository();
@@ -1507,7 +1507,7 @@ function SkillFirstWorkspaceContent() {
       return;
     }
     if (update.id === 'skill-created') {
-      navigateWorkspaceView('run');
+      navigate(`/agents${activeSkill ? `?skillId=${encodeURIComponent(activeSkill.skillId)}` : ''}`);
       return;
     }
     openInspector({
@@ -1552,6 +1552,7 @@ function SkillFirstWorkspaceContent() {
         onDeleteDraft={deleteSession}
         onSelectSkill={openRepositorySkill}
         onSkillAction={handleSkillMenuAction}
+        onAgents={() => navigate('/agents')}
         onConversationSelect={handleConversationSelect}
         onNewConversation={handleNewConversation}
         onConversationRename={renameConversation}
@@ -1616,6 +1617,7 @@ function SkillFirstWorkspaceContent() {
                 <SkillDetailWorkspace
                   token={token}
                   skill={activeSkill}
+                  onAttachToAgent={() => navigate(`/agents?skillId=${encodeURIComponent(activeSkill.skillId)}`)}
                   view={detailView}
                   versions={versions}
                   currentVersionId={currentVersionId}
@@ -1693,10 +1695,11 @@ function SkillFirstWorkspaceContent() {
               ) : createMode === 'document' ? (
                 <DocumentSkillCreationPanel
                   token={token}
-                  onGenerated={async () => {
-                    await refreshRepository();
+                  onGenerated={async (packageIds) => {
+                    const generatedSkills = await refreshRepository();
+                    const ids = generatedSkills.filter(skill => packageIds.includes(skill.packageId)).map(skill => skill.skillId);
                     closeInspector({ force: true });
-                    navigateWorkspaceView('repository', null, true);
+                    navigate(`/agents${ids.length ? `?skillId=${encodeURIComponent(ids[0]!)}` : ''}`);
                   }}
                 />
               ) : createMode === 'manual' ? (

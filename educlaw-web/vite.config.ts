@@ -26,7 +26,10 @@ export default defineConfig({
       '/arena': { target: 'http://127.0.0.1:3001', changeOrigin: true },
       '/optimize': { target: 'http://127.0.0.1:3001', changeOrigin: true },
       '/profiles': { target: 'http://127.0.0.1:3001', changeOrigin: true },
-      '/agents': { target: 'http://127.0.0.1:3001', changeOrigin: true },
+      '/agents': {
+        target: 'http://127.0.0.1:3001', changeOrigin: true,
+        bypass(req) { if (req.headers.accept?.includes('text/html')) return '/index.html'; },
+      },
       '/runtimes': { target: 'http://127.0.0.1:3001', changeOrigin: true },
       '/llm': { target: 'http://127.0.0.1:3001', changeOrigin: true },
       '/events': { target: 'http://127.0.0.1:3001', changeOrigin: true },

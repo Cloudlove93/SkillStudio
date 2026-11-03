@@ -35,14 +35,14 @@ export function getSurfaceLabel(surface: SkillConversationSurface | null): strin
 export function isSkillConversationThread(thread: ArenaThread, skillId: string): boolean {
   if (thread.arenaKind !== 'skill_arena') return false;
   const config = thread.skillArenaConfig;
-  if (!config) return false;
+  if (!config || config.agentExecution) return false;
   // 仅运行/测试会话进入 Run 列表；对比与交互式优化各自独立，不在该列表展示
   const surface = getConversationSurface(thread);
   if (surface !== 'run' && surface !== 'test') return false;
   const left = config.left;
   const right = config.right;
-  return left.skillId === skillId
-    && right.skillId === skillId
+  return left?.skillId === skillId
+    && right?.skillId === skillId
     && left.skillVersionId === right.skillVersionId;
 }
 

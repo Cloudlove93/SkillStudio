@@ -174,9 +174,51 @@ export interface ArenaThreadVariant {
   versionNumber: number;
 }
 
+/** User-configured Agent with explicitly pinned reusable Skills. */
+export interface AgentSkillBinding {
+  skillId: string;
+  skillVersionId: string;
+  enabled: boolean;
+}
+export interface AgentResolvedSkill extends AgentSkillBinding {
+  packageId: string;
+  name: string;
+  description: string;
+  versionNumber: number;
+}
+export interface AgentWorkspace {
+  id: string;
+  name: string;
+  description: string;
+  instructions: string;
+  model: string;
+  skills: AgentResolvedSkill[];
+  createdAt: string;
+  updatedAt: string;
+}
+export interface AgentWorkspaceInput {
+  name: string;
+  description: string;
+  instructions: string;
+  model: string;
+  skills: AgentSkillBinding[];
+}
+export interface AgentExecutionSnapshot {
+  agentId: string;
+  name: string;
+  instructions: string;
+  model: string;
+  skills: Array<AgentResolvedSkill & {
+    packageVersionId: string;
+    skillUid: string;
+    skillMd: string;
+  }>;
+}
+
 export interface SkillArenaConfig {
   mode: 'skill_arena';
   compositionMode: 'skill_only';
+  agentExecution?: AgentExecutionSnapshot;
   /** run: 单版本运行；test: 固定版本测试；arena: 双版本对比；optimize: 交互式优化 */
   surface?: 'run' | 'test' | 'arena' | 'optimize';
   basePackageVersionId: string;
