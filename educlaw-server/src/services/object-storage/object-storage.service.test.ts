@@ -17,6 +17,29 @@ function makeConfig() {
 }
 
 describe('object storage service', () => {
+  it('keeps presigned uploads free of empty-body checksum parameters', async () => {
+    const service = createObjectStorageService({ config: makeConfig() });
+    const objectKey =
+      'skill-sessions/91/source/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.mp4';
+
+    const putGrant = await service.createSignedPutGrant({
+      objectKey,
+      contentType: 'video/mp4',
+    });
+    const partGrant = await service.createSignedUploadPartGrant({
+      objectKey,
+      multipartUploadId: 'upload-123',
+      partNumber: 1,
+    });
+
+    for (const url of [putGrant.url, partGrant.url]) {
+      const checksumParams = [...new URL(url).searchParams.keys()].filter(
+        (name) => /checksum/i.test(name),
+      );
+      expect(checksumParams).toEqual([]);
+    }
+  });
+
   it('generates immutable keys under allowed prefixes and rejects path injection', () => {
     const service = createObjectStorageService({
       config: makeConfig(),

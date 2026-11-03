@@ -84,6 +84,11 @@ export function createObjectStorageService(options: {
         accessKeyId: config.accessKeyId,
         secretAccessKey: config.secretAccessKey,
       },
+      // 预签名 URL 在签名阶段没有真实请求体，SDK 默认会写入空内容的
+      // x-amz-checksum-crc32，浏览器上传真实文件后 SeaweedFS 会因校验不一致拒绝。
+      // 仅在协议明确要求时计算校验值，MinIO 与 SeaweedFS 均兼容。
+      requestChecksumCalculation: 'WHEN_REQUIRED',
+      responseChecksumValidation: 'WHEN_REQUIRED',
     });
   const presignUrl = options.presignUrl ?? getSignedUrl;
   const now = options.now ?? (() => new Date());
