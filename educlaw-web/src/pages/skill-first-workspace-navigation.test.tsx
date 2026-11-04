@@ -329,9 +329,9 @@ it('resumes an unfinished guided draft after opening the Skill repository', asyn
 
   await vi.waitFor(async () => {
     await act(async () => {});
-    expect(button('Skill 资产')).toBeDefined();
+    expect(button('技能库')).toBeDefined();
   });
-  await act(async () => button('Skill 资产')!.click());
+  await act(async () => button('技能库')!.click());
   await vi.waitFor(async () => {
     await act(async () => {});
     expect(
@@ -494,7 +494,7 @@ it('refreshes the repository summary after saving through the actual optimizatio
   expect(api.applyInteractiveChanges.mock.calls[0]?.[3]?.[0]?.modified).toBe(
     'Updated',
   );
-  await act(async () => button('Skill 资产')!.click());
+  await act(async () => button('技能库')!.click());
   await vi.waitFor(async () => {
     await act(async () => {});
     expect(
@@ -575,7 +575,7 @@ it('keeps the newest repository summary when refresh responses arrive out of ord
   });
   await act(async () => button('刷新版本')!.click());
   await act(async () => button('刷新版本')!.click());
-  await act(async () => button('Skill 资产')!.click());
+  await act(async () => button('技能库')!.click());
   await vi.waitFor(async () => {
     await act(async () => {});
     expect(
@@ -684,7 +684,7 @@ it.each(['rollback', 'discard', 'restore'] as const)(
       await act(async () => {});
       expect(container.querySelector('.skill-version-confirm')).toBeNull();
     });
-    await act(async () => button('Skill 资产')!.click());
+    await act(async () => button('技能库')!.click());
     await vi.waitFor(async () => {
       await act(async () => {});
       expect(

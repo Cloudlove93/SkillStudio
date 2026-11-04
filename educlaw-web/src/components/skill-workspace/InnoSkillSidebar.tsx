@@ -134,7 +134,7 @@ export function InnoSkillSidebar(props: Props) {
         </button>
       </div>
 
-      <nav className="isk-sidebar-nav" aria-label="InnoAgent 主导航">
+      <nav className="isk-sidebar-nav" aria-label="SkillStudio 主导航">
         <NavButton
           active={props.activeSection === 'home'}
           icon={<Home />}
@@ -145,7 +145,7 @@ export function InnoSkillSidebar(props: Props) {
         <NavButton
           active={props.activeSection === 'my-skills'}
           icon={<BookOpen />}
-          label="Skill 资产"
+          label="技能库"
           onClick={() => props.onNavigate('my-skills')}
         />
 

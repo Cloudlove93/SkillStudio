@@ -55,7 +55,7 @@ export function SkillCreationHome({
     <main className="skill-creation-home skill-view-enter">
       <div className="skill-creation-home-content">
         <h1>
-          想把哪段<span>教学经验</span>，蒸馏成可复用的 Agent？
+          想把哪段<span>教学经验</span>，变成一位可复用的教学 Agent？
         </h1>
 
         <div className="skill-home-composer-zone">

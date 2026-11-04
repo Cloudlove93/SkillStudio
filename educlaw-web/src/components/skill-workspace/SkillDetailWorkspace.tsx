@@ -338,7 +338,7 @@ function Overview({ skill }: { skill: SkillDetailSelection }) {
   return (
     <div className="skill-flat-overview skill-view-enter">
       <div className="skill-overview-intro">
-        <span className="skill-eyebrow">Skill 资产</span>
+        <span className="skill-eyebrow">教学 Skill</span>
         <h1>{skill.name}</h1>
         <p>{skill.description || '通过结构化流程完成教育场景任务'}</p>
       </div>

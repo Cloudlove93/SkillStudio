@@ -742,7 +742,7 @@ function SkillFirstWorkspaceContent() {
           );
           publishUpdate({
             id: 'skill-created',
-            title: 'Agent 已创建完成',
+            title: 'Skill 已生成完成',
             message: '格式校验、保存和重新加载验证均已通过。',
             actionLabel: '添加到 Agent 并使用',
           });
@@ -755,9 +755,9 @@ function SkillFirstWorkspaceContent() {
           });
         }
       } else if (next.status === 'completed' && next.skill_id) {
-        toast.success('Agent 已生成完成', {
+        toast.success('Skill 已生成完成', {
           action: {
-            label: '打开 Agent',
+            label: '创建 Agent',
             onClick: () => void openSession(next),
           },
         });
@@ -855,7 +855,7 @@ function SkillFirstWorkspaceContent() {
     if (!session) return;
     publishUpdate({
       id: 'skill-generating',
-      title: '正在生成 Agent',
+      title: '正在生成 Skill',
       message: '系统正在生成文件、校验结构并保存首个版本。',
       actionLabel: '查看生成状态',
     });

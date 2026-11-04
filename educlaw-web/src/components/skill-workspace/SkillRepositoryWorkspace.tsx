@@ -204,9 +204,9 @@ export function SkillRepositoryWorkspace({
     >
       <header className="skill-repository-header">
         <div>
-          <span className="skill-eyebrow">Skill 资产</span>
-          <h1>管理你的 Skill 资产</h1>
-          <p>Skill 是 Agent 的可复用能力，在这里查看、整理并挂载给 Agent。</p>
+          <span className="skill-eyebrow">技能库</span>
+          <h1>管理你的教学 Skill</h1>
+          <p>Skill 是 Agent 的能力来源，在这里整理好，再挂载给 Agent。</p>
         </div>
         <button className="skill-primary-button" onClick={onNew}>
           <Plus size={16} aria-hidden="true" />
@@ -217,7 +217,7 @@ export function SkillRepositoryWorkspace({
       <div
         className="skill-repository-tabs"
         role="tablist"
-        aria-label="Skill 资产内容"
+        aria-label="技能库内容"
       >
         <button
           type="button"
