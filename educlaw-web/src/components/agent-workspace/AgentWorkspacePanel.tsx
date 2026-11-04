@@ -498,8 +498,8 @@ function AgentWorkspaceSession({
             <Plus size={17} />
           </button>
         </div>
-        <p className="agent-muted">把多个 Skills 组合成自己的教学助手。</p>
-        {listLoading && <p role="status">正在加载 Agents…</p>}
+        <p className="agent-muted">把可复用的 Skill 组合成自己的教学 Agent。</p>
+        {listLoading && <p role="status">正在加载 Agent…</p>}
         {listError && (
           <div role="alert" className="agent-error">
             {listError}
@@ -520,14 +520,14 @@ function AgentWorkspaceSession({
               <strong>{item.name}</strong>
               <span>{item.description || '教学助手'}</span>
               <small>
-                {item.skills.filter((s) => s.enabled).length} 个启用的 Skills
+                {item.skills.filter((s) => s.enabled).length} 个启用的 Skill
               </small>
             </button>
           ))}
         </nav>
         {!listLoading && !listError && !agents.length && (
           <div className="agent-empty-inline">
-            创建第一个 Agent，绑定你已有的 Skills。
+            创建第一个 Agent，绑定你已有的 Skill。
           </div>
         )}
         <button
@@ -543,10 +543,10 @@ function AgentWorkspaceSession({
       <main className="agent-main" aria-label="Agent 工作区">
         <header className="agent-header">
           <div>
-            <p className="agent-eyebrow">AGENT WORKSPACE</p>
+            <p className="agent-eyebrow">AGENT 工作区</p>
             <h1>{agent?.name ?? (selectedId ? 'Agent 配置' : '创建 Agent')}</h1>
             <p className="agent-muted">
-              配置你的助手，明确它可以使用的 Skills。
+              配置你的助手，明确它可以使用的 Skill。
             </p>
           </div>
           <div className="agent-actions">
@@ -719,7 +719,7 @@ function AgentWorkspaceSession({
                       maxLength={16000}
                       rows={5}
                       value={draft.instructions}
-                      placeholder="定义角色、工作方式和多个 Skills 的协作规则…"
+                      placeholder="定义角色、工作方式和多个 Skill 的协作规则…"
                       onChange={(e) =>
                         setDraft({ ...draft, instructions: e.target.value })
                       }

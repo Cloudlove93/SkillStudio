@@ -409,7 +409,7 @@ it('keeps the saved Agent and reuses the conversation key after save-and-run tra
 it('attaches generated skill to an existing Agent, then reselects it in a new draft', async () => {
   window.history.replaceState({}, '', '/agents?skillId=12');
   await render();
-  await click('课程助手备课1 个启用的 Skills');
+  await click('课程助手备课1 个启用的 Skill');
   await click('放弃并继续');
   await click('添加待绑定 Skill');
   await click('保存配置');

@@ -55,7 +55,7 @@ export function SkillCreationHome({
     <main className="skill-creation-home skill-view-enter">
       <div className="skill-creation-home-content">
         <h1>
-          想把哪段<span>教学经验</span>，蒸馏成可复用的 Skill？
+          想把哪段<span>教学经验</span>，蒸馏成可复用的 Agent？
         </h1>
 
         <div className="skill-home-composer-zone">
@@ -97,9 +97,9 @@ export function SkillCreationHome({
               rows={1}
               value={input}
               name="skill-creation-home-message"
-              aria-label="描述你的教学经验"
+              aria-label="描述你的教学需求"
               autoComplete="off"
-              placeholder="描述你的教学经验，或直接拖入教案、课例文档……"
+              placeholder="描述你的教学需求，或直接拖入教案、课例文档……"
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter' && !event.shiftKey) {
