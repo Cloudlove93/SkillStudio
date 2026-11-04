@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { ArenaThread, GuidedCreationSession } from '@educlaw/shared';
 import {
   AudioLines,
+  Bot,
   BookOpen,
   ChevronDown,
   FileText,
@@ -64,6 +65,7 @@ type Props = {
     title: string,
   ) => Promise<void> | void;
   onConversationDelete?: (thread: ArenaThread) => Promise<void> | void;
+  onAgents?: () => void;
   onAdmin: () => void;
   onLogout: () => void;
 };
@@ -146,6 +148,7 @@ export function InnoSkillSidebar(props: Props) {
           onClick={() => props.onNavigate('my-skills')}
         />
 
+        {props.onAgents && <NavButton active={false} icon={<Bot />} label="我的 Agent" onClick={props.onAgents} />}
         <span className="isk-sidebar-section-label">生成</span>
         <div
           className={`isk-sidebar-create ${props.activeSection === 'create' ? 'is-active' : ''}`}

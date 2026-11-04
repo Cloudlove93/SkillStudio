@@ -29,6 +29,8 @@ const DEFAULT_MAX_MODEL_CALLS = 8;
 export const DEFAULT_PI_RUN_TIMEOUT_MS = 180_000;
 const MAX_RECORDED_EVENTS = 200;
 const MAX_RECORDED_TOOL_NAMES = 16;
+/** 系统提示词总字符上限，避免 Agent 多 Skill 拼接超出模型上下文。 */
+export const MAX_PI_SYSTEM_PROMPT_CHARS = 60_000;
 const ZERO_USAGE: Usage = {
   input: 0,
   output: 0,
@@ -136,6 +138,16 @@ function validateRequest(request: HarnessRunRequest): HarnessRunError | null {
   if (!request.selectedSkill.skillMd.trim()) {
     return runError("SKILL_INVALID", "当前 Skill 版本没有可执行的规则正文。");
   }
+  if (request.additionalSkills?.some(skill => !Number.isSafeInteger(skill.versionId) || skill.versionId < 1 || !skill.skillMd.trim())) {
+    return runError("SKILL_INVALID", "附加 Skill 版本或正文无效。");
+  }
+  const systemPromptChars = buildPiSystemPrompt(request).length;
+  if (systemPromptChars > MAX_PI_SYSTEM_PROMPT_CHARS) {
+    return runError(
+      "SKILL_INVALID",
+      `Agent 指令与 Skill 正文合计 ${systemPromptChars} 字符，超过 ${MAX_PI_SYSTEM_PROMPT_CHARS} 字符上限。请减少挂载的 Skill 或精简 Skill 正文。`,
+    );
+  }
   if (!request.agentInstructions.trim() || !request.model.modelId.trim()) {
     return runError("INVALID_REQUEST", "Agent 指令或模型配置无效。");
   }
@@ -172,6 +184,7 @@ export function buildPiSystemPrompt(request: HarnessRunRequest): string {
     "",
     "<skill-md>",
     request.selectedSkill.skillMd.trim(),
+    ...(request.additionalSkills ?? []).flatMap(skill => ["", `# Fixed Skill Version ${skill.versionId}`, skill.skillMd.trim()]),
     "</skill-md>",
   ].join("\n");
 }

@@ -2887,6 +2887,22 @@ export async function deletePackage(userId: string, packageId: string) {
   if (!pkg.rows[0])
     throw new Error('\u667a\u80fd\u4f53\u5305\u4e0d\u5b58\u5728');
 
+  const attached = await query<{ name: string }>(
+    `select a.name from user_agents a
+     where a.user_id = $2 and exists (
+       select 1 from jsonb_array_elements(a.skills_json) binding
+       join agent_package_skills s on s.id = (case when binding->>'skillId' ~ '^[1-9][0-9]*$'
+         then (binding->>'skillId')::bigint end)
+       where s.package_id = $1
+     )
+     order by a.name limit 1`,
+    [packageId, userId],
+  );
+  if (attached.rows[0])
+    throw new Error(
+      `该智能体包正被 Agent「${attached.rows[0].name}」使用，请先在 Agent 中移除后再删除`,
+    );
+
   await query(
     'delete from arena_messages where thread_id in (select id from arena_threads where package_id = $1 and user_id = $2)',
     [packageId, userId],

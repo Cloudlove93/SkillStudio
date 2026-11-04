@@ -10,6 +10,7 @@ import { useAuthStore } from './stores/auth'
 
 const AdminPage = lazy(() => import('./pages/AdminPage'))
 const LoginPage = lazy(() => import('./pages/LoginPage'))
+const AgentWorkspacePage = lazy(() => import('./pages/AgentWorkspacePage'))
 const SkillFirstWorkspace = lazy(() => import('./pages/SkillFirstWorkspace'))
 
 function RouteFallback() {
@@ -82,6 +83,7 @@ function AppRoutes() {
       <Routes>
         <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />} />
         <Route path="/" element={<RequireAuth><SkillFirstWorkspace /></RequireAuth>} />
+        <Route path="/agents" element={<RequireAuth><AgentWorkspacePage /></RequireAuth>} />
         <Route path="/skills" element={<RequireAuth><SkillFirstWorkspace /></RequireAuth>} />
         <Route path="/legacy" element={<Navigate to="/" replace />} />
         <Route path="/workflow" element={<Navigate to="/" replace />} />

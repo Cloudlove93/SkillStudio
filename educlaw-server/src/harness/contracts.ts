@@ -45,6 +45,7 @@ export interface HarnessRunRequest {
     versionId: number;
     skillMd: string;
   };
+  additionalSkills?: readonly { versionId: number; skillMd: string }[];
   agentInstructions: string;
   history: readonly HarnessHistoryMessage[];
   currentInput: string;
