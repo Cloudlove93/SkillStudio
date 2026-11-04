@@ -205,7 +205,7 @@ it.each(['/?view=create', '/?view=run&skill=7%3A11&conversation=91'])(
       expect(api.getGuidedCreationDetail).toHaveBeenCalledWith('test-token', {
         session_id: unfinishedGuidedDraft.id,
       });
-      expect(container.textContent).toContain('确认这个 Skill 的工作方式');
+      expect(container.textContent).toContain('确认这位 Agent 的工作方式');
       const params = new URLSearchParams(
         container.querySelector('[data-route]')!.textContent!,
       );
@@ -251,7 +251,7 @@ it('resumes an unfinished guided draft after switching to another Skill conversa
   await act(async () => draftButton()!.click());
   await vi.waitFor(async () => {
     await act(async () => {});
-    expect(container.textContent).toContain('确认这个 Skill 的工作方式');
+    expect(container.textContent).toContain('确认这位 Agent 的工作方式');
     expect(
       new URLSearchParams(
         container.querySelector('[data-route]')!.textContent!,
@@ -306,7 +306,7 @@ it('resumes an unfinished guided draft after entering a Skill conversation from 
   await act(async () => draftButton()!.click());
   await vi.waitFor(async () => {
     await act(async () => {});
-    expect(container.textContent).toContain('确认这个 Skill 的工作方式');
+    expect(container.textContent).toContain('确认这位 Agent 的工作方式');
     expect(
       new URLSearchParams(
         container.querySelector('[data-route]')!.textContent!,
@@ -345,7 +345,7 @@ it('resumes an unfinished guided draft after opening the Skill repository', asyn
   await act(async () => draftButton()!.click());
   await vi.waitFor(async () => {
     await act(async () => {});
-    expect(container.textContent).toContain('确认这个 Skill 的工作方式');
+    expect(container.textContent).toContain('确认这位 Agent 的工作方式');
     expect(
       new URLSearchParams(
         container.querySelector('[data-route]')!.textContent!,

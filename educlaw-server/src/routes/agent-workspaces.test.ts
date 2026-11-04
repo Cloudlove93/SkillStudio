@@ -6,6 +6,7 @@ const mocks = {
   listAgents: vi.fn(),
   getAgent: vi.fn(),
   saveAgent: vi.fn(),
+  provisionAgent: vi.fn(),
   listAgentConversations: vi.fn(),
   createAgentConversation: vi.fn(),
 };
@@ -15,6 +16,7 @@ let WorkspaceError: typeof import('../services/agent-workspace-service.js').Agen
 const endpoints = [
   ['GET', '/agent-workspaces', 'listAgents'],
   ['POST', '/agent-workspaces', 'saveAgent'],
+  ['POST', '/agent-workspaces/provision', 'provisionAgent'],
   ['GET', '/agent-workspaces/12', 'getAgent'],
   ['PUT', '/agent-workspaces/12', 'saveAgent'],
   ['GET', '/agent-workspaces/12/conversations', 'listAgentConversations'],
@@ -129,7 +131,9 @@ describe('Agent workspace gateway routes', () => {
               : ['gateway-owner', body, '12']
             : key === 'createAgentConversation'
               ? ['gateway-owner', '12', body]
-              : ['gateway-owner', '12'];
+              : key === 'provisionAgent'
+                ? ['gateway-owner', body]
+                : ['gateway-owner', '12'];
       expect(mocks[key]).toHaveBeenCalledExactlyOnceWith(...args);
     },
   );

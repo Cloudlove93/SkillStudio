@@ -119,6 +119,12 @@ function AgentWorkspaceSession({
     requestId: string;
   } | null>(null);
   const adoptedAgentId = useRef<string | null>(null);
+  const provisionAttempt = useRef<string | null>(null);
+  const autoChatStarted = useRef(false);
+  const [autoChat] = useState(
+    () =>
+      new URLSearchParams(window.location.search).get('autochat') === '1',
+  );
   const dirty =
     JSON.stringify(draft) !==
     JSON.stringify(agent ? inputOf(agent) : emptyInput());
@@ -310,6 +316,42 @@ function AgentWorkspaceSession({
     );
   }, [pendingSkill, querySkillId, selectionReady, selectedId, detailRetry]);
 
+  // 从生成流程或仓库带着 skillId 进入时，直接把 Skill 转成可对话的 Agent。
+  useEffect(() => {
+    if (
+      !selectionReady ||
+      selectedId ||
+      !querySkillId ||
+      provisionAttempt.current === querySkillId
+    )
+      return;
+    provisionAttempt.current = querySkillId;
+    setAttachmentLoading(true);
+    setAttachmentError('');
+    void agentsApi
+      .provision(token, { skillId: querySkillId })
+      .then((created) => {
+        setAgents((previous) => [
+          created,
+          ...previous.filter((item) => item.id !== created.id),
+        ]);
+        setSelectedId(created.id);
+        setSelectionReady(true);
+        setQuerySkillId('');
+        setPendingSkill(null);
+        const url = new URL(window.location.href);
+        url.searchParams.delete('skillId');
+        url.searchParams.set('agentId', created.id);
+        window.history.replaceState(
+          window.history.state,
+          '',
+          `${url.pathname}${url.search}${url.hash}`,
+        );
+      })
+      .catch((e: unknown) => setAttachmentError(errorMessage(e)))
+      .finally(() => setAttachmentLoading(false));
+  }, [token, querySkillId, selectionReady, selectedId]);
+
   function choose(id: string | null) {
     if (saving || starting || (selectionReady && id === selectedId)) return;
     if (dirty) {
@@ -428,7 +470,7 @@ function AgentWorkspaceSession({
     }
   }
 
-  async function start(purpose: 'run' | 'test') {
+  async function start(purpose: 'run' | 'test', requestId?: string) {
     if (
       !agent ||
       dirty ||
@@ -440,7 +482,9 @@ function AgentWorkspaceSession({
     setStarting(true);
     setActionError('');
     const generation = scope.current;
-    if (
+    if (requestId) {
+      requestKey.current = { agentId: agent.id, purpose, requestId };
+    } else if (
       requestKey.current?.agentId !== agent.id ||
       requestKey.current.purpose !== purpose
     ) {
@@ -480,6 +524,31 @@ function AgentWorkspaceSession({
     !starting &&
     !saving &&
     agent.skills.some((s) => s.enabled && s.available !== false);
+
+  // 自动创建 Agent 后直接进入对话，让“生成”结果马上可用。
+  useEffect(() => {
+    if (
+      !autoChat ||
+      autoChatStarted.current ||
+      !agent ||
+      dirty ||
+      starting ||
+      saving
+    )
+      return;
+    autoChatStarted.current = true;
+    if (conversations.length) {
+      const latest = conversations[0]!;
+      setThread(latest);
+      setTab('chat');
+      writeSelection(agent.id, latest.id);
+      return;
+    }
+    void start('run', `auto:${agent.id}`);
+    // 只在首次进入时自动开一次对话，后续由用户主动操作。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoChat, agent, dirty, starting, saving, conversations]);
+
   const openSkill = onOpenSkill;
   return (
     <div className="skill-workspace-root agent-workspace-panel">
@@ -571,7 +640,9 @@ function AgentWorkspaceSession({
         </header>
         {attachmentLoading && (
           <p role="status" className="agent-banner">
-            正在查找待绑定 Skill…
+            {querySkillId
+              ? '正在把 Skill 转换成 Agent，并准备对话…'
+              : '正在查找待绑定 Skill…'}
           </p>
         )}
         {attachmentError && (
@@ -583,7 +654,7 @@ function AgentWorkspaceSession({
           <div className="agent-banner">
             <div>
               <strong>待绑定：{pendingSkill.name}</strong>
-              <p>为新 Agent 预选，或从左侧选择已有 Agent 后添加。</p>
+              <p>自动创建 Agent 未成功，可把这个 Skill 手动加入后继续。</p>
             </div>
             <button
               type="button"

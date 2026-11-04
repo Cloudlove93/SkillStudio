@@ -49,9 +49,9 @@ type Props = {
 };
 
 const phaseSteps = [
-  { key: 'generating', label: '生成 Skill 文件' },
+  { key: 'generating', label: '生成教学 Skill' },
   { key: 'validating', label: '检查结构与内容' },
-  { key: 'saving', label: '保存 Skill v1' },
+  { key: 'saving', label: '创建 Agent 并挂载' },
 ];
 
 const guidedStageLabels: Record<GuidedCreationStage, string> = {
@@ -144,8 +144,8 @@ export function GuidedSkillCreationPanel(props: Props) {
             <Sparkles size={24} />
           </div>
           <span className="skill-eyebrow">正在创建</span>
-          <h1>正在把确认内容生成 Skill</h1>
-          <p>生成过程中可以切换到其他草稿，任务会继续在后台完成。</p>
+          <h1>正在创建你的教学 Agent</h1>
+          <p>系统会先生成教学 Skill，再把它挂载到 Agent；任务在后台继续完成。</p>
           <div className="skill-phase-list">
             {phaseSteps.map((step, index) => {
               const activeIndex = Math.max(
@@ -205,9 +205,9 @@ export function GuidedSkillCreationPanel(props: Props) {
             返回对话补充
           </button>
           <span className="skill-eyebrow">生成前确认</span>
-          <h1>确认这个 Skill 的工作方式</h1>
+          <h1>确认这位 Agent 的工作方式</h1>
           <p className="skill-page-subtitle">
-            确认后会创建 Skill v1，当前对话和草案都会继续保留。
+            确认后会生成教学 Skill v1，并自动创建可对话的 Agent；当前对话和草案都会保留。
           </p>
           <div className="skill-confirm-grid">
             {props.session?.confirmation?.sections.map((section) => (
@@ -242,7 +242,7 @@ export function GuidedSkillCreationPanel(props: Props) {
               ) : (
                 <Sparkles size={16} />
               )}
-              确认并生成 Skill
+              确认并创建 Agent
             </button>
           </div>
         </div>

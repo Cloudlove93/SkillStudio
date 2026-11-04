@@ -205,6 +205,11 @@ export interface AgentWorkspaceInput {
   model: string;
   skills: AgentSkillBinding[];
 }
+/** 由已有产物转成 Agent：生成会话或仓库中的 Skill，二选一。 */
+export interface AgentProvisionInput {
+  sessionId?: string;
+  skillId?: string;
+}
 export interface AgentExecutionSnapshot {
   agentId: string;
   name: string;

@@ -253,6 +253,153 @@ export async function saveAgent(userId: string, raw: unknown, id?: string) {
     return toAgent(client, result.rows[0]!);
   });
 }
+
+const isId = (value: unknown): value is string =>
+  typeof value === 'string' &&
+  /^[1-9]\d*$/.test(value) &&
+  Number.isSafeInteger(Number(value));
+
+/**
+ * 把已生成的 Skill 转成可对话的 Agent。
+ * 同一个生成会话或同一个 Skill 只会创建一个 Agent；重复调用返回既有 Agent。
+ */
+export async function provisionAgent(
+  userId: string,
+  raw: unknown,
+): Promise<AgentWorkspace> {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw))
+    throw new AgentWorkspaceError('Agent 来源不能为空');
+  const body = raw as Record<string, unknown>;
+  const sessionId =
+    typeof body.sessionId === 'string' ? body.sessionId.trim() : '';
+  const requestedSkillId =
+    typeof body.skillId === 'string' ? body.skillId.trim() : '';
+  if (!!sessionId === !!requestedSkillId)
+    throw new AgentWorkspaceError('请提供且仅提供一个 Agent 来源');
+  if (!isId(sessionId || requestedSkillId))
+    throw new AgentWorkspaceError('Agent 来源标识无效');
+
+  return withTransaction(async (client) => {
+    let sourceKey: string;
+    let skillId: string;
+    let skillVersionId: string;
+    let preferredName = '';
+    let model = '';
+
+    if (sessionId) {
+      const session = await client.query<Record<string, unknown>>(
+        `select display_name, status, model, skill_id, skill_version_id
+           from skill_guided_creation_sessions
+          where id = $1 and user_id = $2 and deleted_at is null`,
+        [sessionId, userId],
+      );
+      const row = session.rows[0];
+      if (!row)
+        throw new AgentWorkspaceError(
+          '创建会话不存在',
+          404,
+          'SESSION_NOT_FOUND',
+        );
+      if (!row.skill_id || !row.skill_version_id || row.status !== 'completed')
+        throw new AgentWorkspaceError(
+          '该会话尚未完成生成，请稍后再试',
+          409,
+          'SESSION_NOT_READY',
+        );
+      sourceKey = `guided:${sessionId}`;
+      skillId = String(row.skill_id);
+      skillVersionId = String(row.skill_version_id);
+      preferredName =
+        typeof row.display_name === 'string' ? row.display_name.trim() : '';
+      model =
+        typeof row.model === 'string' ? row.model.trim().slice(0, 256) : '';
+    } else {
+      const latest = await client.query<{ id: string }>(
+        `select sv.id
+           from agent_skill_versions sv
+           join agent_package_skills s on s.id = sv.skill_id
+           join agent_packages p on p.id = sv.package_id
+          where sv.skill_id = $1 and p.user_id = $2
+            and s.status = 'active' and sv.status = 'active'
+          order by sv.version_number desc
+          limit 1`,
+        [requestedSkillId, userId],
+      );
+      const versionId = latest.rows[0]?.id;
+      if (!versionId)
+        throw new AgentWorkspaceError(
+          'Skill 或版本不可用，请重新选择',
+          422,
+          'SKILL_UNAVAILABLE',
+        );
+      sourceKey = `skill:${requestedSkillId}`;
+      skillId = requestedSkillId;
+      skillVersionId = String(versionId);
+    }
+
+    const skills = await resolveSkills(
+      client,
+      userId,
+      [{ skillId, skillVersionId, enabled: true }],
+      true,
+    );
+    const skill = skills[0]!;
+    const name = (preferredName || skill.name).slice(0, 100);
+    const description = skill.description.slice(0, 2000);
+    const instructions = `你是「${name}」教学 Agent。请围绕用户的教学场景，优先依据已挂载的教学 Skill 完成任务；信息不足时先澄清，不编造课程事实。`;
+
+    const bySource = await client.query<AgentRow>(
+      'select * from user_agents where user_id = $1 and source_key = $2',
+      [userId, sourceKey],
+    );
+    if (bySource.rows[0]) return toAgent(client, bySource.rows[0]);
+
+    // 同一 Skill 已经有 Agent 时复用它，避免重复创建。
+    const bySkill = await client.query<AgentRow>(
+      `select * from user_agents a
+        where a.user_id = $1
+          and exists (
+            select 1 from jsonb_array_elements(a.skills_json) binding
+            where binding->>'skillId' = $2
+          )
+        order by a.updated_at desc, a.id desc
+        limit 1`,
+      [userId, skillId],
+    );
+    if (bySkill.rows[0]) {
+      await client.query(
+        'update user_agents set source_key = $1 where id = $2 and source_key is null',
+        [sourceKey, bySkill.rows[0].id],
+      );
+      return toAgent(client, bySkill.rows[0]);
+    }
+
+    const now = new Date().toISOString();
+    try {
+      const inserted = await client.query<AgentRow>(
+        'insert into user_agents (name,description,instructions,model,skills_json,updated_at,created_at,user_id,source_key) values ($1,$2,$3,$4,$5,$6,$6,$7,$8) returning *',
+        [
+          name,
+          description,
+          instructions,
+          model,
+          JSON.stringify([{ skillId, skillVersionId, enabled: true }]),
+          now,
+          userId,
+          sourceKey,
+        ],
+      );
+      return toAgent(client, inserted.rows[0]!);
+    } catch (error) {
+      const retry = await client.query<AgentRow>(
+        'select * from user_agents where user_id = $1 and source_key = $2',
+        [userId, sourceKey],
+      );
+      if (retry.rows[0]) return toAgent(client, retry.rows[0]);
+      throw error;
+    }
+  });
+}
 export async function listAgentConversations(userId: string, id: string) {
   await ownedAgent({ query }, userId, id);
   const rows = await query<{ thread_id: string }>(

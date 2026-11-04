@@ -1,11 +1,13 @@
 import type {
   ArenaThread,
+  AgentProvisionInput,
   AgentWorkspace,
   AgentWorkspaceInput,
 } from '@educlaw/shared';
 import { apiFetch } from './client';
 
 export type {
+  AgentProvisionInput,
   AgentWorkspace,
   AgentWorkspaceInput,
   AgentSkillBinding,
@@ -53,6 +55,11 @@ export const agentsApi = {
     request<AgentWorkspaceDetail>(token, pathFor(agentId)),
   create: (token: string, input: AgentWorkspaceInput) =>
     request<AgentWorkspace>(token, '', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+  provision: (token: string, input: AgentProvisionInput) =>
+    request<AgentWorkspace>(token, '/provision', {
       method: 'POST',
       body: JSON.stringify(input),
     }),

@@ -687,6 +687,7 @@ export const schemaStatements = historicalSchemaStatements.concat(
       name text not null, description text not null default '',
       instructions text not null default '', model text not null default '',
       skills_json jsonb not null default '[]'::jsonb,
+      source_key text,
       created_at timestamptz not null, updated_at timestamptz not null
     )`,
     `create index if not exists idx_user_agents_owner on user_agents(user_id, id)`,
@@ -704,6 +705,8 @@ export const schemaStatements = historicalSchemaStatements.concat(
  * Statements are run independently so an already-migrated column does not block later migrations.
  */
 export const migrationStatements = [
+  `alter table user_agents add column if not exists source_key text`,
+  `create unique index if not exists uq_user_agents_source_key on user_agents(user_id, source_key) where source_key is not null`,
   // JSON text columns to JSONB.
   `alter table agent_package_skills add column if not exists display_name text`,
   `alter table agent_package_versions alter column snapshot_json type jsonb using snapshot_json::jsonb`,
