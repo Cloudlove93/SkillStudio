@@ -1286,7 +1286,7 @@ async function resolveThreadRuntime(
         name: skill.name, description: skill.description, skillMd: skill.skillMd })),
     };
     return { arenaKind: 'skill_arena', packageSnapshot: snapshot,
-      packageVersionId: Number(anchor.packageVersionId), baselineSnapshot: null,
+      packageVersionId: Number(positiveId(anchor.packageVersionId || thread.basePackageVersionId || '', 'basePackageVersionId')), baselineSnapshot: null,
       enhancedSnapshot: snapshot, labels: { baseline: 'Baseline', enhanced: execution.name },
       skillVersions: { baseline: null, enhanced: { id: Number(anchor.skillVersionId), versionNumber: anchor.versionNumber, skillUid: anchor.skillUid } } };
   }

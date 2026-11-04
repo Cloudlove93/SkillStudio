@@ -143,6 +143,7 @@ async function loadSnapshot(
 async function resolvePackageSkills(
   db: Queryable,
   pkg: PackageRow,
+  snapshot?: AgentPackageSnapshot,
 ): Promise<
   Array<
     AgentExecutionSnapshot['skills'][number] & {
@@ -151,6 +152,13 @@ async function resolvePackageSkills(
     }
   >
 > {
+  const versionSnapshot = snapshot ?? (await loadSnapshot(db, pkg));
+  const enabledById = new Map<string, boolean>(
+    (versionSnapshot.skills ?? []).map((skill) => [
+      String(skill.id),
+      skill.enabled !== false,
+    ]),
+  );
   const result = await db.query<SkillLinkRow>(
     `select link.skill_id, link.skill_version_id, s.skill_uid, s.dir_name,
             coalesce(nullif(s.display_name, ''), s.name) as name, s.description,
@@ -173,7 +181,7 @@ async function resolvePackageSkills(
     return {
       skillId: String(row.skill_id),
       skillVersionId: String(row.skill_version_id),
-      enabled: true,
+      enabled: enabledById.get(row.skill_uid) !== false,
       packageId: String(pkg.id),
       packageVersionId: String(pkg.current_version_id),
       skillUid: row.skill_uid,
@@ -187,10 +195,8 @@ async function resolvePackageSkills(
 }
 
 async function toAgent(db: Queryable, pkg: PackageRow): Promise<AgentWorkspace> {
-  const [snapshot, skills] = await Promise.all([
-    loadSnapshot(db, pkg),
-    resolvePackageSkills(db, pkg),
-  ]);
+  const snapshot = await loadSnapshot(db, pkg);
+  const skills = await resolvePackageSkills(db, pkg, snapshot);
   return {
     id: String(pkg.id),
     name: pkg.name,
@@ -200,7 +206,7 @@ async function toAgent(db: Queryable, pkg: PackageRow): Promise<AgentWorkspace> 
     skills: skills.map((skill) => ({
       skillId: skill.skillId,
       skillVersionId: skill.skillVersionId,
-      enabled: true,
+      enabled: skill.enabled,
       packageId: skill.packageId,
       name: skill.name,
       description: skill.description,
@@ -227,6 +233,8 @@ export async function getAgent(userId: string, id: string) {
 /**
  * 把前端选择的 Skill 版本内容整理成包快照。
  * 包即 Agent，因此跨包选中的 Skill 会在保存时复制进当前 Agent 包。
+ * 停用的 Skill 也需要保留在快照里，否则再次保存后复选框会消失；
+ * 只有停用且版本已不可用时才安全跳过。
  */
 async function buildSnapshotSkills(
   db: Queryable,
@@ -234,7 +242,7 @@ async function buildSnapshotSkills(
   bindings: AgentWorkspaceInput['skills'],
 ): Promise<PackageSkill[]> {
   const skills: PackageSkill[] = [];
-  for (const binding of bindings.filter((item) => item.enabled)) {
+  for (const binding of bindings) {
     const result = await db.query<{
       skill_uid: string;
       dir_name: string;
@@ -256,18 +264,23 @@ async function buildSnapshotSkills(
       [binding.skillVersionId, binding.skillId, userId],
     );
     const row = result.rows[0];
-    if (!row || row.status !== 'active' || row.skill_status !== 'active')
+    if (!row || row.status !== 'active' || row.skill_status !== 'active') {
+      if (!binding.enabled) continue;
       throw new AgentWorkspaceError(
         '挂载的 Skill 或版本不可用，请重新选择',
         422,
         'SKILL_UNAVAILABLE',
       );
+    }
     const snapshot = parseDbJson<Partial<PackageSkill>>(
       row.skill_snapshot_json,
       {},
     );
     const skillMd = typeof snapshot.skillMd === 'string' ? snapshot.skillMd : '';
-    if (!skillMd.trim()) throw new AgentWorkspaceError('Skill 内容为空');
+    if (!skillMd.trim()) {
+      if (!binding.enabled) continue;
+      throw new AgentWorkspaceError('Skill 内容为空');
+    }
     if (skills.some((skill) => skill.id === row.skill_uid))
       throw new AgentWorkspaceError('不能重复挂载同一个 Skill');
     skills.push({
@@ -276,6 +289,7 @@ async function buildSnapshotSkills(
       name: row.display_name?.trim() || snapshot.name || row.skill_uid,
       description: snapshot.description || row.description || '',
       skillMd,
+      enabled: binding.enabled,
     });
   }
   return skills;
@@ -470,13 +484,12 @@ export async function createAgentConversation(
       return (await getThreadDetail(userId, String(replay.id))).thread;
     }
 
-    const [snapshot, skills] = await Promise.all([
-      loadSnapshot(client, agent),
-      resolvePackageSkills(client, agent),
-    ]);
-    if (!skills.length)
+    const snapshot = await loadSnapshot(client, agent);
+    const skills = await resolvePackageSkills(client, agent, snapshot);
+    const enabledSkills = skills.filter((skill) => skill.enabled);
+    if (!enabledSkills.length)
       throw new AgentWorkspaceError('请先启用至少一个 Skill');
-    if (skills.some((skill) => !skill.available))
+    if (enabledSkills.some((skill) => !skill.available))
       throw new AgentWorkspaceError(
         '该 Agent 的部分 Skill 已不可用，请重新保存配置',
         422,
@@ -487,7 +500,7 @@ export async function createAgentConversation(
       name: agent.name,
       instructions: snapshot.agentMd || '',
       model: agent.model || '',
-      skills: skills.map((skill) => ({
+      skills: enabledSkills.map((skill) => ({
         skillId: skill.skillId,
         skillVersionId: skill.skillVersionId,
         enabled: true,

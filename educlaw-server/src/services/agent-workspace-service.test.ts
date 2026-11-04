@@ -679,6 +679,13 @@ describe('Agent conversations on packages', () => {
       'owner',
       input('Empty', [binding('11', '101', false)]),
     );
+    // 停用的 Skill 必须保留在快照中，重新读取才能还原“未启用”状态。
+    expect(
+      (await service.getAgent('owner', empty.id)).skills.map((skill) => ({
+        enabled: skill.enabled,
+        available: skill.available,
+      })),
+    ).toEqual([{ enabled: false, available: true }]);
     await expect(
       service.createAgentConversation('owner', empty.id, {
         purpose: 'run',

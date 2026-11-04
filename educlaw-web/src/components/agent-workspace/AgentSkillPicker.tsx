@@ -74,6 +74,7 @@ export function AgentSkillPicker({
   }
 
   const needle = query.trim().toLocaleLowerCase();
+  const limitReached = skills.length >= 20;
   const available = repository.filter(
     (s) => !skills.some((binding) => binding.skillId === s.id),
   );
@@ -89,6 +90,7 @@ export function AgentSkillPicker({
       <p className="agent-muted">
         每个 Skill 固定到明确版本。更新 Skill
         后，可在这里选择新版本；已创建的对话保留原有绑定。
+        {limitReached ? ' 每个 Agent 最多挂载 20 个 Skill。' : ''}
       </p>
       <div className="agent-attached-skills">
         {skills.map((binding) => {
@@ -152,9 +154,10 @@ export function AgentSkillPicker({
                 </div>
                 <button
                   type="button"
-                  disabled={!versionId}
+                  disabled={!versionId || limitReached}
+                  title={limitReached ? '每个 Agent 最多挂载 20 个 Skill' : undefined}
                   onClick={() => {
-                    if (versionId)
+                    if (versionId && !limitReached)
                       onChange([
                         ...skills,
                         {

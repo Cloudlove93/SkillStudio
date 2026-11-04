@@ -62,6 +62,17 @@ function writeSelection(agentId: string | null, conversationId?: number) {
     `${url.pathname}${url.search}${url.hash}`,
   );
 }
+/** 自动开聊只生效一次，成功后移除参数，避免刷新页面重复建会话。 */
+function clearAutoChatParam() {
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has('autochat')) return;
+  url.searchParams.delete('autochat');
+  window.history.replaceState(
+    window.history.state,
+    '',
+    `${url.pathname}${url.search}${url.hash}`,
+  );
+}
 
 /** Mount inside the authenticated /agents page or an existing workspace shell. */
 export function AgentWorkspacePanel(props: AgentWorkspacePanelProps) {
@@ -100,6 +111,12 @@ function AgentWorkspaceSession({
   const [conversationError, setConversationError] = useState('');
   const [conversationLoading, setConversationLoading] = useState(false);
   const [conversationRetry, setConversationRetry] = useState(0);
+  /** 对话历史加载完成的 Agent；自动开聊必须等它匹配后才允许启动。 */
+  const [conversationLoadedFor, setConversationLoadedFor] = useState<
+    string | null
+  >(null);
+  const [provisionFailed, setProvisionFailed] = useState(false);
+  const [provisionRetry, setProvisionRetry] = useState(0);
   const [thread, setThread] = useState<ArenaThread | null>(null);
   const [tab, setTab] = useState<'settings' | 'chat'>('settings');
   const [saving, setSaving] = useState(false);
@@ -265,6 +282,7 @@ function AgentWorkspaceSession({
     let current = true;
     setConversationError('');
     setConversationLoading(!!selectedId);
+    setConversationLoadedFor(null);
     if (!selectedId) {
       setConversations([]);
       return;
@@ -274,6 +292,7 @@ function AgentWorkspaceSession({
       .then((items) => {
         if (!current) return;
         setConversations(items);
+        setConversationLoadedFor(selectedId);
         const requested = new URLSearchParams(window.location.search).get(
           'conversation',
         );
@@ -326,6 +345,7 @@ function AgentWorkspaceSession({
     )
       return;
     provisionAttempt.current = querySkillId;
+    setProvisionFailed(false);
     setAttachmentLoading(true);
     setAttachmentError('');
     void agentsApi
@@ -348,9 +368,19 @@ function AgentWorkspaceSession({
           `${url.pathname}${url.search}${url.hash}`,
         );
       })
-      .catch((e: unknown) => setAttachmentError(errorMessage(e)))
+      .catch((e: unknown) => {
+        setProvisionFailed(true);
+        setAttachmentError(errorMessage(e));
+      })
       .finally(() => setAttachmentLoading(false));
-  }, [token, querySkillId, selectionReady, selectedId]);
+  }, [token, querySkillId, selectionReady, selectedId, provisionRetry]);
+
+  function retryProvision() {
+    provisionAttempt.current = null;
+    setProvisionFailed(false);
+    setAttachmentError('');
+    setProvisionRetry((r) => r + 1);
+  }
 
   function choose(id: string | null) {
     if (saving || starting || (selectionReady && id === selectedId)) return;
@@ -383,6 +413,8 @@ function AgentWorkspaceSession({
         { skillId: pendingSkill.id, skillVersionId: versionId, enabled: true },
       ],
     }));
+    setAttachmentError('');
+    setProvisionFailed(false);
     setTab('settings');
     setNotice(`已添加 ${pendingSkill.name}，保存后生效。`);
   }
@@ -399,6 +431,7 @@ function AgentWorkspaceSession({
     setSaving(true);
     setActionError('');
     setNotice('');
+    if (andRun) clearAutoChatParam();
     const generation = scope.current;
     const input = {
       ...draft,
@@ -481,6 +514,7 @@ function AgentWorkspaceSession({
     actionLock.current = true;
     setStarting(true);
     setActionError('');
+    clearAutoChatParam();
     const generation = scope.current;
     if (requestId) {
       requestKey.current = { agentId: agent.id, purpose, requestId };
@@ -526,6 +560,7 @@ function AgentWorkspaceSession({
     agent.skills.some((s) => s.enabled && s.available !== false);
 
   // 自动创建 Agent 后直接进入对话，让“生成”结果马上可用。
+  // 必须等对话历史加载完成，否则会在历史存在时重复新建会话。
   useEffect(() => {
     if (
       !autoChat ||
@@ -533,10 +568,12 @@ function AgentWorkspaceSession({
       !agent ||
       dirty ||
       starting ||
-      saving
+      saving ||
+      conversationLoadedFor !== agent.id
     )
       return;
     autoChatStarted.current = true;
+    clearAutoChatParam();
     if (conversations.length) {
       const latest = conversations[0]!;
       setThread(latest);
@@ -547,7 +584,7 @@ function AgentWorkspaceSession({
     void start('run', `auto:${agent.id}`);
     // 只在首次进入时自动开一次对话，后续由用户主动操作。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoChat, agent, dirty, starting, saving, conversations]);
+  }, [autoChat, agent, dirty, starting, saving, conversations, conversationLoadedFor]);
 
   const openSkill = onOpenSkill;
   return (
@@ -648,6 +685,11 @@ function AgentWorkspaceSession({
         {attachmentError && (
           <div role="alert" className="agent-error">
             {attachmentError}
+            {provisionFailed && querySkillId && (
+              <button type="button" onClick={retryProvision}>
+                重新尝试自动创建
+              </button>
+            )}
           </div>
         )}
         {pendingSkill && (

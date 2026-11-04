@@ -74,6 +74,8 @@ export interface PackageSkill {
   name: string;
   description: string;
   skillMd: string;
+  /** Agent 包内标记该 Skill 是否启用；缺省视为启用。 */
+  enabled?: boolean;
 }
 
 export interface AgentPackageSnapshot {
