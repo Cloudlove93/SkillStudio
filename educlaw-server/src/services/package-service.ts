@@ -2227,12 +2227,13 @@ export async function createPackageWithSnapshotTx(
   userId: string,
   snapshot: AgentPackageSnapshot,
   source: PackageVersion['source'],
+  model = '',
 ): Promise<CreatedPackageSnapshotIds> {
   const now = new Date().toISOString();
   const fixedSnapshot = ensureSkillIds(snapshot);
   const pkgResult = await client.query<{ id: number }>(
-    'insert into agent_packages (user_id, name, description, current_version_id, created_at, updated_at) values ($1, $2, $3, 0, $4, $5) returning id',
-    [userId, fixedSnapshot.name, fixedSnapshot.description, now, now],
+    'insert into agent_packages (user_id, name, description, model, current_version_id, created_at, updated_at) values ($1, $2, $3, $4, 0, $5, $6) returning id',
+    [userId, fixedSnapshot.name, fixedSnapshot.description, model, now, now],
   );
   const packageId = pkgResult.rows[0].id;
   const verResult = await client.query<{ id: number }>(
@@ -2284,6 +2285,7 @@ export async function createPackageVersionWithSnapshotTx(
     snapshot: AgentPackageSnapshot;
     source: PackageVersion['source'];
     note?: string;
+    model?: string;
   },
 ): Promise<CreatedPackageSnapshotIds> {
   const now = new Date().toISOString();
@@ -2344,11 +2346,12 @@ export async function createPackageVersionWithSnapshotTx(
   });
   await client.query(
     `update agent_packages
-        set name = $1, description = $2, current_version_id = $3, updated_at = $4
-      where id = $5 and user_id = $6`,
+        set name = $1, description = $2, model = $3, current_version_id = $4, updated_at = $5
+      where id = $6 and user_id = $7`,
     [
       fixedSnapshot.name,
       fixedSnapshot.description,
+      input.model ?? pkg.model ?? '',
       packageVersionId,
       now,
       input.packageId,
@@ -2886,22 +2889,6 @@ export async function deletePackage(userId: string, packageId: string) {
   );
   if (!pkg.rows[0])
     throw new Error('\u667a\u80fd\u4f53\u5305\u4e0d\u5b58\u5728');
-
-  const attached = await query<{ name: string }>(
-    `select a.name from user_agents a
-     where a.user_id = $2 and exists (
-       select 1 from jsonb_array_elements(a.skills_json) binding
-       join agent_package_skills s on s.id = (case when binding->>'skillId' ~ '^[1-9][0-9]*$'
-         then (binding->>'skillId')::bigint end)
-       where s.package_id = $1
-     )
-     order by a.name limit 1`,
-    [packageId, userId],
-  );
-  if (attached.rows[0])
-    throw new Error(
-      `该智能体包正被 Agent「${attached.rows[0].name}」使用，请先在 Agent 中移除后再删除`,
-    );
 
   await query(
     'delete from arena_messages where thread_id in (select id from arena_threads where package_id = $1 and user_id = $2)',

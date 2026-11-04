@@ -226,6 +226,8 @@ export interface SkillArenaConfig {
   mode: 'skill_arena';
   compositionMode: 'skill_only';
   agentExecution?: AgentExecutionSnapshot;
+  /** Agent 对话的幂等键，同时用于把线程归属到某个 Agent。 */
+  agentRequestId?: string;
   /** run: 单版本运行；test: 固定版本测试；arena: 双版本对比；optimize: 交互式优化 */
   surface?: 'run' | 'test' | 'arena' | 'optimize';
   basePackageVersionId: string;

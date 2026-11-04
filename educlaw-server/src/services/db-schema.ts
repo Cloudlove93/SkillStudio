@@ -7,6 +7,7 @@ const historicalSchemaStatements = [
       user_id text not null,
       name text not null,
       description text not null default '',
+      model text not null default '',
       current_version_id bigint not null,
       created_at timestamptz not null,
       updated_at timestamptz not null
@@ -679,34 +680,17 @@ export const multimodalSchemaStatements = [
   `,
 ];
 
-export const schemaStatements = historicalSchemaStatements.concat(
-  multimodalSchemaStatements,
-  [
-    `create table if not exists user_agents (
-      id bigserial primary key, user_id text not null,
-      name text not null, description text not null default '',
-      instructions text not null default '', model text not null default '',
-      skills_json jsonb not null default '[]'::jsonb,
-      source_key text,
-      created_at timestamptz not null, updated_at timestamptz not null
-    )`,
-    `create index if not exists idx_user_agents_owner on user_agents(user_id, id)`,
-    `create table if not exists user_agent_conversations (
-      agent_id bigint not null references user_agents(id) on delete cascade,
-      thread_id bigint not null unique references arena_threads(id) on delete cascade,
-      request_id text not null, purpose text not null check (purpose in ('run','test')),
-      primary key (agent_id, request_id)
-    )`,
-  ],
-);
+export const schemaStatements = [
+  ...historicalSchemaStatements,
+  ...multimodalSchemaStatements,
+];
 
 /**
  * Migrate existing columns to the current schema shape.
  * Statements are run independently so an already-migrated column does not block later migrations.
  */
 export const migrationStatements = [
-  `alter table user_agents add column if not exists source_key text`,
-  `create unique index if not exists uq_user_agents_source_key on user_agents(user_id, source_key) where source_key is not null`,
+  `alter table agent_packages add column if not exists model text not null default ''`,
   // JSON text columns to JSONB.
   `alter table agent_package_skills add column if not exists display_name text`,
   `alter table agent_package_versions alter column snapshot_json type jsonb using snapshot_json::jsonb`,

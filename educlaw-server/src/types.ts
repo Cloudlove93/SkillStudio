@@ -16,6 +16,7 @@ export interface DbRowPackage {
   user_id: string;
   name: string;
   description: string;
+  model?: string | null;
   current_version_id: number;
   created_at: string;
   updated_at: string;
