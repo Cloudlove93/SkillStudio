@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 
-function readPat(): string {
-  const file = process.env.ZITADEL_SERVICE_PAT_FILE || '';
+function readPat(variable: string, fallback = ''): string {
+  const file = process.env[variable] || fallback;
   return readFileSync(file, 'utf-8').trim();
 }
 
@@ -13,7 +13,10 @@ export const config = {
     return process.env.ZITADEL_INTERNAL_ISSUER || this.zitadelIssuer;
   },
   zitadelClientId: process.env.ZITADEL_CLIENT_ID || '',
-  zitadelServicePat: readPat(),
+  // The admin PAT manages users and project grants.  Completing an OIDC
+  // authorization request, however, requires the separate IAM_LOGIN_CLIENT PAT.
+  zitadelServicePat: readPat('ZITADEL_SERVICE_PAT_FILE'),
+  zitadelLoginClientPat: readPat('ZITADEL_LOGIN_CLIENT_PAT_FILE', '/zitadel/bootstrap/login-client.pat'),
   zitadelLoginRedirectUri:
     process.env.ZITADEL_LOGIN_REDIRECT_URI || 'http://auth-service:3000/auth/callback',
   zitadelProjectId: process.env.ZITADEL_PROJECT_ID || '',

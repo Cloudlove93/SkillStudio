@@ -133,6 +133,7 @@ services:
       - HOST=0.0.0.0
       - PORT=3000
       - ZITADEL_SERVICE_PAT_FILE=/zitadel/bootstrap/admin.pat
+      - ZITADEL_LOGIN_CLIENT_PAT_FILE=/zitadel/bootstrap/login-client.pat
     volumes:
       - zitadel-bootstrap:/zitadel/bootstrap:ro
     networks:

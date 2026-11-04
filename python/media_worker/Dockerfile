@@ -7,9 +7,15 @@ ENV HOME=/tmp/educlaw-worker
 
 WORKDIR /app
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates ffmpeg \
-    && rm -rf /var/lib/apt/lists/* \
+RUN set -eux; \
+    sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources; \
+    for attempt in 1 2 3; do \
+      if apt-get update && apt-get -o Acquire::Retries=5 install -y --no-install-recommends ca-certificates ffmpeg; then break; fi; \
+      if [ "$attempt" = 3 ]; then exit 1; fi; \
+      rm -rf /var/lib/apt/lists/*; \
+      sleep 5; \
+    done; \
+    rm -rf /var/lib/apt/lists/* \
     && groupadd --system media-worker \
     && useradd --system --gid media-worker --home-dir /nonexistent media-worker \
     && mkdir -p /tmp/educlaw-worker \

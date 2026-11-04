@@ -517,7 +517,7 @@ function addDimensionAssessment(
   maxScore: number,
 ) {
   const normalized = dimensionFromAssessment(key, assessment, label, maxScore);
-  const existing = dimensions.get(key) || {
+  const existing: DimensionAccumulator = dimensions.get(key) || {
     label: normalized.name,
     maxScore: normalized.maxScore,
     totalScore: 0,

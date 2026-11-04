@@ -363,6 +363,73 @@ export interface ArenaReport {
   };
 }
 
+export type AutoEvalQuestionSource = 'builtin' | 'document';
+
+export interface AutoEvalQuestion {
+  id: string;
+  title: string;
+  prompt: string;
+  source: AutoEvalQuestionSource;
+}
+
+export interface AutoEvalDimensionScore {
+  key: string;
+  name: string;
+  score: number;
+  maxScore: number;
+  reason: string;
+}
+
+export interface AutoEvalCaseResult {
+  questionId: string;
+  title: string;
+  prompt: string;
+  score: number;
+  maxScore: number;
+  summary: string;
+  issues: string[];
+  suggestions: string[];
+  transcript: Array<{
+    role: string;
+    content: string;
+  }>;
+}
+
+export type AutoEvalRunStatus = 'running' | 'completed' | 'failed';
+
+export interface AutoEvalReport {
+  runId: number;
+  packageId: number;
+  sceneName: string;
+  status: AutoEvalRunStatus;
+  totalScore: number;
+  maxScore: number;
+  summary: string;
+  dimensions: AutoEvalDimensionScore[];
+  cases: AutoEvalCaseResult[];
+  issues: string[];
+  suggestions: string[];
+  compactRetryUsed?: boolean;
+  createdAt: string;
+  updatedAt: string;
+  errorMessage?: string;
+}
+
+export interface AutoEvalPreview {
+  packageId: number;
+  packageName: string;
+  skillCount: number;
+  builtinQuestions: AutoEvalQuestion[];
+  documentQuestions: AutoEvalQuestion[];
+  dimensions: Array<{
+    key: string;
+    name: string;
+    maxScore: number;
+    description: string;
+  }>;
+  latestRun?: AutoEvalReport;
+}
+
 export interface OptimizationIssue {
   expert: 'persona' | 'skill' | 'rubric' | 'merge';
   target: 'agent' | 'skill' | 'rubric';
