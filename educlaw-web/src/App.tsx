@@ -11,6 +11,7 @@ import { useAuthStore } from './stores/auth'
 const AdminPage = lazy(() => import('./pages/AdminPage'))
 const LoginPage = lazy(() => import('./pages/LoginPage'))
 const SkillFirstWorkspace = lazy(() => import('./pages/SkillFirstWorkspace'))
+const WorkflowDemo = lazy(() => import('./pages/WorkflowDemo'))
 
 function RouteFallback() {
   return (
@@ -84,7 +85,7 @@ function AppRoutes() {
         <Route path="/" element={<RequireAuth><SkillFirstWorkspace /></RequireAuth>} />
         <Route path="/skills" element={<RequireAuth><SkillFirstWorkspace /></RequireAuth>} />
         <Route path="/legacy" element={<Navigate to="/" replace />} />
-        <Route path="/workflow" element={<Navigate to="/" replace />} />
+        <Route path="/workflow" element={<WorkflowDemo />} />
         <Route path="/admin" element={<RequireAuth><AdminPage /></RequireAuth>} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
