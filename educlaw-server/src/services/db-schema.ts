@@ -7,6 +7,7 @@ const historicalSchemaStatements = [
       user_id text not null,
       name text not null,
       description text not null default '',
+      model text not null default '',
       current_version_id bigint not null,
       created_at timestamptz not null,
       updated_at timestamptz not null
@@ -679,15 +680,17 @@ export const multimodalSchemaStatements = [
   `,
 ];
 
-export const schemaStatements = historicalSchemaStatements.concat(
-  multimodalSchemaStatements,
-);
+export const schemaStatements = [
+  ...historicalSchemaStatements,
+  ...multimodalSchemaStatements,
+];
 
 /**
  * Migrate existing columns to the current schema shape.
  * Statements are run independently so an already-migrated column does not block later migrations.
  */
 export const migrationStatements = [
+  `alter table agent_packages add column if not exists model text not null default ''`,
   // JSON text columns to JSONB.
   `alter table agent_package_skills add column if not exists display_name text`,
   `alter table agent_package_versions alter column snapshot_json type jsonb using snapshot_json::jsonb`,

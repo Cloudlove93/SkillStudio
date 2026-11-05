@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { ArenaThread, GuidedCreationSession } from '@educlaw/shared';
 import {
   AudioLines,
+  Bot,
   BookOpen,
   ChevronDown,
   FileText,
@@ -64,6 +65,7 @@ type Props = {
     title: string,
   ) => Promise<void> | void;
   onConversationDelete?: (thread: ArenaThread) => Promise<void> | void;
+  onAgents?: () => void;
   onAdmin: () => void;
   onLogout: () => void;
 };
@@ -132,17 +134,18 @@ export function InnoSkillSidebar(props: Props) {
         </button>
       </div>
 
-      <nav className="isk-sidebar-nav" aria-label="InnoSkill 主导航">
+      <nav className="isk-sidebar-nav" aria-label="SkillStudio 主导航">
         <NavButton
           active={props.activeSection === 'home'}
           icon={<Home />}
           label="主页"
           onClick={() => props.onNavigate('home')}
         />
+        {props.onAgents && <NavButton active={false} icon={<Bot />} label="我的 Agent" onClick={props.onAgents} />}
         <NavButton
           active={props.activeSection === 'my-skills'}
           icon={<BookOpen />}
-          label="我的 Skill"
+          label="技能库"
           onClick={() => props.onNavigate('my-skills')}
         />
 
@@ -155,7 +158,7 @@ export function InnoSkillSidebar(props: Props) {
             onClick={() => props.onCreateMode('conversation')}
           >
             <Plus />
-            <span>新建 Skill</span>
+            <span>新建 Agent</span>
           </button>
           <details ref={menuRef}>
             <summary aria-label="选择创建方式">
@@ -228,7 +231,7 @@ export function InnoSkillSidebar(props: Props) {
         {props.skills.length ? (
           <>
             <span className="isk-sidebar-section-label is-compact">
-              最近 Skill
+              最近生成
             </span>
             {props.skills.slice(0, 5).map((skill) => (
               <div

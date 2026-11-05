@@ -1275,6 +1275,21 @@ async function resolveThreadRuntime(
   userId: string,
   thread: ArenaThread,
 ): Promise<ArenaRuntimeContext> {
+  const execution = thread.skillArenaConfig?.agentExecution;
+  if (execution) {
+    const anchor = execution.skills[0];
+    if (!anchor) throw new ArenaServiceError("该 Agent 没有可用的 Skill，请重新绑定", 422, "SKILL_UNAVAILABLE");
+    const snapshot: AgentPackageSnapshot = {
+      name: execution.name, description: '', versionLabel: 'Agent conversation',
+      agentMd: execution.instructions, rubricMd: '',
+      skills: execution.skills.map(skill => ({ id: skill.skillUid, dirName: skill.skillId,
+        name: skill.name, description: skill.description, skillMd: skill.skillMd })),
+    };
+    return { arenaKind: 'skill_arena', packageSnapshot: snapshot,
+      packageVersionId: Number(positiveId(anchor.packageVersionId || thread.basePackageVersionId || '', 'basePackageVersionId')), baselineSnapshot: null,
+      enhancedSnapshot: snapshot, labels: { baseline: 'Baseline', enhanced: execution.name },
+      skillVersions: { baseline: null, enhanced: { id: Number(anchor.skillVersionId), versionNumber: anchor.versionNumber, skillUid: anchor.skillUid } } };
+  }
   if (thread.arenaKind !== "skill_arena") {
     const packageContext = await getPackageWithVersionId(
       userId,
@@ -1870,6 +1885,8 @@ export async function* streamMessage(
   const runtime = await resolveThreadRuntime(userId, detail.thread);
   const surface = detail.thread.skillArenaConfig?.surface;
   const fixedPiSkillVersion = runtime.skillVersions?.enhanced ?? null;
+  const agentExecution = detail.thread.skillArenaConfig?.agentExecution;
+  if (agentExecution && mode !== 'agent') throw new ArenaServiceError('Agent 对话仅支持 Agent 模式', 422, 'INVALID_ARGUMENT');
   const fixedPiSkill = runtime.enhancedSnapshot?.skills[0] ?? null;
   const usePiHarnessForRequest = shouldUsePiHarness({
     arenaKind: runtime.arenaKind,
@@ -2049,6 +2066,7 @@ export async function* streamMessage(
             versionId: skillVersion.id,
             skillMd: skill.skillMd,
           },
+          ...(agentExecution ? { additionalSkills: agentExecution.skills.slice(1).map(bound => ({ versionId: Number(bound.skillVersionId), skillMd: bound.skillMd })) } : {}),
           agentInstructions: buildPiSkillArenaAgentInstructions(
             runtime.enhancedSnapshot || runtime.packageSnapshot,
           ),
@@ -2189,9 +2207,9 @@ export async function* streamMessage(
     if (runtime.arenaKind === "skill_arena") {
       void runSide(
         "enhanced",
-        buildSkillArenaPrompt(
-          runtime.enhancedSnapshot || runtime.packageSnapshot,
-        ),
+        agentExecution
+          ? buildEnhancedPrompt(runtime.enhancedSnapshot || runtime.packageSnapshot, runtime.enhancedSnapshot!.skills)
+          : buildSkillArenaPrompt(runtime.enhancedSnapshot || runtime.packageSnapshot),
          skillArenaPromptContexts?.enhanced.userPrompt
            || buildHistory(fullHistory, "enhanced"),
          skillArenaModel || undefined,
@@ -2268,7 +2286,7 @@ export async function* streamMessage(
         content: sideContents[side],
         reasoningContent,
         createdAt: savedAt,
-        ...(runtime.skillVersions && runtime.skillVersions[side]
+        ...(!agentExecution && runtime.skillVersions && runtime.skillVersions[side]
           ? {
               skillVersionId: String(runtime.skillVersions[side]!.id),
               skillVersionNumber: runtime.skillVersions[side]!.versionNumber,
@@ -2289,10 +2307,14 @@ export async function* streamMessage(
       if (!recordedEnhancedContext || !recordedEnhancedModel) {
         throw new Error("Enhanced answer provenance is unavailable");
       }
-      const baselineContext = skillArenaPromptContexts?.baseline ?? null;
-      const enhancedUsedSkillIds = runtime.skillVersions?.enhanced
-        ? [runtime.skillVersions.enhanced.skillUid]
-        : usedSkillIds;
+      const baselineContext = agentExecution
+        ? null
+        : skillArenaPromptContexts?.baseline ?? null;
+      const enhancedUsedSkillIds = agentExecution
+        ? agentExecution.skills.map((skill) => skill.skillUid)
+        : runtime.skillVersions?.enhanced
+          ? [runtime.skillVersions.enhanced.skillUid]
+          : usedSkillIds;
       const baselineUsedSkillIds = runtime.skillVersions?.baseline
         ? [runtime.skillVersions.baseline.skillUid]
         : [];
@@ -2423,6 +2445,9 @@ export async function sendMessage(
 
 export async function generateReport(userId: string, threadId: string | number, model?: string): Promise<ArenaReport> {
   const detail = await getThreadDetail(userId, threadId);
+  if (detail.thread.skillArenaConfig?.agentExecution) {
+    throw new ArenaServiceError('Agent 对话请使用可恢复运行接口', 422, 'INVALID_ARGUMENT');
+  }
   const runtime = await resolveThreadRuntime(userId, detail.thread);
   assertRubricConfigured(runtime.packageSnapshot.rubricMd, "评估报告");
   const baselineLabel = runtime.labels.baseline;

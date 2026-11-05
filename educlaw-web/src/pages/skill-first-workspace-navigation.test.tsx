@@ -205,7 +205,7 @@ it.each(['/?view=create', '/?view=run&skill=7%3A11&conversation=91'])(
       expect(api.getGuidedCreationDetail).toHaveBeenCalledWith('test-token', {
         session_id: unfinishedGuidedDraft.id,
       });
-      expect(container.textContent).toContain('确认这个 Skill 的工作方式');
+      expect(container.textContent).toContain('确认这位 Agent 的工作方式');
       const params = new URLSearchParams(
         container.querySelector('[data-route]')!.textContent!,
       );
@@ -251,7 +251,7 @@ it('resumes an unfinished guided draft after switching to another Skill conversa
   await act(async () => draftButton()!.click());
   await vi.waitFor(async () => {
     await act(async () => {});
-    expect(container.textContent).toContain('确认这个 Skill 的工作方式');
+    expect(container.textContent).toContain('确认这位 Agent 的工作方式');
     expect(
       new URLSearchParams(
         container.querySelector('[data-route]')!.textContent!,
@@ -306,7 +306,7 @@ it('resumes an unfinished guided draft after entering a Skill conversation from 
   await act(async () => draftButton()!.click());
   await vi.waitFor(async () => {
     await act(async () => {});
-    expect(container.textContent).toContain('确认这个 Skill 的工作方式');
+    expect(container.textContent).toContain('确认这位 Agent 的工作方式');
     expect(
       new URLSearchParams(
         container.querySelector('[data-route]')!.textContent!,
@@ -329,9 +329,9 @@ it('resumes an unfinished guided draft after opening the Skill repository', asyn
 
   await vi.waitFor(async () => {
     await act(async () => {});
-    expect(button('我的 Skill')).toBeDefined();
+    expect(button('技能库')).toBeDefined();
   });
-  await act(async () => button('我的 Skill')!.click());
+  await act(async () => button('技能库')!.click());
   await vi.waitFor(async () => {
     await act(async () => {});
     expect(
@@ -345,7 +345,7 @@ it('resumes an unfinished guided draft after opening the Skill repository', asyn
   await act(async () => draftButton()!.click());
   await vi.waitFor(async () => {
     await act(async () => {});
-    expect(container.textContent).toContain('确认这个 Skill 的工作方式');
+    expect(container.textContent).toContain('确认这位 Agent 的工作方式');
     expect(
       new URLSearchParams(
         container.querySelector('[data-route]')!.textContent!,
@@ -494,7 +494,7 @@ it('refreshes the repository summary after saving through the actual optimizatio
   expect(api.applyInteractiveChanges.mock.calls[0]?.[3]?.[0]?.modified).toBe(
     'Updated',
   );
-  await act(async () => button('我的 Skill')!.click());
+  await act(async () => button('技能库')!.click());
   await vi.waitFor(async () => {
     await act(async () => {});
     expect(
@@ -575,7 +575,7 @@ it('keeps the newest repository summary when refresh responses arrive out of ord
   });
   await act(async () => button('刷新版本')!.click());
   await act(async () => button('刷新版本')!.click());
-  await act(async () => button('我的 Skill')!.click());
+  await act(async () => button('技能库')!.click());
   await vi.waitFor(async () => {
     await act(async () => {});
     expect(
@@ -684,7 +684,7 @@ it.each(['rollback', 'discard', 'restore'] as const)(
       await act(async () => {});
       expect(container.querySelector('.skill-version-confirm')).toBeNull();
     });
-    await act(async () => button('我的 Skill')!.click());
+    await act(async () => button('技能库')!.click());
     await vi.waitFor(async () => {
       await act(async () => {});
       expect(

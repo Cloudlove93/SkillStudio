@@ -74,6 +74,8 @@ export interface PackageSkill {
   name: string;
   description: string;
   skillMd: string;
+  /** Agent 包内标记该 Skill 是否启用；缺省视为启用。 */
+  enabled?: boolean;
 }
 
 export interface AgentPackageSnapshot {
@@ -174,9 +176,60 @@ export interface ArenaThreadVariant {
   versionNumber: number;
 }
 
+/** User-configured Agent with explicitly pinned reusable Skills. */
+export interface AgentSkillBinding {
+  skillId: string;
+  skillVersionId: string;
+  enabled: boolean;
+}
+export interface AgentResolvedSkill extends AgentSkillBinding {
+  packageId: string;
+  name: string;
+  description: string;
+  versionNumber: number;
+  /** 为 false 表示固定的 Skill 或版本已不可用，需要重新选择。 */
+  available: boolean;
+}
+export interface AgentWorkspace {
+  id: string;
+  name: string;
+  description: string;
+  instructions: string;
+  model: string;
+  skills: AgentResolvedSkill[];
+  createdAt: string;
+  updatedAt: string;
+}
+export interface AgentWorkspaceInput {
+  name: string;
+  description: string;
+  instructions: string;
+  model: string;
+  skills: AgentSkillBinding[];
+}
+/** 由已有产物转成 Agent：生成会话或仓库中的 Skill，二选一。 */
+export interface AgentProvisionInput {
+  sessionId?: string;
+  skillId?: string;
+}
+export interface AgentExecutionSnapshot {
+  agentId: string;
+  name: string;
+  instructions: string;
+  model: string;
+  skills: Array<AgentResolvedSkill & {
+    packageVersionId: string;
+    skillUid: string;
+    skillMd: string;
+  }>;
+}
+
 export interface SkillArenaConfig {
   mode: 'skill_arena';
   compositionMode: 'skill_only';
+  agentExecution?: AgentExecutionSnapshot;
+  /** Agent 对话的幂等键，同时用于把线程归属到某个 Agent。 */
+  agentRequestId?: string;
   /** run: 单版本运行；test: 固定版本测试；arena: 双版本对比；optimize: 交互式优化 */
   surface?: 'run' | 'test' | 'arena' | 'optimize';
   basePackageVersionId: string;
