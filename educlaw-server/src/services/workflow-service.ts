@@ -222,6 +222,26 @@ export async function runWorkflow(
       let output: unknown;
       if (current.type === 'start') output = { text: input.content };
       else if (current.type === 'condition') output = { passed: conditionPassed(current, input.content, nodeResults) };
+      else if (current.type === 'loop') {
+        const iterations = Number(current.params.iterations);
+        const instruction = renderTemplate(current.params.promptTemplate, input.content, nodeResults);
+        let previous = '';
+        for (let index = 0; index < iterations; index += 1) {
+          previous = await generateText({
+            model: typeof current.params.model === 'string' ? current.params.model : input.model,
+            systemPrompt: version.snapshot.agentMd,
+            userPrompt: [
+              `循环任务：${instruction}`,
+              `工作流输入：${input.content}`,
+              previous ? `上一轮结果：${previous}` : '这是第一轮处理，请直接开始。',
+              `当前为第 ${index + 1} / ${iterations} 轮，请输出可供下一轮继续使用的结果。`,
+            ].join('\n\n'),
+            maxTokens: 2_000,
+            hidePromptContentInLogs: true,
+          });
+        }
+        output = { text: previous, iterations };
+      }
       else if (current.type === 'end') output = { text: renderTemplate(current.params.outputTemplate, input.content, nodeResults) };
       else {
         const template = current.type === 'skill'

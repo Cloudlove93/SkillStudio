@@ -87,7 +87,7 @@ export interface AgentPackageSnapshot {
   workflow?: WorkflowDefinition;
 }
 
-export type WorkflowNodeType = 'start' | 'llm' | 'skill' | 'condition' | 'end';
+export type WorkflowNodeType = 'start' | 'llm' | 'skill' | 'condition' | 'loop' | 'end';
 export type WorkflowConditionOperator =
   | 'equals'
   | 'not_equals'
@@ -166,13 +166,22 @@ export function validateWorkflowDefinition(value: unknown): WorkflowValidationEr
   const edges = definition.edges as WorkflowEdge[];
   const nodeIds = new Set<string>();
   const edgeIds = new Set<string>();
-  const allowedTypes = new Set<WorkflowNodeType>(['start', 'llm', 'skill', 'condition', 'end']);
+  const allowedTypes = new Set<WorkflowNodeType>(['start', 'llm', 'skill', 'condition', 'loop', 'end']);
   for (const node of nodes) {
     if (!node || typeof node.id !== 'string' || !node.id.trim() || nodeIds.has(node.id)) {
       errors.push({ code: 'WORKFLOW_INVALID', message: '节点 ID 必须唯一且非空。', nodeId: node?.id });
     } else nodeIds.add(node.id);
     if (!allowedTypes.has(node?.type)) {
       errors.push({ code: 'WORKFLOW_INVALID', message: '节点类型不受支持。', nodeId: node?.id });
+    }
+    if (node?.type === 'loop') {
+      const iterations = Number(node.params?.iterations);
+      if (!Number.isInteger(iterations) || iterations < 1 || iterations > 20) {
+        errors.push({ code: 'WORKFLOW_INVALID', message: '循环节点的循环次数必须为 1 到 20 的整数。', nodeId: node.id });
+      }
+      if (typeof node.params?.promptTemplate !== 'string' || !node.params.promptTemplate.trim()) {
+        errors.push({ code: 'WORKFLOW_INVALID', message: '循环节点需要填写每轮处理说明。', nodeId: node.id });
+      }
     }
   }
   const starts = nodes.filter(node => node.type === 'start');

@@ -107,6 +107,7 @@ const SkillDetailWorkspace = lazy(() =>
   ),
 );
 const WorkflowDemo = lazy(() => import('./WorkflowDemo'));
+const WorkflowLibrary = lazy(() => import('./WorkflowLibrary'));
 
 type StreamError = { code: string; message: string; retryable: boolean };
 
@@ -201,6 +202,8 @@ function SkillFirstWorkspaceContent() {
   const [multimodalCreationKey, setMultimodalCreationKey] = useState(0);
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [workflowOpen, setWorkflowOpen] = useState(false);
+  const [workflowLibraryOpen, setWorkflowLibraryOpen] = useState(false);
+  const [workflowPackageId, setWorkflowPackageId] = useState<string | undefined>();
   const [importOpen, setImportOpen] = useState(false);
   const [importBusy, setImportBusy] = useState(false);
   const [workspaceState, dispatchWorkspace] = useReducer(
@@ -1489,7 +1492,7 @@ function SkillFirstWorkspaceContent() {
       createMode === 'conversation' &&
       !visiblePendingGuidedMessage);
   const activeSidebarSection: InnoSkillNavSection = workflowOpen
-    ? 'home'
+    ? 'workflow-library'
     : isRepositoryView || activeSkill
       ? 'my-skills'
       : workspaceState.activeView === 'create' || session
@@ -1549,7 +1552,15 @@ function SkillFirstWorkspaceContent() {
         completedConversationIds={completedConversationIds}
         onToggle={() => setLeftCollapsed((value) => !value)}
         onNavigate={(section) => {
+          if (section === 'workflow-library') {
+            closeInspector({ force: true });
+            setWorkflowPackageId(undefined);
+            setWorkflowLibraryOpen(true);
+            setWorkflowOpen(true);
+            return;
+          }
           setWorkflowOpen(false);
+          setWorkflowLibraryOpen(false);
           openPortalView(section);
         }}
         onCreateMode={(mode) => {
@@ -1601,11 +1612,11 @@ function SkillFirstWorkspaceContent() {
               fallback={<SkillWorkspaceLoadingState label="正在打开工作区" />}
             >
               {workflowOpen ? (
-                <WorkflowDemo
+                workflowLibraryOpen ? <WorkflowLibrary token={token} onCreate={() => { setWorkflowPackageId(undefined); setWorkflowLibraryOpen(false); }} onOpen={(packageId) => { setWorkflowPackageId(packageId); setWorkflowLibraryOpen(false); }} /> : <WorkflowDemo
                   embedded
                   token={token}
-                  packageId={activeSkill?.packageId}
-                  packageVersionId={currentPackageVersionId}
+                  packageId={workflowPackageId}
+                  onOpenLibrary={() => setWorkflowLibraryOpen(true)}
                 />
               ) : workspaceState.activeView === 'home' ? (
                 <SkillCreationHome
@@ -1622,6 +1633,8 @@ function SkillFirstWorkspaceContent() {
                   onOpenManual={() => newSkill('manual')}
                   onOpenWorkflow={() => {
                     closeInspector({ force: true });
+                    setWorkflowPackageId(undefined);
+                    setWorkflowLibraryOpen(false);
                     setWorkflowOpen(true);
                   }}
                 />
@@ -1776,6 +1789,8 @@ function SkillFirstWorkspaceContent() {
                   onOpenManual={() => newSkill('manual')}
                   onOpenWorkflow={() => {
                     closeInspector({ force: true });
+                    setWorkflowPackageId(undefined);
+                    setWorkflowLibraryOpen(false);
                     setWorkflowOpen(true);
                   }}
                 />

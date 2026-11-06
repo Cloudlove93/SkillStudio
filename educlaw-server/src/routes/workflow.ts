@@ -1,7 +1,7 @@
 import { Router, type Response } from 'express';
 import { requireAuth } from '../middleware/auth.js';
 import type { AuthedRequest } from '../types.js';
-import { getPackage } from '../services/package-service.js';
+import { getPackage, listPackages } from '../services/package-service.js';
 import {
   WorkflowServiceError,
   createWorkflow,
@@ -42,6 +42,29 @@ router.post('/workflows', requireAuth, async (req, res) => {
       (req as AuthedRequest).userId || '',
       req.body?.definition,
     ));
+  } catch (error) {
+    respondError(res, error);
+  }
+});
+
+router.get('/workflows', requireAuth, async (req, res) => {
+  try {
+    const userId = (req as AuthedRequest).userId || '';
+    const packages = await listPackages(userId);
+    const details = await Promise.all(packages.map(item => getPackage(userId, item.id)));
+    res.json(details.flatMap(item => {
+      const workflow = item.snapshot.workflow;
+      if (!workflow) return [];
+      return [{
+        id: String(item.id),
+        name: item.name,
+        description: item.description,
+        versionNumber: item.versionNumber,
+        updatedAt: item.updatedAt,
+        nodeCount: workflow.nodes.length,
+        skillNodeCount: workflow.nodes.filter(node => node.type === 'skill').length,
+      }];
+    }));
   } catch (error) {
     respondError(res, error);
   }

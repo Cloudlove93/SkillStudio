@@ -54,6 +54,16 @@ export interface DiagnosisIssue {
   suggestion: string;
 }
 
+export interface WorkflowListItem {
+  id: string;
+  name: string;
+  description: string;
+  versionNumber: number;
+  updatedAt: string;
+  nodeCount: number;
+  skillNodeCount: number;
+}
+
 export interface DiagnosisResult {
   welcomeMessage: string;
   issues: DiagnosisIssue[];
@@ -1291,6 +1301,8 @@ export const liteApi = {
   me: (token: string) => request<UserSummary>('/auth/me', {}, token),
   listPackages: (token: string) =>
     request<AgentPackageSummary[]>(PACKAGE_ROUTES.LIST, {}, token),
+  listWorkflows: (token: string) =>
+    request<WorkflowListItem[]>('/workflows', {}, token),
   getPackage: (token: string, packageId: string) =>
     request<AgentPackageDetail>(
       `${PACKAGE_ROUTES.DETAIL}?packageId=${encodeURIComponent(packageId)}`,

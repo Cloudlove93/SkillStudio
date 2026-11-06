@@ -6,6 +6,7 @@ import {
   ChevronDown,
   FileText,
   FileUp,
+  GitBranch,
   Home,
   Layers3,
   LogOut,
@@ -28,7 +29,7 @@ import {
   type SkillMenuAction,
 } from './SkillWorkspaceSidebar';
 
-export type InnoSkillNavSection = 'home' | 'my-skills' | 'create';
+export type InnoSkillNavSection = 'home' | 'my-skills' | 'workflow-library' | 'create';
 
 type Props = {
   sessions: GuidedCreationSession[];
@@ -146,6 +147,12 @@ export function InnoSkillSidebar(props: Props) {
           icon={<BookOpen />}
           label="我的 Skill"
           onClick={() => props.onNavigate('my-skills')}
+        />
+        <NavButton
+          active={props.activeSection === 'workflow-library'}
+          icon={<GitBranch />}
+          label="工作流库"
+          onClick={() => props.onNavigate('workflow-library')}
         />
 
         <span className="isk-sidebar-section-label">生成</span>
