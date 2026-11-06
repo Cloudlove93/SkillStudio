@@ -263,6 +263,8 @@ export interface MediaSessionSummary {
 export interface RepositorySkillRecord {
   id: string;
   packageId: string;
+  originPackageId?: string;
+  originSkillId?: string;
   skillUid: string;
   dirName: string;
   name: string;
@@ -1450,13 +1452,20 @@ export const liteApi = {
     documents: Array<{ name: string; content: string }>,
     onEvent: (event: PackageGenerateStreamEvent) => void,
     singleSkill?: boolean,
+    requestId?: string,
   ) =>
     streamRequest<PackageGenerateStreamEvent>(
       '/packages/generate/stream',
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ instruction, model, documents, singleSkill }),
+        body: JSON.stringify({
+          instruction,
+          model,
+          documents,
+          singleSkill,
+          requestId,
+        }),
       },
       token,
       onEvent,
@@ -1583,7 +1592,10 @@ export const liteApi = {
     signal?: AbortSignal,
   ) =>
     streamRequest<ArenaMessageStreamEvent>(
-      ARENA_ROUTES.MESSAGE_STREAM.replace(':threadId', encodeURIComponent(threadId)),
+      ARENA_ROUTES.MESSAGE_STREAM.replace(
+        ':threadId',
+        encodeURIComponent(threadId),
+      ),
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

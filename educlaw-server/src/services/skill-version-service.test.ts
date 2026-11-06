@@ -1037,3 +1037,69 @@ describe('skill version service', () => {
     ).toBe(false);
   });
 });
+
+describe('copied Skill provenance', () => {
+  it.each([true, false])(
+    'accepts only owned or previously stored lineage (valid=%s)',
+    async (valid) => {
+      queryMock.mockImplementation(async (sql: string, values?: unknown[]) => {
+        if (sql.startsWith('select skill_uid, dir_name')) return { rows: [] };
+        if (
+          sql.includes('union all') &&
+          sql.includes('existing.origin_skill_id')
+        ) {
+          expect(values).toEqual(['31', '3', '1', 'copied']);
+          return { rows: valid ? [{ id: '11' }] : [] };
+        }
+        if (sql.startsWith('insert into agent_package_skills'))
+          return { rows: [{ id: '11' }] };
+        if (sql.startsWith('select sv.id'))
+          return { rows: [{ id: '21', version_number: 1 }] };
+        if (
+          sql.startsWith('update agent_package_skills') ||
+          sql.startsWith('insert into agent_package_version_skills')
+        )
+          return { rows: [] };
+        throw new Error(`Unexpected query: ${sql}`);
+      });
+      const { syncPackageVersionSkillsFromSnapshot } = await loadService();
+      const work = syncPackageVersionSkillsFromSnapshot(
+        { query: queryMock },
+        {
+          packageId: '1',
+          packageVersionId: '10',
+          packageVersionNumber: 1,
+          source: 'manual',
+          snapshot: {
+            name: 'Copy',
+            description: '',
+            versionLabel: 'v1',
+            agentMd: '',
+            rubricMd: '',
+            skills: [
+              {
+                id: 'copied',
+                dirName: 'copied',
+                name: 'Copy',
+                description: '',
+                skillMd: 'same content',
+                originPackageId: '3',
+                originSkillId: '31',
+              },
+            ],
+          },
+        },
+      );
+      if (valid) {
+        await expect(work).resolves.toBeInstanceOf(Map);
+      } else {
+        await expect(work).rejects.toMatchObject({ code: 'SKILL_UNAVAILABLE' });
+        expect(
+          queryMock.mock.calls.some(([sql]) =>
+            String(sql).startsWith('insert into'),
+          ),
+        ).toBe(false);
+      }
+    },
+  );
+});

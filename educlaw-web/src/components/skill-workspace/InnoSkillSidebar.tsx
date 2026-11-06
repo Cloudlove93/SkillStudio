@@ -134,21 +134,28 @@ export function InnoSkillSidebar(props: Props) {
         </button>
       </div>
 
-      <nav className="isk-sidebar-nav" aria-label="InnoSkill 主导航">
+      <nav className="isk-sidebar-nav" aria-label="SkillStudio 主导航">
         <NavButton
           active={props.activeSection === 'home'}
           icon={<Home />}
           label="主页"
           onClick={() => props.onNavigate('home')}
         />
+        {props.onAgents && (
+          <NavButton
+            active={false}
+            icon={<Bot />}
+            label="我的 Agent"
+            onClick={props.onAgents}
+          />
+        )}
         <NavButton
           active={props.activeSection === 'my-skills'}
           icon={<BookOpen />}
-          label="我的 Skill"
+          label="技能库"
           onClick={() => props.onNavigate('my-skills')}
         />
 
-        {props.onAgents && <NavButton active={false} icon={<Bot />} label="我的 Agent" onClick={props.onAgents} />}
         <span className="isk-sidebar-section-label">生成</span>
         <div
           className={`isk-sidebar-create ${props.activeSection === 'create' ? 'is-active' : ''}`}
@@ -158,7 +165,7 @@ export function InnoSkillSidebar(props: Props) {
             onClick={() => props.onCreateMode('conversation')}
           >
             <Plus />
-            <span>新建 Skill</span>
+            <span>新建 Agent</span>
           </button>
           <details ref={menuRef}>
             <summary aria-label="选择创建方式">
@@ -228,10 +235,32 @@ export function InnoSkillSidebar(props: Props) {
           </div>
         ))}
 
+        {props.sessions.some((item) => item.status === 'completed') && (
+          <>
+            <span className="isk-sidebar-section-label is-compact">
+              生成记录
+            </span>
+            {props.sessions
+              .filter((item) => item.status === 'completed')
+              .slice(0, 4)
+              .map((item) => (
+                <div className="isk-sidebar-skill" key={`result-${item.id}`}>
+                  <button
+                    type="button"
+                    onClick={() => props.onSelectDraft(item)}
+                  >
+                    <Layers3 />
+                    <span>{getSessionName(item)}</span>
+                  </button>
+                </div>
+              ))}
+          </>
+        )}
+
         {props.skills.length ? (
           <>
             <span className="isk-sidebar-section-label is-compact">
-              最近 Skill
+              最近生成
             </span>
             {props.skills.slice(0, 5).map((skill) => (
               <div

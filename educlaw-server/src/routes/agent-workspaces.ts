@@ -7,6 +7,7 @@ import {
   listAgents,
   getAgent,
   saveAgent,
+  provisionAgent,
   listAgentConversations,
   createAgentConversation,
 } from '../services/agent-workspace-service.js';
@@ -46,6 +47,11 @@ router.post(
   '/agent-workspaces',
   requireAuth,
   handle((user, _id, body) => saveAgent(user, body)),
+);
+router.post(
+  '/agent-workspaces/provision',
+  requireAuth,
+  handle((user, _id, body) => provisionAgent(user, body)),
 );
 router.get(
   '/agent-workspaces/:agentId',

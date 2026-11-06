@@ -82,6 +82,8 @@ router.post('/packages/generate', requireAuth, async (req, res) => {
       String(req.body?.instruction || ''),
       typeof req.body?.model === 'string' ? req.body.model : undefined,
       Array.isArray(req.body?.documents) ? req.body.documents : undefined,
+      undefined, undefined, undefined,
+      req.body?.requestId,
     );
     res.json(pkg);
   } catch (error) {
@@ -148,6 +150,7 @@ router.post(
         (preview) => writeSseEvent(res, 'preview', preview),
         (delta) => writeSseEvent(res, 'preview_delta', delta),
         req.body?.singleSkill === true ? 1 : undefined,
+        req.body?.requestId,
       );
       writeSseEvent(res, 'phase', { label: '保存智能体与初始版本' });
       writeSseEvent(res, 'done', pkg);

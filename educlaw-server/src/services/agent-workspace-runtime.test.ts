@@ -10,6 +10,7 @@ const getPackageMock = vi.fn();
 const getPackageVersionMock = vi.fn();
 const generateTextMock = vi.fn();
 let execution: AgentExecutionSnapshot;
+let answerRunInserts: unknown[][];
 
 async function collect(stream: AsyncGenerator<ArenaChatStreamEvent>) {
   const events: ArenaChatStreamEvent[] = [];
@@ -86,6 +87,7 @@ beforeEach(() => {
     })),
   };
   let messageId = 100;
+  answerRunInserts = [];
   queryMock.mockImplementation(async (sql: string, args: unknown[] = []) => {
     if (
       sql.startsWith(
@@ -122,6 +124,10 @@ beforeEach(() => {
     if (sql.includes('from arena_messages')) return { rows: [], rowCount: 0 };
     if (sql.startsWith('insert into arena_messages'))
       return { rows: [{ id: messageId++ }], rowCount: 1 };
+    if (sql.startsWith('insert into arena_answer_runs')) {
+      answerRunInserts.push(args);
+      return { rows: [], rowCount: 1 };
+    }
     if (sql.startsWith('update arena_threads set updated_at'))
       return { rows: [], rowCount: 1 };
     throw new Error(`Unexpected runtime query: ${sql}`);
@@ -141,7 +147,7 @@ afterEach(() => {
   vi.resetModules();
 });
 
-function assertNoPackageSelection() {
+function assertNoPackageSelection(allowAnswerRun = false) {
   expect(getPackageMock).not.toHaveBeenCalled();
   expect(getPackageVersionMock).not.toHaveBeenCalled();
   expect(
@@ -155,7 +161,7 @@ function assertNoPackageSelection() {
     queryMock.mock.calls.some(([sql]) =>
       sql.includes('insert into arena_answer_runs'),
     ),
-  ).toBe(false);
+  ).toBe(allowAnswerRun);
 }
 
 describe('Agent fixed snapshot runtime', () => {
@@ -215,7 +221,14 @@ describe('Agent fixed snapshot runtime', () => {
         `# Fixed Skill Version ${skill.skillVersionId}`,
       );
     }
-    assertNoPackageSelection();
+    assertNoPackageSelection(true);
+    const answerRun = answerRunInserts[0]!;
+    expect(JSON.parse(String(answerRun[7]))).toEqual(
+      execution.skills.map((skill) => skill.skillUid),
+    );
+    expect(answerRun[12]).toBeNull();
+    expect(answerRun[13]).toBeNull();
+    expect(answerRun[14]).toBe(Number(execution.skills[0]!.skillVersionId));
     expect(events).toContainEqual(
       expect.objectContaining({
         event: 'side_done',
@@ -259,7 +272,10 @@ describe('Agent fixed snapshot runtime', () => {
     events.push(...(await collect(stream)));
     expect(streamMock).toHaveBeenCalledTimes(1);
     expect(piMock).not.toHaveBeenCalled();
-    assertNoPackageSelection();
+    assertNoPackageSelection(true);
+    expect(JSON.parse(String(answerRunInserts[0]![7]))).toEqual(
+      original.skills.map((skill) => skill.skillUid),
+    );
     const assistant = queryMock.mock.calls.find(
       ([sql, args]) =>
         sql.startsWith('insert into arena_messages') && args[3] === 'assistant',

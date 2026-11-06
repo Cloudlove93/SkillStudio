@@ -7,6 +7,7 @@ const historicalSchemaStatements = [
       user_id text not null,
       name text not null,
       description text not null default '',
+      model text not null default '',
       current_version_id bigint not null,
       created_at timestamptz not null,
       updated_at timestamptz not null
@@ -225,32 +226,32 @@ const historicalSchemaStatements = [
       check (error_json is null or jsonb_typeof(error_json) = 'object')
       )
     `,
-    `
+  `
       alter table skill_guided_creation_sessions
         add column if not exists start_client_message_id text
     `,
-    `
+  `
       alter table skill_guided_creation_sessions
         add column if not exists flow_version integer not null default 1
     `,
-    `
+  `
       alter table skill_guided_creation_sessions
         add column if not exists confirmed_stages_json jsonb not null default '[]'::jsonb
     `,
-    `
+  `
       alter table skill_guided_creation_sessions
         add column if not exists display_name varchar(200)
     `,
-    `
+  `
       alter table skill_guided_creation_sessions
         add column if not exists deleted_at timestamptz
     `,
-    `
+  `
       create unique index if not exists uq_guided_session_start_message
         on skill_guided_creation_sessions (user_id, start_client_message_id)
         where start_client_message_id is not null
     `,
-    `
+  `
       create index if not exists idx_guided_sessions_user_status_updated
       on skill_guided_creation_sessions (user_id, status, updated_at desc)
   `,
@@ -679,31 +680,25 @@ export const multimodalSchemaStatements = [
   `,
 ];
 
-export const schemaStatements = historicalSchemaStatements.concat(
-  multimodalSchemaStatements,
-  [
-    `create table if not exists user_agents (
-      id bigserial primary key, user_id text not null,
-      name text not null, description text not null default '',
-      instructions text not null default '', model text not null default '',
-      skills_json jsonb not null default '[]'::jsonb,
-      created_at timestamptz not null, updated_at timestamptz not null
-    )`,
-    `create index if not exists idx_user_agents_owner on user_agents(user_id, id)`,
-    `create table if not exists user_agent_conversations (
-      agent_id bigint not null references user_agents(id) on delete cascade,
-      thread_id bigint not null unique references arena_threads(id) on delete cascade,
-      request_id text not null, purpose text not null check (purpose in ('run','test')),
-      primary key (agent_id, request_id)
-    )`,
-  ],
-);
+export const schemaStatements = [
+  ...historicalSchemaStatements,
+  ...multimodalSchemaStatements,
+];
 
 /**
  * Migrate existing columns to the current schema shape.
  * Statements are run independently so an already-migrated column does not block later migrations.
  */
 export const migrationStatements = [
+  `alter table agent_packages add column if not exists generation_request_key text`,
+  `alter table agent_packages add column if not exists generation_request_hash text`,
+  `create unique index if not exists uq_agent_packages_generation_request on agent_packages (user_id, generation_request_key) where generation_request_key is not null`,
+  `alter table agent_packages add column if not exists source_session_id bigint`,
+  `create unique index if not exists uq_agent_packages_source_session on agent_packages (user_id, source_session_id) where source_session_id is not null`,
+  `alter table agent_package_skills add column if not exists origin_package_id bigint`,
+  `alter table agent_package_skills add column if not exists origin_skill_id bigint`,
+  `create index if not exists ix_agent_package_skills_origin on agent_package_skills (origin_package_id, origin_skill_id) where origin_package_id is not null`,
+  `alter table agent_packages add column if not exists model text not null default ''`,
   // JSON text columns to JSONB.
   `alter table agent_package_skills add column if not exists display_name text`,
   `alter table agent_package_versions alter column snapshot_json type jsonb using snapshot_json::jsonb`,

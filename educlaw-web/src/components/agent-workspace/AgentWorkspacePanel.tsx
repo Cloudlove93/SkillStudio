@@ -45,6 +45,10 @@ const inputOf = (agent: AgentWorkspace): AgentWorkspaceInput => ({
 });
 const errorMessage = (error: unknown) =>
   error instanceof Error ? error.message : '操作失败，请重试';
+const newRequestId = () =>
+  typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 function writeSelection(agentId: string | null, conversationId?: number) {
   const url = new URL(window.location.href);
   if (agentId) url.searchParams.set('agentId', agentId);
@@ -52,6 +56,17 @@ function writeSelection(agentId: string | null, conversationId?: number) {
   if (conversationId)
     url.searchParams.set('conversation', String(conversationId));
   else url.searchParams.delete('conversation');
+  window.history.replaceState(
+    window.history.state,
+    '',
+    `${url.pathname}${url.search}${url.hash}`,
+  );
+}
+/** 自动开聊只生效一次，成功后移除参数，避免刷新页面重复建会话。 */
+function clearAutoChatParam() {
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has('autochat')) return;
+  url.searchParams.delete('autochat');
   window.history.replaceState(
     window.history.state,
     '',
@@ -96,6 +111,12 @@ function AgentWorkspaceSession({
   const [conversationError, setConversationError] = useState('');
   const [conversationLoading, setConversationLoading] = useState(false);
   const [conversationRetry, setConversationRetry] = useState(0);
+  /** 对话历史加载完成的 Agent；自动开聊必须等它匹配后才允许启动。 */
+  const [conversationLoadedFor, setConversationLoadedFor] = useState<
+    string | null
+  >(null);
+  const [provisionFailed, setProvisionFailed] = useState(false);
+  const [provisionRetry, setProvisionRetry] = useState(0);
   const [thread, setThread] = useState<ArenaThread | null>(null);
   const [tab, setTab] = useState<'settings' | 'chat'>('settings');
   const [saving, setSaving] = useState(false);
@@ -115,6 +136,12 @@ function AgentWorkspaceSession({
     requestId: string;
   } | null>(null);
   const adoptedAgentId = useRef<string | null>(null);
+  const provisionAttempt = useRef<string | null>(null);
+  const autoChatStarted = useRef(false);
+  const [autoChat] = useState(
+    () =>
+      new URLSearchParams(window.location.search).get('autochat') === '1',
+  );
   const dirty =
     JSON.stringify(draft) !==
     JSON.stringify(agent ? inputOf(agent) : emptyInput());
@@ -255,6 +282,7 @@ function AgentWorkspaceSession({
     let current = true;
     setConversationError('');
     setConversationLoading(!!selectedId);
+    setConversationLoadedFor(null);
     if (!selectedId) {
       setConversations([]);
       return;
@@ -264,6 +292,7 @@ function AgentWorkspaceSession({
       .then((items) => {
         if (!current) return;
         setConversations(items);
+        setConversationLoadedFor(selectedId);
         const requested = new URLSearchParams(window.location.search).get(
           'conversation',
         );
@@ -306,6 +335,53 @@ function AgentWorkspaceSession({
     );
   }, [pendingSkill, querySkillId, selectionReady, selectedId, detailRetry]);
 
+  // 从生成流程或仓库带着 skillId 进入时，直接把 Skill 转成可对话的 Agent。
+  useEffect(() => {
+    if (
+      !selectionReady ||
+      selectedId ||
+      !querySkillId ||
+      provisionAttempt.current === querySkillId
+    )
+      return;
+    provisionAttempt.current = querySkillId;
+    setProvisionFailed(false);
+    setAttachmentLoading(true);
+    setAttachmentError('');
+    void agentsApi
+      .provision(token, { skillId: querySkillId })
+      .then((created) => {
+        setAgents((previous) => [
+          created,
+          ...previous.filter((item) => item.id !== created.id),
+        ]);
+        setSelectedId(created.id);
+        setSelectionReady(true);
+        setQuerySkillId('');
+        setPendingSkill(null);
+        const url = new URL(window.location.href);
+        url.searchParams.delete('skillId');
+        url.searchParams.set('agentId', created.id);
+        window.history.replaceState(
+          window.history.state,
+          '',
+          `${url.pathname}${url.search}${url.hash}`,
+        );
+      })
+      .catch((e: unknown) => {
+        setProvisionFailed(true);
+        setAttachmentError(errorMessage(e));
+      })
+      .finally(() => setAttachmentLoading(false));
+  }, [token, querySkillId, selectionReady, selectedId, provisionRetry]);
+
+  function retryProvision() {
+    provisionAttempt.current = null;
+    setProvisionFailed(false);
+    setAttachmentError('');
+    setProvisionRetry((r) => r + 1);
+  }
+
   function choose(id: string | null) {
     if (saving || starting || (selectionReady && id === selectedId)) return;
     if (dirty) {
@@ -337,6 +413,8 @@ function AgentWorkspaceSession({
         { skillId: pendingSkill.id, skillVersionId: versionId, enabled: true },
       ],
     }));
+    setAttachmentError('');
+    setProvisionFailed(false);
     setTab('settings');
     setNotice(`已添加 ${pendingSkill.name}，保存后生效。`);
   }
@@ -353,6 +431,7 @@ function AgentWorkspaceSession({
     setSaving(true);
     setActionError('');
     setNotice('');
+    if (andRun) clearAutoChatParam();
     const generation = scope.current;
     const input = {
       ...draft,
@@ -385,7 +464,7 @@ function AgentWorkspaceSession({
         writeSelection(saved.id);
         setSelectedId(saved.id);
       }
-      if (andRun && saved.skills.some((s) => s.enabled)) {
+      if (andRun && saved.skills.some((s) => s.enabled && s.available !== false)) {
         if (
           requestKey.current?.agentId !== saved.id ||
           requestKey.current.purpose !== 'run'
@@ -393,7 +472,7 @@ function AgentWorkspaceSession({
           requestKey.current = {
             agentId: saved.id,
             purpose: 'run',
-            requestId: crypto.randomUUID(),
+            requestId: newRequestId(),
           };
         }
         const input = {
@@ -424,26 +503,29 @@ function AgentWorkspaceSession({
     }
   }
 
-  async function start(purpose: 'run' | 'test') {
+  async function start(purpose: 'run' | 'test', requestId?: string) {
     if (
       !agent ||
       dirty ||
-      !agent.skills.some((s) => s.enabled) ||
+      !agent.skills.some((s) => s.enabled && s.available !== false) ||
       actionLock.current
     )
       return;
     actionLock.current = true;
     setStarting(true);
     setActionError('');
+    clearAutoChatParam();
     const generation = scope.current;
-    if (
+    if (requestId) {
+      requestKey.current = { agentId: agent.id, purpose, requestId };
+    } else if (
       requestKey.current?.agentId !== agent.id ||
       requestKey.current.purpose !== purpose
     ) {
       requestKey.current = {
         agentId: agent.id,
         purpose,
-        requestId: crypto.randomUUID(),
+        requestId: newRequestId(),
       };
     }
     const input = { purpose, requestId: requestKey.current.requestId };
@@ -475,7 +557,35 @@ function AgentWorkspaceSession({
     !detailError &&
     !starting &&
     !saving &&
-    agent.skills.some((s) => s.enabled);
+    agent.skills.some((s) => s.enabled && s.available !== false);
+
+  // 自动创建 Agent 后直接进入对话，让“生成”结果马上可用。
+  // 必须等对话历史加载完成，否则会在历史存在时重复新建会话。
+  useEffect(() => {
+    if (
+      !autoChat ||
+      autoChatStarted.current ||
+      !agent ||
+      dirty ||
+      starting ||
+      saving ||
+      conversationLoadedFor !== agent.id
+    )
+      return;
+    autoChatStarted.current = true;
+    clearAutoChatParam();
+    if (conversations.length) {
+      const latest = conversations[0]!;
+      setThread(latest);
+      setTab('chat');
+      writeSelection(agent.id, latest.id);
+      return;
+    }
+    void start('run', `auto:${agent.id}`);
+    // 只在首次进入时自动开一次对话，后续由用户主动操作。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoChat, agent, dirty, starting, saving, conversations, conversationLoadedFor]);
+
   const openSkill = onOpenSkill;
   return (
     <div className="skill-workspace-root agent-workspace-panel">
@@ -494,8 +604,8 @@ function AgentWorkspaceSession({
             <Plus size={17} />
           </button>
         </div>
-        <p className="agent-muted">把多个 Skills 组合成自己的教学助手。</p>
-        {listLoading && <p role="status">正在加载 Agents…</p>}
+        <p className="agent-muted">把可复用的 Skill 组合成自己的教学 Agent。</p>
+        {listLoading && <p role="status">正在加载 Agent…</p>}
         {listError && (
           <div role="alert" className="agent-error">
             {listError}
@@ -516,14 +626,14 @@ function AgentWorkspaceSession({
               <strong>{item.name}</strong>
               <span>{item.description || '教学助手'}</span>
               <small>
-                {item.skills.filter((s) => s.enabled).length} 个启用的 Skills
+                {item.skills.filter((s) => s.enabled).length} 个启用的 Skill
               </small>
             </button>
           ))}
         </nav>
         {!listLoading && !listError && !agents.length && (
           <div className="agent-empty-inline">
-            创建第一个 Agent，绑定你已有的 Skills。
+            创建第一个 Agent，绑定你已有的 Skill。
           </div>
         )}
         <button
@@ -539,10 +649,10 @@ function AgentWorkspaceSession({
       <main className="agent-main" aria-label="Agent 工作区">
         <header className="agent-header">
           <div>
-            <p className="agent-eyebrow">AGENT WORKSPACE</p>
+            <p className="agent-eyebrow">AGENT 工作区</p>
             <h1>{agent?.name ?? (selectedId ? 'Agent 配置' : '创建 Agent')}</h1>
             <p className="agent-muted">
-              配置你的助手，明确它可以使用的 Skills。
+              配置你的助手，明确它可以使用的 Skill。
             </p>
           </div>
           <div className="agent-actions">
@@ -567,19 +677,26 @@ function AgentWorkspaceSession({
         </header>
         {attachmentLoading && (
           <p role="status" className="agent-banner">
-            正在查找待绑定 Skill…
+            {querySkillId
+              ? '正在把 Skill 转换成 Agent，并准备对话…'
+              : '正在查找待绑定 Skill…'}
           </p>
         )}
         {attachmentError && (
           <div role="alert" className="agent-error">
             {attachmentError}
+            {provisionFailed && querySkillId && (
+              <button type="button" onClick={retryProvision}>
+                重新尝试自动创建
+              </button>
+            )}
           </div>
         )}
         {pendingSkill && (
           <div className="agent-banner">
             <div>
               <strong>待绑定：{pendingSkill.name}</strong>
-              <p>为新 Agent 预选，或从左侧选择已有 Agent 后添加。</p>
+              <p>自动创建 Agent 未成功，可把这个 Skill 手动加入后继续。</p>
             </div>
             <button
               type="button"
@@ -715,7 +832,7 @@ function AgentWorkspaceSession({
                       maxLength={16000}
                       rows={5}
                       value={draft.instructions}
-                      placeholder="定义角色、工作方式和多个 Skills 的协作规则…"
+                      placeholder="定义角色、工作方式和多个 Skill 的协作规则…"
                       onChange={(e) =>
                         setDraft({ ...draft, instructions: e.target.value })
                       }

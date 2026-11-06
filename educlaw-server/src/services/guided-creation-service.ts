@@ -17,6 +17,7 @@ import type {
   GuidedSkillDraft,
 } from '@educlaw/shared';
 import { query, withTransaction } from './db.js';
+import { config } from '../config.js';
 import {
   parseStructuredGuidedInput,
   structuredInputToEducationDraft,
@@ -157,7 +158,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function cleanAcknowledgement(value: string): string {
-  const cleaned = value.replace(/[？?]+/g, '。').replace(/\s+/g, ' ').trim();
+  const cleaned = value
+    .replace(/[？?]+/g, '。')
+    .replace(/\s+/g, ' ')
+    .trim();
   return cleaned.slice(0, 200) || '明白了。';
 }
 
@@ -334,7 +338,9 @@ export function buildGuidedAssistantTurn(input: {
     input.extraction.operations,
   );
   const evaluation = evaluateDraft(draft, stateOverrides);
-  const acknowledgement = cleanAcknowledgement(input.extraction.acknowledgement);
+  const acknowledgement = cleanAcknowledgement(
+    input.extraction.acknowledgement,
+  );
 
   if (evaluation.ready_for_confirmation) {
     return {
@@ -407,10 +413,9 @@ function parseStagePhrasing(
   const fallbackQuestion = field
     ? FALLBACK_QUESTIONS[field]
     : `我已经记下${confirmationSummary ? `：${confirmationSummary}` : '这些信息'}。这个理解准确吗？`;
-  const question =
-    candidateIsUsable
-      ? firstQuestion.replace(/\?$/, '？')
-      : fallbackQuestion;
+  const question = candidateIsUsable
+    ? firstQuestion.replace(/\?$/, '？')
+    : fallbackQuestion;
   const candidateOptions = Array.isArray(phrasing?.suggested_options)
     ? phrasing.suggested_options
         .filter((option): option is string => typeof option === 'string')
@@ -443,7 +448,7 @@ function isEducationStepConfirmation(value: string): boolean {
   const normalized = value
     .normalize('NFKC')
     .toLocaleLowerCase()
-    .replace(/[\s，,。.!！、；;：:\/]+/g, '');
+    .replace(/[\s，,。.!！、；;：:/]+/g, '');
   if (isClearStageConfirmation(normalized)) return true;
   if (!normalized) return false;
 
@@ -520,12 +525,10 @@ export function buildGuidedAssistantTurnV2(input: {
     }
   }
 
-  const evaluation = evaluateGuidedFlow(
-    draft,
-    stateOverrides,
-    confirmedStages,
+  const evaluation = evaluateGuidedFlow(draft, stateOverrides, confirmedStages);
+  const acknowledgement = cleanAcknowledgement(
+    input.extraction.acknowledgement,
   );
-  const acknowledgement = cleanAcknowledgement(input.extraction.acknowledgement);
   if (evaluation.ready_for_confirmation) {
     return {
       draft: evaluation.normalized_draft,
@@ -640,7 +643,11 @@ const STEP_FALLBACK_OPTIONS: Record<GuidedCreationStep, string[]> = {
   intent_context: ['理解关键概念', '能够独立实践', '能解释并迁移应用'],
   teacher_experience: ['说说常见困难', '分享一次有效做法', '说明你会关注什么'],
   strategy_co_creation: ['先诊断再引导', '通过探究形成理解', '用反馈推动修正'],
-  action_adjustment: ['根据错误类型调整', '逐步增减学习支架', '关键节点由教师确认'],
+  action_adjustment: [
+    '根据错误类型调整',
+    '逐步增减学习支架',
+    '关键节点由教师确认',
+  ],
   evidence_review: ['用作品或表现判断', '用真实任务验证', '结合过程与结果判断'],
 };
 
@@ -707,9 +714,11 @@ function parseEducationPhrasing(
     ? step === 'intent_context'
       ? `${intentFallback}需要补充的地方可以直接告诉我。`
       : STEP_CONFIRMATION_QUESTIONS[step]
-    : usesExpectedStep && firstQuestion.length > 0 && firstQuestion.length <= 180
-    ? firstQuestion.replace(/\?$/, '？')
-    : intentFallback;
+    : usesExpectedStep &&
+        firstQuestion.length > 0 &&
+        firstQuestion.length <= 180
+      ? firstQuestion.replace(/\?$/, '？')
+      : intentFallback;
 
   const candidateOptions = Array.isArray(phrasing?.suggested_options)
     ? phrasing.suggested_options
@@ -775,11 +784,10 @@ export function buildGuidedAssistantTurnV3(input: {
     const hasRequiredEvidence = requiredDimensions.every((dimension) =>
       hasUserOwnedEvidence(draft, dimension),
     );
-    const hasConflictedInStep = requiredDimensions.some(
-      (dimension) =>
-        Boolean(draft[dimension]?.evidence.some(
-          (item) => item.source === 'conflicted',
-        )),
+    const hasConflictedInStep = requiredDimensions.some((dimension) =>
+      Boolean(
+        draft[dimension]?.evidence.some((item) => item.source === 'conflicted'),
+      ),
     );
     if (
       confirmedByUser &&
@@ -816,7 +824,9 @@ export function buildGuidedAssistantTurnV3(input: {
   }
 
   const evaluation = evaluateEducationFlow(draft, completedSteps);
-  const acknowledgement = cleanAcknowledgement(input.extraction.acknowledgement);
+  const acknowledgement = cleanAcknowledgement(
+    input.extraction.acknowledgement,
+  );
   const legacyStates = Object.fromEntries(
     GUIDED_DRAFT_FIELDS.map((field) => [field, 'missing']),
   ) as Record<GuidedDraftField, GuidedFieldState>;
@@ -917,15 +927,23 @@ function asIso(value: unknown): string {
 }
 
 function mapSession(row: Record<string, unknown>): GuidedCreationSession {
+  const generated = parseJson<AgentPackageSnapshot | null>(
+    row.generated_snapshot_json,
+    null,
+  );
+  const hasAgentResult =
+    row.status === 'completed' &&
+    generated?.sourceSessionId === String(row.id) &&
+    row.package_id &&
+    row.skill_id &&
+    row.skill_version_id &&
+    row.package_version_id;
   const storedDraft = parseJson<Record<string, unknown>>(row.draft_json, {});
   const storedStates = parseJson<
     Partial<Record<GuidedDraftField, GuidedFieldState>>
   >(row.field_states_json, {});
   const flowVersion = Math.max(1, Number(row.flow_version ?? 1));
-  const storedProgress = parseJson<unknown[]>(
-    row.confirmed_stages_json,
-    [],
-  );
+  const storedProgress = parseJson<unknown[]>(row.confirmed_stages_json, []);
   const confirmedStages = storedProgress.filter(
     (stage): stage is GuidedCreationStage =>
       typeof stage === 'string' && GUIDED_STAGE_SET.has(stage),
@@ -982,6 +1000,21 @@ function mapSession(row: Record<string, unknown>): GuidedCreationSession {
     created_at: asIso(row.created_at),
     updated_at: asIso(row.updated_at),
     completed_at: row.completed_at ? asIso(row.completed_at) : null,
+    generatedAgent:
+      hasAgentResult && generated
+        ? {
+            agentId: String(row.package_id),
+            skillId: String(row.skill_id),
+            skillVersionId: String(row.skill_version_id),
+            packageVersionId: String(row.package_version_id),
+            sourceSessionId: String(row.id),
+            name: generated.name,
+            description: generated.description,
+            instructions: generated.agentMd,
+            model: String(row.model || config.llmModel),
+            skills: generated.skills,
+          }
+        : null,
   };
 }
 
@@ -991,9 +1024,7 @@ function mapMessage(row: Record<string, unknown>): GuidedCreationMessage {
     session_id: String(row.session_id),
     message_no: Number(row.message_no),
     client_message_id:
-      typeof row.client_message_id === 'string'
-        ? row.client_message_id
-        : null,
+      typeof row.client_message_id === 'string' ? row.client_message_id : null,
     role: row.role as GuidedCreationMessage['role'],
     content: String(row.content),
     metadata: parseJson<Record<string, unknown>>(row.metadata_json, {}),
@@ -1156,12 +1187,7 @@ export async function renameGuidedCreation(input: {
         and revision_no = $3
         and deleted_at is null
         and status <> 'finalizing'`,
-    [
-      input.session_id,
-      input.auth_user_id,
-      input.revision_no,
-      displayName,
-    ],
+    [input.session_id, input.auth_user_id, input.revision_no, displayName],
   );
   if (result.rowCount !== 1) {
     throw new GuidedCreationError(
@@ -1360,7 +1386,8 @@ function currentFocusStep(
   const focusStep = [...session.messages]
     .reverse()
     .find((message) => message.role === 'assistant')?.metadata.focus_step;
-  return typeof focusStep === 'string' && GUIDED_CREATION_STEP_SET.has(focusStep)
+  return typeof focusStep === 'string' &&
+    GUIDED_CREATION_STEP_SET.has(focusStep)
     ? (focusStep as GuidedCreationStep)
     : null;
 }
@@ -1487,9 +1514,9 @@ async function generateAssistantTurn(input: {
     }
     const effectiveDraft = input.session.education_draft ?? {};
     const effectiveCompletedSteps = [...(input.session.completed_steps ?? [])];
-      const totalUserMessages = input.session.messages.filter(
-        (m) => m.role === 'user',
-      ).length;
+    const totalUserMessages = input.session.messages.filter(
+      (m) => m.role === 'user',
+    ).length;
     const stepRounds = currentStep
       ? input.session.messages.filter(
           (m) =>
@@ -1683,9 +1710,9 @@ async function generateAssistantTurn(input: {
       phrasing: null,
     });
   }
-      const totalUserMessages = input.session.messages.filter(
-        (m) => m.role === 'user',
-      ).length;
+  const totalUserMessages = input.session.messages.filter(
+    (m) => m.role === 'user',
+  ).length;
   if (totalUserMessages >= MAX_TOTAL_USER_MESSAGES) {
     const forcedExtraction: GuidedExtractionResult = {
       operations: [],
@@ -1750,7 +1777,8 @@ export async function processGuidedCreationMessage(input: {
   if (existingUserMessage) {
     const messageLeaseExpired =
       session.status === 'collecting' &&
-      Date.now() - new Date(session.updated_at).getTime() >= GUIDED_MESSAGE_LEASE_MS;
+      Date.now() - new Date(session.updated_at).getTime() >=
+        GUIDED_MESSAGE_LEASE_MS;
     if (session.status !== 'failed' && !messageLeaseExpired) {
       throw new GuidedCreationError(
         'MESSAGE_PROCESSING',
@@ -1950,7 +1978,7 @@ export async function processGuidedCreationMessage(input: {
         for update`,
       [input.session_id, input.auth_user_id],
     );
-      const lockedRow = locked.rows[0];
+    const lockedRow = locked.rows[0];
     if (
       !lockedRow ||
       Number(lockedRow.revision_no) !== acceptedRevision ||
@@ -2180,7 +2208,7 @@ export async function summarizeGuidedCreation(input: {
         where session_id = $1`,
       [input.session_id],
     );
-      const messageNo = Number(sequence.rows[0]?.last_message_no ?? 0) + 1;
+    const messageNo = Number(sequence.rows[0]?.last_message_no ?? 0) + 1;
     await client.query(
       `insert into skill_guided_creation_messages (
          session_id, message_no, role, content, metadata_json
@@ -2380,12 +2408,7 @@ export async function confirmGuidedCreation(input: {
           status in ('ready_for_confirmation', 'failed')
           or (status = 'finalizing' and updated_at < now() - interval '10 minutes')
         )`,
-    [
-      input.session_id,
-      input.auth_user_id,
-      input.revision_no,
-      input.request_id,
-    ],
+    [input.session_id, input.auth_user_id, input.revision_no, input.request_id],
   );
   if (claimed.rowCount !== 1) {
     throw new GuidedCreationError(
@@ -2429,6 +2452,13 @@ export async function confirmGuidedCreation(input: {
     }
 
     input.on_phase?.('saving');
+    if (config.generationAgentEnabled !== false)
+      snapshot.sourceSessionId = input.session_id;
+    if (config.generationAgentEnabled !== false) {
+      snapshot.agentMd =
+        snapshot.agentMd.trim() ||
+        '你是一位教学助手。遵循已启用 Skill 的工作方法，根据用户的教学目标完成任务；信息不足时先询问，并明确说明依据与边界。';
+    }
     await withTransaction(async (client) => {
       const locked = await client.query<Record<string, unknown>>(
         `select id
@@ -2459,7 +2489,12 @@ export async function confirmGuidedCreation(input: {
         input.auth_user_id,
         snapshot!,
         'generated',
+        session.model?.trim() || config.llmModel,
       );
+      snapshot!.skills = snapshot!.skills.map((skill) => ({
+        ...skill,
+        originPackageId: String(created.packageId),
+      }));
       const mapping = await client.query<Record<string, unknown>>(
         `select skill_id, skill_version_id
            from agent_package_version_skills
@@ -2486,6 +2521,8 @@ export async function confirmGuidedCreation(input: {
                 package_id = $7,
                 skill_id = $8,
                 skill_version_id = $9,
+                package_version_id = $10,
+                model = $11,
                 error_json = null,
                 completed_at = now(),
                 updated_at = now()
@@ -2504,6 +2541,8 @@ export async function confirmGuidedCreation(input: {
           created.packageId,
           skillId,
           skillVersionId,
+          created.packageVersionId,
+          session.model?.trim() || config.llmModel,
         ],
       );
       if (completed.rowCount !== 1) {

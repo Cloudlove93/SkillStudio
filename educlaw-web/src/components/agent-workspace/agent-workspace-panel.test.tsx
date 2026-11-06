@@ -11,6 +11,7 @@ const api = vi.hoisted(() => ({
   list: vi.fn(),
   get: vi.fn(),
   create: vi.fn(),
+  provision: vi.fn(),
   update: vi.fn(),
   listConversations: vi.fn(),
   createConversation: vi.fn(),
@@ -85,6 +86,7 @@ function agent(extra: Partial<AgentWorkspace> = {}): AgentWorkspace {
         name: '教学设计',
         description: '设计课程',
         versionNumber: 2,
+        available: true,
         enabled: true,
       },
     ],
@@ -167,10 +169,12 @@ beforeEach(() => {
           name: s.skillId === '12' ? '课程评价' : '教学设计',
           description: '',
           versionNumber: 2,
+          available: true,
         }),
       ),
     }),
   );
+  api.provision.mockImplementation(async () => agent());
   api.update.mockImplementation(async (_token, _id, input) =>
     agent({
       ...input,
@@ -182,6 +186,7 @@ beforeEach(() => {
           name: s.skillId === '12' ? '课程评价' : '教学设计',
           description: '',
           versionNumber: 2,
+          available: true,
         }),
       ),
     }),
@@ -274,6 +279,12 @@ async function change(label: string, value: string) {
     input.dispatchEvent(new Event('input', { bubbles: true }));
   });
 }
+async function settle() {
+  for (let index = 0; index < 6; index += 1)
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+}
 it('creates an Agent without skills under StrictMode and retains the saved selection', async () => {
   api.list.mockResolvedValue([]);
   await render({}, true);
@@ -364,49 +375,70 @@ it('restores agent and conversation from the URL without using current skill ver
   expect(container.querySelector('output')?.textContent).toBe('91:7:101');
   expect(container.textContent).toContain('旧指令');
 });
-it('preselects a generated query skill then creates and starts in one click', async () => {
-  window.history.replaceState({}, '', '/agents?skillId=12');
-  await render({}, true);
-  expect(container.querySelectorAll('.agent-attached-skill')).toHaveLength(1);
-  await change('Agent 名称', '新评价助手');
-  await click('创建并使用');
-  expect(api.create).toHaveBeenCalledWith(
-    'explicit-token',
-    expect.objectContaining({
-      skills: [{ skillId: '12', skillVersionId: '202', enabled: true }],
-    }),
-  );
+it('turns a generated query skill into an Agent and opens the conversation', async () => {
+  api.list.mockResolvedValue([]);
+  const provisioned = agent({
+    id: '2',
+    name: '课程评价助手',
+    skills: [
+      {
+        skillId: '12',
+        skillVersionId: '202',
+        packageId: '8',
+        name: '课程评价',
+        description: '',
+        versionNumber: 2,
+        enabled: true,
+        available: true,
+      },
+    ],
+  });
+  api.provision.mockResolvedValue(provisioned);
+  api.get.mockResolvedValue(provisioned);
+  window.history.replaceState({}, '', '/agents?skillId=12&autochat=1');
+  await render();
+  await settle();
+  expect(api.provision).toHaveBeenCalledWith('explicit-token', {
+    skillId: '12',
+  });
+  expect(container.textContent).toContain('课程评价助手');
+  expect(api.get).toHaveBeenCalledWith('explicit-token', '2');
   expect(api.createConversation).toHaveBeenCalledWith(
     'explicit-token',
-    '1',
-    expect.objectContaining({ purpose: 'run' }),
+    '2',
+    expect.objectContaining({ purpose: 'run', requestId: 'auto:2' }),
   );
+  expect(window.location.search).toContain('agentId=2');
   expect(window.location.search).toContain('conversation=91');
+  expect(window.location.search).not.toContain('skillId');
 });
 it('keeps the saved Agent and reuses the conversation key after save-and-run transport failure', async () => {
-  api.list.mockResolvedValue([]);
   api.createConversation
     .mockRejectedValueOnce(new TypeError('connection lost'))
     .mockResolvedValueOnce(thread());
   window.history.replaceState({}, '', '/agents?skillId=11');
-  await render({}, true);
+  await render();
+  await settle();
   await change('Agent 名称', '新助手');
-  await click('创建并使用');
-  expect(api.create).toHaveBeenCalledTimes(1);
+  await click('保存并使用');
+  expect(api.update).toHaveBeenCalledTimes(1);
+  expect(api.create).not.toHaveBeenCalled();
   expect(window.location.search).toContain('agentId=1');
   expect(container.textContent).toContain('connection lost');
   await click('保存并使用');
-  expect(api.create).toHaveBeenCalledTimes(1);
-  expect(api.update).not.toHaveBeenCalled();
+  expect(api.update).toHaveBeenCalledTimes(1);
   expect(api.createConversation.mock.calls[0][2]).toEqual(
     api.createConversation.mock.calls[1][2],
   );
   expect(container.querySelector('output')?.textContent).toBe('91:7:101');
 });
 it('attaches generated skill to an existing Agent, then reselects it in a new draft', async () => {
+  api.provision.mockRejectedValueOnce(
+    new AgentWorkspaceApiError('自动创建 Agent 未成功', 500),
+  );
   window.history.replaceState({}, '', '/agents?skillId=12');
   await render();
-  await click('课程助手备课1 个启用的 Skills');
+  await click('课程助手备课1 个启用的 Skill');
   await click('放弃并继续');
   await click('添加待绑定 Skill');
   await click('保存配置');

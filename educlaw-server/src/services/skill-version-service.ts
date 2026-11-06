@@ -44,6 +44,8 @@ interface DbSkillRow {
   next_version_number: number;
   created_at: string;
   updated_at: string;
+  origin_package_id?: string | null;
+  origin_skill_id?: string | null;
 }
 
 interface DbSkillVersionRow {
@@ -108,7 +110,11 @@ function normalizeBatchSkillIds(values: unknown): string[] {
       400,
     );
   }
-  if (values.some((value) => typeof value !== 'string' || !/^[1-9]\d*$/.test(value))) {
+  if (
+    values.some(
+      (value) => typeof value !== 'string' || !/^[1-9]\d*$/.test(value),
+    )
+  ) {
     throw new SkillVersionError(
       'INVALID_ARGUMENT',
       'skillIds must contain positive integer strings',
@@ -188,6 +194,10 @@ function normalizeSkillSnapshot(
     name: String(skill.name || '').trim(),
     description: String(skill.description || '').trim(),
     skillMd: String(skill.skillMd || '').trim(),
+    ...(skill.originPackageId
+      ? { originPackageId: skill.originPackageId }
+      : {}),
+    ...(skill.originSkillId ? { originSkillId: skill.originSkillId } : {}),
   };
 }
 
@@ -196,8 +206,11 @@ function stableJson(value: unknown): string {
 }
 
 function hashSkill(skill: PackageSkill): string {
+  // 来源是关联信息，不改变可执行正文的内容哈希。
+  const { id, dirName, name, description, skillMd } =
+    normalizeSkillSnapshot(skill);
   return createHash('sha256')
-    .update(stableJson(normalizeSkillSnapshot(skill)))
+    .update(stableJson({ id, dirName, name, description, skillMd }))
     .digest('hex');
 }
 
@@ -351,7 +364,9 @@ async function resolveSnapshotSkills(
   const skillUidByDirName = new Map<string, string>();
   const usedSkillUids = new Set<string>();
   for (const row of existing.rows) {
-    const dirKey = String(row.dir_name || '').trim().toLocaleLowerCase();
+    const dirKey = String(row.dir_name || '')
+      .trim()
+      .toLocaleLowerCase();
     if (dirKey && !skillUidByDirName.has(dirKey)) {
       skillUidByDirName.set(dirKey, row.skill_uid);
     }
@@ -367,7 +382,10 @@ async function resolveSnapshotSkills(
     let skillUid = String(skill.id || '').trim();
     if (!skillUid) {
       skillUid = skillUidByDirName.get(dirKey) || slugifySkillUid(dirName);
-      if (usedSkillUids.has(skillUid) && skillUidByDirName.get(dirKey) !== skillUid) {
+      if (
+        usedSkillUids.has(skillUid) &&
+        skillUidByDirName.get(dirKey) !== skillUid
+      ) {
         let suffix = 2;
         const base = skillUid;
         while (usedSkillUids.has(`${base}-${suffix}`)) {
@@ -547,11 +565,54 @@ export async function syncPackageVersionSkillsFromSnapshot(
     packageId,
     command.snapshot.skills,
   );
-  const syncedVersions = new Map<string, { id: string; versionNumber: number }>();
+  const syncedVersions = new Map<
+    string,
+    { id: string; versionNumber: number }
+  >();
 
   for (let index = 0; index < normalizedSkills.length; index += 1) {
     const skill = normalizedSkills[index]!;
+    // 新引用必须属于同一用户；已保存的来源在原包删除后仍可继续使用。
+    if (skill.originPackageId && skill.originPackageId !== packageId) {
+      if (!skill.originSkillId)
+        throw new SkillVersionError(
+          'SKILL_UNAVAILABLE',
+          'Skill 来源不完整，请重新选择',
+          422,
+        );
+      const origin = await client.query(
+        `select s.id from agent_package_skills s
+           join agent_packages source on source.id = s.package_id
+           join agent_packages target on target.user_id = source.user_id
+          where target.id = $3 and (
+            (s.id = $1 and s.package_id = $2)
+            or (s.origin_skill_id = $1 and s.origin_package_id = $2)
+          )
+         union all
+         select existing.id from agent_package_skills existing
+          where existing.package_id = $3 and existing.skill_uid = $4
+            and existing.origin_package_id = $2 and existing.origin_skill_id = $1
+         limit 1`,
+        [skill.originSkillId, skill.originPackageId, packageId, skill.id],
+      );
+      if (!origin.rows[0])
+        throw new SkillVersionError(
+          'SKILL_UNAVAILABLE',
+          'Skill 来源不可用，请重新选择',
+          422,
+        );
+    }
     const skillRow = await getOrCreateSkillRow(client, packageId, skill, now);
+    if (skill.originPackageId) {
+      await client.query(
+        `update agent_package_skills set origin_package_id = $1, origin_skill_id = $2 where id = $3`,
+        [
+          skill.originPackageId,
+          skill.originSkillId || skillRow.id,
+          skillRow.id,
+        ],
+      );
+    }
     const forced = command.forcedSkillVersions?.get(skill.id);
     const contentHash = hashSkill(skill);
     const reusableVersion = !forced
@@ -619,6 +680,8 @@ function toSkillSummary(row: DbSkillRow) {
     description: row.description,
     status: row.status,
     updatedAt: row.updated_at,
+    originPackageId: String(row.origin_package_id || row.package_id),
+    originSkillId: String(row.origin_skill_id || row.id),
   };
 }
 
@@ -704,13 +767,30 @@ export async function listRepositorySkills(input: {
        ) latest_sv on true
        where p.user_id = $1
          and s.status = 'active'
+         and not exists (
+           select 1 from agent_package_skills canonical
+           join agent_packages canonical_package on canonical_package.id = canonical.package_id
+           join agent_package_version_skills canonical_link on canonical_link.package_id = canonical.package_id
+             and canonical_link.package_version_id = canonical_package.current_version_id and canonical_link.skill_id = canonical.id
+           join agent_skill_versions canonical_version on canonical_version.id = canonical_link.skill_version_id
+           where coalesce(canonical.origin_skill_id, canonical.id) = coalesce(s.origin_skill_id, s.id)
+             and coalesce(canonical.origin_package_id, canonical.package_id) = coalesce(s.origin_package_id, s.package_id)
+             and canonical.id < s.id and canonical.status = 'active'
+             and canonical_package.user_id = p.user_id
+             and canonical_version.content_hash = current_sv.content_hash
+         )
          and (
            $2::timestamptz is null
            or (s.updated_at, s.id) < ($2::timestamptz, $3::bigint)
          )
        order by s.updated_at desc, s.id desc
        limit $4`,
-      [input.authUserId, cursor?.updatedAt ?? null, cursor?.id ?? null, limit + 1],
+      [
+        input.authUserId,
+        cursor?.updatedAt ?? null,
+        cursor?.id ?? null,
+        limit + 1,
+      ],
     );
     const hasMore = result.rows.length > limit;
     const pageRows = result.rows.slice(0, limit);
@@ -718,6 +798,8 @@ export async function listRepositorySkills(input: {
       items: pageRows.map((row) => ({
         id: String(row.id),
         packageId: String(row.package_id),
+        originPackageId: String(row.origin_package_id || row.package_id),
+        originSkillId: String(row.origin_skill_id || row.id),
         skillUid: row.skill_uid,
         dirName: row.dir_name,
         name: row.display_name?.trim() || row.name,
@@ -828,7 +910,10 @@ async function ensurePackageSkillHistory(client: Queryable, pkg: DbRowPackage) {
     if (mappedVersionIds.has(String(version.id))) {
       continue;
     }
-    const snapshot = parseDbJson<AgentPackageSnapshot>(version.snapshot_json, emptySnapshot());
+    const snapshot = parseDbJson<AgentPackageSnapshot>(
+      version.snapshot_json,
+      emptySnapshot(),
+    );
     // An empty historical snapshot has no meaningful mapping to materialize.
     if (snapshot.skills.length === 0) continue;
     await syncPackageVersionSkillsFromSnapshot(client, {
@@ -869,7 +954,12 @@ export async function listPackageSkills(input: {
 }) {
   const packageId = positiveId(input.packageId, 'packageId');
   return withTransaction(async (client) => {
-    const pkg = await getOwnedPackage(client, input.authUserId, packageId, true);
+    const pkg = await getOwnedPackage(
+      client,
+      input.authUserId,
+      packageId,
+      true,
+    );
     await ensurePackageSkillHistory(client, pkg);
     const result = await client.query<DbSkillRow>(
       `select * from agent_package_skills
@@ -893,7 +983,9 @@ export async function renameSkill(input: {
   if (!displayName || displayName.length > 80) {
     throw new SkillVersionError(
       'INVALID_ARGUMENT',
-      displayName ? 'Skill name must not exceed 80 characters' : 'Skill name is required',
+      displayName
+        ? 'Skill name must not exceed 80 characters'
+        : 'Skill name is required',
       422,
     );
   }
@@ -937,16 +1029,12 @@ export async function batchDeleteSkills(input: {
     );
     const foundIds = new Set(ownershipResult.rows.map((row) => String(row.id)));
     if (skillIds.some((skillId) => !foundIds.has(skillId))) {
-      throw new SkillVersionError(
-        'SKILL_NOT_FOUND',
-        'Skill not found',
-        404,
-      );
+      throw new SkillVersionError('SKILL_NOT_FOUND', 'Skill not found', 404);
     }
 
-    const packageIds = [...new Set(
-      ownershipResult.rows.map((row) => String(row.package_id)),
-    )].sort((left, right) => {
+    const packageIds = [
+      ...new Set(ownershipResult.rows.map((row) => String(row.package_id))),
+    ].sort((left, right) => {
       const leftId = BigInt(left);
       const rightId = BigInt(right);
       return leftId < rightId ? -1 : leftId > rightId ? 1 : 0;
@@ -959,11 +1047,7 @@ export async function batchDeleteSkills(input: {
       [input.authUserId, packageIds],
     );
     if (packagesResult.rows.length !== packageIds.length) {
-      throw new SkillVersionError(
-        'SKILL_NOT_FOUND',
-        'Skill not found',
-        404,
-      );
+      throw new SkillVersionError('SKILL_NOT_FOUND', 'Skill not found', 404);
     }
 
     const targetResult = await client.query<DbSkillRow>(
@@ -977,11 +1061,7 @@ export async function batchDeleteSkills(input: {
     );
     const lockedIds = new Set(targetResult.rows.map((row) => String(row.id)));
     if (skillIds.some((skillId) => !lockedIds.has(skillId))) {
-      throw new SkillVersionError(
-        'SKILL_NOT_FOUND',
-        'Skill not found',
-        404,
-      );
+      throw new SkillVersionError('SKILL_NOT_FOUND', 'Skill not found', 404);
     }
     const activeTargets = targetResult.rows.filter(
       (row) => row.status === 'active',
@@ -1000,9 +1080,9 @@ export async function batchDeleteSkills(input: {
     const activePackageIds = new Set(targetsByPackage.keys());
 
     const now = new Date().toISOString();
-    for (const pkg of packagesResult.rows.filter((row) => (
-      activePackageIds.has(String(row.id))
-    ))) {
+    for (const pkg of packagesResult.rows.filter((row) =>
+      activePackageIds.has(String(row.id)),
+    )) {
       const packageId = String(pkg.id);
       const currentVersionResult = await client.query<DbRowPackageVersion>(
         `select * from agent_package_versions
@@ -1112,7 +1192,12 @@ export async function listSkillVersions(input: {
   const limit = Math.min(Math.max(input.limit || 50, 1), 100);
   const cursor = input.cursor ? positiveId(input.cursor, 'cursor') : null;
   return withTransaction(async (client) => {
-    const pkg = await getOwnedPackage(client, input.authUserId, packageId, true);
+    const pkg = await getOwnedPackage(
+      client,
+      input.authUserId,
+      packageId,
+      true,
+    );
     await ensurePackageSkillHistory(client, pkg);
     await getOwnedSkill(client, input.authUserId, packageId, skillId);
     const result = await client.query<DbSkillVersionRow>(
@@ -1140,7 +1225,9 @@ export async function listSkillVersions(input: {
     return {
       items,
       nextCursor,
-      currentPackageVersionId: pkg.current_version_id ? String(pkg.current_version_id) : null,
+      currentPackageVersionId: pkg.current_version_id
+        ? String(pkg.current_version_id)
+        : null,
       currentVersionId: currentVersion.rows[0]
         ? String(currentVersion.rows[0].skill_version_id)
         : null,
@@ -1156,7 +1243,12 @@ export async function getSkillVersionDetail(input: {
   const packageId = positiveId(input.packageId, 'packageId');
   const versionId = positiveId(input.versionId, 'versionId');
   return withTransaction(async (client) => {
-    const pkg = await getOwnedPackage(client, input.authUserId, packageId, true);
+    const pkg = await getOwnedPackage(
+      client,
+      input.authUserId,
+      packageId,
+      true,
+    );
     await ensurePackageSkillHistory(client, pkg);
     return toSkillVersion(
       await getOwnedSkillVersion(client, {
@@ -1243,7 +1335,12 @@ export async function undiscardSkillVersion(input: {
   const packageId = positiveId(input.packageId, 'packageId');
   const versionId = positiveId(input.versionId, 'versionId');
   return withTransaction(async (client) => {
-    const pkg = await getOwnedPackage(client, input.authUserId, packageId, true);
+    const pkg = await getOwnedPackage(
+      client,
+      input.authUserId,
+      packageId,
+      true,
+    );
     await ensurePackageSkillHistory(client, pkg);
     const result = await client.query<DbSkillVersionRow>(
       `update agent_skill_versions
@@ -1497,7 +1594,10 @@ export async function createManualSkillVersion(input: {
         422,
       );
     }
-    const validationErrors = validateSkillMdStandard(skillMd, baseSkill.dirName);
+    const validationErrors = validateSkillMdStandard(
+      skillMd,
+      baseSkill.dirName,
+    );
     if (validationErrors.length > 0) {
       throw new SkillVersionError(
         'INVALID_SKILL_MD',

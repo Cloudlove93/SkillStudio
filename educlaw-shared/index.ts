@@ -74,6 +74,11 @@ export interface PackageSkill {
   name: string;
   description: string;
   skillMd: string;
+  /** Agent 包内标记该 Skill 是否启用；缺省视为启用。 */
+  enabled?: boolean;
+  /** 跨包副本的原始归属；名称不能用作资源标识。 */
+  originPackageId?: string;
+  originSkillId?: string;
 }
 
 export interface AgentPackageSnapshot {
@@ -83,6 +88,7 @@ export interface AgentPackageSnapshot {
   agentMd: string;
   rubricMd: string;
   skills: PackageSkill[];
+  sourceSessionId?: string;
 }
 
 export interface AgentPackageSummary {
@@ -128,6 +134,8 @@ export interface PackageSkillRecord {
   description: string;
   status: SkillEntityStatus;
   updatedAt: string;
+  originPackageId?: string;
+  originSkillId?: string;
 }
 
 export interface SkillVersionDetail {
@@ -185,6 +193,8 @@ export interface AgentResolvedSkill extends AgentSkillBinding {
   name: string;
   description: string;
   versionNumber: number;
+  /** 为 false 表示固定的 Skill 或版本已不可用，需要重新选择。 */
+  available: boolean;
 }
 export interface AgentWorkspace {
   id: string;
@@ -195,6 +205,24 @@ export interface AgentWorkspace {
   skills: AgentResolvedSkill[];
   createdAt: string;
   updatedAt: string;
+  /** 当前 Agent package version 的数据库 ID。 */
+  currentVersion?: string;
+  sourceSessionId?: string | null;
+}
+export type AgentSummary = AgentWorkspace;
+
+/** 生成事务完成后返回的双仓资源，旧记录可以没有此字段。 */
+export interface GeneratedAgentResult {
+  agentId: string;
+  skillId: string;
+  skillVersionId: string;
+  packageVersionId: string;
+  sourceSessionId: string;
+  name: string;
+  description: string;
+  instructions: string;
+  model: string;
+  skills: PackageSkill[];
 }
 export interface AgentWorkspaceInput {
   name: string;
@@ -202,6 +230,11 @@ export interface AgentWorkspaceInput {
   instructions: string;
   model: string;
   skills: AgentSkillBinding[];
+}
+/** 由已有产物转成 Agent：生成会话或仓库中的 Skill，二选一。 */
+export interface AgentProvisionInput {
+  sessionId?: string;
+  skillId?: string;
 }
 export interface AgentExecutionSnapshot {
   agentId: string;
@@ -219,6 +252,8 @@ export interface SkillArenaConfig {
   mode: 'skill_arena';
   compositionMode: 'skill_only';
   agentExecution?: AgentExecutionSnapshot;
+  /** Agent 对话的幂等键，同时用于把线程归属到某个 Agent。 */
+  agentRequestId?: string;
   /** run: 单版本运行；test: 固定版本测试；arena: 双版本对比；optimize: 交互式优化 */
   surface?: 'run' | 'test' | 'arena' | 'optimize';
   basePackageVersionId: string;
@@ -576,6 +611,7 @@ export interface GuidedCreationSession {
   created_at: string;
   updated_at: string;
   completed_at: string | null;
+  generatedAgent?: GeneratedAgentResult | null;
 }
 
 export interface GuidedCreationSessionDetail extends GuidedCreationSession {

@@ -1278,7 +1278,7 @@ async function resolveThreadRuntime(
   const execution = thread.skillArenaConfig?.agentExecution;
   if (execution) {
     const anchor = execution.skills[0];
-    if (!anchor) throw new ArenaServiceError("Agent has no bound Skills", 422, "SKILL_UNAVAILABLE");
+    if (!anchor) throw new ArenaServiceError("该 Agent 没有可用的 Skill，请重新绑定", 422, "SKILL_UNAVAILABLE");
     const snapshot: AgentPackageSnapshot = {
       name: execution.name, description: '', versionLabel: 'Agent conversation',
       agentMd: execution.instructions, rubricMd: '',
@@ -1286,7 +1286,7 @@ async function resolveThreadRuntime(
         name: skill.name, description: skill.description, skillMd: skill.skillMd })),
     };
     return { arenaKind: 'skill_arena', packageSnapshot: snapshot,
-      packageVersionId: Number(anchor.packageVersionId), baselineSnapshot: null,
+      packageVersionId: Number(positiveId(anchor.packageVersionId || thread.basePackageVersionId || '', 'basePackageVersionId')), baselineSnapshot: null,
       enhancedSnapshot: snapshot, labels: { baseline: 'Baseline', enhanced: execution.name },
       skillVersions: { baseline: null, enhanced: { id: Number(anchor.skillVersionId), versionNumber: anchor.versionNumber, skillUid: anchor.skillUid } } };
   }
@@ -1886,7 +1886,7 @@ export async function* streamMessage(
   const surface = detail.thread.skillArenaConfig?.surface;
   const fixedPiSkillVersion = runtime.skillVersions?.enhanced ?? null;
   const agentExecution = detail.thread.skillArenaConfig?.agentExecution;
-  if (agentExecution && mode !== 'agent') throw new ArenaServiceError('Agent conversations use agent mode', 422, 'INVALID_ARGUMENT');
+  if (agentExecution && mode !== 'agent') throw new ArenaServiceError('Agent 对话仅支持 Agent 模式', 422, 'INVALID_ARGUMENT');
   const fixedPiSkill = runtime.enhancedSnapshot?.skills[0] ?? null;
   const usePiHarnessForRequest = shouldUsePiHarness({
     arenaKind: runtime.arenaKind,
@@ -2295,7 +2295,7 @@ export async function* streamMessage(
       });
     }
 
-    if (!agentExecution && (packageArenaEnhanced || runtime.arenaKind === "skill_arena")) {
+    if (packageArenaEnhanced || runtime.arenaKind === "skill_arena") {
       if (enhancedAnswerMessageId === null) {
         throw new Error("Enhanced answer was not saved");
       }
@@ -2307,10 +2307,14 @@ export async function* streamMessage(
       if (!recordedEnhancedContext || !recordedEnhancedModel) {
         throw new Error("Enhanced answer provenance is unavailable");
       }
-      const baselineContext = skillArenaPromptContexts?.baseline ?? null;
-      const enhancedUsedSkillIds = runtime.skillVersions?.enhanced
-        ? [runtime.skillVersions.enhanced.skillUid]
-        : usedSkillIds;
+      const baselineContext = agentExecution
+        ? null
+        : skillArenaPromptContexts?.baseline ?? null;
+      const enhancedUsedSkillIds = agentExecution
+        ? agentExecution.skills.map((skill) => skill.skillUid)
+        : runtime.skillVersions?.enhanced
+          ? [runtime.skillVersions.enhanced.skillUid]
+          : usedSkillIds;
       const baselineUsedSkillIds = runtime.skillVersions?.baseline
         ? [runtime.skillVersions.baseline.skillUid]
         : [];

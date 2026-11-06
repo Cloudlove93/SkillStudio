@@ -39,17 +39,22 @@ function createMemoryDb() {
   const messages: Row[] = [];
   const now = () => new Date().toISOString();
 
-  const result = (rows: Row[] = [], rowCount = rows.length) => ({ rows, rowCount });
+  const result = (rows: Row[] = [], rowCount = rows.length) => ({
+    rows,
+    rowCount,
+  });
   mocks.query.mockImplementation(
     async (sqlValue: string, params: unknown[] = []) => {
-    const sql = sqlValue.replace(/\s+/g, ' ').trim().toLowerCase();
+      const sql = sqlValue.replace(/\s+/g, ' ').trim().toLowerCase();
 
       if (sql.startsWith('insert into skill_guided_creation_sessions')) {
-      const existing = sessions.find(
-        (row) => row.user_id === params[0] && row.start_client_message_id === params[3],
-      );
+        const existing = sessions.find(
+          (row) =>
+            row.user_id === params[0] &&
+            row.start_client_message_id === params[3],
+        );
         if (existing) return result([], 0);
-      const timestamp = now();
+        const timestamp = now();
         const row: Row = {
           id: String(nextSessionId++),
           user_id: params[0],
@@ -84,9 +89,11 @@ function createMemoryDb() {
         return result([row]);
       }
       if (sql.includes('where user_id = $1 and start_client_message_id = $2')) {
-      const row = sessions.find(
-        (item) => item.user_id === params[0] && item.start_client_message_id === params[1],
-      );
+        const row = sessions.find(
+          (item) =>
+            item.user_id === params[0] &&
+            item.start_client_message_id === params[1],
+        );
         return result(row ? [{ id: row.id }] : []);
       }
       if (
@@ -104,12 +111,12 @@ function createMemoryDb() {
         );
       }
       if (sql.startsWith('select * from skill_guided_creation_sessions')) {
-      const row = sessions.find(
-        (item) =>
-          String(item.id) === String(params[0]) &&
-          item.user_id === params[1] &&
-          (!sql.includes('deleted_at is null') || item.deleted_at == null),
-      );
+        const row = sessions.find(
+          (item) =>
+            String(item.id) === String(params[0]) &&
+            item.user_id === params[1] &&
+            (!sql.includes('deleted_at is null') || item.deleted_at == null),
+        );
         return result(row ? [row] : []);
       }
       if (sql.startsWith('select m.* from skill_guided_creation_messages')) {
@@ -126,9 +133,10 @@ function createMemoryDb() {
           'select revision_no, status from skill_guided_creation_sessions',
         )
       ) {
-      const row = sessions.find(
-        (item) => String(item.id) === String(params[0]) && item.user_id === params[1],
-      );
+        const row = sessions.find(
+          (item) =>
+            String(item.id) === String(params[0]) && item.user_id === params[1],
+        );
         return result(
           row ? [{ revision_no: row.revision_no, status: row.status }] : [],
         );
@@ -137,32 +145,37 @@ function createMemoryDb() {
         sql.startsWith('select id from skill_guided_creation_sessions') &&
         sql.includes("status = 'finalizing'")
       ) {
-      const row = sessions.find(
-        (item) =>
-          String(item.id) === String(params[0]) &&
-          item.user_id === params[1] &&
-          item.status === 'finalizing' &&
-          item.finalize_request_id === params[2] &&
-          Number(item.revision_no) === Number(params[3]),
-      );
+        const row = sessions.find(
+          (item) =>
+            String(item.id) === String(params[0]) &&
+            item.user_id === params[1] &&
+            item.status === 'finalizing' &&
+            item.finalize_request_id === params[2] &&
+            Number(item.revision_no) === Number(params[3]),
+        );
         return result(row ? [{ id: row.id }] : []);
       }
       if (
         sql.startsWith('select message_no from skill_guided_creation_messages')
       ) {
-      const row = messages.find(
-        (item) => String(item.session_id) === String(params[0]) && item.client_message_id === params[1],
-      );
+        const row = messages.find(
+          (item) =>
+            String(item.session_id) === String(params[0]) &&
+            item.client_message_id === params[1],
+        );
         return result(row ? [{ message_no: row.message_no }] : []);
       }
       if (sql.startsWith('select coalesce(max(message_no), 0)')) {
-      const last = messages
-        .filter((item) => String(item.session_id) === String(params[0]))
-        .reduce((maximum, item) => Math.max(maximum, Number(item.message_no)), 0);
+        const last = messages
+          .filter((item) => String(item.session_id) === String(params[0]))
+          .reduce(
+            (maximum, item) => Math.max(maximum, Number(item.message_no)),
+            0,
+          );
         return result([{ last_message_no: last }]);
       }
       if (sql.startsWith('insert into skill_guided_creation_messages')) {
-      const isUser = sql.includes("'user'");
+        const isUser = sql.includes("'user'");
         messages.push({
           id: String(nextMessageId++),
           session_id: String(params[0]),
@@ -179,14 +192,14 @@ function createMemoryDb() {
         sql.startsWith('update skill_guided_creation_sessions') &&
         sql.includes('set display_name = $4')
       ) {
-      const row = sessions.find(
-        (item) =>
-          String(item.id) === String(params[0]) &&
-          item.user_id === params[1] &&
-          Number(item.revision_no) === Number(params[2]) &&
-          item.deleted_at == null &&
-          item.status !== 'finalizing',
-      );
+        const row = sessions.find(
+          (item) =>
+            String(item.id) === String(params[0]) &&
+            item.user_id === params[1] &&
+            Number(item.revision_no) === Number(params[2]) &&
+            item.deleted_at == null &&
+            item.status !== 'finalizing',
+        );
         if (!row) return result([], 0);
         row.display_name = params[3];
         row.revision_no = Number(row.revision_no) + 1;
@@ -197,14 +210,14 @@ function createMemoryDb() {
         sql.startsWith('update skill_guided_creation_sessions') &&
         sql.includes('set deleted_at = now()')
       ) {
-      const row = sessions.find(
-        (item) =>
-          String(item.id) === String(params[0]) &&
-          item.user_id === params[1] &&
-          Number(item.revision_no) === Number(params[2]) &&
-          item.deleted_at == null &&
-          item.status !== 'finalizing',
-      );
+        const row = sessions.find(
+          (item) =>
+            String(item.id) === String(params[0]) &&
+            item.user_id === params[1] &&
+            Number(item.revision_no) === Number(params[2]) &&
+            item.deleted_at == null &&
+            item.status !== 'finalizing',
+        );
         if (!row) return result([], 0);
         row.deleted_at = now();
         row.revision_no = Number(row.revision_no) + 1;
@@ -215,12 +228,12 @@ function createMemoryDb() {
         sql.includes("set status = 'collecting'") &&
         sql.includes('revision_no = revision_no + 1')
       ) {
-      const row = sessions.find(
-        (item) =>
-          String(item.id) === String(params[0]) &&
-          item.user_id === params[1] &&
-          Number(item.revision_no) === Number(params[2]),
-      );
+        const row = sessions.find(
+          (item) =>
+            String(item.id) === String(params[0]) &&
+            item.user_id === params[1] &&
+            Number(item.revision_no) === Number(params[2]),
+        );
         if (!row) return result([], 0);
         row.status = 'collecting';
         row.confirmation_json = null;
@@ -233,13 +246,13 @@ function createMemoryDb() {
         sql.includes("set status = 'collecting'") &&
         sql.includes("status = 'failed'")
       ) {
-      const row = sessions.find(
-        (item) =>
-          String(item.id) === String(params[0]) &&
-          item.user_id === params[1] &&
-          Number(item.revision_no) === Number(params[2]) &&
-          item.status === 'failed',
-      );
+        const row = sessions.find(
+          (item) =>
+            String(item.id) === String(params[0]) &&
+            item.user_id === params[1] &&
+            Number(item.revision_no) === Number(params[2]) &&
+            item.status === 'failed',
+        );
         if (!row) return result([], 0);
         row.status = 'collecting';
         row.error_json = null;
@@ -250,14 +263,15 @@ function createMemoryDb() {
         sql.includes("set status = 'collecting'") &&
         sql.includes("interval '2 minutes'")
       ) {
-      const row = sessions.find(
-        (item) =>
-          String(item.id) === String(params[0]) &&
-          item.user_id === params[1] &&
-          Number(item.revision_no) === Number(params[2]) &&
-          item.status === 'collecting' &&
-          Date.now() - new Date(String(item.updated_at)).getTime() >= 2 * 60 * 1_000,
-      );
+        const row = sessions.find(
+          (item) =>
+            String(item.id) === String(params[0]) &&
+            item.user_id === params[1] &&
+            Number(item.revision_no) === Number(params[2]) &&
+            item.status === 'collecting' &&
+            Date.now() - new Date(String(item.updated_at)).getTime() >=
+              2 * 60 * 1_000,
+        );
         if (!row) return result([], 0);
         row.error_json = null;
         row.updated_at = now();
@@ -267,13 +281,13 @@ function createMemoryDb() {
         sql.includes("set status = 'failed'") &&
         sql.includes("status = 'collecting'")
       ) {
-      const row = sessions.find(
-        (item) =>
-          String(item.id) === String(params[0]) &&
-          item.user_id === params[1] &&
-          Number(item.revision_no) === Number(params[2]) &&
-          item.status === 'collecting',
-      );
+        const row = sessions.find(
+          (item) =>
+            String(item.id) === String(params[0]) &&
+            item.user_id === params[1] &&
+            Number(item.revision_no) === Number(params[2]) &&
+            item.status === 'collecting',
+        );
         if (!row) return result([], 0);
         row.status = 'failed';
         row.error_json = JSON.parse(String(params[3]));
@@ -284,13 +298,14 @@ function createMemoryDb() {
         sql.includes("set status = 'finalizing'") &&
         sql.includes('finalize_request_id = $4')
       ) {
-      const row = sessions.find(
-        (item) =>
-          String(item.id) === String(params[0]) &&
-          item.user_id === params[1] &&
-          Number(item.revision_no) === Number(params[2]) &&
-          (item.status === 'ready_for_confirmation' || item.status === 'failed'),
-      );
+        const row = sessions.find(
+          (item) =>
+            String(item.id) === String(params[0]) &&
+            item.user_id === params[1] &&
+            Number(item.revision_no) === Number(params[2]) &&
+            (item.status === 'ready_for_confirmation' ||
+              item.status === 'failed'),
+        );
         if (!row) return result([], 0);
         row.status = 'finalizing';
         row.finalize_request_id = params[3];
@@ -302,13 +317,13 @@ function createMemoryDb() {
         sql.includes("set status = 'failed'") &&
         sql.includes('finalize_request_id = $3')
       ) {
-      const row = sessions.find(
-        (item) =>
-          String(item.id) === String(params[0]) &&
-          item.user_id === params[1] &&
-          item.status === 'finalizing' &&
-          item.finalize_request_id === params[2],
-      );
+        const row = sessions.find(
+          (item) =>
+            String(item.id) === String(params[0]) &&
+            item.user_id === params[1] &&
+            item.status === 'finalizing' &&
+            item.finalize_request_id === params[2],
+        );
         if (!row) return result([], 0);
         row.status = 'failed';
         row.generated_snapshot_json = params[3]
@@ -321,14 +336,43 @@ function createMemoryDb() {
       }
       if (
         sql.startsWith('update skill_guided_creation_sessions') &&
+        sql.includes("set status = 'completed'")
+      ) {
+        const row = sessions.find(
+          (item) =>
+            item.id === params[0] &&
+            item.user_id === params[1] &&
+            item.status === 'finalizing' &&
+            item.finalize_request_id === params[2],
+        );
+        if (!row) return result([], 0);
+        Object.assign(row, {
+          status: 'completed',
+          generated_snapshot_json: JSON.parse(String(params[4])),
+          validation_result_json: JSON.parse(String(params[5])),
+          package_id: params[6],
+          skill_id: params[7],
+          skill_version_id: params[8],
+          package_version_id: params[9],
+          model: params[10],
+          completed_at: now(),
+          updated_at: now(),
+        });
+        return result([], 1);
+      }
+      if (sql.startsWith('select skill_id, skill_version_id')) {
+        return result([{ skill_id: '42', skill_version_id: '43' }]);
+      }
+      if (
+        sql.startsWith('update skill_guided_creation_sessions') &&
         sql.includes('draft_json = $4::jsonb')
       ) {
-      const row = sessions.find(
-        (item) =>
-          String(item.id) === String(params[0]) &&
-          item.user_id === params[1] &&
-          Number(item.revision_no) === Number(params[7]),
-      );
+        const row = sessions.find(
+          (item) =>
+            String(item.id) === String(params[0]) &&
+            item.user_id === params[1] &&
+            Number(item.revision_no) === Number(params[7]),
+        );
         if (!row) return result([], 0);
         row.status = params[2];
         row.draft_json = JSON.parse(String(params[3]));
@@ -349,12 +393,14 @@ function createMemoryDb() {
 }
 
 const extraction = {
-  operations: [{
-    dimension: 'educational_goal',
-    content: '帮助教师设计课堂活动',
-    source: 'user_explicit',
-    quote: '设计课堂活动',
-  }],
+  operations: [
+    {
+      dimension: 'educational_goal',
+      content: '帮助教师设计课堂活动',
+      source: 'user_explicit',
+      quote: '设计课堂活动',
+    },
+  ],
   step_complete: false,
   acknowledgement: '明白了。',
   question: '你希望学生通过这些课堂活动获得什么具体变化？',
@@ -668,6 +714,74 @@ describe('guided creation persistence and retry', () => {
     expect(replay.skill_version_id).toBe('43');
     expect(mocks.buildGeneratedPackageSnapshot).not.toHaveBeenCalled();
     expect(mocks.createPackageWithSnapshotTx).not.toHaveBeenCalled();
+  });
+
+  it('returns both generated resources and stable source IDs when confirmation is replayed', async () => {
+    const db = createMemoryDb();
+    mocks.generateJson.mockResolvedValueOnce(extraction);
+    const created = await startGuidedCreation({
+      auth_user_id: 'owner-1',
+      content: '设计课堂活动',
+      client_message_id: 'message-dual-1',
+    });
+    Object.assign(db.sessions[0], {
+      status: 'ready_for_confirmation',
+      model: 'chosen-model',
+      flow_version: 1,
+      draft_json: {
+        roles: '教师助手',
+        goal: '设计课堂活动',
+        usage_scenario: '备课',
+        input_contract: '教学目标',
+        output_contract: '活动方案',
+        core_capabilities: '分析并生成',
+        workflow: '分析、生成、自检',
+      },
+    });
+    mocks.buildGeneratedPackageSnapshot.mockResolvedValueOnce({
+      name: '课堂活动',
+      description: '教学活动设计',
+      versionLabel: 'v1',
+      agentMd: '',
+      rubricMd: '',
+      skills: [
+        {
+          id: 'lesson',
+          dirName: 'lesson',
+          name: '课堂活动',
+          description: '',
+          skillMd: '# Lesson',
+        },
+      ],
+    });
+    mocks.createPackageWithSnapshotTx.mockResolvedValueOnce({
+      packageId: 41,
+      packageVersionId: 44,
+      skillVersionIds: { lesson: '43' },
+    });
+    const input = {
+      auth_user_id: 'owner-1',
+      session_id: created.id,
+      revision_no: created.revision_no,
+      request_id: 'finalize-dual-1',
+    };
+    const result = await confirmGuidedCreation(input);
+    expect(result.generatedAgent).toMatchObject({
+      agentId: '41',
+      skillId: '42',
+      skillVersionId: '43',
+      packageVersionId: '44',
+      sourceSessionId: created.id,
+      model: 'chosen-model',
+    });
+    expect(result.generatedAgent?.instructions).toContain('教学助手');
+    expect(mocks.createPackageWithSnapshotTx.mock.calls[0]?.[4]).toBe(
+      'chosen-model',
+    );
+    expect((await confirmGuidedCreation(input)).generatedAgent).toEqual(
+      result.generatedAgent,
+    );
+    expect(mocks.createPackageWithSnapshotTx).toHaveBeenCalledOnce();
   });
 
   it('marks the session failed without result IDs when the save transaction rolls back', async () => {

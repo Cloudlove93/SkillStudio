@@ -74,6 +74,7 @@ export function AgentSkillPicker({
   }
 
   const needle = query.trim().toLocaleLowerCase();
+  const limitReached = skills.length >= 20;
   const available = repository.filter(
     (s) => !skills.some((binding) => binding.skillId === s.id),
   );
@@ -89,6 +90,7 @@ export function AgentSkillPicker({
       <p className="agent-muted">
         每个 Skill 固定到明确版本。更新 Skill
         后，可在这里选择新版本；已创建的对话保留原有绑定。
+        {limitReached ? ' 每个 Agent 最多挂载 20 个 Skill。' : ''}
       </p>
       <div className="agent-attached-skills">
         {skills.map((binding) => {
@@ -152,9 +154,10 @@ export function AgentSkillPicker({
                 </div>
                 <button
                   type="button"
-                  disabled={!versionId}
+                  disabled={!versionId || limitReached}
+                  title={limitReached ? '每个 Agent 最多挂载 20 个 Skill' : undefined}
                   onClick={() => {
-                    if (versionId)
+                    if (versionId && !limitReached)
                       onChange([
                         ...skills,
                         {
@@ -223,6 +226,7 @@ function AttachedSkill({
     name: string;
     description: string;
     versionNumber?: number;
+    available?: boolean;
   };
   onChange: (binding: AgentSkillBinding) => void;
   onRemove: () => void;
@@ -230,6 +234,7 @@ function AttachedSkill({
 }) {
   const versions = useSkillVersions(token, info?.packageId, binding.skillId);
   const pinned = versions.versions.find((v) => v.id === binding.skillVersionId);
+  const unavailable = info?.available === false;
   return (
     <div
       className={`agent-attached-skill${binding.enabled ? '' : ' is-disabled'}`}
@@ -245,11 +250,17 @@ function AttachedSkill({
         </button>
       </div>
       <p>{info?.description}</p>
+      {unavailable && (
+        <p role="alert" className="agent-error">
+          该 Skill 或版本已不可用，请移除后重新绑定。
+        </p>
+      )}
       <div className="agent-binding-controls">
         <label>
           <input
             type="checkbox"
             checked={binding.enabled}
+            disabled={unavailable}
             onChange={(e) =>
               onChange({ ...binding, enabled: e.target.checked })
             }

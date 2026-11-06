@@ -12,10 +12,7 @@ import {
   X,
 } from 'lucide-react';
 import { getSessionName } from './SkillWorkspaceSidebar';
-import {
-  RepositoryDraftCard,
-  RepositorySkillCard,
-} from './RepositoryCards';
+import { RepositoryDraftCard, RepositorySkillCard } from './RepositoryCards';
 import { SkillDeleteConfirmDialog } from './SkillDeleteConfirmDialog';
 import { SkillRenameDialog } from './SkillRenameDialog';
 import { InspectorPortal } from './InspectorPortal';
@@ -33,6 +30,9 @@ import {
 export type RepositorySkill = {
   key: string;
   packageId: string;
+  originPackageId?: string;
+  originSkillId?: string;
+  packageName?: string;
   skillId: string;
   name: string;
   description: string;
@@ -204,20 +204,20 @@ export function SkillRepositoryWorkspace({
     >
       <header className="skill-repository-header">
         <div>
-          <span className="skill-eyebrow">Skill 仓库</span>
-          <h1>管理你的教育 Skill</h1>
-          <p>查找、使用和整理已创建的 Skill。</p>
+          <span className="skill-eyebrow">技能库</span>
+          <h1>管理你的教学 Skill</h1>
+          <p>Skill 是 Agent 的能力来源，在这里整理好，再挂载给 Agent。</p>
         </div>
         <button className="skill-primary-button" onClick={onNew}>
           <Plus size={16} aria-hidden="true" />
-          新建 Skill
+          创建 Agent
         </button>
       </header>
 
       <div
         className="skill-repository-tabs"
         role="tablist"
-        aria-label="Skill 仓库内容"
+        aria-label="技能库内容"
       >
         <button
           type="button"

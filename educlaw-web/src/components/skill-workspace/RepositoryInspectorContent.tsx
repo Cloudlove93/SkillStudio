@@ -51,6 +51,12 @@ export function RepositoryInspectorContent({
             {previewSkill.description || '可继续运行、测试、优化和管理版本。'}
           </p>
           <dl>
+            {previewSkill.packageName && (
+              <div>
+                <dt>所属 Agent</dt>
+                <dd>{previewSkill.packageName}</dd>
+              </div>
+            )}
             <div>
               <dt>最近更新</dt>
               <dd>

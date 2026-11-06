@@ -23,27 +23,27 @@ export function AgentConversation({
       s.skillId === anchor?.skillId &&
       s.skillVersionId === anchor?.skillVersionId,
   );
+  // 依赖原始值而不是每次渲染都会新建的对象，避免 effect 反复触发重复请求。
+  const anchorSkillId = boundAnchor?.skillId ?? '';
+  const anchorVersionId = boundAnchor?.skillVersionId ?? '';
+  const anchorPackageId = boundAnchor?.packageId ?? '';
 
   useEffect(() => {
     let current = true;
     setVersion(undefined);
     setError('');
-    if (!boundAnchor || !execution) {
+    if (!execution || !anchorSkillId || !anchorVersionId || !anchorPackageId) {
       setError('此对话缺少 Agent 运行绑定，无法安全恢复。请创建新对话。');
       return;
     }
     void liteApi
-      .getSkillVersionDetail(
-        token,
-        boundAnchor.packageId,
-        boundAnchor.skillVersionId,
-      )
+      .getSkillVersionDetail(token, anchorPackageId, anchorVersionId)
       .then((next) => {
         if (!current) return;
         if (
-          next.id !== boundAnchor.skillVersionId ||
-          next.skillId !== boundAnchor.skillId ||
-          next.packageId !== boundAnchor.packageId
+          next.id !== anchorVersionId ||
+          next.skillId !== anchorSkillId ||
+          next.packageId !== anchorPackageId
         )
           throw new Error('对话绑定版本与返回的 Skill 版本不一致');
         setVersion(next);
@@ -55,7 +55,7 @@ export function AgentConversation({
     return () => {
       current = false;
     };
-  }, [token, boundAnchor, execution, retry]);
+  }, [token, anchorSkillId, anchorVersionId, anchorPackageId, execution, retry]);
 
   return (
     <div className="agent-conversation">

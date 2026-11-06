@@ -1,20 +1,22 @@
 # Agent + Skill 第一阶段
 
-用户通过「我的 Agent」（`/agents`）创建多个教学助手，为每个助手配置名称、描述、角色指令、模型和最多 20 个 Skill。Skill 绑定到明确版本，可逐项启用、停用、移除和切换版本，同一 Skill 可用于多个 Agent。
+用户通过「我的 Agent」（`/agents`）管理多个教学助手，为每个助手配置名称、描述、角色指令、模型和最多 20 个 Skill。Agent 直接使用 `agent_packages`：包名称、包描述、`agentMd`、挂载的 Skill 和版本就是 Agent 的全部配置，因此一个包即一个 Agent。选中的 Skill 版本会复制进该包，后续在 Agent 内独立演进。
 
 生成后，通过「添加到 Agent 并使用」选择已有 Agent 或新建 Agent。「创建并使用 / 保存并使用」保存配置并打开运行对话；也可以新建测试对话，输入固定样例验证输出。文档生成和多模态生成已连接 Agent 入口，原 Skill 创建、优化、Arena 和版本管理继续可用。
 
 ## 执行与版本
 
-本阶段将所有已启用 Skill 的规则显式加载到模型上下文，不增加工具调用或自动 Skill 路由。会话保存 Agent 指令、模型和每个 Skill 的版本及正文快照。修改 Agent、停用 Skill 或升级版本只影响新对话，历史会话继续使用原配置。模型留空使用后端默认模型。
+本阶段将所有已挂载 Skill 的规则显式加载到模型上下文，不增加工具调用或自动 Skill 路由。会话保存 Agent 指令、模型和每个 Skill 的版本及正文快照。修改 Agent 或升级版本只影响新对话，历史会话继续使用原配置。模型留空使用后端默认模型。
 
 运行复用现有 Run 接口与 SSE 快照恢复；刷新、切换对话只解除订阅。活动执行仍由单个服务进程持有，服务重启后可恢复已保存历史，不能续跑在途模型请求。
 
-Agent 对话显示实际绑定的所有 Skill，可打开原 Skill 工作区继续优化和版本管理。本阶段没有把跨 Package 的 Agent 回答接入旧的单 Package 回答优化溯源表，因此 Agent 回答下不显示旧的回答优化按钮。原单 Skill 回答优化保持可用。
+Agent 指令与全部启用 Skill 正文合计超过 60000 字符时拒绝运行，并返回可读错误提示精简内容。保存时会校验 Skill 与版本仍然有效；失效项标记为不可用并提示重新选择。删除包会同时删除它作为 Agent 的对话记录。
+
+Agent 对话会把全部挂载 Skill 的 UID 记入回答溯源表，但没有接入单 Package 的回答优化流程，因此 Agent 回答下不显示旧的回答优化按钮。原单 Skill 回答优化保持可用。Agent 对话仍显示包内 Skill，可打开对应 Skill 工作区继续优化和版本管理。
 
 ## 数据与启动
 
-新增 `user_agents` 保存用户隔离的配置，`user_agent_conversations` 关联现有 Arena 线程。发布前需要执行数据库初始化：
+Agent 读写 `agent_packages`（新增 `model` 列）与 `agent_package_versions.snapshot_json`：名称、描述、`agentMd`、`rubricMd` 和 Skill 快照都来自包版本。对话线程记录在 `arena_threads`，通过 `arena_config_jsonb` 中的 `agentRequestId` 归属 Agent 并保证幂等；不再使用旧的 `user_agents` / `user_agent_conversations`。发布前需要执行数据库初始化：
 
 ```sh
 pnpm --filter educlaw-server db:init

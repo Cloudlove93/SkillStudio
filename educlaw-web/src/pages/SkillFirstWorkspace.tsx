@@ -18,6 +18,7 @@ import type {
 } from '@educlaw/shared';
 import { toast } from 'sonner';
 import { liteApi, type GuidedCreationSseEvent } from '../api/lite-api';
+import { agentsApi } from '../api/agents';
 import { useAuthStore } from '../stores/auth';
 import { SkillImportDialog } from '../components/skill-workspace/SkillImportDialog';
 import { SkillExportDialog } from '../components/skill-workspace/SkillExportDialog';
@@ -155,6 +156,9 @@ function SkillFirstWorkspaceContent() {
     readSkillConversationId(location.search),
   );
   const initialUrlState = useRef(parseSkillWorkspaceSearch(location.search));
+  const initialResultSession = useRef(
+    new URLSearchParams(location.search).get('resultSession'),
+  );
   const token = useAuthStore((state) => state.token) || '';
   const user = useAuthStore((state) => state.user);
   const isAdmin = useAuthStore((state) => state.isAdmin);
@@ -237,7 +241,10 @@ function SkillFirstWorkspaceContent() {
   const activeRunRef = useRef<string | null>(null);
   const activeSkill: SkillDetailSelection | null =
     selectedRepositorySkill ??
-    (session?.status === 'completed' && session.package_id && session.skill_id
+    (workspaceState.activeView !== 'create' &&
+    session?.status === 'completed' &&
+    session.package_id &&
+    session.skill_id
       ? {
           packageId: session.package_id,
           skillId: session.skill_id,
@@ -282,6 +289,11 @@ function SkillFirstWorkspaceContent() {
       clearInspector = false,
     ) => {
       let baseSearch = location.search;
+      {
+        const params = new URLSearchParams(baseSearch);
+        params.delete('resultSession');
+        baseSearch = params.toString() ? `?${params.toString()}` : '';
+      }
       if (clearInspector) {
         const params = new URLSearchParams(baseSearch);
         params.delete('inspector');
@@ -483,6 +495,9 @@ function SkillFirstWorkspaceContent() {
         ...page.items.map((skill) => ({
           key: `${skill.packageId}:${skill.id}`,
           packageId: skill.packageId,
+          packageName: skill.packageName,
+          originPackageId: skill.originPackageId,
+          originSkillId: skill.originSkillId,
           skillId: skill.id,
           name: skill.name,
           description: skill.description || skill.packageDescription,
@@ -734,17 +749,12 @@ function SkillFirstWorkspaceContent() {
         setSelectedSessionId(next.id);
         setDocuments(next.documents);
         if (next.status === 'completed') {
-          navigateWorkspaceView(
-            'run',
-            next.package_id && next.skill_id
-              ? `${next.package_id}:${next.skill_id}`
-              : null,
-          );
           publishUpdate({
             id: 'skill-created',
-            title: 'Skill 已创建完成',
-            message: '格式校验、保存和重新加载验证均已通过。',
-            actionLabel: '添加到 Agent 并使用',
+            title: 'Agent 已创建完成',
+            message:
+              'Agent 与教学 Skill 已保存，可在结果页进入对话或查看 Skill。',
+            actionLabel: '打开 Agent',
           });
         } else {
           publishUpdate({
@@ -755,10 +765,10 @@ function SkillFirstWorkspaceContent() {
           });
         }
       } else if (next.status === 'completed' && next.skill_id) {
-        toast.success('Skill 已生成完成', {
+        toast.success('Agent 已创建完成', {
           action: {
-            label: '打开 Skill',
-            onClick: () => void openSession(next),
+            label: '打开 Agent',
+            onClick: () => void enterAgentWorkspace(next),
           },
         });
       }
@@ -855,9 +865,9 @@ function SkillFirstWorkspaceContent() {
     if (!session) return;
     publishUpdate({
       id: 'skill-generating',
-      title: '正在生成 Skill',
-      message: '系统正在生成文件、校验结构并保存首个版本。',
-      actionLabel: '查看生成状态',
+      title: '正在创建 Agent',
+      message: '正在生成教学 Skill、校验结构并创建可对话的 Agent。',
+      actionLabel: '查看创建状态',
     });
     const sessionId = session.id;
     const requestId = createRequestId('finalize');
@@ -938,13 +948,7 @@ function SkillFirstWorkspaceContent() {
       if (detail.status === 'completed') {
         openingSessionRef.current = null;
         closeInspector({ force: true });
-        navigateWorkspaceView(
-          'run',
-          detail.package_id && detail.skill_id
-            ? `${detail.package_id}:${detail.skill_id}`
-            : null,
-          true,
-        );
+        navigateWorkspaceView('create', null, true);
         dispatchWorkspace({ type: 'dismiss-update' });
       } else {
         if (
@@ -963,6 +967,58 @@ function SkillFirstWorkspaceContent() {
       );
     }
   };
+
+  useEffect(() => {
+    const sessionId = initialResultSession.current;
+    if (!sessionId || !token) return;
+    let cancelled = false;
+    selectedRef.current = sessionId;
+    void liteApi
+      .getGuidedCreationDetail(token, { session_id: sessionId })
+      .then((detail) => {
+        if (cancelled || selectedRef.current !== sessionId) return;
+        initialResultSession.current = null;
+        setSession(detail);
+        setSelectedSessionId(detail.id);
+        setDocuments(detail.documents);
+        setCreateMode('conversation');
+      })
+      .catch((error) => {
+        if (!cancelled)
+          toast.error(
+            error instanceof Error ? error.message : '生成结果加载失败',
+          );
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
+  useEffect(() => {
+    if (
+      workspaceState.activeView !== 'create' ||
+      session?.status !== 'completed'
+    )
+      return;
+    const params = new URLSearchParams(location.search);
+    if (params.get('resultSession') === session.id) return;
+    params.set('resultSession', session.id);
+    navigate(
+      {
+        pathname: location.pathname,
+        search: `?${params.toString()}`,
+        hash: location.hash,
+      },
+      { replace: true },
+    );
+  }, [
+    session,
+    workspaceState.activeView,
+    location.search,
+    location.pathname,
+    location.hash,
+    navigate,
+  ]);
 
   useEffect(() => {
     if (!session || session.status !== 'finalizing') return undefined;
@@ -995,12 +1051,7 @@ function SkillFirstWorkspaceContent() {
         if (detail.status === 'completed') {
           setError(null);
           void refreshRepository().catch(() => undefined);
-          navigateWorkspaceView(
-            'run',
-            detail.package_id && detail.skill_id
-              ? `${detail.package_id}:${detail.skill_id}`
-              : null,
-          );
+          navigateWorkspaceView('create', null);
         } else if (detail.status === 'failed') {
           setError({
             code: String(detail.error?.code || 'FINALIZATION_FAILED'),
@@ -1328,12 +1379,27 @@ function SkillFirstWorkspaceContent() {
     dispatchWorkspace({ type: 'dismiss-update' });
   };
 
+  async function enterAgentWorkspace(summary: GuidedCreationSession) {
+    try {
+      const agentId =
+        summary.generatedAgent?.agentId ||
+        (await agentsApi.provision(token, { sessionId: summary.id })).id;
+      navigate(`/agents?agentId=${encodeURIComponent(agentId)}&autochat=1`);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : 'Agent 创建失败，请稍后重试',
+      );
+    }
+  }
+
   const openGeneratedSkill = async (skillId: string) => {
     try {
       const skills = await refreshRepository();
       const generated = skills.find((skill) => skill.skillId === skillId);
       if (generated) {
-        navigate(`/agents?skillId=${encodeURIComponent(generated.skillId)}`);
+        navigate(
+          `/agents?skillId=${encodeURIComponent(generated.skillId)}&autochat=1`,
+        );
         return;
       }
       openRepository();
@@ -1507,7 +1573,13 @@ function SkillFirstWorkspaceContent() {
       return;
     }
     if (update.id === 'skill-created') {
-      navigate(`/agents${activeSkill ? `?skillId=${encodeURIComponent(activeSkill.skillId)}` : ''}`);
+      if (session?.status === 'completed') {
+        void enterAgentWorkspace(session);
+        return;
+      }
+      navigate(
+        `/agents${activeSkill ? `?skillId=${encodeURIComponent(activeSkill.skillId)}&autochat=1` : '?autochat=1'}`,
+      );
       return;
     }
     openInspector({
@@ -1576,7 +1648,8 @@ function SkillFirstWorkspaceContent() {
                 ? 'my-skills'
                 : activeSkill
                   ? `skill-${activeSkill.packageId}-${activeSkill.skillId}`
-                  : session?.id || (workspaceState.activeView === 'home' ? 'home' : 'new')
+                  : session?.id ||
+                    (workspaceState.activeView === 'home' ? 'home' : 'new')
             }
           >
             <Suspense
@@ -1617,7 +1690,11 @@ function SkillFirstWorkspaceContent() {
                 <SkillDetailWorkspace
                   token={token}
                   skill={activeSkill}
-                  onAttachToAgent={() => navigate(`/agents?skillId=${encodeURIComponent(activeSkill.skillId)}`)}
+                  onAttachToAgent={() =>
+                    navigate(
+                      `/agents?skillId=${encodeURIComponent(activeSkill.skillId)}&autochat=1`,
+                    )
+                  }
                   view={detailView}
                   versions={versions}
                   currentVersionId={currentVersionId}
@@ -1668,6 +1745,15 @@ function SkillFirstWorkspaceContent() {
                   onSend={send}
                   onConfirm={confirm}
                   onSummarize={summarize}
+                  onOpenAgent={() => void enterAgentWorkspace(session)}
+                  onOpenSkill={() => {
+                    if (session.package_id && session.skill_id)
+                      navigateWorkspaceView(
+                        'versions',
+                        `${session.package_id}:${session.skill_id}`,
+                        true,
+                      );
+                  }}
                   onRetry={() => lastActionRef.current?.()}
                   onFiles={(files) => void addFiles(files)}
                   onRemoveDocument={(index) =>
@@ -1696,10 +1782,13 @@ function SkillFirstWorkspaceContent() {
                 <DocumentSkillCreationPanel
                   token={token}
                   onGenerated={async (packageIds) => {
-                    const generatedSkills = await refreshRepository();
-                    const ids = generatedSkills.filter(skill => packageIds.includes(skill.packageId)).map(skill => skill.skillId);
+                    await refreshRepository();
                     closeInspector({ force: true });
-                    navigate(`/agents${ids.length ? `?skillId=${encodeURIComponent(ids[0]!)}` : ''}`);
+                    const agentId = packageIds[0];
+                    if (agentId)
+                      navigate(
+                        `/agents?agentId=${encodeURIComponent(agentId)}&autochat=1`,
+                      );
                   }}
                 />
               ) : createMode === 'manual' ? (

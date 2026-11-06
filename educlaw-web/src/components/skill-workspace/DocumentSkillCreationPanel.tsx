@@ -30,6 +30,7 @@ export function DocumentSkillCreationPanel({ token, onGenerated }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [documents, setDocuments] = useState<DocumentSource[]>([]);
   const documentsRef = useRef<DocumentSource[]>([]);
+  const generationKeys = useRef(new Map<string, string>());
   const [instruction, setInstruction] = useState('');
   const [runs, setRuns] = useState<DocumentBatchRun[]>([]);
   const [busy, setBusy] = useState(false);
@@ -108,10 +109,17 @@ export function DocumentSkillCreationPanel({ token, onGenerated }: Props) {
         if (!run || !document) return;
         updateRun(run.id, { status: 'running' });
         try {
+          const intent = JSON.stringify([instruction.trim(), document]);
+          let requestId = generationKeys.current.get(intent);
+          if (!requestId) {
+            requestId = crypto.randomUUID();
+            generationKeys.current.set(intent, requestId);
+          }
           const result = await generateDocumentSkill(
             token,
             instruction.trim(),
             document,
+            requestId,
           );
           successCount += 1;
           generatedPackageIds.push(result.packageId);
@@ -272,6 +280,7 @@ async function generateDocumentSkill(
   token: string,
   instruction: string,
   document: DocumentSource,
+  requestId: string,
 ) {
   let packageId = '';
   let packageName = '';
@@ -290,6 +299,7 @@ async function generateDocumentSkill(
       }
     },
     true,
+    requestId,
   );
   if (!packageId) throw new Error('服务未返回生成结果');
   return { packageId, packageName };

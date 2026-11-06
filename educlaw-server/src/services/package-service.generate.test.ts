@@ -38,9 +38,10 @@ async function loadService() {
             user_id: args[0],
             name: args[1],
             description: args[2],
+            model: args[3],
             current_version_id: 0,
-            created_at: args[3],
-            updated_at: args[4],
+            created_at: args[4],
+            updated_at: args[5],
           };
           return { rows: [{ id }], rowCount: 1 };
         }
@@ -88,6 +89,31 @@ async function loadService() {
           };
         }
 
+        if (sql.startsWith('select pg_advisory_xact_lock'))
+          return { rows: [], rowCount: 1 };
+        if (sql.startsWith('select id, generation_request_hash')) {
+          return {
+            rows:
+              storedPackage?.user_id === args[0] &&
+              storedPackage?.generation_request_key === args[1]
+                ? [storedPackage]
+                : [],
+            rowCount: 1,
+          };
+        }
+        if (
+          sql.startsWith('update agent_packages set generation_request_key')
+        ) {
+          Object.assign(storedPackage!, {
+            generation_request_key: args[0],
+            generation_request_hash: args[1],
+          });
+          return { rows: [], rowCount: 1 };
+        }
+        if (sql.startsWith('update agent_packages set source_session_id')) {
+          Object.assign(storedPackage!, { source_session_id: args[0] });
+          return { rows: [], rowCount: 1 };
+        }
         throw new Error(`Unexpected query: ${sql}`);
       },
     ),
@@ -108,6 +134,127 @@ async function loadService() {
 }
 
 describe('explicit generation names', () => {
+  it('replays a document generation without model calls and rejects reuse for different content', async () => {
+    const { createPackageWithSnapshotTx, generatePackage } =
+      await loadService();
+    const snapshot = {
+      name: '课堂活动',
+      description: '',
+      agentMd: '',
+      rubricMd: '',
+      versionLabel: 'v1',
+      skills: [
+        {
+          id: 'lesson',
+          dirName: 'lesson',
+          name: '课堂活动',
+          description: '',
+          skillMd: '# Lesson',
+        },
+      ],
+    };
+    await createPackageWithSnapshotTx(
+      { query: queryMock },
+      'owner',
+      snapshot,
+      'generated',
+    );
+    const { createHash } = await import('node:crypto');
+    const hash = createHash('sha256')
+      .update(
+        JSON.stringify({
+          instruction: '设计课堂活动',
+          model: '',
+          documents: [],
+          maxSkills: 1,
+        }),
+      )
+      .digest('hex');
+    await queryMock(
+      'update agent_packages set generation_request_key = $1, generation_request_hash = $2 where id = $3',
+      ['document-request-1', hash, 1],
+    );
+    generateJsonMock.mockClear();
+    queryMock.mockClear();
+    const result = await generatePackage(
+      'owner',
+      '设计课堂活动',
+      undefined,
+      [],
+      undefined,
+      undefined,
+      1,
+      'document-request-1',
+    );
+    expect(result.id).toBe(1);
+    expect(result.snapshot.agentMd).toContain('教学助手');
+    expect(result.snapshot.skills[0].originPackageId).toBe('1');
+    expect(generateJsonMock).not.toHaveBeenCalled();
+    expect(
+      queryMock.mock.calls.some(([sql]) => sql.startsWith('insert into')),
+    ).toBe(false);
+    await expect(
+      generatePackage(
+        'owner',
+        '不同的内容',
+        undefined,
+        [],
+        undefined,
+        undefined,
+        1,
+        'document-request-1',
+      ),
+    ).rejects.toThrow('已用于其他生成内容');
+  });
+
+  it('rejects 21 skills before any write and preserves the selected generation model', async () => {
+    const { createPackageWithSnapshotTx } = await loadService();
+    const skill = {
+      id: 'lesson',
+      dirName: 'lesson',
+      name: 'Lesson',
+      description: '',
+      skillMd: '# Lesson',
+    };
+    const snapshot = {
+      name: 'Lesson',
+      description: '',
+      agentMd: '',
+      rubricMd: '',
+      versionLabel: 'v1',
+      skills: Array.from({ length: 21 }, (_, index) => ({
+        ...skill,
+        id: `lesson-${index}`,
+        dirName: `lesson-${index}`,
+      })),
+    };
+    await expect(
+      createPackageWithSnapshotTx(
+        { query: queryMock },
+        'owner',
+        snapshot,
+        'generated',
+      ),
+    ).rejects.toThrow('最多挂载 20');
+    expect(queryMock).not.toHaveBeenCalled();
+    await createPackageWithSnapshotTx(
+      { query: queryMock },
+      'owner',
+      { ...snapshot, sourceSessionId: '55', skills: [skill] },
+      'generated',
+      'chosen-model',
+    );
+    expect(
+      queryMock.mock.calls.find(([sql]) =>
+        sql.startsWith('insert into agent_packages'),
+      )?.[1][3],
+    ).toBe('chosen-model');
+    expect(
+      queryMock.mock.calls.find(([sql]) =>
+        sql.startsWith('update agent_packages set source_session_id'),
+      )?.[1],
+    ).toEqual(['55', 1]);
+  });
   it('uses the complete title clause and never truncates the following task as a name', async () => {
     const { extractExplicitSkillName } = await loadService();
     expect(

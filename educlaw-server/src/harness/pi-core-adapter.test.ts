@@ -689,6 +689,24 @@ describe("Pi Core adapter", () => {
     expect(harness.agents).toHaveLength(0);
   });
 
+  it("rejects a system prompt over the character budget before constructing an Agent", async () => {
+    const harness = testAdapter();
+    const result = await harness.run(
+      request({
+        additionalSkills: Array.from({ length: 20 }, (_, index) => ({
+          versionId: 100 + index,
+          skillMd: "x".repeat(4000),
+        })),
+      }),
+      () => undefined,
+    );
+
+    expect(result.status).toBe("failed");
+    expect(result.error?.code).toBe("SKILL_INVALID");
+    expect(result.error?.userMessage).toContain("字符上限");
+    expect(harness.agents).toHaveLength(0);
+  });
+
   it("enforces the model call budget", async () => {
     const harness = testAdapter({ prepareRequestCount: 2 });
     const events: HarnessEvent[] = [];

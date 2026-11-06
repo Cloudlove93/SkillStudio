@@ -1,42 +1,78 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AgentWorkspaceInput, ArenaThread } from '@educlaw/shared';
+import type {
+  AgentPackageSnapshot,
+  AgentWorkspaceInput,
+  ArenaThread,
+  PackageSkill,
+  SkillArenaConfig,
+} from '@educlaw/shared';
 
 const queryMock = vi.fn();
 const transactionMock = vi.fn();
 const detailMock = vi.fn();
-type AgentRow = {
+
+type Pkg = {
   id: string;
-  user_id: string;
+  userId: string;
   name: string;
   description: string;
-  instructions: string;
   model: string;
-  skills_json: AgentWorkspaceInput['skills'];
-  created_at: string;
-  updated_at: string;
+  currentVersionId: string;
+  createdAt: string;
+  updatedAt: string;
 };
-type VersionRow = {
-  skill_id: string;
-  user_id: string;
-  package_id: string;
-  current_version_id: string;
-  skill_uid: string;
-  version_number: number;
+type PkgVersion = {
+  id: string;
+  packageId: string;
+  versionNumber: number;
+  snapshot: AgentPackageSnapshot;
+};
+type SkillRow = {
+  id: string;
+  packageId: string;
+  uid: string;
+  dirName: string;
+  displayName: string | null;
+  name: string;
+  description: string;
   status: string;
-  skill_status: string;
-  display_name: string;
-  skill_snapshot_json: { name: string; description: string; skillMd: string };
 };
-let agents: Map<string, AgentRow>;
-let versions: Map<string, VersionRow>;
+type SkillVersionRow = {
+  id: string;
+  skillId: string;
+  packageId: string;
+  versionNumber: number;
+  status: string;
+  skill: PackageSkill;
+};
+type Link = {
+  packageVersionId: string;
+  packageId: string;
+  skillId: string;
+  skillVersionId: string;
+  sortOrder: number;
+};
+
+let packages: Map<string, Pkg>;
+let versions: Map<string, PkgVersion>;
+let skills: Map<string, SkillRow>;
+let skillVersions: Map<string, SkillVersionRow>;
+let links: Link[];
 let threads: Map<string, { userId: string; thread: ArenaThread }>;
-let conversations: {
-  agentId: string;
-  threadId: string;
-  requestId: string;
-  purpose: string;
-}[];
+let skillSequence: number;
+let versionSequence: number;
+let packageSequence: number;
+let packageVersionSequence: number;
 let service: typeof import('./agent-workspace-service.js');
+
+class PackageVersionConflictError extends Error {
+  readonly code = 'PACKAGE_VERSION_CONFLICT';
+  readonly status = 409;
+  constructor() {
+    super('PACKAGE_VERSION_CONFLICT');
+    this.name = 'PackageVersionConflictError';
+  }
+}
 
 const binding = (skillId = '11', skillVersionId = '101', enabled = true) => ({
   skillId,
@@ -44,115 +80,296 @@ const binding = (skillId = '11', skillVersionId = '101', enabled = true) => ({
   enabled,
 });
 const input = (
-  name = 'Teaching agent',
+  name = 'Teaching Agent',
   skills = [binding()],
 ): AgentWorkspaceInput => ({
   name,
   description: 'Teaching',
-  instructions: 'Use all attached procedures.',
+  instructions: 'Use the mounted procedures.',
   model: 'fixed-model',
   skills,
 });
 
-// This fixture persists writes and applies owner/version predicates. Unknown SQL
-// fails loudly so a new lookup cannot accidentally pass with an empty result.
+const now = '2026-11-04T00:00:00.000Z';
+
+function seedPackage(id: string, userId: string) {
+  packages.set(id, {
+    id,
+    userId,
+    name: 'Source package',
+    description: '',
+    model: '',
+    currentVersionId: '0',
+    createdAt: now,
+    updatedAt: now,
+  });
+}
+
+function seedSkillVersion(options: {
+  versionId: string;
+  skillId: string;
+  packageId: string;
+  userId?: string;
+  uid: string;
+  name: string;
+  skillMd: string;
+  versionStatus?: string;
+  skillStatus?: string;
+}) {
+  seedPackage(options.packageId, options.userId || 'owner');
+  skills.set(options.skillId, {
+    id: options.skillId,
+    packageId: options.packageId,
+    uid: options.uid,
+    dirName: options.uid,
+    displayName: options.name,
+    name: options.name,
+    description: `${options.name} description`,
+    status: options.skillStatus || 'active',
+  });
+  skillVersions.set(options.versionId, {
+    id: options.versionId,
+    skillId: options.skillId,
+    packageId: options.packageId,
+    versionNumber: 1,
+    status: options.versionStatus || 'active',
+    skill: {
+      id: options.uid,
+      dirName: options.uid,
+      name: options.name,
+      description: `${options.name} description`,
+      skillMd: options.skillMd,
+    },
+  });
+}
+
+function syncSnapshot(
+  packageId: string,
+  packageVersionId: string,
+  snapshot: AgentPackageSnapshot,
+) {
+  snapshot.skills.forEach((skill, index) => {
+    let skillRow = [...skills.values()].find(
+      (row) => row.packageId === packageId && row.uid === skill.id,
+    );
+    if (!skillRow) {
+      const id = String(++skillSequence);
+      skillRow = {
+        id,
+        packageId,
+        uid: skill.id,
+        dirName: skill.dirName,
+        displayName: skill.name,
+        name: skill.name,
+        description: skill.description,
+        status: 'active',
+      };
+      skills.set(id, skillRow);
+    }
+    const skillVersionId = String(++versionSequence);
+    skillVersions.set(skillVersionId, {
+      id: skillVersionId,
+      skillId: skillRow.id,
+      packageId,
+      versionNumber: 1,
+      status: 'active',
+      skill,
+    });
+    links.push({
+      packageVersionId,
+      packageId,
+      skillId: skillRow.id,
+      skillVersionId,
+      sortOrder: index,
+    });
+  });
+}
+
+const result = (rows: unknown[]) => ({
+  rows: structuredClone(rows),
+  rowCount: rows.length,
+});
+
+const encodePackage = (row: Pkg) => ({
+  id: row.id,
+  user_id: row.userId,
+  name: row.name,
+  description: row.description,
+  model: row.model,
+  current_version_id: row.currentVersionId,
+  created_at: row.createdAt,
+  updated_at: row.updatedAt,
+});
+
 beforeEach(async () => {
   vi.resetModules();
-  agents = new Map();
+  packages = new Map();
+  versions = new Map();
+  skills = new Map();
+  skillVersions = new Map();
+  links = [];
   threads = new Map();
-  conversations = [];
-  versions = new Map(
-    ['101', '202', '303'].map((id, index) => [
-      id,
-      {
-        skill_id: String(11 + index),
-        user_id: index === 2 ? 'other' : 'owner',
-        package_id: String(7 + index),
-        current_version_id: String(70 + index),
-        skill_uid: `skill-${index}`,
-        version_number: index + 1,
-        status: 'active',
-        skill_status: 'active',
-        display_name: `Procedure ${index}`,
-        skill_snapshot_json: {
-          name: `Skill ${index}`,
-          description: `Description ${index}`,
-          skillMd: `PINNED_BODY_${index}`,
-        },
-      },
-    ]),
-  );
+  skillSequence = 0;
+  versionSequence = 0;
+  packageSequence = 0;
+  packageVersionSequence = 0;
+
+  seedSkillVersion({
+    versionId: '101',
+    skillId: '11',
+    packageId: '7',
+    uid: 'procedure-a',
+    name: 'Procedure A',
+    skillMd: 'BODY_A',
+  });
+  seedSkillVersion({
+    versionId: '202',
+    skillId: '12',
+    packageId: '8',
+    uid: 'procedure-b',
+    name: 'Procedure B',
+    skillMd: 'BODY_B',
+  });
+  seedSkillVersion({
+    versionId: '303',
+    skillId: '13',
+    packageId: '9',
+    userId: 'other',
+    uid: 'procedure-c',
+    name: 'Procedure C',
+    skillMd: 'BODY_C',
+  });
+
   queryMock
     .mockReset()
     .mockImplementation(async (text: string, args: unknown[] = []) => {
       const sql = text.replace(/\s+/g, ' ').trim();
-      const result = (rows: unknown[]) => ({
-        rows: structuredClone(rows),
-        rowCount: rows.length,
-      });
-      if (sql.startsWith('select * from user_agents where id')) {
+      if (sql.startsWith('select * from agent_packages where id')) {
+        const row = packages.get(String(args[0]));
         return result(
-          [...agents.values()].filter(
-            (row) => row.id === args[0] && row.user_id === args[1],
-          ),
+          row && row.userId === args[1] ? [encodePackage(row)] : [],
         );
       }
-      if (sql.startsWith('select * from user_agents where user_id')) {
+      if (sql.startsWith('select * from agent_packages where user_id')) {
         return result(
-          [...agents.values()]
-            .filter((row) => row.user_id === args[0])
+          [...packages.values()]
+            .filter((row) => row.userId === args[0])
             .sort(
               (a, b) =>
-                b.updated_at.localeCompare(a.updated_at) ||
+                b.updatedAt.localeCompare(a.updatedAt) ||
                 Number(b.id) - Number(a.id),
-            ),
+            )
+            .map(encodePackage),
         );
       }
-      if (sql.startsWith('select sv.package_id')) {
+      if (sql.startsWith('select snapshot_json from agent_package_versions')) {
         const row = versions.get(String(args[0]));
         return result(
-          row && row.skill_id === args[1] && row.user_id === args[2]
-            ? [row]
+          row && row.packageId === args[1]
+            ? [{ snapshot_json: row.snapshot }]
+            : [],
+        );
+      }
+      if (sql.startsWith('select link.skill_id')) {
+        return result(
+          links
+            .filter(
+              (link) =>
+                link.packageId === args[0] && link.packageVersionId === args[1],
+            )
+            .sort((a, b) => a.sortOrder - b.sortOrder)
+            .map((link) => {
+              const skill = skills.get(link.skillId)!;
+              const version = skillVersions.get(link.skillVersionId)!;
+              return {
+                skill_id: link.skillId,
+                skill_version_id: link.skillVersionId,
+                skill_uid: skill.uid,
+                dir_name: skill.dirName,
+                name: skill.displayName || skill.name,
+                description: skill.description,
+                version_number: version.versionNumber,
+                skill_snapshot_json: version.skill,
+              };
+            }),
+        );
+      }
+      if (sql.startsWith('select s.skill_uid, s.dir_name')) {
+        const version = skillVersions.get(String(args[0]));
+        const skill = skills.get(String(args[1]));
+        const owner = packages.get(skill?.packageId || '');
+        return result(
+          version && skill && owner?.userId === args[2]
+            ? [
+                {
+                  skill_uid: skill.uid,
+                  dir_name: skill.dirName,
+                  display_name: skill.displayName,
+                  description: skill.description,
+                  version_number: version.versionNumber,
+                  status: version.status,
+                  skill_status: skill.status,
+                  skill_snapshot_json: version.skill,
+                  package_id: skill.packageId,
+                  skill_id: skill.id,
+                },
+              ]
             : [],
         );
       }
       if (
-        sql.startsWith('insert into user_agents') ||
-        sql.startsWith('update user_agents')
+        sql.startsWith('select status, package_id, skill_id from skill_guided')
       ) {
-        const updating = sql.startsWith('update');
-        const id = updating ? String(args[6]) : String(agents.size + 1);
-        const previous = agents.get(id);
-        if (updating && previous?.user_id !== args[7]) return result([]);
-        const row: AgentRow = {
-          id,
-          user_id: String(updating ? args[7] : args[6]),
-          name: String(args[0]),
-          description: String(args[1]),
-          instructions: String(args[2]),
-          model: String(args[3]),
-          skills_json: JSON.parse(String(args[4])),
-          created_at: previous?.created_at ?? String(args[5]),
-          updated_at: String(args[5]),
-        };
-        agents.set(id, row);
-        return result([row]);
-      }
-      if (
-        sql.startsWith(
-          'select thread_id, purpose from user_agent_conversations',
-        )
-      ) {
+        const sessions = (globalThis as Record<string, unknown>)
+          .__agentSessions as Array<Record<string, unknown>>;
         return result(
-          conversations
+          (sessions || []).filter(
+            (row) => String(row.id) === args[0] && row.user_id === args[1],
+          ),
+        );
+      }
+      if (sql.startsWith('select s.package_id from agent_package_skills')) {
+        const skill = skills.get(String(args[0]));
+        const owner = packages.get(skill?.packageId || '');
+        return result(
+          skill && owner?.userId === args[1]
+            ? [{ package_id: skill.packageId }]
+            : [],
+        );
+      }
+      if (sql.startsWith('select id from arena_threads')) {
+        return result(
+          [...threads.values()]
             .filter(
-              (row) => row.agentId === args[0] && row.requestId === args[1],
+              (entry) =>
+                entry.userId === args[0] &&
+                entry.thread.packageId === Number(args[1]) &&
+                entry.thread.skillArenaConfig?.agentRequestId,
             )
-            .map((row) => ({ thread_id: row.threadId, purpose: row.purpose })),
+            .map((entry) => ({ id: String(entry.thread.id) })),
+        );
+      }
+      if (sql.startsWith('select id, arena_config_jsonb from arena_threads')) {
+        const found = [...threads.values()].find(
+          (entry) =>
+            entry.userId === args[0] &&
+            entry.thread.packageId === Number(args[1]) &&
+            entry.thread.skillArenaConfig?.agentRequestId === args[2],
+        );
+        return result(
+          found
+            ? [
+                {
+                  id: String(found.thread.id),
+                  arena_config_jsonb: found.thread.skillArenaConfig,
+                },
+              ]
+            : [],
         );
       }
       if (sql.startsWith('insert into arena_threads')) {
         const id = String(threads.size + 91);
+        const config = JSON.parse(String(args[5])) as SkillArenaConfig;
         threads.set(id, {
           userId: String(args[0]),
           thread: {
@@ -162,7 +379,7 @@ beforeEach(async () => {
             model: args[3] as string | null,
             arenaKind: 'skill_arena',
             basePackageVersionId: String(args[4]),
-            skillArenaConfig: JSON.parse(String(args[5])),
+            skillArenaConfig: config,
             createdAt: String(args[6]),
             updatedAt: String(args[6]),
           },
@@ -171,60 +388,142 @@ beforeEach(async () => {
       }
       if (sql.startsWith('insert into arena_thread_variants'))
         return result([]);
-      if (sql.startsWith('insert into user_agent_conversations')) {
-        conversations.push({
-          agentId: String(args[0]),
-          threadId: String(args[1]),
-          requestId: String(args[2]),
-          purpose: String(args[3]),
-        });
-        return result([]);
-      }
-      if (sql.startsWith('select c.thread_id from user_agent_conversations')) {
-        return result(
-          conversations
-            .filter(
-              (row) =>
-                row.agentId === args[0] &&
-                threads.get(row.threadId)?.userId === args[1],
-            )
-            .map((row) => ({ thread_id: row.threadId })),
-        );
-      }
       throw new Error(`Unexpected query: ${sql}`);
     });
+
+  vi.doMock('./db.js', () => ({
+    query: queryMock,
+    withTransaction: transactionMock,
+  }));
+  vi.doMock('./arena-service.js', () => ({ getThreadDetail: detailMock }));
+  vi.doMock('./package-service.js', () => ({
+    PackageVersionConflictError,
+    createPackageWithSnapshotTx: async (
+      _client: unknown,
+      userId: string,
+      snapshot: AgentPackageSnapshot,
+      _source: string,
+      model = '',
+    ) => {
+      const packageId = String(++packageSequence);
+      const packageVersionId = String(++packageVersionSequence);
+      packages.set(packageId, {
+        id: packageId,
+        userId,
+        name: snapshot.name,
+        description: snapshot.description,
+        model,
+        currentVersionId: packageVersionId,
+        createdAt: now,
+        updatedAt: now,
+      });
+      versions.set(packageVersionId, {
+        id: packageVersionId,
+        packageId,
+        versionNumber: 1,
+        snapshot,
+      });
+      syncSnapshot(packageId, packageVersionId, snapshot);
+      return {
+        packageId: Number(packageId),
+        packageVersionId: Number(packageVersionId),
+        packageVersionNumber: 1,
+        skillVersionIds: {},
+      };
+    },
+    createPackageVersionWithSnapshotTx: async (
+      _client: unknown,
+      request: {
+        userId: string;
+        packageId: string;
+        expectedPackageVersionId: string;
+        snapshot: AgentPackageSnapshot;
+        model?: string;
+      },
+    ) => {
+      const pkg = packages.get(String(request.packageId));
+      if (!pkg || pkg.userId !== request.userId) throw new Error('not found');
+      if (pkg.currentVersionId !== request.expectedPackageVersionId)
+        throw new PackageVersionConflictError();
+      const versionNumber =
+        Math.max(
+          ...[...versions.values()]
+            .filter((row) => row.packageId === pkg.id)
+            .map((row) => row.versionNumber),
+          0,
+        ) + 1;
+      const packageVersionId = String(++packageVersionSequence);
+      versions.set(packageVersionId, {
+        id: packageVersionId,
+        packageId: pkg.id,
+        versionNumber,
+        snapshot: request.snapshot,
+      });
+      syncSnapshot(pkg.id, packageVersionId, request.snapshot);
+      pkg.name = request.snapshot.name;
+      pkg.description = request.snapshot.description;
+      pkg.model = request.model ?? pkg.model;
+      pkg.currentVersionId = packageVersionId;
+      pkg.updatedAt = now;
+      return {
+        packageId: Number(pkg.id),
+        packageVersionId: Number(packageVersionId),
+        packageVersionNumber: versionNumber,
+        skillVersionIds: {},
+      };
+    },
+  }));
+
   transactionMock.mockReset().mockImplementation(async (work) => {
-    const saved = structuredClone({ agents, threads, conversations });
+    const snapshot = structuredClone({
+      packages,
+      versions,
+      skills,
+      skillVersions,
+      links,
+      threads,
+      skillSequence,
+      versionSequence,
+      packageSequence,
+      packageVersionSequence,
+    });
     try {
       return await work({ query: queryMock });
     } catch (error) {
-      ({ agents, threads, conversations } = saved);
+      packages = snapshot.packages;
+      versions = snapshot.versions;
+      skills = snapshot.skills;
+      skillVersions = snapshot.skillVersions;
+      links = snapshot.links;
+      threads = snapshot.threads;
+      skillSequence = snapshot.skillSequence;
+      versionSequence = snapshot.versionSequence;
+      packageSequence = snapshot.packageSequence;
+      packageVersionSequence = snapshot.packageVersionSequence;
       throw error;
     }
   });
   detailMock
     .mockReset()
     .mockImplementation(async (userId: string, id: string) => {
-      const row = threads.get(id);
-      if (!row || row.userId !== userId) throw new Error('Thread not owned');
-      return { thread: structuredClone(row.thread), messages: [] };
+      const entry = threads.get(String(id));
+      if (!entry || entry.userId !== userId)
+        throw new Error('Thread not owned');
+      return { thread: structuredClone(entry.thread), messages: [] };
     });
-  vi.doMock('./db.js', () => ({
-    query: queryMock,
-    withTransaction: transactionMock,
-  }));
-  vi.doMock('./arena-service.js', () => ({ getThreadDetail: detailMock }));
+  (globalThis as Record<string, unknown>).__agentSessions = [];
   service = await import('./agent-workspace-service.js');
 });
 
 afterEach(() => {
   vi.doUnmock('./db.js');
   vi.doUnmock('./arena-service.js');
+  vi.doUnmock('./package-service.js');
   vi.resetModules();
 });
 
-describe('Agent workspace ownership and edits', () => {
-  it('persists several independent Agents per owner and isolates every owned operation', async () => {
+describe('Package-backed Agents', () => {
+  it('persists Agents as packages and isolates every owned operation', async () => {
     const first = await service.saveAgent('owner', input('First'));
     const second = await service.saveAgent(
       'owner',
@@ -235,15 +534,17 @@ describe('Agent workspace ownership and edits', () => {
       input('Private', [binding('13', '303')]),
     );
     expect(first.id).not.toBe(second.id);
-    expect(
-      (await service.listAgents('owner')).map((agent) => agent.name).sort(),
-    ).toEqual(['First', 'Second']);
+    const names = (await service.listAgents('owner')).map(
+      (agent) => agent.name,
+    );
+    expect(names).toEqual(expect.arrayContaining(['First', 'Second']));
     expect(
       (await service.listAgents('other')).map((agent) => agent.id),
-    ).toEqual([foreign.id]);
+    ).toEqual(expect.arrayContaining([foreign.id]));
     expect(await service.getAgent('owner', second.id)).toMatchObject({
       name: 'Second',
-      skills: [binding('12', '202')],
+      instructions: 'Use the mounted procedures.',
+      model: 'fixed-model',
     });
     for (const operation of [
       () => service.getAgent('other', first.id),
@@ -265,11 +566,13 @@ describe('Agent workspace ownership and edits', () => {
         code: 'AGENT_NOT_FOUND',
       });
     expect((await service.getAgent('owner', first.id)).name).toBe('First');
-    expect(conversations).toEqual([]);
   });
 
-  it('requires CAS, advances the timestamp, and rejects a stale editor without overwriting', async () => {
+  it('requires CAS and writes a new package version on update', async () => {
     const agent = await service.saveAgent('owner', input());
+    const versionCount = () =>
+      [...versions.values()].filter((v) => v.packageId === agent.id).length;
+    expect(versionCount()).toBe(1);
     for (const expectedUpdatedAt of [
       undefined,
       'invalid',
@@ -285,250 +588,144 @@ describe('Agent workspace ownership and edits', () => {
     }
     const edited = await service.saveAgent(
       'owner',
-      { ...input('Updated'), expectedUpdatedAt: agent.updatedAt },
-      agent.id,
-    );
-    expect(Date.parse(edited.updatedAt)).toBeGreaterThan(
-      Date.parse(agent.updatedAt),
-    );
-    await expect(
-      service.saveAgent(
-        'owner',
-        { ...input('Stale'), expectedUpdatedAt: agent.updatedAt },
-        agent.id,
-      ),
-    ).rejects.toMatchObject({ status: 409, code: 'AGENT_CONFLICT' });
-    expect(await service.getAgent('owner', agent.id)).toMatchObject({
-      name: 'Updated',
-      updatedAt: edited.updatedAt,
-    });
-    expect(
-      queryMock.mock.calls.some(([sql]) => sql.includes('for update')),
-    ).toBe(true);
-  });
-
-  it.each([true, false])(
-    'rejects duplicate skill ids even when the second binding is enabled=%s',
-    async (enabled) => {
-      await expect(
-        service.saveAgent(
-          'owner',
-          input('Duplicate', [binding(), binding('11', '102', enabled)]),
-        ),
-      ).rejects.toMatchObject({ status: 422, code: 'INVALID_ARGUMENT' });
-      expect(transactionMock).not.toHaveBeenCalled();
-      expect(agents.size).toBe(0);
-    },
-  );
-
-  it.each(['0', '-1', '1.2', 'abc', '9007199254740992'])(
-    'rejects invalid version id %s before database access',
-    async (id) => {
-      await expect(
-        service.saveAgent('owner', input('Invalid', [binding('11', id)])),
-      ).rejects.toMatchObject({ status: 422 });
-      expect(queryMock).not.toHaveBeenCalled();
-    },
-  );
-
-  it.each([
-    'missing',
-    'inaccessible',
-    'mismatched',
-    'discarded',
-    'removed',
-    'empty',
-  ] as const)(
-    'rejects %s versions on save and leaves no partial Agent',
-    async (scenario) => {
-      const selected =
-        scenario === 'inaccessible' ? binding('13', '303') : binding();
-      const version = versions.get('101')!;
-      if (scenario === 'missing') versions.delete('101');
-      if (scenario === 'mismatched') version.skill_id = '99';
-      if (scenario === 'discarded') version.status = 'discarded';
-      if (scenario === 'removed') version.skill_status = 'removed';
-      if (scenario === 'empty') version.skill_snapshot_json.skillMd = '   ';
-      await expect(
-        service.saveAgent('owner', input('Invalid', [selected])),
-      ).rejects.toMatchObject({
-        status: 422,
-        code: scenario === 'empty' ? 'INVALID_ARGUMENT' : 'SKILL_UNAVAILABLE',
-      });
-      expect(agents.size).toBe(0);
-    },
-  );
-});
-
-describe('Agent conversation snapshots', () => {
-  it('pins all enabled cross-package versions and preserves old snapshots after Agent and repository changes', async () => {
-    const agent = await service.saveAgent(
-      'owner',
-      input('Original', [binding(), binding('12', '202')]),
-    );
-    const old = await service.createAgentConversation('owner', agent.id, {
-      purpose: 'run',
-      requestId: 'original',
-    });
-    const frozen = structuredClone(old.skillArenaConfig!.agentExecution!);
-    expect(frozen).toMatchObject({
-      name: 'Original',
-      instructions: input().instructions,
-      model: 'fixed-model',
-      skills: [
-        {
-          skillId: '11',
-          skillVersionId: '101',
-          packageId: '7',
-          packageVersionId: '70',
-          versionNumber: 1,
-          skillMd: 'PINNED_BODY_0',
-        },
-        {
-          skillId: '12',
-          skillVersionId: '202',
-          packageId: '8',
-          packageVersionId: '71',
-          versionNumber: 2,
-          skillMd: 'PINNED_BODY_1',
-        },
-      ],
-    });
-    versions.set('102', {
-      ...structuredClone(versions.get('101')!),
-      version_number: 2,
-      current_version_id: '80',
-      skill_snapshot_json: {
-        name: 'New',
-        description: 'New',
-        skillMd: 'NEW_VERSION_BODY',
-      },
-    });
-    await service.saveAgent(
-      'owner',
       {
-        ...input('Reconfigured', [binding('11', '102')]),
+        ...input('Updated', [binding('12', '202')]),
         instructions: 'New instructions',
         model: 'new-model',
         expectedUpdatedAt: agent.updatedAt,
       },
       agent.id,
     );
-    versions.get('101')!.status = 'discarded';
-    versions.get('202')!.skill_snapshot_json.skillMd =
-      'CHANGED_REPOSITORY_BODY';
-    const fresh = await service.createAgentConversation('owner', agent.id, {
-      purpose: 'test',
-      requestId: 'fresh',
-    });
-    expect(fresh.skillArenaConfig!.agentExecution).toMatchObject({
-      name: 'Reconfigured',
+    expect(edited.id).toBe(agent.id);
+    expect(versionCount()).toBe(2);
+    expect(
+      queryMock.mock.calls.some(([sql]) => sql.includes('for update')),
+    ).toBe(true);
+    expect(await service.getAgent('owner', agent.id)).toMatchObject({
+      name: 'Updated',
       instructions: 'New instructions',
       model: 'new-model',
-      skills: [{ skillVersionId: '102', skillMd: 'NEW_VERSION_BODY' }],
     });
-    const listed = await service.listAgentConversations('owner', agent.id);
-    expect(
-      listed.find((thread) => thread.id === old.id)!.skillArenaConfig!
-        .agentExecution,
-    ).toEqual(frozen);
-    expect(old.skillArenaConfig!.agentExecution).toEqual(frozen);
   });
 
-  it('excludes disabled bindings before resolving versions and can run when a disabled version is discarded', async () => {
+  it('rejects duplicate and malformed skill bindings before database access', async () => {
+    await expect(
+      service.saveAgent(
+        'owner',
+        input('Duplicate', [binding(), binding('11', '102')]),
+      ),
+    ).rejects.toMatchObject({ status: 422, code: 'INVALID_ARGUMENT' });
+    expect(queryMock).not.toHaveBeenCalled();
+    for (const id of ['0', '-1', '1.2', 'abc', '9007199254740992']) {
+      await expect(
+        service.saveAgent('owner', input('Invalid', [binding('11', id)])),
+      ).rejects.toMatchObject({ status: 422 });
+    }
+    expect(queryMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    'missing',
+    'inaccessible',
+    'discarded',
+    'removed',
+    'empty',
+  ] as const)(
+    'rejects %s versions on save without leaving a package behind',
+    async (scenario) => {
+      const selected =
+        scenario === 'inaccessible' ? binding('13', '303') : binding();
+      const version = skillVersions.get('101')!;
+      if (scenario === 'missing') skillVersions.delete('101');
+      if (scenario === 'discarded') version.status = 'discarded';
+      if (scenario === 'removed') skills.get('11')!.status = 'removed';
+      if (scenario === 'empty') version.skill.skillMd = '   ';
+      await expect(
+        service.saveAgent('owner', input('Invalid', [selected])),
+      ).rejects.toMatchObject({
+        status: 422,
+        code: scenario === 'empty' ? 'INVALID_ARGUMENT' : 'SKILL_UNAVAILABLE',
+      });
+      expect(
+        [...packages.values()].filter((p) => p.userId === 'owner'),
+      ).toHaveLength(2);
+    },
+  );
+});
+
+describe('Agent conversations on packages', () => {
+  it('pins the package snapshot and replays idempotent requests', async () => {
     const agent = await service.saveAgent(
       'owner',
-      input('Enabled only', [binding(), binding('12', '202', false)]),
+      input('Original', [binding(), binding('12', '202')]),
     );
-    versions.get('202')!.status = 'discarded';
-    expect((await service.getAgent('owner', agent.id)).skills).toHaveLength(2);
-    queryMock.mockClear();
     const thread = await service.createAgentConversation('owner', agent.id, {
       purpose: 'run',
-      requestId: 'one',
+      requestId: 'original',
     });
-    expect(thread.skillArenaConfig!.agentExecution!.skills).toHaveLength(1);
-    expect(
-      thread.skillArenaConfig!.agentExecution!.skills[0].skillVersionId,
-    ).toBe('101');
-    expect(
-      queryMock.mock.calls
-        .filter(([sql]) => sql.includes('select sv.package_id'))
-        .map(([, args]) => args),
-    ).toEqual([['101', '11', 'owner']]);
-  });
+    expect(thread.packageId).toBe(Number(agent.id));
+    expect(thread.skillArenaConfig).toMatchObject({
+      mode: 'skill_arena',
+      surface: 'run',
+      agentRequestId: 'original',
+      agentExecution: {
+        agentId: agent.id,
+        name: 'Original',
+        instructions: 'Use the mounted procedures.',
+        model: 'fixed-model',
+        skills: [
+          { skillUid: 'procedure-a', skillMd: 'BODY_A', versionNumber: 1 },
+          { skillUid: 'procedure-b', skillMd: 'BODY_B', versionNumber: 1 },
+        ],
+      },
+    });
+    expect(thread.title).toContain('对话');
 
-  it('rejects an Agent with no enabled skills without creating a conversation', async () => {
-    const agent = await service.saveAgent(
-      'owner',
-      input('Disabled', [binding('11', '101', false)]),
-    );
+    const first = thread;
+    skillVersions.get('101')!.status = 'discarded';
+    queryMock.mockClear();
+    expect(
+      await service.createAgentConversation('owner', agent.id, {
+        purpose: 'run',
+        requestId: 'original',
+      }),
+    ).toEqual(first);
+    expect(
+      queryMock.mock.calls.some(([sql]) => sql.includes('insert into')),
+    ).toBe(false);
     await expect(
       service.createAgentConversation('owner', agent.id, {
         purpose: 'test',
+        requestId: 'original',
+      }),
+    ).rejects.toMatchObject({ status: 409, code: 'IDEMPOTENCY_CONFLICT' });
+  });
+
+  it('requires at least one mounted skill and scopes conversations to each Agent', async () => {
+    const empty = await service.saveAgent(
+      'owner',
+      input('Empty', [binding('11', '101', false)]),
+    );
+    // 停用的 Skill 必须保留在快照中，重新读取才能还原“未启用”状态。
+    expect(
+      (await service.getAgent('owner', empty.id)).skills.map((skill) => ({
+        enabled: skill.enabled,
+        available: skill.available,
+      })),
+    ).toEqual([{ enabled: false, available: true }]);
+    await expect(
+      service.createAgentConversation('owner', empty.id, {
+        purpose: 'run',
         requestId: 'none',
       }),
     ).rejects.toMatchObject({ status: 422 });
     expect(threads.size).toBe(0);
-    expect(conversations).toEqual([]);
-  });
 
-  it.each(['missing', 'inaccessible', 'discarded', 'removed'] as const)(
-    'revalidates enabled %s versions at conversation creation',
-    async (scenario) => {
-      const agent = await service.saveAgent('owner', input());
-      if (scenario === 'missing') versions.delete('101');
-      if (scenario === 'inaccessible') versions.get('101')!.user_id = 'other';
-      if (scenario === 'discarded') versions.get('101')!.status = 'discarded';
-      if (scenario === 'removed') versions.get('101')!.skill_status = 'removed';
-      await expect(
-        service.createAgentConversation('owner', agent.id, {
-          purpose: 'run',
-          requestId: 'unavailable',
-        }),
-      ).rejects.toMatchObject({ status: 422, code: 'SKILL_UNAVAILABLE' });
-      expect(threads.size).toBe(0);
-      expect(conversations).toEqual([]);
-    },
-  );
-
-  it.each(['run', 'test'] as const)(
-    'replays %s requests without new writes or resolving changed bindings; rejects purpose reuse',
-    async (purpose) => {
-      const agent = await service.saveAgent('owner', input());
-      const request = { purpose, requestId: 'retry' };
-      const first = await service.createAgentConversation(
-        'owner',
-        agent.id,
-        request,
-      );
-      versions.get('101')!.status = 'discarded';
-      queryMock.mockClear();
-      expect(
-        await service.createAgentConversation('owner', agent.id, request),
-      ).toEqual(first);
-      expect(
-        queryMock.mock.calls.some(
-          ([sql]) =>
-            sql.includes('insert into') || sql.includes('select sv.package_id'),
-        ),
-      ).toBe(false);
-      await expect(
-        service.createAgentConversation('owner', agent.id, {
-          ...request,
-          purpose: purpose === 'run' ? 'test' : 'run',
-        }),
-      ).rejects.toMatchObject({ status: 409, code: 'IDEMPOTENCY_CONFLICT' });
-      expect(threads.size).toBe(1);
-      expect(conversations).toHaveLength(1);
-      expect(first.skillArenaConfig!.surface).toBe(purpose);
-      expect(first.title).toContain(purpose === 'run' ? '对话' : '测试');
-    },
-  );
-
-  it('scopes request ids and conversation lists to each Agent', async () => {
     const first = await service.saveAgent('owner', input('First'));
-    const second = await service.saveAgent('owner', input('Second'));
+    const second = await service.saveAgent(
+      'owner',
+      input('Second', [binding('12', '202')]),
+    );
     const a = await service.createAgentConversation('owner', first.id, {
       purpose: 'run',
       requestId: 'same',
@@ -550,13 +747,95 @@ describe('Agent conversation snapshots', () => {
     null,
     {},
     { purpose: 'arena', requestId: 'id' },
-    { purpose: 'run', requestId: '' },
-    { purpose: 'test', requestId: '   ' },
-    { purpose: 'run', requestId: 'x'.repeat(121) },
-  ])('rejects invalid conversation input %# before DB access', async (body) => {
-    await expect(
-      service.createAgentConversation('owner', '1', body),
-    ).rejects.toMatchObject({ status: 422 });
-    expect(queryMock).not.toHaveBeenCalled();
+    { purpose: 'run', requestId: '   ' },
+  ])(
+    'rejects invalid conversation input %# before database access',
+    async (body) => {
+      await expect(
+        service.createAgentConversation('owner', '1', body),
+      ).rejects.toMatchObject({ status: 422 });
+      expect(queryMock).not.toHaveBeenCalled();
+    },
+  );
+});
+
+describe('Agent provisioning', () => {
+  it('converts a legacy package in place once without creating another Skill', async () => {
+    const agent = await service.saveAgent('owner', {
+      ...input('Legacy'),
+      instructions: '',
+      model: '',
+    });
+    const skillCount = skills.size;
+    const packageCount = packages.size;
+    const first = await service.provisionAgent('owner', {
+      skillId: agent.skills[0]!.skillId,
+    });
+    expect(first.id).toBe(agent.id);
+    expect(first.instructions).toContain('教学助手');
+    expect(first.model).toBeTruthy();
+    const versionCount = versions.size;
+    await service.provisionAgent('owner', {
+      skillId: agent.skills[0]!.skillId,
+    });
+    expect(versions.size).toBe(versionCount);
+    expect(skills.size).toBe(skillCount);
+    expect(packages.size).toBe(packageCount);
   });
+  it('returns the generated package behind a completed session', async () => {
+    const agent = await service.saveAgent('owner', input('Generated'));
+    (globalThis as Record<string, unknown>).__agentSessions = [
+      {
+        id: '55',
+        user_id: 'owner',
+        status: 'completed',
+        package_id: agent.id,
+        skill_id: null,
+      },
+    ];
+    expect(
+      await service.provisionAgent('owner', { sessionId: '55' }),
+    ).toMatchObject({
+      id: agent.id,
+      name: 'Generated',
+    });
+  });
+
+  it('resolves the owning package from a skill and refuses foreign or unfinished sources', async () => {
+    const agent = await service.saveAgent('owner', input('From skill'));
+    const [skillId] = [...skills.values()]
+      .filter((row) => row.packageId === agent.id)
+      .map((row) => row.id);
+    expect(await service.provisionAgent('owner', { skillId })).toMatchObject({
+      id: agent.id,
+      name: 'From skill',
+    });
+    (globalThis as Record<string, unknown>).__agentSessions = [
+      { id: '56', user_id: 'owner', status: 'in_progress', package_id: null },
+    ];
+    await expect(
+      service.provisionAgent('owner', { sessionId: '56' }),
+    ).rejects.toMatchObject({ status: 409, code: 'SESSION_NOT_READY' });
+    await expect(
+      service.provisionAgent('other', { skillId }),
+    ).rejects.toMatchObject({ status: 422, code: 'SKILL_UNAVAILABLE' });
+  });
+});
+
+it('keeps independent same-name Skills and rejects colliding Skill identifiers', async () => {
+  skillVersions.get('202')!.skill.name = skillVersions.get('101')!.skill.name;
+  const agent = await service.saveAgent(
+    'owner',
+    input('Same names', [binding(), binding('12', '202')]),
+  );
+  expect(agent.skills).toHaveLength(2);
+  skillVersions.get('202')!.skill.id = skillVersions.get('101')!.skill.id;
+  skillVersions.get('202')!.skill.dirName =
+    skillVersions.get('101')!.skill.dirName;
+  await expect(
+    service.saveAgent(
+      'owner',
+      input('Conflicting identifiers', [binding(), binding('12', '202')]),
+    ),
+  ).rejects.toMatchObject({ status: 422 });
 });
