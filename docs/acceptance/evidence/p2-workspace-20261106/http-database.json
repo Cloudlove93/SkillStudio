@@ -1,0 +1,74 @@
+{
+  "environment": "real isolated PostgreSQL + production HTTP routes; no model calls",
+  "modelConfigured": false,
+  "passed": 7,
+  "failed": 0,
+  "checks": [
+    {
+      "name": "concurrent requestId creates one persisted snapshot with enabled Skills and default model",
+      "status": "passed",
+      "evidence": {
+        "threadId": 1,
+        "concurrentRequests": 24,
+        "persistedRows": 1,
+        "enabledSkills": 2,
+        "defaultModel": "gpt-4.1-mini",
+        "purposeConflict": 409
+      }
+    },
+    {
+      "name": "old conversation retains its complete snapshot after Agent configuration changes",
+      "status": "passed",
+      "evidence": {
+        "originalThreadId": 1,
+        "newThreadId": 2,
+        "fixedExecutionUnchanged": true
+      }
+    },
+    {
+      "name": "all disabled returns readable 422; re-enabling restores conversation creation",
+      "status": "passed",
+      "evidence": {
+        "disabledStatus": 422,
+        "code": "NO_ENABLED_SKILLS",
+        "restoredStatus": 200
+      }
+    },
+    {
+      "name": "discarded pinned Skill blocks new conversations while persisted history stays readable",
+      "status": "passed",
+      "evidence": {
+        "newStatus": 422,
+        "code": "SKILL_UNAVAILABLE",
+        "oldHistoryStatus": 200
+      }
+    },
+    {
+      "name": "legacy skill_arena remains readable with its pinned version",
+      "status": "passed",
+      "evidence": {
+        "threadId": "4",
+        "comparisonThreadId": "5",
+        "pinnedSkillVersionId": "1",
+        "persistedMessages": 5,
+        "historyStatus": 200
+      }
+    },
+    {
+      "name": "all retired conversation-creation HTTP entrances return 422 without inserting a thread",
+      "status": "passed",
+      "evidence": {
+        "blockedEntrances": 8,
+        "noNewThreads": true
+      }
+    },
+    {
+      "name": "another user cannot read or create this Agent conversation",
+      "status": "passed",
+      "evidence": {
+        "readStatus": 404,
+        "createStatus": 404
+      }
+    }
+  ]
+}

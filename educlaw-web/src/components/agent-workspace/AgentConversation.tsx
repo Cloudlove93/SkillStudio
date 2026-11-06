@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { ArenaThread, SkillVersionDetail } from '@educlaw/shared';
 import { liteApi } from '../../api/lite-api';
 import { SkillRunWorkspace } from '../skill-workspace/SkillRunWorkspace';
@@ -13,7 +13,7 @@ export function AgentConversation({
   thread: ArenaThread;
   onOpenSkill?: OpenAgentSkill;
 }) {
-  const [version, setVersion] = useState<SkillVersionDetail>();
+  const [legacyVersion, setLegacyVersion] = useState<SkillVersionDetail>();
   const [error, setError] = useState('');
   const [retry, setRetry] = useState(0);
   const execution = thread.skillArenaConfig?.agentExecution;
@@ -24,16 +24,51 @@ export function AgentConversation({
       s.skillVersionId === anchor?.skillVersionId,
   );
   // 依赖原始值而不是每次渲染都会新建的对象，避免 effect 反复触发重复请求。
-  const anchorSkillId = boundAnchor?.skillId ?? '';
-  const anchorVersionId = boundAnchor?.skillVersionId ?? '';
-  const anchorPackageId = boundAnchor?.packageId ?? '';
+  const anchorSkillId = boundAnchor?.skillId ?? anchor?.skillId ?? '';
+  const anchorVersionId =
+    boundAnchor?.skillVersionId ?? anchor?.skillVersionId ?? '';
+  const anchorPackageId = boundAnchor?.packageId ?? String(thread.packageId);
+  const pinnedVersion = useMemo<SkillVersionDetail | undefined>(() => {
+    if (!boundAnchor) return;
+    return {
+      id: boundAnchor.skillVersionId,
+      skillId: boundAnchor.skillId,
+      packageId: boundAnchor.packageId,
+      createdInPackageVersionId: boundAnchor.packageVersionId,
+      versionNumber: boundAnchor.versionNumber,
+      source: 'manual',
+      basedOnVersionId: null,
+      skill: {
+        id: boundAnchor.skillUid,
+        dirName: boundAnchor.skillUid,
+        name: boundAnchor.name,
+        description: boundAnchor.description,
+        skillMd: boundAnchor.skillMd,
+      },
+      contentHash: '',
+      status: 'active',
+      note: '对话创建时的 Skill 快照',
+      createdAt: thread.createdAt,
+      discardedAt: null,
+      discardedBy: null,
+      discardReason: null,
+      restoredAt: null,
+      restoredBy: null,
+    };
+  }, [boundAnchor, thread.createdAt]);
+  const version = execution ? pinnedVersion : legacyVersion;
 
   useEffect(() => {
     let current = true;
-    setVersion(undefined);
+    setLegacyVersion(undefined);
     setError('');
-    if (!execution || !anchorSkillId || !anchorVersionId || !anchorPackageId) {
-      setError('此对话缺少 Agent 运行绑定，无法安全恢复。请创建新对话。');
+    if (execution) {
+      if (!pinnedVersion)
+        setError('此对话缺少完整的 Agent 运行快照，请重新打开其他历史对话。');
+      return;
+    }
+    if (!anchorSkillId || !anchorVersionId || !anchorPackageId) {
+      setError('此历史对话缺少固定版本信息，无法恢复。');
       return;
     }
     void liteApi
@@ -46,7 +81,7 @@ export function AgentConversation({
           next.packageId !== anchorPackageId
         )
           throw new Error('对话绑定版本与返回的 Skill 版本不一致');
-        setVersion(next);
+        setLegacyVersion(next);
       })
       .catch((e: unknown) => {
         if (current)
@@ -55,14 +90,22 @@ export function AgentConversation({
     return () => {
       current = false;
     };
-  }, [token, anchorSkillId, anchorVersionId, anchorPackageId, execution, retry]);
+  }, [
+    token,
+    anchorSkillId,
+    anchorVersionId,
+    anchorPackageId,
+    execution,
+    pinnedVersion,
+    retry,
+  ]);
 
   return (
     <div className="agent-conversation">
       <details className="agent-bound-skills" open>
         <summary>
-          本对话绑定 · {execution?.name ?? 'Agent'} ·{' '}
-          {execution?.skills.length ?? 0} 个 Skills
+          本对话绑定 · {execution?.name ?? '历史 Skill 对话'} ·{' '}
+          {execution?.skills.length ?? (anchor ? 1 : 0)} 个 Skills
         </summary>
         <p className="agent-muted">
           模型：{execution?.model || thread.model || '服务端默认'} ·{' '}
@@ -73,7 +116,12 @@ export function AgentConversation({
         </p>
         <div className="agent-binding-chips">
           {execution?.skills.map((skill) => (
-            <span key={skill.skillId}>
+            <details key={skill.skillId} className="agent-pinned-skill">
+              <summary>
+                {skill.name} · v{skill.versionNumber}
+              </summary>
+              <p className="agent-muted">固定版本 ID：{skill.skillVersionId}</p>
+              <pre className="agent-pinned-instructions">{skill.skillMd}</pre>
               {onOpenSkill ? (
                 <button
                   type="button"
@@ -87,15 +135,26 @@ export function AgentConversation({
                   }
                   title="打开原 Skill 工作区，可查看版本和优化 Skill"
                 >
-                  {skill.name} · v{skill.versionNumber} ↗
+                  查看 Skill 资产：{skill.name} ↗
                 </button>
-              ) : (
-                <span>
-                  {skill.name} · v{skill.versionNumber}
-                </span>
-              )}
-            </span>
+              ) : null}
+            </details>
           ))}
+          {!execution && anchor && (
+            <details className="agent-pinned-skill">
+              <summary>
+                {anchor.skillName} · v{anchor.versionNumber}（历史固定版本）
+              </summary>
+              <p className="agent-muted">
+                固定版本 ID：{anchor.skillVersionId}
+              </p>
+              {version && (
+                <pre className="agent-pinned-instructions">
+                  {version.skill.skillMd}
+                </pre>
+              )}
+            </details>
+          )}
         </div>
         {execution?.instructions && (
           <details>
@@ -113,12 +172,16 @@ export function AgentConversation({
             重试对话版本
           </button>
         </div>
-      ) : version && boundAnchor ? (
+      ) : version ? (
         <SkillRunWorkspace
           token={token}
-          packageId={boundAnchor.packageId}
+          packageId={anchorPackageId}
           version={version}
-          currentPackageVersionId={boundAnchor.packageVersionId}
+          currentPackageVersionId={
+            boundAnchor?.packageVersionId ??
+            thread.basePackageVersionId ??
+            undefined
+          }
           selectedThreadId={String(thread.id)}
           purpose={thread.skillArenaConfig?.surface === 'test' ? 'test' : 'run'}
           agentName={execution?.name}

@@ -4,6 +4,23 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const streamMessageMock = vi.fn();
 
+it('requires an Agent snapshot for new conversations on the old thread URL', async () => {
+  const { server, url } = await listen(await createApp());
+  try {
+    const response = await fetch(url + '/api/arena/threads/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ packageId: '7' }),
+    });
+    expect(response.status).toBe(422);
+    expect(await response.json()).toMatchObject({
+      code: 'AGENT_REQUIRED', nextUrl: '/agents',
+    });
+  } finally {
+    await close(server);
+  }
+});
+
 async function createApp(userId: string | null = "user-1", draining = false) {
   vi.resetModules();
   vi.doMock("../services/arena-service.js", () => ({

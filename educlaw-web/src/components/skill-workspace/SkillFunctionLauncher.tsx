@@ -24,10 +24,25 @@ export type SkillNavigation = {
 };
 
 const launcherItems = [
-  { view: 'run', label: '使用', description: '运行当前版本', icon: Play },
-  { view: 'arena', label: 'Arena', description: '对比两个版本', icon: Scale },
-  { view: 'optimize', label: '优化', description: '通过对话改进', icon: WandSparkles },
-  { view: 'versions', label: '版本', description: '管理历史版本', icon: GitBranch },
+  { view: 'run', label: '使用', description: '预览并进入 Agent', icon: Play },
+  {
+    view: 'arena',
+    label: 'Arena',
+    description: '查看 Skill，进入 Agent 测试',
+    icon: Scale,
+  },
+  {
+    view: 'optimize',
+    label: '优化',
+    description: '通过对话改进',
+    icon: WandSparkles,
+  },
+  {
+    view: 'versions',
+    label: '版本',
+    description: '管理历史版本',
+    icon: GitBranch,
+  },
 ] as const;
 
 function readPinnedPreference() {
@@ -133,7 +148,9 @@ export function SkillFunctionLauncher({
                     if (!pinned) setOpen(false);
                   }}
                 >
-                  <span aria-hidden="true"><Icon size={15} /></span>
+                  <span aria-hidden="true">
+                    <Icon size={15} />
+                  </span>
                   <span>
                     <strong>{label}</strong>
                     <small>{description}</small>

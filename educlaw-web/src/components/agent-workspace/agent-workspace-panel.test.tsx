@@ -152,6 +152,7 @@ function thread(purpose: 'run' | 'test' = 'run'): ArenaThread {
 let root: Root, container: HTMLDivElement;
 beforeEach(() => {
   vi.resetAllMocks();
+  sessionStorage.clear();
   window.history.replaceState({}, '', '/agents');
   container = document.createElement('div');
   document.body.append(container);
@@ -346,11 +347,7 @@ it('creates an explicit test conversation using its historical anchor and all bo
     purpose: 'test',
     requestId: expect.stringMatching(/^[0-9a-f-]{36}$/),
   });
-  expect(lite.getSkillVersionDetail).toHaveBeenCalledWith(
-    'explicit-token',
-    '7',
-    '101',
-  );
+  expect(lite.getSkillVersionDetail).not.toHaveBeenCalled();
   expect(container.querySelector('output')?.textContent).toBe('91:7:101');
   expect(container.querySelector('output')?.getAttribute('data-purpose')).toBe(
     'test',
@@ -359,7 +356,9 @@ it('creates an explicit test conversation using its historical anchor and all bo
     'false',
   );
   expect(container.textContent).toContain('old-model');
-  await click('旧评价 · v1 ↗');
+  expect(container.textContent).toContain('# Review');
+  expect(container.textContent).toContain('固定版本 ID：201');
+  await click('查看 Skill 资产：旧评价 ↗');
   expect(onOpenSkill).toHaveBeenCalledWith({
     packageId: '8',
     skillId: '12',
@@ -470,17 +469,129 @@ it('retains unsaved edits after a CAS conflict and offers deliberate reload', as
   await click('继续编辑');
   expect(field('Agent 名称').value).toBe('未保存');
 });
-it('refuses to render chat when the fetched anchor belongs to a different Skill', async () => {
-  lite.getSkillVersionDetail.mockResolvedValue({
-    id: '101',
-    skillId: '99',
-    packageId: '7',
-  });
+it('refuses to render chat when the persisted anchor is absent from the Agent snapshot', async () => {
+  const inconsistent = thread();
+  inconsistent.skillArenaConfig!.right!.skillId = '99';
   window.history.replaceState({}, '', '/agents?agentId=1&conversation=91');
-  api.listConversations.mockResolvedValue([thread()]);
+  api.listConversations.mockResolvedValue([inconsistent]);
   await render();
   expect(container.querySelector('output')).toBeNull();
-  expect(container.textContent).toContain(
-    '对话绑定版本与返回的 Skill 版本不一致',
+  expect(container.textContent).toContain('此对话缺少完整的 Agent 运行快照');
+});
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+it('waits for history before autochat and restores the explicitly selected conversation', async () => {
+  const history = deferred<ArenaThread[]>();
+  api.listConversations.mockReturnValue(history.promise);
+  window.history.replaceState(
+    {},
+    '',
+    '/agents?agentId=1&conversation=92&autochat=1',
   );
+  await render({}, true);
+  expect(api.createConversation).not.toHaveBeenCalled();
+  expect(window.location.search).toContain('autochat=1');
+  await act(async () =>
+    history.resolve([thread(), { ...thread('test'), id: 92 }]),
+  );
+  expect(api.createConversation).not.toHaveBeenCalled();
+  expect(container.querySelector('output')?.textContent).toBe('92:7:101');
+  expect(window.location.search).toContain('conversation=92');
+  expect(window.location.search).not.toContain('autochat');
+});
+it('does not autochat after a failed history load or its explicit retry', async () => {
+  api.listConversations
+    .mockRejectedValueOnce(new Error('历史暂不可用'))
+    .mockResolvedValueOnce([]);
+  window.history.replaceState({}, '', '/agents?agentId=1&autochat=1');
+  await render();
+  expect(container.textContent).toContain('历史暂不可用');
+  expect(api.createConversation).not.toHaveBeenCalled();
+  expect(window.location.search).not.toContain('autochat');
+  await click('刷新');
+  expect(api.createConversation).not.toHaveBeenCalled();
+  await click('新建运行对话');
+  expect(api.createConversation).toHaveBeenCalledOnce();
+});
+it('admits only one create request when the new-conversation button is clicked twice', async () => {
+  const creation = deferred<ArenaThread>();
+  api.createConversation.mockReturnValue(creation.promise);
+  await render();
+  await act(async () => {
+    button('新建运行对话').click();
+    button('新建运行对话').click();
+  });
+  expect(api.createConversation).toHaveBeenCalledOnce();
+  await act(async () => creation.resolve(thread()));
+  expect(window.location.search).toContain('conversation=91');
+});
+it('reuses an unacknowledged conversation request after refreshing the page', async () => {
+  api.createConversation.mockRejectedValueOnce(new TypeError('response lost'));
+  await render();
+  await click('新建运行对话');
+  const input = api.createConversation.mock.calls[0][2];
+  await act(async () => root.unmount());
+  root = createRoot(container);
+  api.createConversation.mockResolvedValueOnce(thread());
+  await render();
+  await click('新建运行对话');
+  expect(api.createConversation.mock.calls[1][2]).toEqual(input);
+  expect(window.location.search).toContain('conversation=91');
+});
+it('uses persisted Skill content even when the original version is unavailable', async () => {
+  lite.getSkillVersionDetail.mockRejectedValue(new Error('version removed'));
+  api.listConversations.mockResolvedValue([thread()]);
+  window.history.replaceState({}, '', '/agents?agentId=1&conversation=91');
+  await render();
+  expect(lite.getSkillVersionDetail).not.toHaveBeenCalled();
+  expect(container.querySelector('output')?.textContent).toBe('91:7:101');
+  const fixedSkill = container.querySelector<HTMLDetailsElement>(
+    '.agent-pinned-skill',
+  )!;
+  await act(async () => fixedSkill.querySelector('summary')!.click());
+  expect(fixedSkill.open).toBe(true);
+  expect(fixedSkill.textContent).toContain('# Lesson');
+  expect(container.textContent).toContain('旧指令');
+});
+it('opens a legacy Skill conversation using its original pinned version', async () => {
+  const legacy = thread();
+  delete legacy.skillArenaConfig!.agentExecution;
+  lite.getSkillVersionDetail.mockResolvedValue({
+    id: '101',
+    skillId: '11',
+    packageId: '7',
+    versionNumber: 1,
+    skill: { skillMd: '# Legacy lesson' },
+  });
+  api.listConversations.mockResolvedValue([legacy]);
+  window.history.replaceState({}, '', '/agents?agentId=1&conversation=91');
+  await render();
+  expect(lite.getSkillVersionDetail).toHaveBeenCalledWith(
+    'explicit-token',
+    '7',
+    '101',
+  );
+  expect(container.querySelector('output')?.textContent).toBe('91:7:101');
+  expect(container.textContent).toContain('历史固定版本');
+  expect(container.textContent).toContain('# Legacy lesson');
+  expect(api.createConversation).not.toHaveBeenCalled();
+});
+it('ignores late provisioning after the user selects another Agent', async () => {
+  const provision = deferred<AgentWorkspace>();
+  api.provision.mockReturnValue(provision.promise);
+  window.history.replaceState({}, '', '/agents?skillId=12');
+  await render();
+  await click('课程助手备课1 个启用的 Skill');
+  await click('放弃并继续');
+  await act(async () =>
+    provision.resolve(agent({ id: '2', name: '迟到的助手' })),
+  );
+  expect(window.location.search).toContain('agentId=1');
+  expect(window.location.search).not.toContain('agentId=2');
+  expect(container.querySelector('h1')?.textContent).toBe('课程助手');
 });

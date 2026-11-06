@@ -222,6 +222,7 @@ interface SkillArenaVariantSelection {
 }
 
 interface CreateArenaThreadInput {
+  optimizationOnly?: boolean;
   authUserId: string;
   packageId: string;
   arenaKind?: ArenaKind;
@@ -1147,7 +1148,7 @@ function buildSkillArenaConfig(input: {
   left: DbSkillArenaVariantRow | null;
   right: DbSkillArenaVariantRow | null;
   surface?: "run" | "test" | "arena" | "optimize";
-}) {
+}): SkillArenaConfig {
   const toVariant = (
     side: "left" | "right",
     row: DbSkillArenaVariantRow | null,
@@ -1606,6 +1607,7 @@ export async function createArenaThread(
     },
     model: input.model || null,
     surface: input.surface || null,
+    ...(input.optimizationOnly ? { optimizationOnly: true } : {}),
   });
 
   return withTransaction(async (client) => {
@@ -1647,6 +1649,7 @@ export async function createArenaThread(
       right,
       surface: input.surface,
     });
+    if (input.optimizationOnly) skillArenaConfig.optimizationOnly = true;
     const warning =
       leftSkillId && rightSkillId &&
       leftSkillId === rightSkillId &&
@@ -1882,6 +1885,12 @@ export async function* streamMessage(
 
   yield { event: "phase", data: { label: "Loading conversation context" } };
   const detail = await getThreadDetail(userId, threadId);
+  if (detail.thread.skillArenaConfig?.optimizationOnly)
+    throw new ArenaServiceError(
+      '此会话仅用于 Skill 优化，请从“我的 Agent”开始对话',
+      422,
+      'AGENT_REQUIRED',
+    );
   const runtime = await resolveThreadRuntime(userId, detail.thread);
   const surface = detail.thread.skillArenaConfig?.surface;
   const fixedPiSkillVersion = runtime.skillVersions?.enhanced ?? null;
@@ -1997,7 +2006,9 @@ export async function* streamMessage(
       }
     : null;
   const skillArenaModel = runtime.arenaKind === "skill_arena"
-    ? model || detail.thread.model || resolveEnhancedModel(undefined)
+    ? (agentExecution
+        ? agentExecution.model || detail.thread.model
+        : model || detail.thread.model) || resolveEnhancedModel(undefined)
     : null;
   const thinkingRequested = thinkingEnabled === true;
   const thinkingAllowed =

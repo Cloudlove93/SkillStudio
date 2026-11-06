@@ -13,12 +13,14 @@ import type {
   AnswerOptimizationSelection,
 } from './answer-optimization-selection';
 import { liteApi } from '../../api/lite-api';
+import { getConversationSurface } from './skill-conversation-list';
 
-const SkillArenaWorkspace = lazy(() =>
-  import('./SkillArenaWorkspace').then((module) => ({
-    default: module.SkillArenaWorkspace,
+const LegacyArenaHistory = lazy(() =>
+  import('./LegacyArenaHistory').then((module) => ({
+    default: module.LegacyArenaHistory,
   })),
 );
+
 const SkillOptimizeWorkspace = lazy(() =>
   import('./SkillOptimizeWorkspace').then((module) => ({
     default: module.SkillOptimizeWorkspace,
@@ -39,6 +41,9 @@ type DetailView = Extract<
   SkillWorkspaceView,
   'overview' | 'run' | 'arena' | 'optimize' | 'versions'
 >;
+const needsLegacyHistory = (thread: ArenaThread) =>
+  getConversationSurface(thread) === 'arena' ||
+  (!thread.skillArenaConfig?.right && !!thread.skillArenaConfig?.left);
 
 export type SkillDetailSelection = {
   packageId: string;
@@ -117,11 +122,17 @@ export function SkillDetailWorkspace(props: Props) {
   const [binding, setBinding] = useState<{
     key: string;
     version?: SkillVersionDetail;
+    thread?: ArenaThread;
     error?: string;
   } | null>(null);
   const [bindingRetry, setBindingRetry] = useState(0);
   useEffect(() => {
-    if (!props.selectedConversationId || listedBoundVersion) return;
+    if (
+      !props.selectedConversationId ||
+      listedBoundVersion ||
+      (selectedThread && needsLegacyHistory(selectedThread))
+    )
+      return;
     let cancelled = false;
     setBinding(null);
     void (async () => {
@@ -135,6 +146,10 @@ export function SkillDetailWorkspace(props: Props) {
               props.selectedConversationId!,
             )
           ).thread;
+        if (needsLegacyHistory(thread)) {
+          if (!cancelled) setBinding({ key: bindingKey, thread });
+          return;
+        }
         const id = thread.skillArenaConfig?.right?.skillVersionId;
         if (!id) throw new Error('无法确认本对话绑定的 Skill 版本');
         const version = await liteApi.getSkillVersionDetail(
@@ -169,6 +184,11 @@ export function SkillDetailWorkspace(props: Props) {
   const boundVersion =
     listedBoundVersion ??
     (binding?.key === bindingKey ? binding.version : undefined);
+  const resolvedThread =
+    selectedThread ??
+    (binding?.key === bindingKey ? binding.thread : undefined);
+  const legacyComparison =
+    !!resolvedThread && needsLegacyHistory(resolvedThread);
   const runVersion = props.selectedConversationId
     ? boundVersion
     : selectedRunVersion;
@@ -192,14 +212,26 @@ export function SkillDetailWorkspace(props: Props) {
 
   return (
     <main className="skill-center skill-detail-workspace">
-      {props.view === 'run' && (
+      {(props.view === 'run' || props.view === 'arena') && (
         <header className="skill-workspace-topbar">
-          {props.onAttachToAgent && <button type="button" onClick={props.onAttachToAgent}>添加到 Agent 并使用</button>}
+          {props.onAttachToAgent ? (
+            <button type="button" onClick={props.onAttachToAgent}>
+              进入 Agent 工作区
+            </button>
+          ) : (
+            <a
+              href={`/agents?skillId=${encodeURIComponent(props.skill.skillId)}&autochat=1`}
+            >
+              进入 Agent 工作区
+            </a>
+          )}
           {props.selectedConversationId && (
             <span role="status">
-              {boundVersion
-                ? `本对话版本：v${boundVersion.versionNumber}${boundVersion.status === 'discarded' ? '（已废弃，保留原对话绑定）' : ''}`
-                : '正在确认对话版本…'}
+              {legacyComparison
+                ? '本对话保留创建时的固定版本'
+                : boundVersion
+                  ? `本对话版本：v${boundVersion.versionNumber}${boundVersion.status === 'discarded' ? '（已废弃，保留原对话绑定）' : ''}`
+                  : '正在确认对话版本…'}
             </span>
           )}
           {binding?.key === bindingKey && binding.error && (
@@ -210,30 +242,25 @@ export function SkillDetailWorkspace(props: Props) {
               </button>
             </span>
           )}
-          <label className="skill-active-version skill-version-picker">
-            <span>新对话版本</span>
-            <select
-              disabled={props.versionsLoading || !selectedRunVersion}
-              value={selectedRunVersion?.id ?? ''}
-              onChange={(event) => setSelectedRunVersionId(event.target.value)}
-            >
-              {props.versions
-                .filter((version) => version.status !== 'discarded')
-                .map((version) => (
-                  <option value={version.id} key={version.id}>
-                    v{version.versionNumber}
-                  </option>
-                ))}
-            </select>
-          </label>
-          {props.selectedConversationId && (
-            <button
-              className="skill-secondary-button"
-              disabled={!selectedRunVersion || props.versionsLoading}
-              onClick={props.onNewConversation}
-            >
-              用所选版本新建对话
-            </button>
+          {!props.selectedConversationId && (
+            <label className="skill-active-version skill-version-picker">
+              <span>预览版本</span>
+              <select
+                disabled={props.versionsLoading || !selectedRunVersion}
+                value={selectedRunVersion?.id ?? ''}
+                onChange={(event) =>
+                  setSelectedRunVersionId(event.target.value)
+                }
+              >
+                {props.versions
+                  .filter((version) => version.status !== 'discarded')
+                  .map((version) => (
+                    <option value={version.id} key={version.id}>
+                      v{version.versionNumber}
+                    </option>
+                  ))}
+              </select>
+            </label>
           )}
           {props.versionsHasMore && (
             <button
@@ -256,35 +283,58 @@ export function SkillDetailWorkspace(props: Props) {
           }
         >
           {props.view === 'overview' && <Overview skill={props.skill} />}
-          {props.view === 'run' && (
-            <SkillRunWorkspace
-              token={props.token}
-              packageId={props.skill.packageId}
-              version={runVersion}
-              currentPackageVersionId={
-                props.currentPackageVersionId ?? undefined
-              }
-              onRunStateChange={props.onRunStateChange}
-              onOptimizeAnswer={props.onOptimizeAnswer}
-              selectedThreadId={props.selectedConversationId}
-              onThreadCreated={props.onConversationCreated}
-              onThreadUpdated={props.onConversationUpdated}
-              rerunRequest={props.answerRerunRequest}
-              onRerunHandled={props.onRerunHandled}
-            />
-          )}
-          {props.view === 'arena' && (
-            <SkillArenaWorkspace
-              token={props.token}
-              packageId={props.skill.packageId}
-              versions={props.versions}
-              currentVersionId={props.currentVersionId}
-              currentPackageVersionId={props.currentPackageVersionId}
-              onOptimizeAnswer={props.onOptimizeAnswer}
-              onCompleted={() => undefined}
-              rerunRequest={props.answerRerunRequest}
-              onRerunHandled={props.onRerunHandled}
-            />
+          {props.view === 'run' &&
+            props.selectedConversationId &&
+            !legacyComparison && (
+              <SkillRunWorkspace
+                token={props.token}
+                packageId={props.skill.packageId}
+                version={runVersion}
+                currentPackageVersionId={
+                  props.currentPackageVersionId ?? undefined
+                }
+                onRunStateChange={props.onRunStateChange}
+                onOptimizeAnswer={props.onOptimizeAnswer}
+                selectedThreadId={props.selectedConversationId}
+                onThreadCreated={props.onConversationCreated}
+                onThreadUpdated={props.onConversationUpdated}
+                rerunRequest={props.answerRerunRequest}
+                onRerunHandled={props.onRerunHandled}
+              />
+            )}
+          {(props.view === 'run' || props.view === 'arena') &&
+            props.selectedConversationId &&
+            legacyComparison && (
+              <LegacyArenaHistory
+                token={props.token}
+                packageId={props.skill.packageId}
+                threadId={props.selectedConversationId}
+              />
+            )}
+          {((props.view === 'run' && !props.selectedConversationId) ||
+            (props.view === 'arena' && !legacyComparison)) && (
+            <section className="skill-flat-overview skill-view-enter">
+              <div className="skill-overview-intro">
+                <span className="skill-eyebrow">Skill 只读预览</span>
+                <h1>{props.skill.name}</h1>
+                <p>
+                  进入 Agent 工作区后，将此 Skill 与 Agent
+                  指令一起用于运行或测试。历史对话仍可从对话列表打开。
+                </p>
+              </div>
+              {selectedRunVersion && (
+                <details className="skill-overview-sections" open>
+                  <summary>
+                    固定版本 v{selectedRunVersion.versionNumber}
+                  </summary>
+                  <pre
+                    style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}
+                  >
+                    {selectedRunVersion.skill?.skillMd}
+                  </pre>
+                </details>
+              )}
+            </section>
           )}
           {props.view === 'optimize' && (
             <SkillOptimizeWorkspace

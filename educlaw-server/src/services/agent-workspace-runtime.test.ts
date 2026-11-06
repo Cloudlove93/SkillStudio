@@ -165,6 +165,27 @@ function assertNoPackageSelection(allowAnswerRun = false) {
 }
 
 describe('Agent fixed snapshot runtime', () => {
+  it('does not allow an optimization workspace to bypass Agent conversation creation', async () => {
+    const runtime = await loadRuntime(false);
+    const databaseQuery = queryMock.getMockImplementation()!;
+    queryMock.mockImplementation(async (sql, args) => {
+      const result = await databaseQuery(sql, args);
+      if (sql.startsWith('select * from arena_threads'))
+        result.rows[0].arena_config_jsonb.optimizationOnly = true;
+      return result;
+    });
+    await expect(
+      collect(
+        runtime.streamMessage('owner', '91', 'Question', undefined, 'agent'),
+      ),
+    ).rejects.toMatchObject({ status: 422, code: 'AGENT_REQUIRED' });
+    expect(streamMock).not.toHaveBeenCalled();
+    expect(piMock).not.toHaveBeenCalled();
+    expect(queryMock.mock.calls.some(([sql]) => sql.startsWith('insert'))).toBe(
+      false,
+    );
+  });
+
   it('passes every cross-package skill to Pi and builds a system prompt with every body and Agent instruction', async () => {
     const runtime = await loadRuntime(true);
     const { buildPiSystemPrompt } =
@@ -199,7 +220,7 @@ describe('Agent fixed snapshot runtime', () => {
         'owner',
         '91',
         'Unrelated question',
-        undefined,
+        'client-model-override',
         'agent',
       ),
     );
@@ -245,7 +266,7 @@ describe('Agent fixed snapshot runtime', () => {
       'owner',
       '91',
       'Unrelated question',
-      undefined,
+      'client-model-override',
       'agent',
     );
     // The shared event occurs after loading the execution snapshot and before generation.
@@ -262,7 +283,9 @@ describe('Agent fixed snapshot runtime', () => {
     ];
     streamMock.mockImplementation(async function* (request: {
       systemPrompt: string;
+      model: string;
     }) {
+      expect(request.model).toBe(original.model);
       expect(request.systemPrompt).toContain(original.instructions);
       for (const skill of original.skills)
         expect(request.systemPrompt).toContain(skill.skillMd);

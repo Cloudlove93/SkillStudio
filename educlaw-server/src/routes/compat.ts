@@ -4,7 +4,8 @@ import type { AuthedRequest } from "../types.js";
 import { requireAuth } from "../middleware/auth.js";
 import { query } from "../services/db.js";
 import { listPackages, getPackage, generatePackage, deletePackage, exportPackageZip, importPackageZip } from "../services/package-service.js";
-import { listThreads, createThread, getThreadDetail, sendMessage, streamMessage, generateReport } from "../services/arena-service.js";
+import { listThreads, getThreadDetail, sendMessage, streamMessage, generateReport } from "../services/arena-service.js";
+import { requireAgentConversation } from '../utils/agent-conversation-policy.js';
 import { optimizePackage } from "../services/optimization-service.js";
 import { config } from "../config.js";
 import { parseDbJson } from "../utils/json.js";
@@ -228,78 +229,9 @@ async function findPackageByRef(userId: string, ref: string) {
   try { return await getPackage(userId, ref); } catch { return null; }
 }
 
-router.post("/arena/chat/profile/:fileName", requireAuth, async (req, res) => {
-  try {
-    const userId = pickUserId(req);
-    const pkg = await findPackageByRef(userId, String(req.params.fileName));
-    if (!pkg) { notFound(res, "Profile not found"); return; }
-    const thread = await createThread(userId, pkg.id, req.body?.model);
-    const detail = await getThreadDetail(userId, thread.id);
-    const turnIndexes = calcTurnIndex(detail.messages);
-    ok(res, {
-      session: threadToSession(thread),
-      messages: detail.messages.map((m, i) => ({
-        id: m.id,
-        arena_session_id: m.threadId,
-        user_id: userId,
-        side: m.side,
-        role: m.role,
-        content: m.content,
-        turn_index: turnIndexes[i],
-        created_at: m.createdAt,
-      })),
-    });
-  } catch (e) { bad(res, e instanceof Error ? e.message : "Failed"); }
-});
-
-router.post("/arena/chat/skill/:dirName", requireAuth, async (req, res) => {
-  try {
-    const userId = pickUserId(req);
-    const packages = await listPackages(userId);
-    const pkg = packages.find((p) => p.name === String(req.params.dirName));
-    if (!pkg) { notFound(res, "Skill not found"); return; }
-    const thread = await createThread(userId, pkg.id, req.body?.model);
-    const detail = await getThreadDetail(userId, thread.id);
-    const turnIndexes = calcTurnIndex(detail.messages);
-    ok(res, {
-      session: threadToSession(thread),
-      messages: detail.messages.map((m, i) => ({
-        id: m.id,
-        arena_session_id: m.threadId,
-        user_id: userId,
-        side: m.side,
-        role: m.role,
-        content: m.content,
-        turn_index: turnIndexes[i],
-        created_at: m.createdAt,
-      })),
-    });
-  } catch (e) { bad(res, e instanceof Error ? e.message : "Failed"); }
-});
-
-router.post("/arena/chat/agent/:id", requireAuth, async (req, res) => {
-  try {
-    const userId = pickUserId(req);
-    const pkg = await findPackageByRef(userId, String(req.params.id));
-    if (!pkg) { notFound(res, "Agent not found"); return; }
-    const thread = await createThread(userId, pkg.id, req.body?.model);
-    const detail = await getThreadDetail(userId, thread.id);
-    const turnIndexes = calcTurnIndex(detail.messages);
-    ok(res, {
-      session: threadToSession(thread),
-      messages: detail.messages.map((m, i) => ({
-        id: m.id,
-        arena_session_id: m.threadId,
-        user_id: userId,
-        side: m.side,
-        role: m.role,
-        content: m.content,
-        turn_index: turnIndexes[i],
-        created_at: m.createdAt,
-      })),
-    });
-  } catch (e) { bad(res, e instanceof Error ? e.message : "Failed"); }
-});
+router.post('/arena/chat/profile/:fileName', requireAuth, requireAgentConversation);
+router.post('/arena/chat/skill/:dirName', requireAuth, requireAgentConversation);
+router.post('/arena/chat/agent/:id', requireAuth, requireAgentConversation);
 
 router.get("/arena/chat/sessions", requireAuth, async (req, res) => {
   try {

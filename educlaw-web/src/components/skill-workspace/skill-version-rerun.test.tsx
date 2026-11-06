@@ -21,7 +21,7 @@ import { SkillDetailWorkspace } from './SkillDetailWorkspace';
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
-it('consumes an optimization rerun once even after visiting version management and returning', async () => {
+it('does not let an optimization rerun create a single Skill conversation', async () => {
   await import('./SkillRunWorkspace');
   const version = {
     id: '3',
@@ -100,11 +100,11 @@ it('consumes an optimization rerun once even after visiting version management a
   }
   try {
     await act(async () => root.render(<Harness view="run" />));
-    expect(api.startArenaRun).toHaveBeenCalledTimes(1);
+    expect(api.startArenaRun).not.toHaveBeenCalled();
     await act(async () => root.render(<Harness view="versions" />));
     await act(async () => root.render(<Harness view="run" />));
-    expect(api.startArenaRun).toHaveBeenCalledTimes(1);
-    expect(api.createArenaThread).toHaveBeenCalledTimes(1);
+    expect(api.startArenaRun).not.toHaveBeenCalled();
+    expect(api.createArenaThread).not.toHaveBeenCalled();
   } finally {
     await act(async () => root.unmount());
   }

@@ -1,0 +1,62 @@
+{
+  "date": "2026-11-06",
+  "baseCommit": "8237b7d",
+  "branch": "feature/p2-workspace-chat",
+  "modelCalls": 0,
+  "build": {
+    "shared": "passed",
+    "openagent": "passed",
+    "server": "passed",
+    "web": "passed"
+  },
+  "web": {
+    "unitTests": {
+      "passed": 400,
+      "failed": 0,
+      "files": 59
+    },
+    "contractTests": {
+      "passed": 116,
+      "failed": 0
+    },
+    "types": {
+      "baselineDiagnostics": 257,
+      "currentDiagnostics": 249,
+      "addedDiagnostics": 0
+    },
+    "eslint": "passed"
+  },
+  "server": {
+    "p2RelatedRegression": {
+      "passed": 165,
+      "files": 17
+    },
+    "modifiedFilesEslint": "passed",
+    "fullSuite": {
+      "passed": 1308,
+      "failed": 10,
+      "skipped": 20,
+      "sameFailuresReproducedOnOriginalMain": true
+    }
+  },
+  "postgresHttp": {
+    "groupsPassed": 7,
+    "groupsFailed": 0,
+    "parallelDuplicateRequests": 24,
+    "persistedConversationsForRequest": 1
+  },
+  "browser": [
+    "Agent header displays identity, effective model and 2 enabled Skills",
+    "Fixed Skill version body and Agent instructions expand from persisted snapshot",
+    "Explicit conversation=1 survives autochat and refresh; autochat removed from URL",
+    "Legacy right-only conversation=4 remains selected with pinned v1 and original messages after refresh",
+    "Legacy two-sided comparison displays both pinned versions and seeded messages",
+    "Created Agent test conversation=6 and refreshed it; Agent history remained at 4 conversations"
+  ],
+  "knownRepositoryChecks": {
+    "fullServerEslint": "existing guided-creation-service.ts unnecessary escape error",
+    "rootScriptTest": "1 existing macOS temporary-path test failure, reproduced on main",
+    "pythonWorkerTests": "not started: pytest missing",
+    "realModelAndProductionAuthentication": "deferred; preview uses isolated local identity and no model calls"
+  }
+}

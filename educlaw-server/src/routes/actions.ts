@@ -2,6 +2,7 @@ import { createTrackedRouter } from '../services/http-drain.js';
 import { Router } from 'express';
 import type { AuthedRequest } from '../types.js';
 import { requireAuth } from '../middleware/auth.js';
+import { AGENT_REQUIRED_MESSAGE } from '../utils/agent-conversation-policy.js';
 import {
   createInternalWorkerAuth,
   isInternalMediaJobAction,
@@ -235,6 +236,9 @@ const actionMap = new Map<string, ApiHandler>([
           422,
         );
       }
+      const surface = optionalArenaSurface(parsed.payload.surface);
+      if (surface !== 'optimize')
+        throw new SkillVersionError('AGENT_REQUIRED', AGENT_REQUIRED_MESSAGE, 422);
       return createArenaThread({
         authUserId,
         packageId: parsed.packageId,
@@ -251,7 +255,8 @@ const actionMap = new Map<string, ApiHandler>([
         left: parseVariantSelection(parsed.payload.left, 'left'),
         right: parseVariantSelection(parsed.payload.right, 'right'),
         model: optionalString(parsed.payload.model, 'model', 120),
-        surface: optionalArenaSurface(parsed.payload.surface),
+        surface,
+        optimizationOnly: true,
       });
     },
   ],

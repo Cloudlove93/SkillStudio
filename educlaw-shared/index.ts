@@ -212,10 +212,13 @@ export interface AgentProvisionInput {
   sessionId?: string;
   skillId?: string;
 }
+/** Persisted with the conversation. Runtime must not resolve current Agent or
+ * Skill configuration or replace its model with a message-level override. */
 export interface AgentExecutionSnapshot {
   agentId: string;
   name: string;
   instructions: string;
+  /** Effective model, including the default resolved at conversation creation. */
   model: string;
   skills: Array<AgentResolvedSkill & {
     packageVersionId: string;
@@ -228,6 +231,8 @@ export interface SkillArenaConfig {
   mode: 'skill_arena';
   compositionMode: 'skill_only';
   agentExecution?: AgentExecutionSnapshot;
+  /** New optimization workspaces cannot be used as ordinary chat entrypoints. */
+  optimizationOnly?: boolean;
   /** Agent 对话的幂等键，同时用于把线程归属到某个 Agent。 */
   agentRequestId?: string;
   /** run: 单版本运行；test: 固定版本测试；arena: 双版本对比；optimize: 交互式优化 */

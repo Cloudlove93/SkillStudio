@@ -378,7 +378,7 @@ describe('Skill-first workspace UI contract', () => {
       );
     }
     expect(detail).toContain("import('./SkillRunWorkspace')");
-    expect(detail).toContain("import('./SkillArenaWorkspace')");
+    expect(detail).not.toContain("import('./SkillArenaWorkspace')");
     expect(detail).toContain("import('./SkillOptimizeWorkspace')");
     expect(detail).toContain("import('./SkillVersionWorkspace')");
     expect(inspector).toContain("import('./SkillAnswerOptimizationPanel')");

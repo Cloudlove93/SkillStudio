@@ -259,6 +259,78 @@ it('resumes an unfinished guided draft after switching to another Skill conversa
     ).toBe('create');
   });
 });
+it('restores an explicit single-sided legacy history before a newer Arena history on refresh', async () => {
+  await Promise.all([
+    import('../components/skill-workspace/SkillDetailWorkspace'),
+    import('../components/skill-workspace/SkillRunWorkspace'),
+    import('../components/skill-workspace/LegacyArenaHistory'),
+  ]);
+  const older = {
+    ...threads[0],
+    skillArenaConfig: {
+      ...threads[0].skillArenaConfig,
+      left: null,
+      surface: 'run',
+    },
+  };
+  const newer = {
+    ...threads[1],
+    updatedAt: '2026-11-06T08:00:00Z',
+    skillArenaConfig: { ...threads[1].skillArenaConfig, surface: 'arena' },
+  };
+  api.listThreadPage.mockResolvedValue({
+    items: [newer, older],
+    nextCursor: null,
+  });
+  api.recoverArenaRun.mockImplementation(async (_token, id) => ({
+    run: null,
+    detail: {
+      thread: String(id) === '91' ? older : newer,
+      messages: [
+        {
+          id: 1,
+          threadId: Number(id),
+          role: 'assistant',
+          side: 'enhanced',
+          content: id === '91' ? '原单侧会话的回答' : '不应切换的新对比回答',
+        },
+      ],
+      answerOptimizations: [],
+    },
+  }));
+  for (let mount = 0; mount < 2; mount += 1) {
+    if (mount) {
+      await act(async () => root.unmount());
+      root = createRoot(container);
+    }
+    await act(async () =>
+      root.render(
+        <MemoryRouter
+          initialEntries={['/skills?view=run&skill=7%3A11&conversation=91']}
+        >
+          <SkillFirstWorkspace />
+          <RouteEvidence />
+        </MemoryRouter>,
+      ),
+    );
+    await vi.waitFor(async () => {
+      await act(async () => {});
+      expect(button('使用 Conversation 91')).toBeDefined();
+      expect(button('对比 Conversation 92')).toBeDefined();
+      expect(container.textContent).toContain('原单侧会话的回答');
+    });
+    expect(
+      new URLSearchParams(
+        container.querySelector('[data-route]')!.textContent!,
+      ).get('conversation'),
+    ).toBe('91');
+    expect(container.textContent).not.toContain('不应切换的新对比回答');
+    expect(
+      container.querySelector('textarea[aria-label="输入 Skill 使用任务"]'),
+    ).not.toBeNull();
+    expect(api.createArenaThread).not.toHaveBeenCalled();
+  }
+});
 
 it('resumes an unfinished guided draft after entering a Skill conversation from the home view', async () => {
   await configureUnfinishedDraft();

@@ -7,6 +7,9 @@ const api = vi.hoisted(() => ({
   getSkillVersionDetail: vi.fn(),
 }));
 vi.mock('../../api/lite-api', () => ({ liteApi: api }));
+vi.mock('../lite/lite-rendering', () => ({
+  MarkdownContent: ({ content }: { content: string }) => <div>{content}</div>,
+}));
 // Isolate the version controller from model execution; inspect its execution boundary.
 vi.mock('./SkillRunWorkspace', () => ({
   SkillRunWorkspace: (p: {
@@ -72,24 +75,22 @@ it('displays and passes the conversation binding, not the repository current ver
   expect(container.textContent).toContain('本对话版本：v1');
   expect(container.querySelector('output')?.textContent).toBe('91:1');
 });
-it('only detaches from an existing conversation on the explicit new-conversation action', async () => {
-  const p = props();
+it('offers the Agent entry while retaining the pinned historical conversation', async () => {
+  const p = props({ onAttachToAgent: vi.fn() });
   await render(p);
-  await act(async () => {
-    const select = container.querySelector('select')!;
-    select.value = '2';
-    select.dispatchEvent(new Event('change', { bubbles: true }));
-  });
+  expect(container.querySelector('select')).toBeNull();
   expect(p.onNewConversation).not.toHaveBeenCalled();
   expect(container.querySelector('output')?.textContent).toBe('91:1');
   const button = Array.from(container.querySelectorAll('button')).find(
-    (b) => b.textContent === '用所选版本新建对话',
+    (b) => b.textContent === '进入 Agent 工作区',
   );
   expect(button).toBeDefined();
   await act(async () => button!.click());
-  expect(p.onNewConversation).toHaveBeenCalledOnce();
+  expect(p.onAttachToAgent).toHaveBeenCalledOnce();
+  expect(p.onNewConversation).not.toHaveBeenCalled();
+  expect(container.querySelector('output')?.textContent).toBe('91:1');
 });
-it('does not use a discarded selection for a new conversation', async () => {
+it('offers only a read-only preview and skips discarded versions for new Skill entry', async () => {
   const p = props({ selectedConversationId: null });
   await render(p);
   await act(async () => {
@@ -104,8 +105,145 @@ it('does not use a discarded selection for a new conversation', async () => {
     ),
   });
   expect(container.querySelector('select')?.value).toBe('2');
-  expect(container.querySelector('output')?.textContent).toBe(':2');
+  expect(container.querySelector('output')).toBeNull();
+  expect(container.textContent).toContain('Skill 只读预览');
+  expect(container.querySelector('a')?.getAttribute('href')).toBe(
+    '/agents?skillId=11&autochat=1',
+  );
 });
+it('does not mount the single Skill arena from the legacy test entry', async () => {
+  await render(props({ view: 'arena', selectedConversationId: null }));
+  expect(container.querySelector('output, textarea')).toBeNull();
+  expect(container.textContent).toContain('Skill 只读预览');
+  expect(container.querySelector('a')?.getAttribute('href')).toContain(
+    '/agents?skillId=11',
+  );
+});
+it('opens both sides of a legacy Arena history with its pinned versions and no new composer', async () => {
+  await import('./LegacyArenaHistory');
+  const historical = {
+    id: 91,
+    packageId: 7,
+    arenaKind: 'skill_arena',
+    model: 'old-model',
+    title: '旧版本对比',
+    skillArenaConfig: {
+      surface: 'arena',
+      left: {
+        skillId: '11',
+        skillVersionId: '1',
+        skillName: '旧设计',
+        versionNumber: 1,
+      },
+      right: {
+        skillId: '11',
+        skillVersionId: '2',
+        skillName: '旧设计',
+        versionNumber: 2,
+      },
+    },
+  };
+  api.getArenaThreadDetail.mockResolvedValue({
+    thread: historical,
+    messages: [
+      { id: 1, role: 'user', side: 'shared', content: '旧任务' },
+      { id: 2, role: 'assistant', side: 'baseline', content: '旧A回答' },
+      { id: 3, role: 'assistant', side: 'enhanced', content: '旧B回答' },
+    ],
+  });
+  await render(
+    props({ conversations: [historical] as Props['conversations'] }),
+  );
+  expect(container.textContent).toContain('旧A回答');
+  expect(container.textContent).toContain('旧B回答');
+  expect(container.textContent).toContain('v1（版本 ID：1）');
+  expect(container.textContent).toContain('v2（版本 ID：2）');
+  expect(container.querySelector('textarea, output')).toBeNull();
+  expect(api.getSkillVersionDetail).not.toHaveBeenCalled();
+});
+it('keeps legacy Arena history closed on load failure and retries the same thread', async () => {
+  await import('./LegacyArenaHistory');
+  const historical = {
+    id: 91,
+    packageId: 7,
+    arenaKind: 'skill_arena',
+    model: 'old-model',
+    title: '旧对比',
+    skillArenaConfig: {
+      surface: 'arena',
+      left: null,
+      right: {
+        skillId: '11',
+        skillVersionId: '1',
+        skillName: '旧设计',
+        versionNumber: 1,
+      },
+    },
+  };
+  api.getArenaThreadDetail
+    .mockRejectedValueOnce(new Error('历史读取失败'))
+    .mockResolvedValueOnce({
+      thread: historical,
+      messages: [
+        { id: 2, role: 'assistant', side: 'enhanced', content: '恢复的B回答' },
+      ],
+    });
+  await render(
+    props({ conversations: [historical] as Props['conversations'] }),
+  );
+  expect(container.textContent).toContain('历史读取失败');
+  expect(container.querySelector('textarea, output')).toBeNull();
+  await act(async () =>
+    Array.from(container.querySelectorAll('button'))
+      .find((b) => b.textContent === '重试历史对话')!
+      .click(),
+  );
+  expect(api.getArenaThreadDetail).toHaveBeenNthCalledWith(2, 't', '7', '91');
+  expect(container.textContent).toContain('恢复的B回答');
+  expect(container.textContent).toContain('A：未使用 Skill');
+});
+it.each(['run', 'test'])(
+  'reads a left-only legacy %s history without treating its baseline as an enhanced conversation',
+  async (surface) => {
+    await import('./LegacyArenaHistory');
+    const historical = {
+      id: 91,
+      packageId: 7,
+      arenaKind: 'skill_arena',
+      title: '旧单侧对话',
+      skillArenaConfig: {
+        surface,
+        left: {
+          skillId: '11',
+          skillVersionId: '1',
+          skillName: '旧设计',
+          versionNumber: 1,
+        },
+        right: null,
+      },
+    };
+    api.getArenaThreadDetail.mockResolvedValue({
+      thread: historical,
+      messages: [
+        {
+          id: 2,
+          role: 'assistant',
+          side: 'baseline',
+          content: '原baseline回答',
+        },
+      ],
+    });
+    await render(
+      props({ conversations: [historical] as Props['conversations'] }),
+    );
+    expect(container.textContent).toContain('原baseline回答');
+    expect(container.textContent).toContain('A 回答');
+    expect(container.textContent).toContain('v1（版本 ID：1）');
+    expect(container.textContent).toContain('B：未使用 Skill');
+    expect(container.querySelector('textarea, output')).toBeNull();
+    expect(api.getSkillVersionDetail).not.toHaveBeenCalled();
+  },
+);
 function deferred<T>() {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((r) => {
