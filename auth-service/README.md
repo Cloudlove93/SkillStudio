@@ -248,14 +248,14 @@ auth-service/
 
 ```env
 # Kong
-KONG_PROXY_PORT=80
+KONG_PROXY_PORT=8080
 KONG_ADMIN_PORT=8001
 KONG_APP_HOST=app.localhost
 KONG_AUTH_HOST=auth.localhost
 KONG_EDUNEX_HOST=edunex.localhost
 
 # Zitadel OIDC
-ZITADEL_ISSUER=http://auth.localhost
+ZITADEL_ISSUER=http://auth.localhost:8080
 ZITADEL_INTERNAL_ISSUER=http://auth.localhost
 ZITADEL_CLIENT_ID=your-client-id
 ZITADEL_SERVICE_PAT_FILE=/zitadel/bootstrap/login-client.pat
@@ -292,7 +292,7 @@ AUTH_SECURE_COOKIES=false
 说明：
 
 - `ZITADEL_ISSUER` — 浏览器视角的 Zitadel 地址（token issuer）
-- `ZITADEL_INTERNAL_ISSUER` — 容器内访问 Zitadel 的地址，未设置时回退到 `ZITADEL_ISSUER`
+- `ZITADEL_INTERNAL_ISSUER` — 容器内访问 Zitadel 的地址。默认经 Kong 的 `http://auth.localhost` 访问，以保留与 Zitadel 实例匹配的 Host。
 - `ZITADEL_SERVICE_PAT_FILE` — Zitadel 服务账号 PAT 文件路径（Docker 中通过 volume 自动挂载）
 - `ZITADEL_PROJECT_ID` — Zitadel 项目 ID，用于角色分配和查询
 - `ZITADEL_LOGIN_REDIRECT_URI` — 必须加入 Zitadel App 的 Redirect URIs 白名单
@@ -422,9 +422,9 @@ docker compose up -d                    # 启动全部服务
 
 服务启动后：
 
-- `http://auth.localhost` — 认证服务（Kong 代理）
-- `http://app.localhost` — EduClaw 业务应用（Kong 代理）
-- `http://edunex.localhost` — EduNex 业务应用（Kong 代理）
+- `http://auth.localhost:8080` — 认证服务（Kong 代理）
+- `http://app.localhost:8080` — EduClaw 业务应用（Kong 代理）
+- `http://edunex.localhost:8080` — EduNex 业务应用（Kong 代理）
 
 包含的服务：PostgreSQL、Zitadel、Zitadel Login UI、Kong、auth-backend、auth-frontend、edunex-postgres、edunex-server、edunex-web。
 

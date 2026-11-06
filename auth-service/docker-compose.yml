@@ -46,7 +46,7 @@ services:
       - ZITADEL_API_URL=http://zitadel:8080
       - NEXT_PUBLIC_BASE_PATH=/ui/v2/login
       - ZITADEL_SERVICE_USER_TOKEN_FILE=/zitadel/bootstrap/login-client.pat
-      - CUSTOM_REQUEST_HEADERS=Host:auth.localhost,X-Forwarded-Proto:http
+      - CUSTOM_REQUEST_HEADERS=Host:auth.localhost:8080,X-Forwarded-Proto:http
     depends_on:
       zitadel:
         condition: service_healthy
@@ -92,6 +92,7 @@ services:
       - KONG_AUTH_HOST=${KONG_AUTH_HOST:-auth.localhost}
       - KONG_EDUNEX_HOST=${KONG_EDUNEX_HOST:-edunex.localhost}
       - ZITADEL_ISSUER=${ZITADEL_ISSUER}
+      - ZITADEL_INTERNAL_ISSUER=${ZITADEL_INTERNAL_ISSUER:-http://auth.localhost}
       - ZITADEL_CLIENT_ID=${ZITADEL_CLIENT_ID}
     command: >-
       sh -c 'awk
@@ -99,6 +100,7 @@ services:
       gsub(/__KONG_AUTH_HOST__/,\"$$KONG_AUTH_HOST\");
       gsub(/__KONG_EDUNEX_HOST__/,\"$$KONG_EDUNEX_HOST\");
       gsub(/__ZITADEL_ISSUER__/,\"$$ZITADEL_ISSUER\");
+      gsub(/__ZITADEL_INTERNAL_ISSUER__/,\"$$ZITADEL_INTERNAL_ISSUER\");
       gsub(/__ZITADEL_CLIENT_ID__/,\"$$ZITADEL_CLIENT_ID\"); print}"
       /etc/kong/kong.yml > /tmp/kong.yml
       && exec /docker-entrypoint.sh kong docker-start'

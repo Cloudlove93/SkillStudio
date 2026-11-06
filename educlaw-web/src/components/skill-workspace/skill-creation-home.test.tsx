@@ -32,6 +32,7 @@ describe('SkillCreationHome', () => {
       onRemoveDocument: vi.fn(),
       onOpenMultimodal: vi.fn(),
       onOpenManual: vi.fn(),
+      onOpenWorkflow: vi.fn(),
       ...overrides,
     };
     act(() => root.render(<SkillCreationHome {...props} />));
@@ -68,9 +69,13 @@ describe('SkillCreationHome', () => {
     act(() =>
       buttons.find((button) => button.textContent?.includes('结构视图'))!.click(),
     );
+    act(() =>
+      buttons.find((button) => button.textContent?.includes('工作流'))!.click(),
+    );
 
     expect(props.onOpenMultimodal).toHaveBeenCalledTimes(1);
     expect(props.onOpenManual).toHaveBeenCalledTimes(1);
+    expect(props.onOpenWorkflow).toHaveBeenCalledTimes(1);
   });
 
   it('keeps attached document removal available on the landing page', () => {

@@ -24,6 +24,7 @@
     "@openagent/core": "workspace:*",
     "@tailwindcss/typography": "^0.5.19",
     "@tanstack/react-virtual": "^3.14.10",
+    "@xyflow/react": "^12.12.1",
     "ai": "^6.0.116",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

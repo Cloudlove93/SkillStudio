@@ -77,7 +77,7 @@ services:
       - OBJECT_STORAGE_SECRET_ACCESS_KEY=${OBJECT_STORAGE_SECRET_ACCESS_KEY:-educlaw-local-minio-password}
       - OBJECT_STORAGE_FORCE_PATH_STYLE=true
       - OBJECT_STORAGE_SIGNED_URL_TTL_SECONDS=${OBJECT_STORAGE_SIGNED_URL_TTL_SECONDS:-300}
-      - APP_ORIGIN=${APP_ORIGIN:-http://app.localhost}
+      - APP_ORIGIN=${APP_ORIGIN:-http://app.localhost:8080}
       - PORT=3000
     depends_on:
       educlaw-db-init:
@@ -123,7 +123,7 @@ services:
       - -dir=/data
       - -bucket=${OBJECT_STORAGE_BUCKET:-educlaw-media}
       - -master.telemetry=false
-      - -s3.allowedOrigins=${APP_ORIGIN:-http://app.localhost}
+      - -s3.allowedOrigins=${APP_ORIGIN:-http://app.localhost:8080}
       - -admin.allowInsecureBind
     environment:
       - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER:-educlawlocal}

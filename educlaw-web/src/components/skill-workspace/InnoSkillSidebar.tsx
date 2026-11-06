@@ -6,7 +6,6 @@ import {
   ChevronDown,
   FileText,
   FileUp,
-  GitBranch,
   Home,
   Layers3,
   LogOut,
@@ -29,7 +28,7 @@ import {
   type SkillMenuAction,
 } from './SkillWorkspaceSidebar';
 
-export type InnoSkillNavSection = 'home' | 'my-skills' | 'create' | 'workflow';
+export type InnoSkillNavSection = 'home' | 'my-skills' | 'create';
 
 type Props = {
   sessions: GuidedCreationSession[];
@@ -49,7 +48,7 @@ type Props = {
   completedConversationIds?: ReadonlySet<string>;
   onToggle: () => void;
   onNavigate: (
-    section: Exclude<InnoSkillNavSection, 'create' | 'workflow'>,
+    section: Exclude<InnoSkillNavSection, 'create'>,
   ) => void;
   onCreateMode: (mode: SkillCreateAction) => void;
   onSelectDraft: (session: GuidedCreationSession) => void;
@@ -68,7 +67,6 @@ type Props = {
   ) => Promise<void> | void;
   onConversationDelete?: (thread: ArenaThread) => Promise<void> | void;
   onAdmin: () => void;
-  onWorkflowDemo: () => void;
   onLogout: () => void;
 };
 
@@ -185,14 +183,6 @@ export function InnoSkillSidebar(props: Props) {
             </div>
           </details>
         </div>
-
-        <span className="isk-sidebar-section-label">实验</span>
-        <NavButton
-          active={props.activeSection === 'workflow'}
-          icon={<GitBranch />}
-          label="工作流"
-          onClick={props.onWorkflowDemo}
-        />
 
         {drafts.slice(0, 4).map((draft) => (
           <div

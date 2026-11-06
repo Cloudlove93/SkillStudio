@@ -1489,7 +1489,7 @@ function SkillFirstWorkspaceContent() {
       createMode === 'conversation' &&
       !visiblePendingGuidedMessage);
   const activeSidebarSection: InnoSkillNavSection = workflowOpen
-    ? 'workflow'
+    ? 'home'
     : isRepositoryView || activeSkill
       ? 'my-skills'
       : workspaceState.activeView === 'create' || session
@@ -1572,10 +1572,6 @@ function SkillFirstWorkspaceContent() {
         onConversationRename={renameConversation}
         onConversationDelete={deleteConversation}
         onAdmin={() => navigate('/admin')}
-        onWorkflowDemo={() => {
-          closeInspector({ force: true });
-          setWorkflowOpen(true);
-        }}
         onLogout={logout}
       />
       <div className="skill-content-column">
@@ -1605,7 +1601,12 @@ function SkillFirstWorkspaceContent() {
               fallback={<SkillWorkspaceLoadingState label="正在打开工作区" />}
             >
               {workflowOpen ? (
-                <WorkflowDemo embedded />
+                <WorkflowDemo
+                  embedded
+                  token={token}
+                  packageId={activeSkill?.packageId}
+                  packageVersionId={currentPackageVersionId}
+                />
               ) : workspaceState.activeView === 'home' ? (
                 <SkillCreationHome
                   documents={documents}
@@ -1619,6 +1620,10 @@ function SkillFirstWorkspaceContent() {
                   }
                   onOpenMultimodal={() => newSkill('multimodal')}
                   onOpenManual={() => newSkill('manual')}
+                  onOpenWorkflow={() => {
+                    closeInspector({ force: true });
+                    setWorkflowOpen(true);
+                  }}
                 />
               ) : isRepositoryView ? (
                 <SkillRepositoryWorkspace
@@ -1769,6 +1774,10 @@ function SkillFirstWorkspaceContent() {
                   }
                   onOpenMultimodal={() => newSkill('multimodal')}
                   onOpenManual={() => newSkill('manual')}
+                  onOpenWorkflow={() => {
+                    closeInspector({ force: true });
+                    setWorkflowOpen(true);
+                  }}
                 />
               )}
             </Suspense>
