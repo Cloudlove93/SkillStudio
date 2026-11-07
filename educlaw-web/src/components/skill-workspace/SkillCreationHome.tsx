@@ -151,7 +151,7 @@ export function SkillCreationHome({
         </div>
 
         <section className="skill-home-ways" aria-label="更多触发方式">
-          <p className="skill-home-way-label">更多触发方式</p>
+          <p className="skill-home-way-label">其他生成 Agent 包的方式</p>
           <div className="skill-home-way-grid">
             <button
               type="button"
@@ -165,7 +165,7 @@ export function SkillCreationHome({
                 <strong>
                   材料提炼 <em>专用工作台</em>
                 </strong>
-                <small>教案、课例、反思文档拖入上传区即可提炼</small>
+                <small>教案、课例、反思文档拖入上传区，生成 Agent 包</small>
               </span>
               <ArrowRight className="skill-home-way-arrow" size={15} aria-hidden="true" />
             </button>

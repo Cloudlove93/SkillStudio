@@ -716,11 +716,24 @@ function AgentWorkspaceSession({
       <main className="agent-main" aria-label="Agent 工作区">
         <header className="agent-header">
           <div>
-            <p className="agent-eyebrow">AGENT 工作区</p>
+            <p className="agent-eyebrow">AGENT 装配台</p>
             <h1>{agent?.name ?? (selectedId ? 'Agent 配置' : '创建 Agent')}</h1>
             <p className="agent-muted">
-              配置你的助手，明确它可以使用的 Skill。
+              定义 Agent 核心，再把 Skill 模块自由装配成可运行的包。
             </p>
+            <div className="agent-hero-stats" aria-label="Agent 概览">
+              <span className="agent-stat is-primary">
+                <strong>{draft.skills.filter((s) => s.enabled).length}</strong>
+                启用模块
+              </span>
+              <span className="agent-stat">
+                <strong>{draft.skills.length}</strong>
+                已装配
+              </span>
+              <span className="agent-stat is-model">
+                {draft.model.trim() || '默认模型'}
+              </span>
+            </div>
           </div>
           <div className="agent-actions">
             <button
@@ -856,62 +869,82 @@ function AgentWorkspaceSession({
                 }}
               >
                 <fieldset disabled={saving || starting}>
-                  <div className="agent-form-grid">
-                    <label className="agent-field">
-                      Agent 名称
-                      <input
-                        required
-                        maxLength={100}
-                        value={draft.name}
-                        placeholder="例如：课程设计助手"
-                        onChange={(e) =>
-                          setDraft({ ...draft, name: e.target.value })
-                        }
+                  <div className="agent-editor-layout">
+                    <section className="agent-panel agent-core-panel">
+                      <header className="agent-panel-head">
+                        <span className="agent-panel-index">01</span>
+                        <div>
+                          <h2>Agent 核心</h2>
+                          <p>身份、模型与工作方式</p>
+                        </div>
+                      </header>
+                      <div className="agent-form-grid">
+                        <label className="agent-field">
+                          Agent 名称
+                          <input
+                            required
+                            maxLength={100}
+                            value={draft.name}
+                            placeholder="例如：课程设计助手"
+                            onChange={(e) =>
+                              setDraft({ ...draft, name: e.target.value })
+                            }
+                          />
+                        </label>
+                        <label className="agent-field">
+                          模型
+                          <input
+                            maxLength={256}
+                            value={draft.model}
+                            placeholder="留空使用服务端默认模型"
+                            onChange={(e) =>
+                              setDraft({ ...draft, model: e.target.value })
+                            }
+                          />
+                        </label>
+                      </div>
+                      <label className="agent-field">
+                        描述
+                        <textarea
+                          maxLength={2000}
+                          rows={2}
+                          value={draft.description}
+                          placeholder="这个助手适合完成什么任务？"
+                          onChange={(e) =>
+                            setDraft({ ...draft, description: e.target.value })
+                          }
+                        />
+                      </label>
+                      <label className="agent-field">
+                        Agent 指令
+                        <textarea
+                          maxLength={16000}
+                          rows={5}
+                          value={draft.instructions}
+                          placeholder="定义角色、工作方式和多个 Skill 的协作规则…"
+                          onChange={(e) =>
+                            setDraft({ ...draft, instructions: e.target.value })
+                          }
+                        />
+                      </label>
+                    </section>
+                    <section className="agent-panel agent-module-panel">
+                      <header className="agent-panel-head">
+                        <span className="agent-panel-index is-module">02</span>
+                        <div>
+                          <h2>Skill 模块</h2>
+                          <p>从仓库挑选能力，自由组合到当前 Agent</p>
+                        </div>
+                      </header>
+                      <AgentSkillPicker
+                        token={token}
+                        skills={draft.skills}
+                        resolvedSkills={agent?.skills ?? []}
+                        onOpenSkill={openSkill}
+                        onChange={(skills) => setDraft({ ...draft, skills })}
                       />
-                    </label>
-                    <label className="agent-field">
-                      模型
-                      <input
-                        maxLength={256}
-                        value={draft.model}
-                        placeholder="留空使用服务端默认模型"
-                        onChange={(e) =>
-                          setDraft({ ...draft, model: e.target.value })
-                        }
-                      />
-                    </label>
+                    </section>
                   </div>
-                  <label className="agent-field">
-                    描述
-                    <textarea
-                      maxLength={2000}
-                      rows={2}
-                      value={draft.description}
-                      placeholder="这个助手适合完成什么任务？"
-                      onChange={(e) =>
-                        setDraft({ ...draft, description: e.target.value })
-                      }
-                    />
-                  </label>
-                  <label className="agent-field">
-                    Agent 指令
-                    <textarea
-                      maxLength={16000}
-                      rows={5}
-                      value={draft.instructions}
-                      placeholder="定义角色、工作方式和多个 Skill 的协作规则…"
-                      onChange={(e) =>
-                        setDraft({ ...draft, instructions: e.target.value })
-                      }
-                    />
-                  </label>
-                  <AgentSkillPicker
-                    token={token}
-                    skills={draft.skills}
-                    resolvedSkills={agent?.skills ?? []}
-                    onOpenSkill={openSkill}
-                    onChange={(skills) => setDraft({ ...draft, skills })}
-                  />
                 </fieldset>
                 <footer className="agent-editor-footer">
                   <p className="agent-muted">

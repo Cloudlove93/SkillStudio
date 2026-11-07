@@ -25,12 +25,12 @@ export function GeneratedAgentResult({
         {result?.name ||
           session.display_name ||
           session.draft.goal ||
-          '教学 Skill'}
+          'Agent 包'}
       </h1>
       <p className="skill-page-subtitle">
         {result
           ? result.description ||
-            'Agent 和教学 Skill 已保存，可以开始对话或查看 Skill。'
+            'Agent 包已保存，包含 Agent 指令与可运行 Skill 模块。'
           : '这是一条历史 Skill 生成记录。可转为 Agent 使用，原 Skill 和版本继续保留。'}
       </p>
       {result && (
@@ -40,7 +40,7 @@ export function GeneratedAgentResult({
             <summary>查看 Agent 指令</summary>
             <pre>{result.instructions}</pre>
           </details>
-          <h2>已包含的 Skill</h2>
+          <h2>包内 Skill 模块</h2>
           <ul>
             {result.skills.map((skill) => (
               <li key={skill.id}>

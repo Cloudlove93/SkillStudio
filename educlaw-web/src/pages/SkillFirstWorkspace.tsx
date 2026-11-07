@@ -870,7 +870,7 @@ function SkillFirstWorkspaceContent() {
     publishUpdate({
       id: 'skill-generating',
       title: '正在创建 Agent',
-      message: '正在生成教学 Skill、校验结构并创建可对话的 Agent。',
+      message: '正在生成 Agent 包、校验结构并创建可对话的 Agent。',
       actionLabel: '查看创建状态',
     });
     const sessionId = session.id;
@@ -1364,6 +1364,13 @@ function SkillFirstWorkspaceContent() {
     }
   };
 
+  const useSkillAsAgent = (skill: RepositorySkill) => {
+    cancelOpeningSession();
+    closeInspector({ force: true });
+    dispatchWorkspace({ type: 'dismiss-update' });
+    navigate(`/agents?skillId=${encodeURIComponent(skill.skillId)}&autochat=1`);
+  };
+
   const openRepositorySkill = (skill: RepositorySkill) => {
     cancelOpeningSession();
     activeRunRef.current = null;
@@ -1496,8 +1503,11 @@ function SkillFirstWorkspaceContent() {
       setExportSkill(skill);
       return;
     }
+    if (action === 'open') {
+      useSkillAsAgent(skill);
+      return;
+    }
     openRepositorySkill(skill);
-    if (action === 'open') return;
     navigateWorkspaceView(
       action === 'overview' ? 'overview' : action,
       skill.key,
@@ -1646,7 +1656,7 @@ function SkillFirstWorkspaceContent() {
         onDeleteDraft={deleteSession}
         onSelectSkill={(skill) => {
           setWorkflowOpen(false);
-          openRepositorySkill(skill);
+          useSkillAsAgent(skill);
         }}
         onSkillAction={handleSkillMenuAction}
         onAgents={() => navigate('/agents')}
@@ -1717,7 +1727,7 @@ function SkillFirstWorkspaceContent() {
                   sessions={sessions}
                   search={search}
                   onSearch={handleWorkspaceSearch}
-                  onSelectSkill={openRepositorySkill}
+                  onSelectSkill={useSkillAsAgent}
                   onVersionManagement={(skill) => {
                     openRepositorySkill(skill);
                     navigateWorkspaceView('versions', skill.key, true);

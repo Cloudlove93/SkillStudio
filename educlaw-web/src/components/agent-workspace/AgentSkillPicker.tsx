@@ -81,16 +81,16 @@ export function AgentSkillPicker({
   return (
     <section className="agent-skills" aria-label="Agent 的 Skills">
       <div className="agent-section-heading">
-        <h3>绑定 Skills</h3>
+        <h3>已装配模块</h3>
         <span>
           {skills.filter((s) => s.enabled).length} 个启用 / {skills.length}{' '}
-          个绑定
+          个已装配
         </span>
       </div>
       <p className="agent-muted">
-        每个 Skill 固定到明确版本。更新 Skill
-        后，可在这里选择新版本；已创建的对话保留原有绑定。
-        {limitReached ? ' 每个 Agent 最多挂载 20 个 Skill。' : ''}
+        每个模块固定到明确版本。Skill
+        更新后可在这里切换版本；已创建的对话保留原有装配。
+        {limitReached ? ' 每个 Agent 最多装配 20 个 Skill 模块。' : ''}
       </p>
       <div className="agent-attached-skills">
         {skills.map((binding) => {
@@ -120,11 +120,11 @@ export function AgentSkillPicker({
       </div>
       {!skills.length && (
         <p className="agent-empty-inline">
-          还没有绑定 Skill。可以先保存 Agent，再回来添加。
+          还没有装配模块。可以先保存 Agent，再回来组合 Skill。
         </p>
       )}
       <label className="agent-field">
-        从 Skill 仓库添加
+        从 Skill 仓库装配
         <input
           type="search"
           value={query}

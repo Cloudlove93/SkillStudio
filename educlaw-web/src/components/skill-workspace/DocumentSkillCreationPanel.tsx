@@ -95,8 +95,8 @@ export function DocumentSkillCreationPanel({ token, onGenerated }: Props) {
     });
     setNotice(
       documents.length > 1
-        ? `正在分别生成 ${documents.length} 个 Skill`
-        : `正在根据 ${documents[0]?.name || '文档'} 生成 Skill`,
+        ? `正在分别生成 ${documents.length} 个 Agent 包`
+        : `正在根据 ${documents[0]?.name || '文档'} 生成 Agent 包`,
     );
 
     const runWorker = async () => {
@@ -216,7 +216,7 @@ export function DocumentSkillCreationPanel({ token, onGenerated }: Props) {
         </label>
 
         <footer className="skill-document-create-footer">
-          <span>{notice || '每份文档都会单独生成一个 Skill。'}</span>
+          <span>{notice || '每份文档都会单独生成一个 Agent 包。'}</span>
           <button
             type="button"
             className="skill-primary-button"
@@ -229,8 +229,8 @@ export function DocumentSkillCreationPanel({ token, onGenerated }: Props) {
               <Sparkles size={15} aria-hidden="true" />
             )}
             {documents.length > 1
-              ? `批量生成 ${documents.length} 个 Skill`
-              : '生成 Skill'}
+              ? `批量生成 ${documents.length} 个 Agent 包`
+              : '生成 Agent 包'}
           </button>
         </footer>
       </div>

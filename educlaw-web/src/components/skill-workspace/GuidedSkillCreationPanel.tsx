@@ -52,7 +52,7 @@ type Props = {
 };
 
 const phaseSteps = [
-  { key: 'generating', label: '生成教学 Skill' },
+  { key: 'generating', label: '生成 Agent 包' },
   { key: 'validating', label: '检查结构与内容' },
   { key: 'saving', label: '创建 Agent 并挂载' },
 ];
@@ -168,7 +168,7 @@ export function GuidedSkillCreationPanel(props: Props) {
           <span className="skill-eyebrow">正在创建</span>
           <h1>正在创建你的教学 Agent</h1>
           <p>
-            系统会先生成教学 Skill，再把它挂载到 Agent；任务在后台继续完成。
+            系统会先生成 Agent 包并保存到仓库，再创建可对话的 Agent；任务在后台继续完成。
           </p>
           <div className="skill-phase-list">
             {phaseSteps.map((step, index) => {
@@ -231,7 +231,7 @@ export function GuidedSkillCreationPanel(props: Props) {
           <span className="skill-eyebrow">生成前确认</span>
           <h1>确认这位 Agent 的工作方式</h1>
           <p className="skill-page-subtitle">
-            确认后会生成教学 Skill v1，并自动创建可对话的
+            确认后会生成 Agent 包 v1，并自动创建可对话的
             Agent；当前对话和草案都会保留。
           </p>
           <div className="skill-confirm-grid">

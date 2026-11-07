@@ -192,7 +192,7 @@ describe('Skill repository cards', () => {
     await act(async () => {
       container
         .querySelector<HTMLButtonElement>(
-          '[aria-label="打开并使用函数概念教学"]',
+          '[aria-label="用 Agent 打开函数概念教学"]',
         )
         ?.click();
     });
@@ -225,7 +225,7 @@ describe('Skill repository cards', () => {
     await act(async () => {
       container
         .querySelector<HTMLButtonElement>(
-          '[aria-label="打开并使用函数概念教学"]',
+          '[aria-label="用 Agent 打开函数概念教学"]',
         )
         ?.click();
     });

@@ -57,7 +57,7 @@ export function RepositorySkillCard({
       <button
         type="button"
         className="skill-repository-card-main"
-        aria-label={managing ? `选择${skill.name}` : `打开并使用${skill.name}`}
+        aria-label={managing ? `选择${skill.name}` : `用 Agent 打开${skill.name}`}
         aria-pressed={managing ? selected : undefined}
         onClick={cardAction}
       >
@@ -74,14 +74,14 @@ export function RepositorySkillCard({
         </span>
         <strong>{skill.name}</strong>
         <span className="skill-repository-card-description">
-          {skill.description || '可继续运行、试用、优化和管理版本。'}
+          {skill.description || '可装配到 Agent 后试跑、运行与管理版本。'}
         </span>
         <span className="skill-repository-card-footer">
           <time dateTime={skill.updatedAt}>
             更新于 {repositoryDateFormatter.format(new Date(skill.updatedAt))}
           </time>
           <span className="skill-repository-card-open">
-            {managing ? (selected ? '已选择' : '选择') : '打开并使用'}
+            {managing ? (selected ? '已选择' : '选择') : '用 Agent 打开'}
             {managing ? (
               <Check size={15} aria-hidden="true" />
             ) : (
@@ -125,7 +125,7 @@ export function RepositorySkillCard({
             <div role="menu" onClick={(event) => event.stopPropagation()}>
               <button type="button" role="menuitem" onClick={onOpen}>
                 <Play size={14} aria-hidden="true" />
-                打开并使用
+                用 Agent 打开
               </button>
               <button type="button" role="menuitem" onClick={onPreview}>
                 <ArrowUpRight size={14} aria-hidden="true" />

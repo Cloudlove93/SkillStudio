@@ -332,13 +332,8 @@ it('restores an explicit single-sided legacy history before a newer Arena histor
   }
 });
 
-it('resumes an unfinished guided draft after entering a Skill conversation from the home view', async () => {
+it('routes a Skill entry to its Agent while keeping unfinished drafts reachable', async () => {
   await configureUnfinishedDraft();
-  await Promise.all([
-    import('../components/skill-workspace/SkillDetailWorkspace'),
-    import('../components/skill-workspace/SkillVersionWorkspace'),
-    import('../components/skill-workspace/SkillRunWorkspace'),
-  ]);
   await act(async () =>
     root.render(
       <MemoryRouter initialEntries={['/?view=create']}>
@@ -357,22 +352,11 @@ it('resumes an unfinished guided draft after entering a Skill conversation from 
   await act(async () => button('Fixture')!.click());
   await vi.waitFor(async () => {
     await act(async () => {});
-    expect(
-      new URLSearchParams(
-        container.querySelector('[data-route]')!.textContent!,
-      ).get('view'),
-    ).toBe('run');
-    expect(button('使用 Conversation 92')).toBeDefined();
-  });
-  await act(async () => button('使用 Conversation 92')!.click());
-
-  await vi.waitFor(async () => {
-    await act(async () => {});
-    expect(
-      new URLSearchParams(
-        container.querySelector('[data-route]')!.textContent!,
-      ).get('conversation'),
-    ).toBe('92');
+    const params = new URLSearchParams(
+      container.querySelector('[data-route]')!.textContent!,
+    );
+    expect(params.get('skillId')).toBe('11');
+    expect(params.get('autochat')).toBe('1');
   });
 
   await act(async () => draftButton()!.click());
