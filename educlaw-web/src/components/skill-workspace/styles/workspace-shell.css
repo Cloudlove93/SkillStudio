@@ -1,3 +1,19 @@
+.skill-workspace-root,
+.skill-workspace-root *,
+.skill-content-dialog,
+.skill-content-dialog * {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.skill-workspace-root::-webkit-scrollbar,
+.skill-workspace-root *::-webkit-scrollbar,
+.skill-content-dialog::-webkit-scrollbar,
+.skill-content-dialog *::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
 .skill-workspace-root {
   --skill-sidebar-width: 244px;
   --skill-sidebar-current: var(--skill-sidebar-width);
