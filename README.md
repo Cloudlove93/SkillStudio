@@ -28,6 +28,10 @@
 | `tests/unit`、`tests/integration` | [`tests/`](tests) | 测试入口（模块内测试保留在各自模块） |
 | `.github/workflows` | [`.github/workflows/`](.github/workflows) | CI/CD 工作流（待接入） |
 
+## Agent + Skill 第一阶段
+
+新增「我的 Agent」入口：创建多个 Agent、配置多个 Skill 的固定版本，保存后直接使用或新建测试对话。现有 Skill 生成、优化和版本管理保留。部署前执行 `pnpm --filter educlaw-server db:init` 创建新增表，详见 [第一阶段说明](docs/AGENT_SKILL_PHASE1.md)。
+
 ## Start
 
 ```bash

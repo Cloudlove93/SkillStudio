@@ -12,10 +12,7 @@ import {
   X,
 } from 'lucide-react';
 import { getSessionName } from './SkillWorkspaceSidebar';
-import {
-  RepositoryDraftCard,
-  RepositorySkillCard,
-} from './RepositoryCards';
+import { RepositoryDraftCard, RepositorySkillCard } from './RepositoryCards';
 import { SkillDeleteConfirmDialog } from './SkillDeleteConfirmDialog';
 import { SkillRenameDialog } from './SkillRenameDialog';
 import { InspectorPortal } from './InspectorPortal';
@@ -33,6 +30,9 @@ import {
 export type RepositorySkill = {
   key: string;
   packageId: string;
+  originPackageId?: string;
+  originSkillId?: string;
+  packageName?: string;
   skillId: string;
   name: string;
   description: string;

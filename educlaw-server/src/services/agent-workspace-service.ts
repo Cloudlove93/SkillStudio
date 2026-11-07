@@ -36,6 +36,7 @@ type PackageRow = {
   current_version_id: string;
   created_at: Date | string;
   updated_at: Date | string;
+  source_session_id?: string | null;
 };
 
 type SkillLinkRow = {
@@ -183,7 +184,8 @@ async function resolvePackageSkills(
       row.skill_snapshot_json,
       {},
     );
-    const skillMd = typeof snapshot.skillMd === 'string' ? snapshot.skillMd : '';
+    const skillMd =
+      typeof snapshot.skillMd === 'string' ? snapshot.skillMd : '';
     return {
       skillId: String(row.skill_id),
       skillVersionId: String(row.skill_version_id),
@@ -227,6 +229,10 @@ async function toAgent(
     })),
     createdAt: timestamp(pkg.created_at),
     updatedAt: timestamp(pkg.updated_at),
+    currentVersion: String(pkg.current_version_id),
+    sourceSessionId: pkg.source_session_id
+      ? String(pkg.source_session_id)
+      : snapshot.sourceSessionId || null,
   };
 }
 
@@ -264,10 +270,14 @@ async function buildSnapshotSkills(
       status: string;
       skill_status: string;
       skill_snapshot_json: PackageSkill | string;
+      package_id: string;
+      skill_id: string;
+      origin_package_id?: string | null;
+      origin_skill_id?: string | null;
     }>(
       `select s.skill_uid, s.dir_name, s.display_name, s.description,
               sv.version_number, sv.status, s.status as skill_status,
-              sv.skill_snapshot_json
+              sv.skill_snapshot_json, s.package_id, s.id as skill_id, s.origin_package_id, s.origin_skill_id
          from agent_skill_versions sv
          join agent_package_skills s
            on s.id = sv.skill_id and s.package_id = sv.package_id
@@ -288,13 +298,22 @@ async function buildSnapshotSkills(
       row.skill_snapshot_json,
       {},
     );
-    const skillMd = typeof snapshot.skillMd === 'string' ? snapshot.skillMd : '';
+    const skillMd =
+      typeof snapshot.skillMd === 'string' ? snapshot.skillMd : '';
     if (!skillMd.trim()) {
       if (!binding.enabled) continue;
       throw new AgentWorkspaceError('Skill 内容为空');
     }
-    if (skills.some((skill) => skill.id === row.skill_uid))
-      throw new AgentWorkspaceError('不能重复挂载同一个 Skill');
+    if (
+      skills.some(
+        (skill) =>
+          skill.id === row.skill_uid ||
+          skill.dirName === (snapshot.dirName || row.dir_name),
+      )
+    )
+      throw new AgentWorkspaceError(
+        '所选 Skill 的标识或目录重名，请先在来源 Skill 中修改标识后重试',
+      );
     skills.push({
       id: row.skill_uid,
       dirName: (snapshot.dirName || row.dir_name || '').trim(),
@@ -302,6 +321,12 @@ async function buildSnapshotSkills(
       description: snapshot.description || row.description || '',
       skillMd,
       enabled: binding.enabled,
+      originPackageId:
+        row.origin_package_id ||
+        snapshot.originPackageId ||
+        String(row.package_id),
+      originSkillId:
+        row.origin_skill_id || snapshot.originSkillId || String(row.skill_id),
     });
   }
   return skills;
@@ -324,7 +349,9 @@ export async function saveAgent(userId: string, raw: unknown, id?: string) {
         );
     }
     const skills = await buildSnapshotSkills(client, userId, input.skills);
-    const currentSnapshot = current ? await loadSnapshot(client, current) : null;
+    const currentSnapshot = current
+      ? await loadSnapshot(client, current)
+      : null;
     const snapshot: AgentPackageSnapshot = {
       name: input.name,
       description: input.description,
@@ -332,6 +359,9 @@ export async function saveAgent(userId: string, raw: unknown, id?: string) {
       agentMd: input.instructions,
       rubricMd: currentSnapshot?.rubricMd || '',
       skills,
+      ...(currentSnapshot?.sourceSessionId
+        ? { sourceSessionId: currentSnapshot.sourceSessionId }
+        : {}),
     };
     try {
       const saved = current
@@ -429,7 +459,29 @@ export async function provisionAgent(
       422,
       'SKILL_UNAVAILABLE',
     );
-  return toAgent({ query }, await ownedPackage({ query }, userId, packageId));
+  // 旧 skill-only 包原地补全 Agent 默认配置，不复制 Skill 实体。
+  return withTransaction(async (client) => {
+    let pkg = await ownedPackage(client, userId, packageId, true);
+    const snapshot = await loadSnapshot(client, pkg);
+    if (!snapshot.agentMd.trim() || !pkg.model?.trim()) {
+      await createPackageVersionWithSnapshotTx(client, {
+        userId,
+        packageId: pkg.id,
+        expectedPackageVersionId: pkg.current_version_id,
+        snapshot: {
+          ...snapshot,
+          agentMd:
+            snapshot.agentMd.trim() ||
+            '你是一位教学助手。遵循已启用 Skill 的工作方法完成教学任务；信息不足时先询问，并明确说明依据与边界。',
+        },
+        source: 'manual',
+        note: '历史 Skill 转为 Agent',
+        model: pkg.model?.trim() || serverConfig.llmModel,
+      });
+      pkg = await ownedPackage(client, userId, packageId);
+    }
+    return toAgent(client, pkg);
+  });
 }
 
 export async function listAgentConversations(userId: string, id: string) {

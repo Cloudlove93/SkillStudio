@@ -226,32 +226,32 @@ const historicalSchemaStatements = [
       check (error_json is null or jsonb_typeof(error_json) = 'object')
       )
     `,
-    `
+  `
       alter table skill_guided_creation_sessions
         add column if not exists start_client_message_id text
     `,
-    `
+  `
       alter table skill_guided_creation_sessions
         add column if not exists flow_version integer not null default 1
     `,
-    `
+  `
       alter table skill_guided_creation_sessions
         add column if not exists confirmed_stages_json jsonb not null default '[]'::jsonb
     `,
-    `
+  `
       alter table skill_guided_creation_sessions
         add column if not exists display_name varchar(200)
     `,
-    `
+  `
       alter table skill_guided_creation_sessions
         add column if not exists deleted_at timestamptz
     `,
-    `
+  `
       create unique index if not exists uq_guided_session_start_message
         on skill_guided_creation_sessions (user_id, start_client_message_id)
         where start_client_message_id is not null
     `,
-    `
+  `
       create index if not exists idx_guided_sessions_user_status_updated
       on skill_guided_creation_sessions (user_id, status, updated_at desc)
   `,
@@ -690,6 +690,14 @@ export const schemaStatements = [
  * Statements are run independently so an already-migrated column does not block later migrations.
  */
 export const migrationStatements = [
+  `alter table agent_packages add column if not exists generation_request_key text`,
+  `alter table agent_packages add column if not exists generation_request_hash text`,
+  `create unique index if not exists uq_agent_packages_generation_request on agent_packages (user_id, generation_request_key) where generation_request_key is not null`,
+  `alter table agent_packages add column if not exists source_session_id bigint`,
+  `create unique index if not exists uq_agent_packages_source_session on agent_packages (user_id, source_session_id) where source_session_id is not null`,
+  `alter table agent_package_skills add column if not exists origin_package_id bigint`,
+  `alter table agent_package_skills add column if not exists origin_skill_id bigint`,
+  `create index if not exists ix_agent_package_skills_origin on agent_package_skills (origin_package_id, origin_skill_id) where origin_package_id is not null`,
   `alter table agent_packages add column if not exists model text not null default ''`,
   // JSON text columns to JSONB.
   `alter table agent_package_skills add column if not exists display_name text`,

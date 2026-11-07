@@ -31,6 +31,7 @@ import {
   GUIDED_CREATION_STEP_DEFINITIONS,
 } from './guided-creation-progress';
 import { useConversationAutoScroll } from './use-conversation-auto-scroll';
+import { GeneratedAgentResult } from './GeneratedAgentResult';
 
 type Props = {
   session: GuidedCreationSessionDetail | null;
@@ -46,6 +47,8 @@ type Props = {
   onRetry: () => void;
   onFiles: (files: FileList) => void;
   onRemoveDocument: (index: number) => void;
+  onOpenAgent?: () => void;
+  onOpenSkill?: () => void;
 };
 
 const phaseSteps = [
@@ -103,8 +106,10 @@ export function GuidedSkillCreationPanel(props: Props) {
     latestMessage?.id ?? '',
     latestMessage?.content.length ?? 0,
     latestMessage?.content.slice(-32) ?? '',
-    showPendingMessage ? props.pendingMessage?.clientMessageId ?? 'pending' : '',
-    showPendingMessage ? props.pendingMessage?.content.length ?? 0 : 0,
+    showPendingMessage
+      ? (props.pendingMessage?.clientMessageId ?? 'pending')
+      : '',
+    showPendingMessage ? (props.pendingMessage?.content.length ?? 0) : 0,
     props.busy ? 'busy' : 'idle',
     showConversation ? 'conversation' : 'summary',
   ].join('|');
@@ -136,6 +141,23 @@ export function GuidedSkillCreationPanel(props: Props) {
     props.onSend(value);
   };
 
+  if (
+    props.session?.status === 'completed' &&
+    props.onOpenAgent &&
+    props.onOpenSkill
+  ) {
+    return (
+      <main className="skill-center">
+        <GeneratedAgentResult
+          session={props.session}
+          busy={props.busy}
+          onOpenAgent={props.onOpenAgent}
+          onOpenSkill={props.onOpenSkill}
+        />
+      </main>
+    );
+  }
+
   if (isFinalizing) {
     return (
       <main className="skill-center skill-generation-view">
@@ -145,7 +167,9 @@ export function GuidedSkillCreationPanel(props: Props) {
           </div>
           <span className="skill-eyebrow">正在创建</span>
           <h1>正在创建你的教学 Agent</h1>
-          <p>系统会先生成教学 Skill，再把它挂载到 Agent；任务在后台继续完成。</p>
+          <p>
+            系统会先生成教学 Skill，再把它挂载到 Agent；任务在后台继续完成。
+          </p>
           <div className="skill-phase-list">
             {phaseSteps.map((step, index) => {
               const activeIndex = Math.max(
@@ -207,7 +231,8 @@ export function GuidedSkillCreationPanel(props: Props) {
           <span className="skill-eyebrow">生成前确认</span>
           <h1>确认这位 Agent 的工作方式</h1>
           <p className="skill-page-subtitle">
-            确认后会生成教学 Skill v1，并自动创建可对话的 Agent；当前对话和草案都会保留。
+            确认后会生成教学 Skill v1，并自动创建可对话的
+            Agent；当前对话和草案都会保留。
           </p>
           <div className="skill-confirm-grid">
             {props.session?.confirmation?.sections.map((section) => (
@@ -387,11 +412,10 @@ export function GuidedSkillCreationPanel(props: Props) {
             <div className="skill-guided-progress" aria-label="共创进度">
               <span>共创进度</span>
               <strong>
-                已完成 {guidedStageProgress.completed}/{guidedStageProgress.total}
+                已完成 {guidedStageProgress.completed}/
+                {guidedStageProgress.total}
               </strong>
-              <small>
-                当前：{guidedStageProgress.currentLabel}
-              </small>
+              <small>当前：{guidedStageProgress.currentLabel}</small>
             </div>
           ) : null}
           {educationProgress && props.session && (

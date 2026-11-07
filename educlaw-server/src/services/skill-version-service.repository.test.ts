@@ -68,18 +68,19 @@ describe('repository Skill listing', () => {
     );
     expect(client.query.mock.calls[0]?.[0]).toContain('left join lateral');
     expect(client.query.mock.calls[0]?.[0]).toContain(
-      "sv.status = 'active'",
+      'canonical_version.content_hash = current_sv.content_hash',
     );
-    expect(client.query.mock.calls[0]?.[1]).toEqual([
-      'user-1',
-      null,
-      null,
-      2,
-    ]);
+    expect(client.query.mock.calls[0]?.[0]).toContain(
+      'canonical_package.user_id = p.user_id',
+    );
+    expect(client.query.mock.calls[0]?.[0]).toContain("sv.status = 'active'");
+    expect(client.query.mock.calls[0]?.[1]).toEqual(['user-1', null, null, 2]);
     expect(result.items).toEqual([
       {
         id: '12',
         packageId: '3',
+        originPackageId: '3',
+        originSkillId: '12',
         skillUid: 'skill-12',
         dirName: 'math-concept',
         name: '函数辨析',

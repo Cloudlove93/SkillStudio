@@ -130,6 +130,7 @@ export const config = {
   llmBaseUrl: (process.env.LLM_BASE_URL || "https://api.openai.com/v1").replace(/\/+$/, ""),
   llmApiKey,
   llmModel: process.env.LLM_MODEL || "gpt-4.1-mini",
+  generationAgentEnabled: readBoolean("GENERATION_AGENT_ENABLED", true),
   llmNetworkRetries: readNumber("LLM_NETWORK_RETRIES", 2),
   piHarnessSkillRunEnabled: readBoolean("PI_HARNESS_SKILL_RUN_ENABLED", true),
   piHarnessRunTimeoutMs: readBoundedInteger(

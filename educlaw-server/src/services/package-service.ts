@@ -33,7 +33,8 @@ import {
   buildSkillSystemPrompt,
   buildSkillUserPrompt,
 } from '../prompts/package-generation.js';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+import { config } from '../config.js';
 import { query, withTransaction, type Queryable } from './db.js';
 import type { DbRowPackage, DbRowPackageVersion } from '../types.js';
 import { parseDbJson } from '../utils/json.js';
@@ -662,7 +663,7 @@ function reconstructDocxFlatTable(content: string): string {
 
   while (i < lines.length) {
     const line = lines[i] ?? '';
-  const trimmed = line.trim();
+    const trimmed = line.trim();
 
     // 检测表头起点：短行命中 HEADER_SIGNAL_WORDS
     if (trimmed && trimmed.length <= 30 && HEADER_SIGNAL_WORDS.test(trimmed)) {
@@ -684,7 +685,9 @@ function reconstructDocxFlatTable(content: string): string {
         );
         const columnCount =
           headerEnd === -1
-            ? blockLines.findIndex((l, idx) => idx > 0 && !HEADER_SIGNAL_WORDS.test(l))
+            ? blockLines.findIndex(
+                (l, idx) => idx > 0 && !HEADER_SIGNAL_WORDS.test(l),
+              )
             : headerEnd;
         if (columnCount < 3 || columnCount > 10) {
           output.push(line);
@@ -969,8 +972,11 @@ async function aiLocateRubricSection(
   const reconstructed = reconstructDocxFlatTable(content.trim());
   if (!reconstructed) return null;
 
-  const { startLine: windowStart, endLine: windowEnd, numberedWindow } =
-    locateRubricWindow(reconstructed);
+  const {
+    startLine: windowStart,
+    endLine: windowEnd,
+    numberedWindow,
+  } = locateRubricWindow(reconstructed);
   if (!numberedWindow.trim()) return null;
 
   try {
@@ -1013,7 +1019,10 @@ async function aiLocateRubricSection(
       return null;
     }
 
-    const located = lines.slice(startIdx, endIdx + 1).join('\n').trim();
+    const located = lines
+      .slice(startIdx, endIdx + 1)
+      .join('\n')
+      .trim();
     if (!located) return null;
 
     // 校验：AI 抽取结果必须包含足够的 rubric 信号词，避免误定位
@@ -1774,7 +1783,11 @@ export function normalizeAndRepairSkillMd(
     dirName,
     description,
   );
-  return normalizeSkillMdMissingSections(withFrontmatter, skillName, description);
+  return normalizeSkillMdMissingSections(
+    withFrontmatter,
+    skillName,
+    description,
+  );
 }
 
 /** 对外暴露的 SKILL.md 标准校验，供交互式反馈优化等流程复用。 */
@@ -2092,9 +2105,7 @@ async function getPackageRow(userId: string, packageId: string | number) {
 }
 
 export async function listPackages(userId: string) {
-  const result = await query<
-    DbRowPackage & { current_version_number: number }
-  >(
+  const result = await query<DbRowPackage & { current_version_number: number }>(
     `select p.*, v.version_number as current_version_number
      from agent_packages p
      join agent_package_versions v on v.id = p.current_version_id
@@ -2231,11 +2242,40 @@ export async function createPackageWithSnapshotTx(
 ): Promise<CreatedPackageSnapshotIds> {
   const now = new Date().toISOString();
   const fixedSnapshot = ensureSkillIds(snapshot);
+  if (source === 'imported') {
+    delete fixedSnapshot.sourceSessionId;
+    fixedSnapshot.skills = fixedSnapshot.skills.map(skill => {
+      const copy = { ...skill };
+      delete copy.originPackageId;
+      delete copy.originSkillId;
+      return copy;
+    });
+  }
+  if (fixedSnapshot.skills.length > 20)
+    throw new Error('每个 Agent 最多挂载 20 个 Skill，请减少后重试');
+  if (source === 'generated' && config.generationAgentEnabled !== false) {
+    fixedSnapshot.agentMd =
+      fixedSnapshot.agentMd.trim() ||
+      '你是一位教学助手。根据用户的教学目标，遵循已启用 Skill 的工作方法完成任务；信息不足时先询问，并明确说明依据与边界。';
+    model = model.trim() || config.llmModel;
+  }
   const pkgResult = await client.query<{ id: number }>(
     'insert into agent_packages (user_id, name, description, model, current_version_id, created_at, updated_at) values ($1, $2, $3, $4, 0, $5, $6) returning id',
     [userId, fixedSnapshot.name, fixedSnapshot.description, model, now, now],
   );
   const packageId = pkgResult.rows[0].id;
+  if (source === 'generated' && fixedSnapshot.sourceSessionId) {
+    await client.query(
+      'update agent_packages set source_session_id = $1 where id = $2',
+      [fixedSnapshot.sourceSessionId, packageId],
+    );
+  }
+  fixedSnapshot.skills = fixedSnapshot.skills.map((skill) => ({
+    ...skill,
+    ...(source === 'generated' || skill.originPackageId
+      ? { originPackageId: skill.originPackageId || String(packageId) }
+      : {}),
+  }));
   const verResult = await client.query<{ id: number }>(
     'insert into agent_package_versions (package_id, version_number, source, snapshot_json, created_at) values ($1, $2, $3, $4, $5) returning id',
     [packageId, 1, source, JSON.stringify(fixedSnapshot), now],
@@ -2289,6 +2329,8 @@ export async function createPackageVersionWithSnapshotTx(
   },
 ): Promise<CreatedPackageSnapshotIds> {
   const now = new Date().toISOString();
+  if (input.snapshot.skills.length > 20)
+    throw new Error('每个 Agent 最多挂载 20 个 Skill，请减少后重试');
   const packageResult = await client.query<DbRowPackage>(
     'select * from agent_packages where id = $1 and user_id = $2 for update',
     [input.packageId, input.userId],
@@ -2296,7 +2338,8 @@ export async function createPackageVersionWithSnapshotTx(
   const pkg = packageResult.rows[0];
   if (!pkg) throw new Error('智能体不存在');
   if (
-    String(pkg.current_version_id) !== String(input.expectedPackageVersionId).trim()
+    String(pkg.current_version_id) !==
+    String(input.expectedPackageVersionId).trim()
   ) {
     throw new PackageVersionConflictError();
   }
@@ -2372,9 +2415,10 @@ async function createPackageWithSnapshot(
   userId: string,
   snapshot: AgentPackageSnapshot,
   source: PackageVersion['source'],
+  model = '',
 ) {
   const { packageId } = await withTransaction((client) =>
-    createPackageWithSnapshotTx(client, userId, snapshot, source),
+    createPackageWithSnapshotTx(client, userId, snapshot, source, model),
   );
 
   return getPackage(userId, packageId);
@@ -2388,13 +2432,7 @@ export async function buildGeneratedPackageSnapshot(input: {
   onPreview?: (preview: PackageGeneratePreview) => void;
   onPreviewDelta?: (delta: PackageGeneratePreviewDelta) => void;
 }): Promise<AgentPackageSnapshot> {
-  const {
-    instruction,
-    model,
-    documents,
-    onPreview,
-    onPreviewDelta,
-  } = input;
+  const { instruction, model, documents, onPreview, onPreviewDelta } = input;
   const maxSkills = Math.min(
     MAX_GENERATED_SKILLS,
     Math.max(1, Math.trunc(input.max_skills ?? MAX_GENERATED_SKILLS)),
@@ -2628,7 +2666,40 @@ export async function generatePackage(
   onPreview?: (preview: PackageGeneratePreview) => void,
   onPreviewDelta?: (delta: PackageGeneratePreviewDelta) => void,
   maxSkills?: number,
+  requestId?: string,
 ) {
+  if (
+    requestId !== undefined &&
+    (typeof requestId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/.test(requestId))
+  )
+    throw new Error('生成请求标识无效，请重新发起生成');
+  const requestHash = createHash('sha256')
+    .update(
+      JSON.stringify({
+        instruction,
+        model: model || '',
+        documents: documents || [],
+        maxSkills: maxSkills ?? null,
+      }),
+    )
+    .digest('hex');
+  const replay = async (db: Queryable) => {
+    const result = await db.query<{
+      id: number;
+      generation_request_hash: string;
+    }>(
+      'select id, generation_request_hash from agent_packages where user_id = $1 and generation_request_key = $2',
+      [userId, requestId],
+    );
+    const row = result.rows[0];
+    if (row && row.generation_request_hash !== requestHash)
+      throw new Error('该请求标识已用于其他生成内容，请重新发起生成');
+    return row?.id;
+  };
+  if (requestId) {
+    const existingId = await replay({ query });
+    if (existingId) return getPackage(userId, existingId);
+  }
   const snapshot = await buildGeneratedPackageSnapshot({
     instruction,
     model,
@@ -2637,7 +2708,29 @@ export async function generatePackage(
     onPreviewDelta,
     max_skills: maxSkills,
   });
-  return createPackageWithSnapshot(userId, snapshot, 'generated');
+  if (!requestId)
+    return createPackageWithSnapshot(userId, snapshot, 'generated', model);
+  const packageId = await withTransaction(async (client) => {
+    await client.query(
+      'select pg_advisory_xact_lock(hashtextextended($1, 0))',
+      [JSON.stringify([userId, requestId])],
+    );
+    const existingId = await replay(client);
+    if (existingId) return existingId;
+    const created = await createPackageWithSnapshotTx(
+      client,
+      userId,
+      snapshot,
+      'generated',
+      model,
+    );
+    await client.query(
+      'update agent_packages set generation_request_key = $1, generation_request_hash = $2 where id = $3',
+      [requestId, requestHash, created.packageId],
+    );
+    return created.packageId;
+  });
+  return getPackage(userId, packageId);
 }
 
 async function importPackageWithVersions(
@@ -2650,6 +2743,8 @@ async function importPackageWithVersions(
   }>,
 ) {
   if (versions.length === 0) throw new Error('版本历史为空');
+  if (versions.some((version) => version.snapshot.skills.length > 20))
+    throw new Error('每个 Agent 最多挂载 20 个 Skill，请减少后重试');
 
   const now = new Date().toISOString();
 
@@ -2684,6 +2779,14 @@ async function importPackageWithVersions(
         ...v.snapshot,
         name: v.snapshot.name || packageName,
         description: v.snapshot.description || packageDescription,
+      });
+      // ZIP 导入产生新资源，不能信任其他实例导出的数据库 ID。
+      delete enrichedSnapshot.sourceSessionId;
+      enrichedSnapshot.skills = enrichedSnapshot.skills.map(skill => {
+        const copy = { ...skill };
+        delete copy.originPackageId;
+        delete copy.originSkillId;
+        return copy;
       });
       const verResult = await client.query<{ id: number }>(
         'insert into agent_package_versions (package_id, version_number, source, snapshot_json, created_at) values ($1, $2, $3, $4, $5) returning id',
@@ -2742,9 +2845,7 @@ export async function importPackageZip(userId: string, zipBuffer: Buffer) {
 
   if (versionsEntry) {
     try {
-      const versions = JSON.parse(
-        zipReader.readText(versionsEntry),
-      ) as Array<{
+      const versions = JSON.parse(zipReader.readText(versionsEntry)) as Array<{
         versionNumber: number;
         source: string;
         snapshot: AgentPackageSnapshot;
@@ -2915,11 +3016,19 @@ export async function applyOptimizedSnapshot(
   note: string | undefined,
   expectedPackageVersionId: string | number,
 ) {
-  await withTransaction(client => createPackageVersionWithSnapshotTx(client, {
-    userId, packageId, expectedPackageVersionId,
-    snapshot: {...snapshot, rubricMd: normalizeStoredRubricMarkdown(snapshot.rubricMd)},
-    source, note,
-  }));
+  await withTransaction((client) =>
+    createPackageVersionWithSnapshotTx(client, {
+      userId,
+      packageId,
+      expectedPackageVersionId,
+      snapshot: {
+        ...snapshot,
+        rubricMd: normalizeStoredRubricMarkdown(snapshot.rubricMd),
+      },
+      source,
+      note,
+    }),
+  );
   return getPackage(userId, packageId);
 }
 
@@ -2929,7 +3038,10 @@ export async function repairPackageRubric(
   model?: string,
 ) {
   void model;
-  const { package: pkg, versionId } = await getPackageWithVersionId(userId, packageId);
+  const { package: pkg, versionId } = await getPackageWithVersionId(
+    userId,
+    packageId,
+  );
   const currentRawRubric = normalizeRubricMarkdown(pkg.snapshot.rubricMd);
   const currentRubric = normalizeStoredRubricMarkdown(pkg.snapshot.rubricMd);
 
@@ -2962,7 +3074,10 @@ export async function optimizePackageRubric(
   packageId: string,
   model?: string,
 ) {
-  const { package: pkg, versionId } = await getPackageWithVersionId(userId, packageId);
+  const { package: pkg, versionId } = await getPackageWithVersionId(
+    userId,
+    packageId,
+  );
   const currentRawRubric = normalizeRubricMarkdown(pkg.snapshot.rubricMd);
   const currentRubric = normalizeStoredRubricMarkdown(pkg.snapshot.rubricMd);
 
@@ -3020,7 +3135,7 @@ export async function optimizePackageRubric(
     nextSnapshot,
     'optimized',
     'AI 优化 rubric.md',
-        versionId,
+    versionId,
   );
 }
 
@@ -3040,15 +3155,28 @@ export async function applyManualMarkdownEdit(
       ? input.expectedPackageVersionId.trim()
       : '';
   if (!expectedPackageVersionId) {
-    throw Object.assign(new Error('expectedPackageVersionId is required'), { status: 422, code: 'INVALID_ARGUMENT' });
+    throw Object.assign(new Error('expectedPackageVersionId is required'), {
+      status: 422,
+      code: 'INVALID_ARGUMENT',
+    });
   }
-  const { package: pkg, versionId } = await getPackageWithVersionId(userId, packageId);
-  if (String(versionId) !== expectedPackageVersionId) throw new PackageVersionConflictError();
+  const { package: pkg, versionId } = await getPackageWithVersionId(
+    userId,
+    packageId,
+  );
+  if (String(versionId) !== expectedPackageVersionId)
+    throw new PackageVersionConflictError();
   const save = async (snapshot: AgentPackageSnapshot, note: string) => {
-    await withTransaction(client => createPackageVersionWithSnapshotTx(client, {
-      userId, packageId, expectedPackageVersionId,
-      snapshot, source: 'manual', note,
-    }));
+    await withTransaction((client) =>
+      createPackageVersionWithSnapshotTx(client, {
+        userId,
+        packageId,
+        expectedPackageVersionId,
+        snapshot,
+        source: 'manual',
+        note,
+      }),
+    );
     return getPackage(userId, packageId);
   };
   const content = String(input.content || '').trim();
@@ -3063,10 +3191,7 @@ export async function applyManualMarkdownEdit(
     if (content === pkg.snapshot.agentMd.trim())
       throw new Error('内容没有变化，无需保存新版本');
     nextSnapshot.agentMd = content;
-    return save(
-      nextSnapshot,
-      input.note || '手动编辑 agent.md',
-    );
+    return save(nextSnapshot, input.note || '手动编辑 agent.md');
   }
 
   if (input.target === 'rubric') {
@@ -3083,10 +3208,7 @@ export async function applyManualMarkdownEdit(
       throw new Error('内容没有变化，无需保存新版本');
     }
     nextSnapshot.rubricMd = normalizedNextRubric;
-    return save(
-      nextSnapshot,
-      input.note || '手动编辑 rubric.md',
-    );
+    return save(nextSnapshot, input.note || '手动编辑 rubric.md');
   }
 
   const skillId = String(input.skillId || '');
@@ -3102,10 +3224,7 @@ export async function applyManualMarkdownEdit(
   // structural identity rules (frontmatter block, name, bounded description)
   // but not the directory slug or quality sections that
   // `skill.version.manual-edit` requires.
-  const identityErrors = validateSkillIdentity(
-    content,
-    currentSkill.dirName,
-  );
+  const identityErrors = validateSkillIdentity(content, currentSkill.dirName);
   if (identityErrors.length > 0) {
     throw Object.assign(new Error(identityErrors.join('\n')), {
       code: 'INVALID_SKILL_MD',

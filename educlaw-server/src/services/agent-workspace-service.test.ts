@@ -275,8 +275,7 @@ beforeEach(async () => {
           links
             .filter(
               (link) =>
-                link.packageId === args[0] &&
-                link.packageVersionId === args[1],
+                link.packageId === args[0] && link.packageVersionId === args[1],
             )
             .sort((a, b) => a.sortOrder - b.sortOrder)
             .map((link) => {
@@ -313,12 +312,16 @@ beforeEach(async () => {
                   status: version.status,
                   skill_status: skill.status,
                   skill_snapshot_json: version.skill,
+                  package_id: skill.packageId,
+                  skill_id: skill.id,
                 },
               ]
             : [],
         );
       }
-      if (sql.startsWith('select status, package_id, skill_id from skill_guided')) {
+      if (
+        sql.startsWith('select status, package_id, skill_id from skill_guided')
+      ) {
         const sessions = (globalThis as Record<string, unknown>)
           .__agentSessions as Array<Record<string, unknown>>;
         return result(
@@ -385,7 +388,8 @@ beforeEach(async () => {
         });
         return result([{ id }]);
       }
-      if (sql.startsWith('insert into arena_thread_variants')) return result([]);
+      if (sql.startsWith('insert into arena_thread_variants'))
+        return result([]);
       throw new Error(`Unexpected query: ${sql}`);
     });
 
@@ -502,11 +506,14 @@ beforeEach(async () => {
       throw error;
     }
   });
-  detailMock.mockReset().mockImplementation(async (userId: string, id: string) => {
-    const entry = threads.get(String(id));
-    if (!entry || entry.userId !== userId) throw new Error('Thread not owned');
-    return { thread: structuredClone(entry.thread), messages: [] };
-  });
+  detailMock
+    .mockReset()
+    .mockImplementation(async (userId: string, id: string) => {
+      const entry = threads.get(String(id));
+      if (!entry || entry.userId !== userId)
+        throw new Error('Thread not owned');
+      return { thread: structuredClone(entry.thread), messages: [] };
+    });
   (globalThis as Record<string, unknown>).__agentSessions = [];
   service = await import('./agent-workspace-service.js');
 });
@@ -567,7 +574,8 @@ describe('Package-backed Agents', () => {
 
   it('requires CAS and writes a new package version on update', async () => {
     const agent = await service.saveAgent('owner', input());
-    const versionCount = () => [...versions.values()].filter((v) => v.packageId === agent.id).length;
+    const versionCount = () =>
+      [...versions.values()].filter((v) => v.packageId === agent.id).length;
     expect(versionCount()).toBe(1);
     for (const expectedUpdatedAt of [
       undefined,
@@ -606,7 +614,9 @@ describe('Package-backed Agents', () => {
 
   it('rejects duplicate and malformed skill bindings before database access', async () => {
     await expect(
-      service.saveAgent('owner', input('Duplicate', [binding(), binding('11', '102')]),
+      service.saveAgent(
+        'owner',
+        input('Duplicate', [binding(), binding('11', '102')]),
       ),
     ).rejects.toMatchObject({ status: 422, code: 'INVALID_ARGUMENT' });
     expect(queryMock).not.toHaveBeenCalled();
@@ -627,7 +637,8 @@ describe('Package-backed Agents', () => {
   ] as const)(
     'rejects %s versions on save without leaving a package behind',
     async (scenario) => {
-      const selected = scenario === 'inaccessible' ? binding('13', '303') : binding();
+      const selected =
+        scenario === 'inaccessible' ? binding('13', '303') : binding();
       const version = skillVersions.get('101')!;
       if (scenario === 'missing') skillVersions.delete('101');
       if (scenario === 'discarded') version.status = 'discarded';
@@ -828,6 +839,28 @@ describe('Agent conversations on packages', () => {
 });
 
 describe('Agent provisioning', () => {
+  it('converts a legacy package in place once without creating another Skill', async () => {
+    const agent = await service.saveAgent('owner', {
+      ...input('Legacy'),
+      instructions: '',
+      model: '',
+    });
+    const skillCount = skills.size;
+    const packageCount = packages.size;
+    const first = await service.provisionAgent('owner', {
+      skillId: agent.skills[0]!.skillId,
+    });
+    expect(first.id).toBe(agent.id);
+    expect(first.instructions).toContain('教学助手');
+    expect(first.model).toBeTruthy();
+    const versionCount = versions.size;
+    await service.provisionAgent('owner', {
+      skillId: agent.skills[0]!.skillId,
+    });
+    expect(versions.size).toBe(versionCount);
+    expect(skills.size).toBe(skillCount);
+    expect(packages.size).toBe(packageCount);
+  });
   it('returns the generated package behind a completed session', async () => {
     const agent = await service.saveAgent('owner', input('Generated'));
     (globalThis as Record<string, unknown>).__agentSessions = [
@@ -866,4 +899,22 @@ describe('Agent provisioning', () => {
       service.provisionAgent('other', { skillId }),
     ).rejects.toMatchObject({ status: 422, code: 'SKILL_UNAVAILABLE' });
   });
+});
+
+it('keeps independent same-name Skills and rejects colliding Skill identifiers', async () => {
+  skillVersions.get('202')!.skill.name = skillVersions.get('101')!.skill.name;
+  const agent = await service.saveAgent(
+    'owner',
+    input('Same names', [binding(), binding('12', '202')]),
+  );
+  expect(agent.skills).toHaveLength(2);
+  skillVersions.get('202')!.skill.id = skillVersions.get('101')!.skill.id;
+  skillVersions.get('202')!.skill.dirName =
+    skillVersions.get('101')!.skill.dirName;
+  await expect(
+    service.saveAgent(
+      'owner',
+      input('Conflicting identifiers', [binding(), binding('12', '202')]),
+    ),
+  ).rejects.toMatchObject({ status: 422 });
 });

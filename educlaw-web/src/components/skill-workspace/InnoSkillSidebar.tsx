@@ -141,7 +141,14 @@ export function InnoSkillSidebar(props: Props) {
           label="主页"
           onClick={() => props.onNavigate('home')}
         />
-        {props.onAgents && <NavButton active={false} icon={<Bot />} label="我的 Agent" onClick={props.onAgents} />}
+        {props.onAgents && (
+          <NavButton
+            active={false}
+            icon={<Bot />}
+            label="我的 Agent"
+            onClick={props.onAgents}
+          />
+        )}
         <NavButton
           active={props.activeSection === 'my-skills'}
           icon={<BookOpen />}
@@ -227,6 +234,28 @@ export function InnoSkillSidebar(props: Props) {
             </details>
           </div>
         ))}
+
+        {props.sessions.some((item) => item.status === 'completed') && (
+          <>
+            <span className="isk-sidebar-section-label is-compact">
+              生成记录
+            </span>
+            {props.sessions
+              .filter((item) => item.status === 'completed')
+              .slice(0, 4)
+              .map((item) => (
+                <div className="isk-sidebar-skill" key={`result-${item.id}`}>
+                  <button
+                    type="button"
+                    onClick={() => props.onSelectDraft(item)}
+                  >
+                    <Layers3 />
+                    <span>{getSessionName(item)}</span>
+                  </button>
+                </div>
+              ))}
+          </>
+        )}
 
         {props.skills.length ? (
           <>

@@ -156,6 +156,9 @@ function SkillFirstWorkspaceContent() {
     readSkillConversationId(location.search),
   );
   const initialUrlState = useRef(parseSkillWorkspaceSearch(location.search));
+  const initialResultSession = useRef(
+    new URLSearchParams(location.search).get('resultSession'),
+  );
   const token = useAuthStore((state) => state.token) || '';
   const user = useAuthStore((state) => state.user);
   const isAdmin = useAuthStore((state) => state.isAdmin);
@@ -238,7 +241,10 @@ function SkillFirstWorkspaceContent() {
   const activeRunRef = useRef<string | null>(null);
   const activeSkill: SkillDetailSelection | null =
     selectedRepositorySkill ??
-    (session?.status === 'completed' && session.package_id && session.skill_id
+    (workspaceState.activeView !== 'create' &&
+    session?.status === 'completed' &&
+    session.package_id &&
+    session.skill_id
       ? {
           packageId: session.package_id,
           skillId: session.skill_id,
@@ -283,6 +289,11 @@ function SkillFirstWorkspaceContent() {
       clearInspector = false,
     ) => {
       let baseSearch = location.search;
+      {
+        const params = new URLSearchParams(baseSearch);
+        params.delete('resultSession');
+        baseSearch = params.toString() ? `?${params.toString()}` : '';
+      }
       if (clearInspector) {
         const params = new URLSearchParams(baseSearch);
         params.delete('inspector');
@@ -483,6 +494,9 @@ function SkillFirstWorkspaceContent() {
         ...page.items.map((skill) => ({
           key: `${skill.packageId}:${skill.id}`,
           packageId: skill.packageId,
+          packageName: skill.packageName,
+          originPackageId: skill.originPackageId,
+          originSkillId: skill.originSkillId,
           skillId: skill.id,
           name: skill.name,
           description: skill.description || skill.packageDescription,
@@ -737,10 +751,10 @@ function SkillFirstWorkspaceContent() {
           publishUpdate({
             id: 'skill-created',
             title: 'Agent 已创建完成',
-            message: '教学 Skill 已生成并挂载，正在进入 Agent 对话。',
+            message:
+              'Agent 与教学 Skill 已保存，可在结果页进入对话或查看 Skill。',
             actionLabel: '打开 Agent',
           });
-          void enterAgentWorkspace(next);
         } else {
           publishUpdate({
             id: 'creation-updated',
@@ -750,9 +764,6 @@ function SkillFirstWorkspaceContent() {
           });
         }
       } else if (next.status === 'completed' && next.skill_id) {
-        void agentsApi
-          .provision(token, { sessionId: next.id })
-          .catch(() => undefined);
         toast.success('Agent 已创建完成', {
           action: {
             label: '打开 Agent',
@@ -936,13 +947,7 @@ function SkillFirstWorkspaceContent() {
       if (detail.status === 'completed') {
         openingSessionRef.current = null;
         closeInspector({ force: true });
-        navigateWorkspaceView(
-          'run',
-          detail.package_id && detail.skill_id
-            ? `${detail.package_id}:${detail.skill_id}`
-            : null,
-          true,
-        );
+        navigateWorkspaceView('create', null, true);
         dispatchWorkspace({ type: 'dismiss-update' });
       } else {
         if (
@@ -961,6 +966,58 @@ function SkillFirstWorkspaceContent() {
       );
     }
   };
+
+  useEffect(() => {
+    const sessionId = initialResultSession.current;
+    if (!sessionId || !token) return;
+    let cancelled = false;
+    selectedRef.current = sessionId;
+    void liteApi
+      .getGuidedCreationDetail(token, { session_id: sessionId })
+      .then((detail) => {
+        if (cancelled || selectedRef.current !== sessionId) return;
+        initialResultSession.current = null;
+        setSession(detail);
+        setSelectedSessionId(detail.id);
+        setDocuments(detail.documents);
+        setCreateMode('conversation');
+      })
+      .catch((error) => {
+        if (!cancelled)
+          toast.error(
+            error instanceof Error ? error.message : '生成结果加载失败',
+          );
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
+  useEffect(() => {
+    if (
+      workspaceState.activeView !== 'create' ||
+      session?.status !== 'completed'
+    )
+      return;
+    const params = new URLSearchParams(location.search);
+    if (params.get('resultSession') === session.id) return;
+    params.set('resultSession', session.id);
+    navigate(
+      {
+        pathname: location.pathname,
+        search: `?${params.toString()}`,
+        hash: location.hash,
+      },
+      { replace: true },
+    );
+  }, [
+    session,
+    workspaceState.activeView,
+    location.search,
+    location.pathname,
+    location.hash,
+    navigate,
+  ]);
 
   useEffect(() => {
     if (!session || session.status !== 'finalizing') return undefined;
@@ -993,12 +1050,7 @@ function SkillFirstWorkspaceContent() {
         if (detail.status === 'completed') {
           setError(null);
           void refreshRepository().catch(() => undefined);
-          navigateWorkspaceView(
-            'run',
-            detail.package_id && detail.skill_id
-              ? `${detail.package_id}:${detail.skill_id}`
-              : null,
-          );
+          navigateWorkspaceView('create', null);
         } else if (detail.status === 'failed') {
           setError({
             code: String(detail.error?.code || 'FINALIZATION_FAILED'),
@@ -1328,16 +1380,11 @@ function SkillFirstWorkspaceContent() {
 
   async function enterAgentWorkspace(summary: GuidedCreationSession) {
     try {
-      const agent = await agentsApi.provision(token, { sessionId: summary.id });
-      toast.success('Agent 已创建，正在打开对话');
-      navigate(`/agents?agentId=${encodeURIComponent(agent.id)}&autochat=1`);
+      const agentId =
+        summary.generatedAgent?.agentId ||
+        (await agentsApi.provision(token, { sessionId: summary.id })).id;
+      navigate(`/agents?agentId=${encodeURIComponent(agentId)}&autochat=1`);
     } catch (error) {
-      if (summary.skill_id) {
-        navigate(
-          `/agents?skillId=${encodeURIComponent(summary.skill_id)}&autochat=1`,
-        );
-        return;
-      }
       toast.error(
         error instanceof Error ? error.message : 'Agent 创建失败，请稍后重试',
       );
@@ -1525,7 +1572,13 @@ function SkillFirstWorkspaceContent() {
       return;
     }
     if (update.id === 'skill-created') {
-      navigate(`/agents${activeSkill ? `?skillId=${encodeURIComponent(activeSkill.skillId)}&autochat=1` : '?autochat=1'}`);
+      if (session?.status === 'completed') {
+        void enterAgentWorkspace(session);
+        return;
+      }
+      navigate(
+        `/agents${activeSkill ? `?skillId=${encodeURIComponent(activeSkill.skillId)}&autochat=1` : '?autochat=1'}`,
+      );
       return;
     }
     openInspector({
@@ -1594,7 +1647,8 @@ function SkillFirstWorkspaceContent() {
                 ? 'my-skills'
                 : activeSkill
                   ? `skill-${activeSkill.packageId}-${activeSkill.skillId}`
-                  : session?.id || (workspaceState.activeView === 'home' ? 'home' : 'new')
+                  : session?.id ||
+                    (workspaceState.activeView === 'home' ? 'home' : 'new')
             }
           >
             <Suspense
@@ -1635,7 +1689,11 @@ function SkillFirstWorkspaceContent() {
                 <SkillDetailWorkspace
                   token={token}
                   skill={activeSkill}
-                  onAttachToAgent={() => navigate(`/agents?skillId=${encodeURIComponent(activeSkill.skillId)}&autochat=1`)}
+                  onAttachToAgent={() =>
+                    navigate(
+                      `/agents?skillId=${encodeURIComponent(activeSkill.skillId)}&autochat=1`,
+                    )
+                  }
                   view={detailView}
                   versions={versions}
                   currentVersionId={currentVersionId}
@@ -1686,6 +1744,15 @@ function SkillFirstWorkspaceContent() {
                   onSend={send}
                   onConfirm={confirm}
                   onSummarize={summarize}
+                  onOpenAgent={() => void enterAgentWorkspace(session)}
+                  onOpenSkill={() => {
+                    if (session.package_id && session.skill_id)
+                      navigateWorkspaceView(
+                        'versions',
+                        `${session.package_id}:${session.skill_id}`,
+                        true,
+                      );
+                  }}
                   onRetry={() => lastActionRef.current?.()}
                   onFiles={(files) => void addFiles(files)}
                   onRemoveDocument={(index) =>
@@ -1714,10 +1781,13 @@ function SkillFirstWorkspaceContent() {
                 <DocumentSkillCreationPanel
                   token={token}
                   onGenerated={async (packageIds) => {
-                    const generatedSkills = await refreshRepository();
-                    const ids = generatedSkills.filter(skill => packageIds.includes(skill.packageId)).map(skill => skill.skillId);
+                    await refreshRepository();
                     closeInspector({ force: true });
-                    navigate(`/agents${ids.length ? `?skillId=${encodeURIComponent(ids[0]!)}&autochat=1` : '?autochat=1'}`);
+                    const agentId = packageIds[0];
+                    if (agentId)
+                      navigate(
+                        `/agents?agentId=${encodeURIComponent(agentId)}&autochat=1`,
+                      );
                   }}
                 />
               ) : createMode === 'manual' ? (

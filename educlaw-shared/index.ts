@@ -76,6 +76,9 @@ export interface PackageSkill {
   skillMd: string;
   /** Agent 包内标记该 Skill 是否启用；缺省视为启用。 */
   enabled?: boolean;
+  /** 跨包副本的原始归属；名称不能用作资源标识。 */
+  originPackageId?: string;
+  originSkillId?: string;
 }
 
 export interface AgentPackageSnapshot {
@@ -85,6 +88,7 @@ export interface AgentPackageSnapshot {
   agentMd: string;
   rubricMd: string;
   skills: PackageSkill[];
+  sourceSessionId?: string;
 }
 
 export interface AgentPackageSummary {
@@ -130,6 +134,8 @@ export interface PackageSkillRecord {
   description: string;
   status: SkillEntityStatus;
   updatedAt: string;
+  originPackageId?: string;
+  originSkillId?: string;
 }
 
 export interface SkillVersionDetail {
@@ -199,6 +205,24 @@ export interface AgentWorkspace {
   skills: AgentResolvedSkill[];
   createdAt: string;
   updatedAt: string;
+  /** 当前 Agent package version 的数据库 ID。 */
+  currentVersion?: string;
+  sourceSessionId?: string | null;
+}
+export type AgentSummary = AgentWorkspace;
+
+/** 生成事务完成后返回的双仓资源，旧记录可以没有此字段。 */
+export interface GeneratedAgentResult {
+  agentId: string;
+  skillId: string;
+  skillVersionId: string;
+  packageVersionId: string;
+  sourceSessionId: string;
+  name: string;
+  description: string;
+  instructions: string;
+  model: string;
+  skills: PackageSkill[];
 }
 export interface AgentWorkspaceInput {
   name: string;
@@ -592,6 +616,7 @@ export interface GuidedCreationSession {
   created_at: string;
   updated_at: string;
   completed_at: string | null;
+  generatedAgent?: GeneratedAgentResult | null;
 }
 
 export interface GuidedCreationSessionDetail extends GuidedCreationSession {

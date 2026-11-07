@@ -766,3 +766,52 @@ it.each(['rollback', 'discard', 'restore'] as const)(
   },
   20000,
 );
+
+it('restores a completed generation result after refreshing its URL', async () => {
+  api.getGuidedCreationDetail.mockResolvedValue({
+    ...unfinishedGuidedDraft,
+    id: '55',
+    status: 'completed',
+    package_id: '7',
+    skill_id: '11',
+    skill_version_id: '1',
+    generatedAgent: {
+      agentId: '7',
+      skillId: '11',
+      skillVersionId: '1',
+      packageVersionId: '99',
+      sourceSessionId: '55',
+      name: '生成后的课堂助手',
+      description: '辅助教学',
+      instructions: '先了解学生',
+      model: 'test-model',
+      skills: [],
+    },
+  });
+  await import('../components/skill-workspace/GuidedSkillCreationPanel');
+  await act(async () =>
+    root.render(
+      <MemoryRouter initialEntries={['/?view=create&resultSession=55']}>
+        <SkillFirstWorkspace />
+        <RouteEvidence />
+      </MemoryRouter>,
+    ),
+  );
+  await vi.waitFor(async () => {
+    await act(async () => {});
+    expect(container.textContent).toContain('生成后的课堂助手');
+    expect(container.textContent).toContain('先了解学生');
+  });
+  expect(api.getGuidedCreationDetail).toHaveBeenCalledWith('test-token', {
+    session_id: '55',
+  });
+  await act(async () => button('查看 Skill')!.click());
+  await vi.waitFor(() => {
+    const params = new URLSearchParams(
+      container.querySelector('[data-route]')!.textContent!,
+    );
+    expect(params.get('view')).toBe('versions');
+    expect(params.get('skill')).toBe('7:11');
+    expect(params.has('resultSession')).toBe(false);
+  });
+});
