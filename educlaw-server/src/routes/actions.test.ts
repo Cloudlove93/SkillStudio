@@ -552,7 +552,7 @@ describe('POST /api action dispatcher', () => {
     }
   });
 
-  it('creates a skill arena thread through POST /api with authenticated identity', async () => {
+  it('creates an optimization-only workspace through POST /api with authenticated identity', async () => {
     createArenaThreadMock.mockResolvedValueOnce({
       id: 91,
       packageId: 7,
@@ -600,6 +600,7 @@ describe('POST /api action dispatcher', () => {
           payload: {
             arenaKind: 'skill_arena',
             idempotencyKey: 'arena-key-1',
+            surface: 'optimize',
             basePackageVersionId: '33',
             left: {
               skillId: '11',
@@ -629,6 +630,8 @@ describe('POST /api action dispatcher', () => {
           skillVersionId: '202',
         },
         model: undefined,
+        surface: 'optimize',
+        optimizationOnly: true,
       });
     } finally {
       await close(server);
@@ -650,6 +653,7 @@ describe('POST /api action dispatcher', () => {
           pkgId: '7',
           payload: {
             arenaKind: 'skill_arena',
+            surface: 'optimize',
             basePackageVersionId: '33',
             left: {
               skillId: '11',
@@ -669,6 +673,30 @@ describe('POST /api action dispatcher', () => {
       await close(server);
     }
   });
+
+  it.each([undefined, 'run', 'test', 'arena'])(
+    'rejects legacy %s conversation creation before service dispatch',
+    async (surface) => {
+      const { server, url } = await listen(await createApp());
+      try {
+        const response = await fetch(`${url}/api`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-User-Id': 'owner' },
+          body: JSON.stringify({
+            action: 'arena.thread.create', pkgId: '7',
+            payload: { surface, idempotencyKey: 'old-entry', basePackageVersionId: '33' },
+          }),
+        });
+        expect(response.status).toBe(422);
+        expect(await response.json()).toMatchObject({
+          code: 'AGENT_REQUIRED', message: expect.stringContaining('我的 Agent'),
+        });
+        expect(createArenaThreadMock).not.toHaveBeenCalled();
+      } finally {
+        await close(server);
+      }
+    },
+  );
 
   it('returns arena thread detail through POST /api', async () => {
     getArenaThreadDetailMock.mockResolvedValueOnce({

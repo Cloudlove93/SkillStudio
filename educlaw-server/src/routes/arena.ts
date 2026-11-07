@@ -11,7 +11,6 @@ import {
   writeSseEvent,
 } from '../utils/sse.js';
 import {
-  createThread,
   generateReport,
   getThreadDetail,
   listThreads,
@@ -23,6 +22,7 @@ import {
 import { listAnswerOptimizationSummariesForThread } from '../services/answer-skill-optimization-service.js';
 import { arenaRunService } from '../services/arena-run-service.js';
 import { writeArenaRunSnapshot } from '../utils/arena-run-sse.js';
+import { requireAgentConversation } from '../utils/agent-conversation-policy.js';
 
 const router: import('express').Router = createTrackedRouter(Router());
 
@@ -205,21 +205,7 @@ router.get(ARENA_ROUTES.THREADS, requireAuth, async (req, res) => {
   res.json(await listThreads((req as AuthedRequest).userId || "", packageId));
 });
 
-router.post(ARENA_ROUTES.CREATE_THREAD, requireAuth, async (req, res) => {
-  try {
-    res.json(
-      await createThread(
-        (req as AuthedRequest).userId || "",
-        String(req.body?.packageId || ""),
-        typeof req.body?.model === "string" ? req.body.model : undefined,
-      ),
-    );
-  } catch (error) {
-    res
-      .status(400)
-      .json({ error: error instanceof Error ? error.message : "创建 Arena 对话失败" });
-  }
-});
+router.post(ARENA_ROUTES.CREATE_THREAD, requireAuth, requireAgentConversation);
 
 router.get(ARENA_ROUTES.THREAD_DETAIL, requireAuth, async (req, res) => {
   try {

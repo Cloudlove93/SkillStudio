@@ -440,16 +440,15 @@ function SkillFirstWorkspaceContent() {
           setRunningConversationIds((current) => new Set(current).add(id)),
         () => requestNo === conversationLoadRef.current,
       );
-      setSelectedConversationId((current) =>
-        (current ?? initialConversationId.current) &&
-        next.some(
-          (thread) =>
-            String(thread.id) === (current ?? initialConversationId.current),
-        )
-          ? (current ?? initialConversationId.current)
-          : next[0]
-            ? String(next[0].id)
-            : null,
+      const requestedConversationId = initialConversationId.current;
+      setSelectedConversationId(
+        (current) =>
+          requestedConversationId ??
+          (current && next.some((thread) => String(thread.id) === current)
+            ? current
+            : next[0]
+              ? String(next[0].id)
+              : null),
       );
       initialConversationId.current = null;
     } catch (loadError) {

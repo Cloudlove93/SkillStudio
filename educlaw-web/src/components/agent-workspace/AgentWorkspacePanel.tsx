@@ -49,6 +49,30 @@ const newRequestId = () =>
   typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
     ? crypto.randomUUID()
     : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+const pendingRequestStorageKey = (agentId: string, purpose: 'run' | 'test') =>
+  `skillstudio:pending-conversation:${agentId}:${purpose}`;
+function conversationRequestId(
+  agentId: string,
+  purpose: 'run' | 'test',
+  preferred?: string,
+) {
+  const key = pendingRequestStorageKey(agentId, purpose);
+  try {
+    const requestId =
+      sessionStorage.getItem(key) || preferred || newRequestId();
+    sessionStorage.setItem(key, requestId);
+    return requestId;
+  } catch {
+    return preferred || newRequestId();
+  }
+}
+function completeConversationRequest(agentId: string, purpose: 'run' | 'test') {
+  try {
+    sessionStorage.removeItem(pendingRequestStorageKey(agentId, purpose));
+  } catch {
+    // The in-memory key still prevents duplicate requests when storage is unavailable.
+  }
+}
 function writeSelection(agentId: string | null, conversationId?: number) {
   const url = new URL(window.location.href);
   if (agentId) url.searchParams.set('agentId', agentId);
@@ -136,11 +160,13 @@ function AgentWorkspaceSession({
     requestId: string;
   } | null>(null);
   const adoptedAgentId = useRef<string | null>(null);
-  const provisionAttempt = useRef<string | null>(null);
+  const provisionAttempt = useRef<{
+    skillId: string;
+    promise: ReturnType<typeof agentsApi.provision>;
+  } | null>(null);
   const autoChatStarted = useRef(false);
   const [autoChat] = useState(
-    () =>
-      new URLSearchParams(window.location.search).get('autochat') === '1',
+    () => new URLSearchParams(window.location.search).get('autochat') === '1',
   );
   const dirty =
     JSON.stringify(draft) !==
@@ -303,7 +329,14 @@ function AgentWorkspaceSession({
         }
       })
       .catch((e: unknown) => {
-        if (current) setConversationError(errorMessage(e));
+        if (current) {
+          setConversationError(errorMessage(e));
+          if (autoChat && !autoChatStarted.current) {
+            autoChatStarted.current = true;
+            clearAutoChatParam();
+            setTab('chat');
+          }
+        }
       })
       .finally(() => {
         if (current) setConversationLoading(false);
@@ -311,7 +344,7 @@ function AgentWorkspaceSession({
     return () => {
       current = false;
     };
-  }, [token, selectedId, conversationRetry, selectionReady]);
+  }, [token, selectedId, conversationRetry, selectionReady, autoChat]);
 
   useEffect(() => {
     if (!pendingSkill || !selectionReady || selectedId) return;
@@ -337,20 +370,20 @@ function AgentWorkspaceSession({
 
   // 从生成流程或仓库带着 skillId 进入时，直接把 Skill 转成可对话的 Agent。
   useEffect(() => {
-    if (
-      !selectionReady ||
-      selectedId ||
-      !querySkillId ||
-      provisionAttempt.current === querySkillId
-    )
-      return;
-    provisionAttempt.current = querySkillId;
+    if (!selectionReady || selectedId || !querySkillId) return;
+    let current = true;
+    if (provisionAttempt.current?.skillId !== querySkillId) {
+      provisionAttempt.current = {
+        skillId: querySkillId,
+        promise: agentsApi.provision(token, { skillId: querySkillId }),
+      };
+    }
     setProvisionFailed(false);
     setAttachmentLoading(true);
     setAttachmentError('');
-    void agentsApi
-      .provision(token, { skillId: querySkillId })
+    void provisionAttempt.current.promise
       .then((created) => {
+        if (!current) return;
         setAgents((previous) => [
           created,
           ...previous.filter((item) => item.id !== created.id),
@@ -369,10 +402,16 @@ function AgentWorkspaceSession({
         );
       })
       .catch((e: unknown) => {
+        if (!current) return;
         setProvisionFailed(true);
         setAttachmentError(errorMessage(e));
       })
-      .finally(() => setAttachmentLoading(false));
+      .finally(() => {
+        if (current) setAttachmentLoading(false);
+      });
+    return () => {
+      current = false;
+    };
   }, [token, querySkillId, selectionReady, selectedId, provisionRetry]);
 
   function retryProvision() {
@@ -431,7 +470,10 @@ function AgentWorkspaceSession({
     setSaving(true);
     setActionError('');
     setNotice('');
-    if (andRun) clearAutoChatParam();
+    if (andRun) {
+      autoChatStarted.current = true;
+      clearAutoChatParam();
+    }
     const generation = scope.current;
     const input = {
       ...draft,
@@ -464,7 +506,10 @@ function AgentWorkspaceSession({
         writeSelection(saved.id);
         setSelectedId(saved.id);
       }
-      if (andRun && saved.skills.some((s) => s.enabled && s.available !== false)) {
+      if (
+        andRun &&
+        saved.skills.some((s) => s.enabled && s.available !== false)
+      ) {
         if (
           requestKey.current?.agentId !== saved.id ||
           requestKey.current.purpose !== 'run'
@@ -472,7 +517,7 @@ function AgentWorkspaceSession({
           requestKey.current = {
             agentId: saved.id,
             purpose: 'run',
-            requestId: newRequestId(),
+            requestId: conversationRequestId(saved.id, 'run'),
           };
         }
         const input = {
@@ -482,6 +527,7 @@ function AgentWorkspaceSession({
         const next = await agentsApi.createConversation(token, saved.id, input);
         if (!mounted.current || generation !== scope.current) return;
         writeSelection(saved.id, next.id);
+        completeConversationRequest(saved.id, 'run');
         requestKey.current = null;
         setConversations((previous) => [
           next,
@@ -514,10 +560,15 @@ function AgentWorkspaceSession({
     actionLock.current = true;
     setStarting(true);
     setActionError('');
+    autoChatStarted.current = true;
     clearAutoChatParam();
     const generation = scope.current;
     if (requestId) {
-      requestKey.current = { agentId: agent.id, purpose, requestId };
+      requestKey.current = {
+        agentId: agent.id,
+        purpose,
+        requestId: conversationRequestId(agent.id, purpose, requestId),
+      };
     } else if (
       requestKey.current?.agentId !== agent.id ||
       requestKey.current.purpose !== purpose
@@ -525,13 +576,14 @@ function AgentWorkspaceSession({
       requestKey.current = {
         agentId: agent.id,
         purpose,
-        requestId: newRequestId(),
+        requestId: conversationRequestId(agent.id, purpose),
       };
     }
     const input = { purpose, requestId: requestKey.current.requestId };
     try {
       const next = await agentsApi.createConversation(token, agent.id, input);
       if (!mounted.current || generation !== scope.current) return;
+      completeConversationRequest(agent.id, purpose);
       requestKey.current = null;
       setConversations((previous) => [
         next,
@@ -555,6 +607,7 @@ function AgentWorkspaceSession({
     !dirty &&
     !detailLoading &&
     !detailError &&
+    !conversationLoading &&
     !starting &&
     !saving &&
     agent.skills.some((s) => s.enabled && s.available !== false);
@@ -575,16 +628,30 @@ function AgentWorkspaceSession({
     autoChatStarted.current = true;
     clearAutoChatParam();
     if (conversations.length) {
-      const latest = conversations[0]!;
-      setThread(latest);
+      const requested = new URLSearchParams(window.location.search).get(
+        'conversation',
+      );
+      const restored = conversations.find(
+        (item) => String(item.id) === requested,
+      );
+      const next = restored ?? conversations[0]!;
+      setThread(next);
       setTab('chat');
-      writeSelection(agent.id, latest.id);
+      writeSelection(agent.id, next.id);
       return;
     }
     void start('run', `auto:${agent.id}`);
     // 只在首次进入时自动开一次对话，后续由用户主动操作。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoChat, agent, dirty, starting, saving, conversations, conversationLoadedFor]);
+  }, [
+    autoChat,
+    agent,
+    dirty,
+    starting,
+    saving,
+    conversations,
+    conversationLoadedFor,
+  ]);
 
   const openSkill = onOpenSkill;
   return (

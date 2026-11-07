@@ -331,7 +331,9 @@ export function SkillRunWorkspace({
         <div className="skill-composer-input-row">
           <textarea
             aria-label={
-              purpose === 'test' ? '输入测试任务' : '输入 Skill 使用任务'
+              purpose === 'test'
+                ? '输入测试任务'
+                : agentName ? '输入教学任务' : '输入 Skill 使用任务'
             }
             value={state.draft}
             onChange={(event) =>
@@ -351,7 +353,7 @@ export function SkillRunWorkspace({
             placeholder={
               purpose === 'test'
                 ? '输入测试任务…'
-                : agentName ? `输入任务，让 ${agentName} 使用已启用的 Skills…` : '输入任务，立即使用这个 Skill…'
+                : agentName ? '输入教学任务…' : '输入任务，立即使用这个 Skill…'
             }
             disabled={historyLoading}
           />

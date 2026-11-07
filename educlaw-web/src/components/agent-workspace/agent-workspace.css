@@ -400,6 +400,22 @@
   padding: 4px 8px;
   font-size: 12px;
 }
+.agent-pinned-skill {
+  min-width: 0;
+  max-width: 100%;
+  border: 1px solid var(--workspace-border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  background: var(--workspace-canvas);
+}
+.agent-pinned-skill[open] {
+  flex-basis: 100%;
+}
+.agent-pinned-skill pre {
+  overflow-wrap: anywhere;
+  max-height: 180px;
+  overflow: auto;
+}
 .agent-workspace-panel .agent-binding-chips button {
   border: 0;
   padding: 0;

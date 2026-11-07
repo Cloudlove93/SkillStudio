@@ -32,8 +32,10 @@
 
 ```bash
 pnpm install
-docker compose up -d educlaw-postgres
+# 先复制 .env.example 为 .env.local，并将本机开发的 DATABASE_URL 主机改为 127.0.0.1、端口改为 5435。
+docker compose --env-file .env.local up -d educlaw-db
 pnpm --filter @educlaw/shared build
+pnpm --filter educlaw-server db:init
 pnpm --filter educlaw-server dev
 pnpm --filter educlaw-web dev
 ```
@@ -48,6 +50,8 @@ pnpm --filter educlaw-web dev
 
 - Copy `.env.example` to `.env.local`
 - Put real secrets only in `.env.local`
+
+P2 工作区对话的接口约定、本地隔离验收及验证结果见 [P2 验收记录](docs/acceptance/2026-11-06-p2-workspace-chat.md)。
 
 ## Branch 规范
 

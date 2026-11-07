@@ -246,7 +246,9 @@ beforeEach(async () => {
       const sql = text.replace(/\s+/g, ' ').trim();
       if (sql.startsWith('select * from agent_packages where id')) {
         const row = packages.get(String(args[0]));
-        return result(row && row.userId === args[1] ? [encodePackage(row)] : []);
+        return result(
+          row && row.userId === args[1] ? [encodePackage(row)] : [],
+        );
       }
       if (sql.startsWith('select * from agent_packages where user_id')) {
         return result(
@@ -288,6 +290,8 @@ beforeEach(async () => {
                 name: skill.displayName || skill.name,
                 description: skill.description,
                 version_number: version.versionNumber,
+                status: version.status,
+                skill_status: skill.status,
                 skill_snapshot_json: version.skill,
               };
             }),
@@ -390,6 +394,7 @@ beforeEach(async () => {
     withTransaction: transactionMock,
   }));
   vi.doMock('./arena-service.js', () => ({ getThreadDetail: detailMock }));
+  vi.doMock('../config.js', () => ({ config: { llmModel: 'default-model' } }));
   vi.doMock('./package-service.js', () => ({
     PackageVersionConflictError,
     createPackageWithSnapshotTx: async (
@@ -507,6 +512,7 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
+  vi.doUnmock('../config.js');
   vi.doUnmock('./db.js');
   vi.doUnmock('./arena-service.js');
   vi.doUnmock('./package-service.js');
@@ -525,11 +531,13 @@ describe('Package-backed Agents', () => {
       input('Private', [binding('13', '303')]),
     );
     expect(first.id).not.toBe(second.id);
-    const names = (await service.listAgents('owner')).map((agent) => agent.name);
-    expect(names).toEqual(expect.arrayContaining(['First', 'Second']));
-    expect((await service.listAgents('other')).map((agent) => agent.id)).toEqual(
-      expect.arrayContaining([foreign.id]),
+    const names = (await service.listAgents('owner')).map(
+      (agent) => agent.name,
     );
+    expect(names).toEqual(expect.arrayContaining(['First', 'Second']));
+    expect(
+      (await service.listAgents('other')).map((agent) => agent.id),
+    ).toEqual(expect.arrayContaining([foreign.id]));
     expect(await service.getAgent('owner', second.id)).toMatchObject({
       name: 'Second',
       instructions: 'Use the mounted procedures.',
@@ -561,7 +569,11 @@ describe('Package-backed Agents', () => {
     const agent = await service.saveAgent('owner', input());
     const versionCount = () => [...versions.values()].filter((v) => v.packageId === agent.id).length;
     expect(versionCount()).toBe(1);
-    for (const expectedUpdatedAt of [undefined, 'invalid', '2000-01-01T00:00:00.000Z']) {
+    for (const expectedUpdatedAt of [
+      undefined,
+      'invalid',
+      '2000-01-01T00:00:00.000Z',
+    ]) {
       await expect(
         service.saveAgent(
           'owner',
@@ -606,7 +618,13 @@ describe('Package-backed Agents', () => {
     expect(queryMock).not.toHaveBeenCalled();
   });
 
-  it.each(['missing', 'inaccessible', 'discarded', 'removed', 'empty'] as const)(
+  it.each([
+    'missing',
+    'inaccessible',
+    'discarded',
+    'removed',
+    'empty',
+  ] as const)(
     'rejects %s versions on save without leaving a package behind',
     async (scenario) => {
       const selected = scenario === 'inaccessible' ? binding('13', '303') : binding();
@@ -621,12 +639,89 @@ describe('Package-backed Agents', () => {
         status: 422,
         code: scenario === 'empty' ? 'INVALID_ARGUMENT' : 'SKILL_UNAVAILABLE',
       });
-      expect([...packages.values()].filter((p) => p.userId === 'owner')).toHaveLength(2);
+      expect(
+        [...packages.values()].filter((p) => p.userId === 'owner'),
+      ).toHaveLength(2);
     },
   );
 });
 
 describe('Agent conversations on packages', () => {
+  it('releases the transaction connection before reading an idempotent replay', async () => {
+    const agent = await service.saveAgent('owner', input('Retries'));
+    const request = { purpose: 'run', requestId: 'same-request' };
+    const original = await service.createAgentConversation(
+      'owner',
+      agent.id,
+      request,
+    );
+    const transact = transactionMock.getMockImplementation()!;
+    const readDetail = detailMock.getMockImplementation()!;
+    let transactionOpen = false;
+    transactionMock.mockImplementation(async (work) => {
+      transactionOpen = true;
+      try {
+        return await transact(work);
+      } finally {
+        transactionOpen = false;
+      }
+    });
+    detailMock.mockImplementation(async (...args) => {
+      expect(transactionOpen).toBe(false);
+      return readDetail(...args);
+    });
+    expect(
+      await service.createAgentConversation('owner', agent.id, request),
+    ).toEqual(original);
+    expect(threads.size).toBe(1);
+  });
+
+  it('freezes the effective default model and excludes disabled bindings', async () => {
+    const agent = await service.saveAgent('owner', {
+      ...input('Default', [binding(), binding('12', '202', false)]),
+      model: '',
+    });
+    const disabled = agent.skills.find((skill) => !skill.enabled)!;
+    skillVersions.get(disabled.skillVersionId)!.status = 'discarded';
+    const thread = await service.createAgentConversation('owner', agent.id, {
+      purpose: 'run',
+      requestId: 'default',
+    });
+    expect(thread.model).toBe('default-model');
+    expect(thread.skillArenaConfig?.agentExecution).toMatchObject({
+      model: 'default-model',
+      skills: [{ skillUid: 'procedure-a', skillMd: 'BODY_A' }],
+    });
+    expect(thread.skillArenaConfig?.agentExecution?.skills).toHaveLength(1);
+  });
+
+  it.each(['discarded', 'removed', 'empty', 'missing-link'] as const)(
+    'rejects an enabled %s binding before creating a conversation',
+    async (scenario) => {
+      const agent = await service.saveAgent('owner', input('Invalid binding'));
+      const selected = agent.skills[0]!;
+      if (scenario === 'discarded')
+        skillVersions.get(selected.skillVersionId)!.status = 'discarded';
+      if (scenario === 'removed')
+        skills.get(selected.skillId)!.status = 'removed';
+      if (scenario === 'empty')
+        skillVersions.get(selected.skillVersionId)!.skill.skillMd = ' ';
+      if (scenario === 'missing-link')
+        links = links.filter((link) => link.packageId !== agent.id);
+      await expect(
+        service.createAgentConversation('owner', agent.id, {
+          purpose: 'run',
+          requestId: scenario,
+        }),
+      ).rejects.toMatchObject({
+        status: 422,
+        code: 'SKILL_UNAVAILABLE',
+        message: expect.stringContaining('重新保存配置'),
+      });
+      expect(threads.size).toBe(0);
+    },
+  );
+
   it('pins the package snapshot and replays idempotent requests', async () => {
     const agent = await service.saveAgent(
       'owner',
@@ -691,7 +786,7 @@ describe('Agent conversations on packages', () => {
         purpose: 'run',
         requestId: 'none',
       }),
-    ).rejects.toMatchObject({ status: 422 });
+    ).rejects.toMatchObject({ status: 422, code: 'NO_ENABLED_SKILLS' });
     expect(threads.size).toBe(0);
 
     const first = await service.saveAgent('owner', input('First'));
@@ -708,11 +803,20 @@ describe('Agent conversations on packages', () => {
       requestId: 'same',
     });
     expect(a.id).not.toBe(b.id);
-    expect(await service.listAgentConversations('owner', first.id)).toEqual([a]);
-    expect(await service.listAgentConversations('owner', second.id)).toEqual([b]);
+    expect(await service.listAgentConversations('owner', first.id)).toEqual([
+      a,
+    ]);
+    expect(await service.listAgentConversations('owner', second.id)).toEqual([
+      b,
+    ]);
   });
 
-  it.each([null, {}, { purpose: 'arena', requestId: 'id' }, { purpose: 'run', requestId: '   ' }])(
+  it.each([
+    null,
+    {},
+    { purpose: 'arena', requestId: 'id' },
+    { purpose: 'run', requestId: '   ' },
+  ])(
     'rejects invalid conversation input %# before database access',
     async (body) => {
       await expect(
@@ -735,7 +839,9 @@ describe('Agent provisioning', () => {
         skill_id: null,
       },
     ];
-    expect(await service.provisionAgent('owner', { sessionId: '55' })).toMatchObject({
+    expect(
+      await service.provisionAgent('owner', { sessionId: '55' }),
+    ).toMatchObject({
       id: agent.id,
       name: 'Generated',
     });

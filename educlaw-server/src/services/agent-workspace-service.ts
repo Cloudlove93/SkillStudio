@@ -15,6 +15,7 @@ import {
   PackageVersionConflictError,
 } from './package-service.js';
 import { parseDbJson } from '../utils/json.js';
+import { config as serverConfig } from '../config.js';
 
 export class AgentWorkspaceError extends Error {
   constructor(
@@ -45,6 +46,8 @@ type SkillLinkRow = {
   name: string;
   description: string;
   version_number: number;
+  status: string;
+  skill_status: string;
   skill_snapshot_json: PackageSkill | string;
 };
 
@@ -132,7 +135,9 @@ async function loadSnapshot(
   db: Queryable,
   pkg: PackageRow,
 ): Promise<AgentPackageSnapshot> {
-  const result = await db.query<{ snapshot_json: AgentPackageSnapshot | string }>(
+  const result = await db.query<{
+    snapshot_json: AgentPackageSnapshot | string;
+  }>(
     'select snapshot_json from agent_package_versions where id = $1 and package_id = $2',
     [pkg.current_version_id, pkg.id],
   );
@@ -162,7 +167,8 @@ async function resolvePackageSkills(
   const result = await db.query<SkillLinkRow>(
     `select link.skill_id, link.skill_version_id, s.skill_uid, s.dir_name,
             coalesce(nullif(s.display_name, ''), s.name) as name, s.description,
-            sv.version_number, sv.skill_snapshot_json
+            sv.version_number, sv.status, s.status as skill_status,
+            sv.skill_snapshot_json
        from agent_package_version_skills link
        join agent_package_skills s
          on s.id = link.skill_id and s.package_id = link.package_id
@@ -189,12 +195,18 @@ async function resolvePackageSkills(
       description: row.description || snapshot.description || '',
       versionNumber: Number(row.version_number),
       skillMd,
-      available: skillMd.trim().length > 0,
+      available:
+        row.status === 'active' &&
+        row.skill_status === 'active' &&
+        skillMd.trim().length > 0,
     };
   });
 }
 
-async function toAgent(db: Queryable, pkg: PackageRow): Promise<AgentWorkspace> {
+async function toAgent(
+  db: Queryable,
+  pkg: PackageRow,
+): Promise<AgentWorkspace> {
   const snapshot = await loadSnapshot(db, pkg);
   const skills = await resolvePackageSkills(db, pkg, snapshot);
   return {
@@ -385,11 +397,7 @@ export async function provisionAgent(
     );
     const row = session.rows[0];
     if (!row)
-      throw new AgentWorkspaceError(
-        '创建会话不存在',
-        404,
-        'SESSION_NOT_FOUND',
-      );
+      throw new AgentWorkspaceError('创建会话不存在', 404, 'SESSION_NOT_FOUND');
     if (row.status !== 'completed')
       throw new AgentWorkspaceError(
         '该会话尚未完成生成，请稍后再试',
@@ -457,7 +465,7 @@ export async function createAgentConversation(
     throw new AgentWorkspaceError('对话类型或请求标识无效');
   const purpose = body.purpose;
   const requestId = body.requestId.trim();
-  return withTransaction(async (client) => {
+  const conversation = await withTransaction(async (client) => {
     const agent = await ownedPackage(client, userId, id, true);
     const existing = await client.query<{
       id: string;
@@ -481,25 +489,37 @@ export async function createAgentConversation(
           409,
           'IDEMPOTENCY_CONFLICT',
         );
-      return (await getThreadDetail(userId, String(replay.id))).thread;
+      return String(replay.id);
     }
 
     const snapshot = await loadSnapshot(client, agent);
     const skills = await resolvePackageSkills(client, agent, snapshot);
     const enabledSkills = skills.filter((skill) => skill.enabled);
-    if (!enabledSkills.length)
-      throw new AgentWorkspaceError('请先启用至少一个 Skill');
-    if (enabledSkills.some((skill) => !skill.available))
+    // Deleted links must not silently turn a partially mounted Agent into a
+    // different execution. The package snapshot records every intended binding.
+    const missingEnabledSkill = (snapshot.skills ?? []).some(
+      (skill) =>
+        skill.enabled !== false &&
+        !skills.some((resolved) => resolved.skillUid === String(skill.id)),
+    );
+    if (missingEnabledSkill || enabledSkills.some((skill) => !skill.available))
       throw new AgentWorkspaceError(
-        '该 Agent 的部分 Skill 已不可用，请重新保存配置',
+        '该 Agent 的部分 Skill 或固定版本已不可用，请重新保存配置',
         422,
         'SKILL_UNAVAILABLE',
       );
+    if (!enabledSkills.length)
+      throw new AgentWorkspaceError(
+        '请到 Agent 编辑配置中启用至少一个 Skill，再开始对话',
+        422,
+        'NO_ENABLED_SKILLS',
+      );
+    const model = agent.model?.trim() || serverConfig.llmModel;
     const execution: AgentExecutionSnapshot = {
       agentId: String(agent.id),
       name: agent.name,
       instructions: snapshot.agentMd || '',
-      model: agent.model || '',
+      model,
       skills: enabledSkills.map((skill) => ({
         skillId: skill.skillId,
         skillVersionId: skill.skillVersionId,
@@ -541,7 +561,7 @@ export async function createAgentConversation(
         userId,
         agent.id,
         title,
-        agent.model || null,
+        model,
         String(agent.current_version_id),
         JSON.stringify(config),
         now,
@@ -556,12 +576,18 @@ export async function createAgentConversation(
       id: Number(threadId),
       packageId: Number(agent.id),
       title,
-      model: agent.model || null,
+      model,
       arenaKind: 'skill_arena',
       basePackageVersionId: String(agent.current_version_id),
       skillArenaConfig: config,
       createdAt: now,
       updatedAt: now,
-    };
+    } satisfies ArenaThread;
   });
+  // Release the transaction/Agent row lock before loading a replay through the
+  // pool. Concurrent retries waiting on that lock can otherwise occupy every
+  // connection while this owner waits for a separate detail-read connection.
+  return typeof conversation === 'string'
+    ? (await getThreadDetail(userId, conversation)).thread
+    : conversation;
 }
