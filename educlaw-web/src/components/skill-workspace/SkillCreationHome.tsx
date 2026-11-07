@@ -17,6 +17,7 @@ type SkillCreationHomeProps = {
   onSend: (content: string) => void;
   onFiles: (files: FileList) => void;
   onRemoveDocument: (index: number) => void;
+  onOpenDocument: () => void;
   onOpenManual: () => void;
   onOpenWorkflow: () => void;
 };
@@ -27,6 +28,7 @@ export function SkillCreationHome({
   onSend,
   onFiles,
   onRemoveDocument,
+  onOpenDocument,
   onOpenManual,
   onOpenWorkflow,
 }: SkillCreationHomeProps) {
@@ -154,16 +156,16 @@ export function SkillCreationHome({
             <button
               type="button"
               className="is-document"
-              onClick={() => fileInputRef.current?.click()}
+              onClick={onOpenDocument}
             >
               <span className="skill-home-way-icon is-document">
                 <FileText size={19} aria-hidden="true" />
               </span>
               <span className="skill-home-way-copy">
                 <strong>
-                  材料提炼 <em>对话内完成</em>
+                  材料提炼 <em>专用工作台</em>
                 </strong>
-                <small>教案、课例、反思文档拖入上方对话框即可提炼</small>
+                <small>教案、课例、反思文档拖入上传区即可提炼</small>
               </span>
               <ArrowRight className="skill-home-way-arrow" size={15} aria-hidden="true" />
             </button>

@@ -1407,6 +1407,9 @@
   overflow: hidden;
   background: var(--card);
 }
+.skill-main-stage.is-workflow {
+  overflow-y: auto;
+}
 .skill-main-column {
   position: relative;
   display: flex;

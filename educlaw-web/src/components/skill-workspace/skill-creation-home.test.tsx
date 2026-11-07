@@ -30,6 +30,7 @@ describe('SkillCreationHome', () => {
       onSend: vi.fn(),
       onFiles: vi.fn(),
       onRemoveDocument: vi.fn(),
+      onOpenDocument: vi.fn(),
       onOpenManual: vi.fn(),
       onOpenWorkflow: vi.fn(),
       ...overrides,
@@ -63,6 +64,9 @@ describe('SkillCreationHome', () => {
     const buttons = [...container.querySelectorAll('button')];
 
     act(() =>
+      buttons.find((button) => button.textContent?.includes('材料提炼'))!.click(),
+    );
+    act(() =>
       buttons.find((button) => button.textContent?.includes('结构视图'))!.click(),
     );
     act(() =>
@@ -70,6 +74,7 @@ describe('SkillCreationHome', () => {
     );
 
     expect(buttons.some((button) => button.textContent?.includes('实录蒸馏'))).toBe(false);
+    expect(props.onOpenDocument).toHaveBeenCalledTimes(1);
     expect(props.onOpenManual).toHaveBeenCalledTimes(1);
     expect(props.onOpenWorkflow).toHaveBeenCalledTimes(1);
   });

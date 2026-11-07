@@ -1669,7 +1669,7 @@ function SkillFirstWorkspaceContent() {
           <div
             id="main-content"
             tabIndex={-1}
-            className={`skill-main-stage ${isRepositoryView ? 'is-repository' : ''}`}
+            className={`skill-main-stage ${isRepositoryView ? 'is-repository' : ''}${workflowOpen ? ' is-workflow' : ''}`}
             key={
               workflowOpen
                 ? 'workflow'
@@ -1702,6 +1702,7 @@ function SkillFirstWorkspaceContent() {
                       current.filter((_, itemIndex) => itemIndex !== index),
                     )
                   }
+                  onOpenDocument={() => newSkill('document')}
                   onOpenManual={() => newSkill('manual')}
                   onOpenWorkflow={() => {
                     closeInspector({ force: true });
@@ -1875,6 +1876,7 @@ function SkillFirstWorkspaceContent() {
                       current.filter((_, itemIndex) => itemIndex !== index),
                     )
                   }
+                  onOpenDocument={() => newSkill('document')}
                   onOpenManual={() => newSkill('manual')}
                   onOpenWorkflow={() => {
                     closeInspector({ force: true });
