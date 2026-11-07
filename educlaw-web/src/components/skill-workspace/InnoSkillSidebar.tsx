@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { ArenaThread, GuidedCreationSession } from '@educlaw/shared';
 import {
-  AudioLines,
   Bot,
   BookOpen,
   ChevronDown,
@@ -75,7 +74,6 @@ type Props = {
 
 const creationModes = [
   { mode: 'conversation', label: '对话共创', icon: MessageSquareText },
-  { mode: 'multimodal', label: '实录蒸馏', icon: AudioLines },
   { mode: 'document', label: '文档生成', icon: FileText },
   { mode: 'manual', label: '结构视图', icon: PencilLine },
   { mode: 'import', label: '导入 Skill ZIP', icon: FileUp },

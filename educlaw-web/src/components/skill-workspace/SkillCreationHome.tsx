@@ -8,7 +8,6 @@ import {
   MessageCircle,
   PencilLine,
   Plus,
-  Video,
   X,
 } from 'lucide-react';
 
@@ -18,7 +17,6 @@ type SkillCreationHomeProps = {
   onSend: (content: string) => void;
   onFiles: (files: FileList) => void;
   onRemoveDocument: (index: number) => void;
-  onOpenMultimodal: () => void;
   onOpenManual: () => void;
   onOpenWorkflow: () => void;
 };
@@ -29,7 +27,6 @@ export function SkillCreationHome({
   onSend,
   onFiles,
   onRemoveDocument,
-  onOpenMultimodal,
   onOpenManual,
   onOpenWorkflow,
 }: SkillCreationHomeProps) {
@@ -154,19 +151,6 @@ export function SkillCreationHome({
         <section className="skill-home-ways" aria-label="更多触发方式">
           <p className="skill-home-way-label">更多触发方式</p>
           <div className="skill-home-way-grid">
-            <button type="button" className="is-video" onClick={onOpenMultimodal}>
-              <span className="skill-home-way-icon is-video">
-                <Video size={19} aria-hidden="true" />
-              </span>
-              <span className="skill-home-way-copy">
-                <strong>
-                  实录蒸馏 <em className="is-violet">专用工作台</em>
-                </strong>
-                <small>课堂音视频的证据对齐与回放核对，未确认不生成</small>
-              </span>
-              <ArrowRight className="skill-home-way-arrow" size={15} aria-hidden="true" />
-            </button>
-
             <button
               type="button"
               className="is-document"

@@ -1702,7 +1702,6 @@ function SkillFirstWorkspaceContent() {
                       current.filter((_, itemIndex) => itemIndex !== index),
                     )
                   }
-                  onOpenMultimodal={() => newSkill('multimodal')}
                   onOpenManual={() => newSkill('manual')}
                   onOpenWorkflow={() => {
                     closeInspector({ force: true });
@@ -1876,7 +1875,6 @@ function SkillFirstWorkspaceContent() {
                       current.filter((_, itemIndex) => itemIndex !== index),
                     )
                   }
-                  onOpenMultimodal={() => newSkill('multimodal')}
                   onOpenManual={() => newSkill('manual')}
                   onOpenWorkflow={() => {
                     closeInspector({ force: true });

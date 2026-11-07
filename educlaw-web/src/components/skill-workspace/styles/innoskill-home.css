@@ -367,18 +367,19 @@
 
 .skill-home-way-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .skill-home-way-grid > button {
   position: relative;
   display: grid;
   min-width: 0;
-  min-height: 104px;
-  grid-template-columns: 40px minmax(0, 1fr) 16px;
-  align-items: center;
-  gap: 14px;
+  min-height: 136px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto 1fr;
+  align-items: start;
+  gap: 14px 10px;
   overflow: hidden;
   border: 1px solid #e6e6f2;
   border-radius: 14px;
@@ -420,13 +421,10 @@
   display: grid;
   width: 40px;
   height: 40px;
+  grid-column: 1;
+  grid-row: 1;
   place-items: center;
   border-radius: 12px;
-}
-
-.skill-home-way-icon.is-video {
-  background: #f2eafa;
-  color: #7e3ec8;
 }
 
 .skill-home-way-icon.is-document {
@@ -447,8 +445,10 @@
 .skill-home-way-copy {
   display: flex;
   min-width: 0;
+  grid-column: 1 / -1;
+  grid-row: 2;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
 }
 
 .skill-home-way-grid strong {
@@ -471,11 +471,6 @@
   letter-spacing: 0.02em;
 }
 
-.skill-home-way-grid em.is-violet {
-  background: #f2eafa;
-  color: #7e3ec8;
-}
-
 .skill-home-way-grid small {
   display: block;
   color: #63666f;
@@ -484,6 +479,8 @@
 }
 
 .skill-home-way-arrow {
+  grid-column: 2;
+  grid-row: 1;
   justify-self: end;
   color: #b3b5c0;
   transition:
@@ -547,11 +544,6 @@
   color: #b9b3ff;
 }
 
-.dark .skill-home-way-grid em.is-violet {
-  background: rgba(126, 62, 200, 0.22);
-  color: #d4b4f2;
-}
-
 .dark .skill-home-way-arrow {
   color: #6f7482;
 }
@@ -569,6 +561,26 @@
 
   .skill-home-way-grid > button {
     min-height: 0;
+    grid-template-columns: 40px minmax(0, 1fr) 16px;
+    grid-template-rows: auto;
+    align-items: center;
+    gap: 14px;
+    padding: 15px 16px;
+  }
+
+  .skill-home-way-icon {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .skill-home-way-copy {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .skill-home-way-arrow {
+    grid-column: 3;
+    grid-row: 1;
   }
 }
 
