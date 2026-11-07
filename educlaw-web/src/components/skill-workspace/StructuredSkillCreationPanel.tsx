@@ -66,7 +66,7 @@ export function StructuredSkillCreationPanel({
       >
         <header className="skill-structured-header">
           <span className="skill-eyebrow">完整填写</span>
-          <h1>完善 Skill 需求</h1>
+          <h1>完善 Agent 需求</h1>
           <p>一次写清楚，系统会继续检查遗漏并通过对话完善。</p>
         </header>
 
