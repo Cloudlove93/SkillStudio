@@ -1,6 +1,7 @@
 import { useRef, useState, type DragEvent } from 'react';
 import type { GuidedCreationDocument } from '@educlaw/shared';
 import {
+  ArrowRight,
   ArrowUp,
   FileText,
   GitBranch,
@@ -150,51 +151,66 @@ export function SkillCreationHome({
           </div>
         </div>
 
-        <p className="skill-home-way-label">更多触发方式</p>
-        <div className="skill-home-way-grid">
-          <button type="button" onClick={onOpenMultimodal}>
-            <span className="skill-home-way-icon is-video">
-              <Video size={19} aria-hidden="true" />
-            </span>
-            <strong>
-              实录蒸馏 <em className="is-violet">专用工作台</em>
-            </strong>
-            <small>课堂音视频的证据对齐与回放核对，未确认不生成</small>
-          </button>
+        <section className="skill-home-ways" aria-label="更多触发方式">
+          <p className="skill-home-way-label">更多触发方式</p>
+          <div className="skill-home-way-grid">
+            <button type="button" className="is-video" onClick={onOpenMultimodal}>
+              <span className="skill-home-way-icon is-video">
+                <Video size={19} aria-hidden="true" />
+              </span>
+              <span className="skill-home-way-copy">
+                <strong>
+                  实录蒸馏 <em className="is-violet">专用工作台</em>
+                </strong>
+                <small>课堂音视频的证据对齐与回放核对，未确认不生成</small>
+              </span>
+              <ArrowRight className="skill-home-way-arrow" size={15} aria-hidden="true" />
+            </button>
 
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <span className="skill-home-way-icon is-document">
-              <FileText size={19} aria-hidden="true" />
-            </span>
-            <strong>
-              材料提炼 <em>对话内完成</em>
-            </strong>
-            <small>教案、课例、反思文档拖入上方对话框即可提炼</small>
-          </button>
+            <button
+              type="button"
+              className="is-document"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <span className="skill-home-way-icon is-document">
+                <FileText size={19} aria-hidden="true" />
+              </span>
+              <span className="skill-home-way-copy">
+                <strong>
+                  材料提炼 <em>对话内完成</em>
+                </strong>
+                <small>教案、课例、反思文档拖入上方对话框即可提炼</small>
+              </span>
+              <ArrowRight className="skill-home-way-arrow" size={15} aria-hidden="true" />
+            </button>
 
-          <button type="button" onClick={onOpenManual}>
-            <span className="skill-home-way-icon is-manual">
-              <PencilLine size={19} aria-hidden="true" />
-            </span>
-            <strong>
-              结构视图 <em>适合专家</em>
-            </strong>
-            <small>方法已成型时，跳过对话直接定义草案字段</small>
-          </button>
+            <button type="button" className="is-manual" onClick={onOpenManual}>
+              <span className="skill-home-way-icon is-manual">
+                <PencilLine size={19} aria-hidden="true" />
+              </span>
+              <span className="skill-home-way-copy">
+                <strong>
+                  结构视图 <em>适合专家</em>
+                </strong>
+                <small>方法已成型时，跳过对话直接定义草案字段</small>
+              </span>
+              <ArrowRight className="skill-home-way-arrow" size={15} aria-hidden="true" />
+            </button>
 
-          <button type="button" onClick={onOpenWorkflow}>
-            <span className="skill-home-way-icon is-manual">
-              <GitBranch size={19} aria-hidden="true" />
-            </span>
-            <strong>
-              工作流 <em>按需编排</em>
-            </strong>
-            <small>先创建流程，再按需要添加并绑定 Skill 节点</small>
-          </button>
-        </div>
+            <button type="button" className="is-workflow" onClick={onOpenWorkflow}>
+              <span className="skill-home-way-icon is-workflow">
+                <GitBranch size={19} aria-hidden="true" />
+              </span>
+              <span className="skill-home-way-copy">
+                <strong>
+                  工作流 <em>按需编排</em>
+                </strong>
+                <small>先创建流程，再按需要添加并绑定 Skill 节点</small>
+              </span>
+              <ArrowRight className="skill-home-way-arrow" size={15} aria-hidden="true" />
+            </button>
+          </div>
+        </section>
       </div>
     </main>
   );
