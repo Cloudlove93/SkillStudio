@@ -398,13 +398,13 @@
 }
 .skill-assistant-message .prose code {
   font-size: 13px;
-  background: var(--surface-muted);
+  background: var(--muted);
   padding: 1px 4px;
   border-radius: 3px;
 }
 .skill-assistant-message .prose pre {
   font-size: 13px;
-  background: var(--surface-muted);
+  background: var(--muted);
   padding: 8px 10px;
   border-radius: 6px;
   overflow-x: auto;
@@ -560,7 +560,7 @@
 }
 .skill-interview-step.is-conflicted i {
   border-color: color-mix(in srgb, var(--destructive) 42%, var(--border));
-  background: var(--destructive-soft);
+  background: color-mix(in srgb, var(--destructive) 10%, transparent);
   color: var(--destructive);
 }
 .skill-interview-step.is-complete::before {

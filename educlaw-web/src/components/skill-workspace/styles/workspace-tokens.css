@@ -13,6 +13,7 @@
   --workspace-warning: #b7652e;
   --workspace-danger: #c24141;
   --workspace-border: #dde2e1;
+  --workspace-hover: rgba(24, 33, 45, 0.05);
   --workspace-text-xs: 12px;
   --workspace-text-sm: 13px;
   --workspace-text-md: 15px;
@@ -45,4 +46,5 @@
   --workspace-warning: #e2a070;
   --workspace-danger: #f08181;
   --workspace-border: #2d3839;
+  --workspace-hover: rgba(255, 255, 255, 0.06);
 }
