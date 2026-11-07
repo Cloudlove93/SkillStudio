@@ -38,6 +38,8 @@ import type {
   SkillVersionDetail,
   SkillVersionListResult,
   UserSummary,
+  WorkflowDefinition,
+  WorkflowRunReport,
 } from '@educlaw/shared';
 import { ARENA_ROUTES, PACKAGE_ROUTES } from '@educlaw/shared';
 import { apiFetch } from './client';
@@ -50,6 +52,16 @@ export interface DiagnosisIssue {
   title: string;
   reason: string;
   suggestion: string;
+}
+
+export interface WorkflowListItem {
+  id: string;
+  name: string;
+  description: string;
+  versionNumber: number;
+  updatedAt: string;
+  nodeCount: number;
+  skillNodeCount: number;
 }
 
 export interface DiagnosisResult {
@@ -1291,9 +1303,62 @@ export const liteApi = {
   me: (token: string) => request<UserSummary>('/auth/me', {}, token),
   listPackages: (token: string) =>
     request<AgentPackageSummary[]>(PACKAGE_ROUTES.LIST, {}, token),
+  listWorkflows: (token: string) =>
+    request<WorkflowListItem[]>('/workflows', {}, token),
   getPackage: (token: string, packageId: string) =>
     request<AgentPackageDetail>(
       `${PACKAGE_ROUTES.DETAIL}?packageId=${encodeURIComponent(packageId)}`,
+      {},
+      token,
+    ),
+  createWorkflow: (token: string, definition: WorkflowDefinition) =>
+    request<AgentPackageDetail>(
+      '/workflows',
+      { method: 'POST', body: JSON.stringify({ definition }) },
+      token,
+    ),
+  validateWorkflow: (
+    token: string,
+    packageId: string,
+    definition: WorkflowDefinition,
+  ) =>
+    request<{ valid: true; definition: WorkflowDefinition }>(
+      `/packages/${packageId}/workflow/validate`,
+      { method: 'POST', body: JSON.stringify({ definition }) },
+      token,
+    ),
+  saveWorkflow: (
+    token: string,
+    packageId: string,
+    payload: {
+      expectedPackageVersionId: string;
+      definition: WorkflowDefinition;
+      note?: string;
+    },
+  ) =>
+    request<AgentPackageDetail>(
+      `/packages/${packageId}/workflow`,
+      { method: 'PUT', body: JSON.stringify(payload) },
+      token,
+    ),
+  runWorkflow: (
+    token: string,
+    packageId: string,
+    payload: {
+      packageVersionId: string;
+      requestId: string;
+      content: string;
+      model?: string;
+    },
+  ) =>
+    request<WorkflowRunReport>(
+      `/packages/${packageId}/workflow/runs`,
+      { method: 'POST', body: JSON.stringify(payload) },
+      token,
+    ),
+  getWorkflowRun: (token: string, packageId: string, runId: string) =>
+    request<WorkflowRunReport>(
+      `/packages/${packageId}/workflow/runs/${encodeURIComponent(runId)}`,
       {},
       token,
     ),

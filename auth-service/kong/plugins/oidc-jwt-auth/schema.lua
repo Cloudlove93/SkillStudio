@@ -10,6 +10,8 @@ return {
         fields = {
           { require_token = { type = "boolean", required = true, default = true }, },
           { expected_issuer = { type = "string", required = true }, },
+          { discovery_url = { type = "string", required = false }, },
+          { jwks_url = { type = "string", required = false }, },
           { expected_audience = { type = "string", required = true }, },
           { header_names = {
               type = "set",

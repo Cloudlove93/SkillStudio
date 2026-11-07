@@ -39,10 +39,17 @@ function getIssuer(): string {
   return config.zitadelInternalIssuer.replace(/\/+$/, '');
 }
 
-function serviceJsonHeaders(): Record<string, string> {
+function adminJsonHeaders(): Record<string, string> {
   return {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${config.zitadelServicePat}`,
+  };
+}
+
+function loginClientJsonHeaders(): Record<string, string> {
+  return {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${config.zitadelLoginClientPat}`,
   };
 }
 
@@ -91,7 +98,7 @@ async function startOidcFlow(includeAuthBodyInError: boolean): Promise<{
 async function createSession(checks: unknown, errorPrefix: string): Promise<SessionTokens> {
   const sessionRes = await fetch(`${getIssuer()}/v2/sessions`, {
     method: 'POST',
-    headers: serviceJsonHeaders(),
+    headers: loginClientJsonHeaders(),
     body: JSON.stringify({ checks }),
   });
 
@@ -109,7 +116,7 @@ async function finishOidcFlow(
 ): Promise<LoginTokens> {
   const finRes = await fetch(`${flow.issuer}/v2/oidc/auth_requests/${flow.authRequestID}`, {
     method: 'POST',
-    headers: serviceJsonHeaders(),
+    headers: loginClientJsonHeaders(),
     body: JSON.stringify({ session }),
   });
   if (!finRes.ok) {
@@ -210,7 +217,7 @@ async function registerWithPassword(username: string, email: string, password: s
   const givenName = username.replace(/[^a-zA-Z0-9]/g, '') || username;
   const createRes = await fetch(`${getIssuer()}/v2/users/human`, {
     method: 'POST',
-    headers: serviceJsonHeaders(),
+    headers: adminJsonHeaders(),
     body: JSON.stringify({
       username,
       profile: { givenName, familyName: 'User' },
@@ -392,7 +399,7 @@ async function registerWithPhone(
   const e164Phone = toE164Phone(phone);
   const createRes = await fetch(`${getIssuer()}/v2/users/human`, {
     method: 'POST',
-    headers: serviceJsonHeaders(),
+    headers: adminJsonHeaders(),
     body: JSON.stringify({
       username,
       profile: { givenName, familyName: 'User' },

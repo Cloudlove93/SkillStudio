@@ -89,6 +89,163 @@ export interface AgentPackageSnapshot {
   rubricMd: string;
   skills: PackageSkill[];
   sourceSessionId?: string;
+  /** Optional so snapshots written before workflows remain readable. */
+  workflow?: WorkflowDefinition;
+}
+
+export type WorkflowNodeType = 'start' | 'llm' | 'skill' | 'condition' | 'loop' | 'end';
+export type WorkflowConditionOperator =
+  | 'equals'
+  | 'not_equals'
+  | 'contains'
+  | 'not_contains'
+  | 'is_empty'
+  | 'not_empty';
+
+export interface WorkflowNode {
+  id: string;
+  type: WorkflowNodeType;
+  name: string;
+  position: { x: number; y: number };
+  params: Record<string, unknown>;
+}
+
+export interface WorkflowEdge {
+  id: string;
+  from: string;
+  to: string;
+  condition?: 'true' | 'false';
+}
+
+export interface WorkflowDefinition {
+  schemaVersion: 1;
+  nodes: WorkflowNode[];
+  edges: WorkflowEdge[];
+}
+
+export interface WorkflowValidationError {
+  code: string;
+  message: string;
+  nodeId?: string;
+  edgeId?: string;
+}
+
+export interface WorkflowNodeTrace {
+  nodeId: string;
+  status: 'queued' | 'running' | 'succeeded' | 'failed' | 'skipped';
+  startedAt?: string;
+  endedAt?: string;
+  durationMs?: number;
+  input?: unknown;
+  output?: unknown;
+  error?: { code: string; message: string; retryable: boolean };
+}
+
+export interface WorkflowRunReport {
+  runId: string;
+  packageId: string;
+  packageVersionId: string;
+  requestId: string;
+  status: 'running' | 'succeeded' | 'failed';
+  input: string;
+  output?: string;
+  traces: WorkflowNodeTrace[];
+  startedAt: string;
+  endedAt?: string;
+  error?: { code: string; message: string };
+}
+
+/** Pure structural validation shared by the editor and the server. */
+export function validateWorkflowDefinition(value: unknown): WorkflowValidationError[] {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return [{ code: 'WORKFLOW_INVALID', message: '工作流定义必须是对象。' }];
+  }
+  const definition = value as Partial<WorkflowDefinition>;
+  if (definition.schemaVersion !== 1 || !Array.isArray(definition.nodes) || !Array.isArray(definition.edges)) {
+    return [{ code: 'WORKFLOW_INVALID', message: '工作流版本或节点、连线格式无效。' }];
+  }
+  if (definition.nodes.length < 2 || definition.nodes.length > 30) {
+    return [{ code: 'WORKFLOW_INVALID', message: '工作流节点数必须在 2 到 30 之间。' }];
+  }
+  const errors: WorkflowValidationError[] = [];
+  const nodes = definition.nodes as WorkflowNode[];
+  const edges = definition.edges as WorkflowEdge[];
+  const nodeIds = new Set<string>();
+  const edgeIds = new Set<string>();
+  const allowedTypes = new Set<WorkflowNodeType>(['start', 'llm', 'skill', 'condition', 'loop', 'end']);
+  for (const node of nodes) {
+    if (!node || typeof node.id !== 'string' || !node.id.trim() || nodeIds.has(node.id)) {
+      errors.push({ code: 'WORKFLOW_INVALID', message: '节点 ID 必须唯一且非空。', nodeId: node?.id });
+    } else nodeIds.add(node.id);
+    if (!allowedTypes.has(node?.type)) {
+      errors.push({ code: 'WORKFLOW_INVALID', message: '节点类型不受支持。', nodeId: node?.id });
+    }
+    if (node?.type === 'loop') {
+      const iterations = Number(node.params?.iterations);
+      if (!Number.isInteger(iterations) || iterations < 1 || iterations > 20) {
+        errors.push({ code: 'WORKFLOW_INVALID', message: '循环节点的循环次数必须为 1 到 20 的整数。', nodeId: node.id });
+      }
+      if (typeof node.params?.promptTemplate !== 'string' || !node.params.promptTemplate.trim()) {
+        errors.push({ code: 'WORKFLOW_INVALID', message: '循环节点需要填写每轮处理说明。', nodeId: node.id });
+      }
+    }
+  }
+  const starts = nodes.filter(node => node.type === 'start');
+  const ends = nodes.filter(node => node.type === 'end');
+  if (starts.length !== 1) errors.push({ code: 'WORKFLOW_INVALID', message: '必须且只能有一个开始节点。' });
+  if (ends.length !== 1) errors.push({ code: 'WORKFLOW_INVALID', message: '必须且只能有一个结束节点。' });
+  const incoming = new Map<string, WorkflowEdge[]>();
+  const outgoing = new Map<string, WorkflowEdge[]>();
+  const edgeKeys = new Set<string>();
+  for (const edge of edges) {
+    if (!edge || typeof edge.id !== 'string' || !edge.id.trim() || edgeIds.has(edge.id)) {
+      errors.push({ code: 'WORKFLOW_INVALID', message: '连线 ID 必须唯一且非空。', edgeId: edge?.id });
+      continue;
+    }
+    edgeIds.add(edge.id);
+    if (!nodeIds.has(edge.from) || !nodeIds.has(edge.to) || edge.from === edge.to) {
+      errors.push({ code: 'WORKFLOW_INVALID', message: '连线必须连接两个不同的有效节点。', edgeId: edge.id });
+      continue;
+    }
+    const key = `${edge.from}:${edge.to}:${edge.condition || ''}`;
+    if (edgeKeys.has(key)) errors.push({ code: 'WORKFLOW_INVALID', message: '存在重复连线。', edgeId: edge.id });
+    edgeKeys.add(key);
+    incoming.set(edge.to, [...(incoming.get(edge.to) || []), edge]);
+    outgoing.set(edge.from, [...(outgoing.get(edge.from) || []), edge]);
+  }
+  for (const node of nodes) {
+    const ins = incoming.get(node.id) || [];
+    const outs = outgoing.get(node.id) || [];
+    if (node.type === 'start' && ins.length) errors.push({ code: 'WORKFLOW_INVALID', message: '开始节点不能有入线。', nodeId: node.id });
+    if (node.type === 'end' && outs.length) errors.push({ code: 'WORKFLOW_INVALID', message: '结束节点不能有出线。', nodeId: node.id });
+    if (node.type !== 'start' && node.type !== 'end' && ins.length !== 1) errors.push({ code: 'WORKFLOW_INVALID', message: '除开始和结束节点外，每个节点必须有一条入线。', nodeId: node.id });
+    if (node.type === 'end' && ins.length < 1) errors.push({ code: 'WORKFLOW_INVALID', message: '结束节点必须有至少一条入线。', nodeId: node.id });
+    if (node.type === 'condition') {
+      const labels = new Set(outs.map(edge => edge.condition));
+      if (outs.length !== 2 || !labels.has('true') || !labels.has('false')) {
+        errors.push({ code: 'WORKFLOW_INVALID', message: '条件节点必须有 true 和 false 两条出线。', nodeId: node.id });
+      }
+    } else if (node.type !== 'end' && outs.length !== 1) {
+      errors.push({ code: 'WORKFLOW_INVALID', message: '该节点必须有一条出线。', nodeId: node.id });
+    }
+  }
+  const start = starts[0];
+  if (!start) return errors;
+  const visited = new Set<string>();
+  const visiting = new Set<string>();
+  const visit = (id: string) => {
+    if (visiting.has(id)) { errors.push({ code: 'WORKFLOW_INVALID', message: '工作流不能包含循环。', nodeId: id }); return; }
+    if (visited.has(id)) return;
+    visiting.add(id);
+    for (const edge of outgoing.get(id) || []) visit(edge.to);
+    visiting.delete(id);
+    visited.add(id);
+  };
+  visit(start.id);
+  for (const node of nodes) {
+    if (!visited.has(node.id)) errors.push({ code: 'WORKFLOW_INVALID', message: '节点必须可从开始节点到达。', nodeId: node.id });
+  }
+  return errors;
 }
 
 export interface AgentPackageSummary {
@@ -443,6 +600,73 @@ export interface ArenaReport {
     baseline: string;
     enhanced: string;
   };
+}
+
+export type AutoEvalQuestionSource = 'builtin' | 'document';
+
+export interface AutoEvalQuestion {
+  id: string;
+  title: string;
+  prompt: string;
+  source: AutoEvalQuestionSource;
+}
+
+export interface AutoEvalDimensionScore {
+  key: string;
+  name: string;
+  score: number;
+  maxScore: number;
+  reason: string;
+}
+
+export interface AutoEvalCaseResult {
+  questionId: string;
+  title: string;
+  prompt: string;
+  score: number;
+  maxScore: number;
+  summary: string;
+  issues: string[];
+  suggestions: string[];
+  transcript: Array<{
+    role: string;
+    content: string;
+  }>;
+}
+
+export type AutoEvalRunStatus = 'running' | 'completed' | 'failed';
+
+export interface AutoEvalReport {
+  runId: number;
+  packageId: number;
+  sceneName: string;
+  status: AutoEvalRunStatus;
+  totalScore: number;
+  maxScore: number;
+  summary: string;
+  dimensions: AutoEvalDimensionScore[];
+  cases: AutoEvalCaseResult[];
+  issues: string[];
+  suggestions: string[];
+  compactRetryUsed?: boolean;
+  createdAt: string;
+  updatedAt: string;
+  errorMessage?: string;
+}
+
+export interface AutoEvalPreview {
+  packageId: number;
+  packageName: string;
+  skillCount: number;
+  builtinQuestions: AutoEvalQuestion[];
+  documentQuestions: AutoEvalQuestion[];
+  dimensions: Array<{
+    key: string;
+    name: string;
+    maxScore: number;
+    description: string;
+  }>;
+  latestRun?: AutoEvalReport;
 }
 
 export interface OptimizationIssue {

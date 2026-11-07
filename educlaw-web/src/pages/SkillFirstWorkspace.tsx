@@ -107,6 +107,8 @@ const SkillDetailWorkspace = lazy(() =>
     (module) => ({ default: module.SkillDetailWorkspace }),
   ),
 );
+const WorkflowDemo = lazy(() => import('./WorkflowDemo'));
+const WorkflowLibrary = lazy(() => import('./WorkflowLibrary'));
 
 type StreamError = { code: string; message: string; retryable: boolean };
 
@@ -203,6 +205,9 @@ function SkillFirstWorkspaceContent() {
     useState<SkillCreateMode>(initialCreateMode);
   const [multimodalCreationKey, setMultimodalCreationKey] = useState(0);
   const [leftCollapsed, setLeftCollapsed] = useState(false);
+  const [workflowOpen, setWorkflowOpen] = useState(false);
+  const [workflowLibraryOpen, setWorkflowLibraryOpen] = useState(false);
+  const [workflowPackageId, setWorkflowPackageId] = useState<string | undefined>();
   const [importOpen, setImportOpen] = useState(false);
   const [importBusy, setImportBusy] = useState(false);
   const [workspaceState, dispatchWorkspace] = useReducer(
@@ -1551,8 +1556,9 @@ function SkillFirstWorkspaceContent() {
       !session &&
       createMode === 'conversation' &&
       !visiblePendingGuidedMessage);
-  const activeSidebarSection: InnoSkillNavSection =
-    isRepositoryView || activeSkill
+  const activeSidebarSection: InnoSkillNavSection = workflowOpen
+    ? 'workflow-library'
+    : isRepositoryView || activeSkill
       ? 'my-skills'
       : workspaceState.activeView === 'create' || session
         ? 'create'
@@ -1590,7 +1596,7 @@ function SkillFirstWorkspaceContent() {
 
   return (
     <div
-      className={`skill-workspace-root ${leftCollapsed ? 'is-left-collapsed' : ''} ${inspectorState.open ? 'is-context-open' : ''} ${isCreationHome ? 'is-create-home' : ''}`}
+      className={`skill-workspace-root ${leftCollapsed ? 'is-left-collapsed' : ''} ${inspectorState.open ? 'is-context-open' : ''} ${!workflowOpen && isCreationHome ? 'is-create-home' : ''}`}
       style={
         {
           '--skill-context-current': inspectorState.open
@@ -1616,12 +1622,32 @@ function SkillFirstWorkspaceContent() {
         conversationRunningIds={runningConversationIds}
         completedConversationIds={completedConversationIds}
         onToggle={() => setLeftCollapsed((value) => !value)}
-        onNavigate={(section) => openPortalView(section)}
-        onCreateMode={newSkill}
-        onSelectDraft={(item) => void openSession(item)}
+        onNavigate={(section) => {
+          if (section === 'workflow-library') {
+            closeInspector({ force: true });
+            setWorkflowPackageId(undefined);
+            setWorkflowLibraryOpen(true);
+            setWorkflowOpen(true);
+            return;
+          }
+          setWorkflowOpen(false);
+          setWorkflowLibraryOpen(false);
+          openPortalView(section);
+        }}
+        onCreateMode={(mode) => {
+          setWorkflowOpen(false);
+          newSkill(mode);
+        }}
+        onSelectDraft={(item) => {
+          setWorkflowOpen(false);
+          void openSession(item);
+        }}
         onRenameDraft={renameSession}
         onDeleteDraft={deleteSession}
-        onSelectSkill={openRepositorySkill}
+        onSelectSkill={(skill) => {
+          setWorkflowOpen(false);
+          openRepositorySkill(skill);
+        }}
         onSkillAction={handleSkillMenuAction}
         onAgents={() => navigate('/agents')}
         onConversationSelect={handleConversationSelect}
@@ -1633,17 +1659,21 @@ function SkillFirstWorkspaceContent() {
       />
       <div className="skill-content-column">
         <div className="skill-main-column">
-          <SkillPinnedUpdate
-            update={workspaceState.pinnedUpdate}
-            onAction={handlePinnedAction}
-            onDismiss={() => dispatchWorkspace({ type: 'dismiss-update' })}
-          />
+          {!workflowOpen ? (
+            <SkillPinnedUpdate
+              update={workspaceState.pinnedUpdate}
+              onAction={handlePinnedAction}
+              onDismiss={() => dispatchWorkspace({ type: 'dismiss-update' })}
+            />
+          ) : null}
           <div
             id="main-content"
             tabIndex={-1}
             className={`skill-main-stage ${isRepositoryView ? 'is-repository' : ''}`}
             key={
-              isRepositoryView
+              workflowOpen
+                ? 'workflow'
+                : isRepositoryView
                 ? 'my-skills'
                 : activeSkill
                   ? `skill-${activeSkill.packageId}-${activeSkill.skillId}`
@@ -1654,7 +1684,14 @@ function SkillFirstWorkspaceContent() {
             <Suspense
               fallback={<SkillWorkspaceLoadingState label="正在打开工作区" />}
             >
-              {workspaceState.activeView === 'home' ? (
+              {workflowOpen ? (
+                workflowLibraryOpen ? <WorkflowLibrary token={token} onCreate={() => { setWorkflowPackageId(undefined); setWorkflowLibraryOpen(false); }} onOpen={(packageId) => { setWorkflowPackageId(packageId); setWorkflowLibraryOpen(false); }} /> : <WorkflowDemo
+                  embedded
+                  token={token}
+                  packageId={workflowPackageId}
+                  onOpenLibrary={() => setWorkflowLibraryOpen(true)}
+                />
+              ) : workspaceState.activeView === 'home' ? (
                 <SkillCreationHome
                   documents={documents}
                   busy={busy}
@@ -1667,6 +1704,12 @@ function SkillFirstWorkspaceContent() {
                   }
                   onOpenMultimodal={() => newSkill('multimodal')}
                   onOpenManual={() => newSkill('manual')}
+                  onOpenWorkflow={() => {
+                    closeInspector({ force: true });
+                    setWorkflowPackageId(undefined);
+                    setWorkflowLibraryOpen(false);
+                    setWorkflowOpen(true);
+                  }}
                 />
               ) : isRepositoryView ? (
                 <SkillRepositoryWorkspace
@@ -1835,6 +1878,12 @@ function SkillFirstWorkspaceContent() {
                   }
                   onOpenMultimodal={() => newSkill('multimodal')}
                   onOpenManual={() => newSkill('manual')}
+                  onOpenWorkflow={() => {
+                    closeInspector({ force: true });
+                    setWorkflowPackageId(undefined);
+                    setWorkflowLibraryOpen(false);
+                    setWorkflowOpen(true);
+                  }}
                 />
               )}
             </Suspense>

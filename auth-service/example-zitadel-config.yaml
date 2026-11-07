@@ -7,9 +7,9 @@ Log:
 # 例如：auth.educlaw.local 或 auth.yourdomain.com
 
 # 必须填写浏览器实际访问 Zitadel 子域名的域名，不能写容器内地址 `zitadel`
-# 本地开发默认通过 Kong 的 auth.localhost:80 对外暴露
+# 本地开发默认通过 Kong 的 auth.localhost:8080 对外暴露
 ExternalDomain: 'auth.localhost'
-ExternalPort: 80
+ExternalPort: 8080
 ExternalSecure: false
 
 # 这些地址原先通过 docker-compose 环境变量传入，现统一放在配置文件中维护。

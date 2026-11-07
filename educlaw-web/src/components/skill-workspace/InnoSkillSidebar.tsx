@@ -7,6 +7,7 @@ import {
   ChevronDown,
   FileText,
   FileUp,
+  GitBranch,
   Home,
   Layers3,
   LogOut,
@@ -29,7 +30,7 @@ import {
   type SkillMenuAction,
 } from './SkillWorkspaceSidebar';
 
-export type InnoSkillNavSection = 'home' | 'my-skills' | 'create';
+export type InnoSkillNavSection = 'home' | 'my-skills' | 'workflow-library' | 'create';
 
 type Props = {
   sessions: GuidedCreationSession[];
@@ -48,7 +49,9 @@ type Props = {
   conversationRunningIds?: ReadonlySet<string>;
   completedConversationIds?: ReadonlySet<string>;
   onToggle: () => void;
-  onNavigate: (section: Exclude<InnoSkillNavSection, 'create'>) => void;
+  onNavigate: (
+    section: Exclude<InnoSkillNavSection, 'create'>,
+  ) => void;
   onCreateMode: (mode: SkillCreateAction) => void;
   onSelectDraft: (session: GuidedCreationSession) => void;
   onRenameDraft: (
@@ -154,6 +157,12 @@ export function InnoSkillSidebar(props: Props) {
           icon={<BookOpen />}
           label="技能库"
           onClick={() => props.onNavigate('my-skills')}
+        />
+        <NavButton
+          active={props.activeSection === 'workflow-library'}
+          icon={<GitBranch />}
+          label="工作流库"
+          onClick={() => props.onNavigate('workflow-library')}
         />
 
         <span className="isk-sidebar-section-label">生成</span>

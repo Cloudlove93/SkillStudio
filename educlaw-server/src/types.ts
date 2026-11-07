@@ -128,3 +128,26 @@ export interface DbRowInteractiveOptimizationSession {
   created_at: string;
   updated_at: string;
 }
+
+export interface DbRowAutoEvalSpec {
+  id: number;
+  user_id: string;
+  package_id: number;
+  questions_json: unknown;
+  dimensions_json: unknown;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DbRowAutoEvalRun {
+  id: number;
+  user_id: string;
+  package_id: number;
+  scene_name: string;
+  status: string;
+  questions_json: unknown;
+  report_json: unknown;
+  error_message: string;
+  created_at: string;
+  updated_at: string;
+}

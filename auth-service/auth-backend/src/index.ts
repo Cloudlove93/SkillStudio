@@ -12,6 +12,7 @@ app.use(cors({
   origin: [
     `http://${config.host === '0.0.0.0' ? 'localhost' : config.host}:${config.port}`,
     'http://auth.localhost',
+    'http://auth.localhost:8080',
     'http://localhost',
     'http://127.0.0.1',
   ],

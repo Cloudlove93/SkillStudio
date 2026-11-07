@@ -87,9 +87,13 @@ local function fetch_json(url)
 end
 
 local function get_discovery(conf)
-  local cache_key = "oidc-jwt-auth:discovery:" .. conf.expected_issuer
+  local discovery_url = conf.discovery_url
+  if type(discovery_url) ~= "string" or discovery_url == "" then
+    discovery_url = trim_trailing_slash(conf.expected_issuer) .. "/.well-known/openid-configuration"
+  end
+  local cache_key = "oidc-jwt-auth:discovery:" .. discovery_url
   return kong.cache:get(cache_key, { ttl = conf.discovery_ttl_seconds }, function()
-    local body, err = fetch_json(trim_trailing_slash(conf.expected_issuer) .. "/.well-known/openid-configuration")
+    local body, err = fetch_json(discovery_url)
     if not body then
       return nil, err
     end
@@ -250,7 +254,11 @@ function OidcJwtAuth:access(conf)
     return kong.response.exit(500, { error = "Authentication upstream unavailable" })
   end
 
-  local jwks, jwks_err = get_jwks(conf, discovery.jwks_uri)
+  local jwks_url = conf.jwks_url
+  if type(jwks_url) ~= "string" or jwks_url == "" then
+    jwks_url = discovery.jwks_uri
+  end
+  local jwks, jwks_err = get_jwks(conf, jwks_url)
   if not jwks then
     kong.log.err("JWKS fetch failed: ", jwks_err)
     return kong.response.exit(500, { error = "Authentication upstream unavailable" })

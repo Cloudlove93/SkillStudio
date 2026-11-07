@@ -3,6 +3,7 @@ import type { GuidedCreationDocument } from '@educlaw/shared';
 import {
   ArrowUp,
   FileText,
+  GitBranch,
   MessageCircle,
   PencilLine,
   Plus,
@@ -18,6 +19,7 @@ type SkillCreationHomeProps = {
   onRemoveDocument: (index: number) => void;
   onOpenMultimodal: () => void;
   onOpenManual: () => void;
+  onOpenWorkflow: () => void;
 };
 
 export function SkillCreationHome({
@@ -28,6 +30,7 @@ export function SkillCreationHome({
   onRemoveDocument,
   onOpenMultimodal,
   onOpenManual,
+  onOpenWorkflow,
 }: SkillCreationHomeProps) {
   const [input, setInput] = useState('');
   const [dragActive, setDragActive] = useState(false);
@@ -180,6 +183,16 @@ export function SkillCreationHome({
               结构视图 <em>适合专家</em>
             </strong>
             <small>方法已成型时，跳过对话直接定义草案字段</small>
+          </button>
+
+          <button type="button" onClick={onOpenWorkflow}>
+            <span className="skill-home-way-icon is-manual">
+              <GitBranch size={19} aria-hidden="true" />
+            </span>
+            <strong>
+              工作流 <em>按需编排</em>
+            </strong>
+            <small>先创建流程，再按需要添加并绑定 Skill 节点</small>
           </button>
         </div>
       </div>

@@ -40,6 +40,8 @@ services:
             config:
               require_token: false
               expected_issuer: "__ZITADEL_ISSUER__"
+              discovery_url: "__ZITADEL_INTERNAL_ISSUER__/.well-known/openid-configuration"
+              jwks_url: "__ZITADEL_INTERNAL_ISSUER__/oauth/v2/keys"
               expected_audience: "__ZITADEL_CLIENT_ID__"
 
   - name: auth-frontend-pages
@@ -75,6 +77,8 @@ services:
             config:
               require_token: true
               expected_issuer: "__ZITADEL_ISSUER__"
+              discovery_url: "__ZITADEL_INTERNAL_ISSUER__/.well-known/openid-configuration"
+              jwks_url: "__ZITADEL_INTERNAL_ISSUER__/oauth/v2/keys"
               expected_audience: "__ZITADEL_CLIENT_ID__"
 
   - name: educlaw-web
@@ -101,6 +105,8 @@ services:
             config:
               require_token: true
               expected_issuer: "__ZITADEL_ISSUER__"
+              discovery_url: "__ZITADEL_INTERNAL_ISSUER__/.well-known/openid-configuration"
+              jwks_url: "__ZITADEL_INTERNAL_ISSUER__/oauth/v2/keys"
               expected_audience: "__ZITADEL_CLIENT_ID__"
 
   - name: edunex-web
