@@ -153,7 +153,7 @@ export function InnoSkillSidebar(props: Props) {
         <NavButton
           active={props.activeSection === 'my-skills'}
           icon={<BookOpen />}
-          label="技能库"
+          label="仓库"
           onClick={() => props.onNavigate('my-skills')}
         />
         <NavButton

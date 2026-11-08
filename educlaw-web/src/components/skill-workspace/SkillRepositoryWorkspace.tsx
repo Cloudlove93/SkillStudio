@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { getSessionName } from './SkillWorkspaceSidebar';
 import { RepositoryDraftCard, RepositorySkillCard } from './RepositoryCards';
+import { AgentRepositoryPanel } from './AgentRepositoryPanel';
 import { SkillDeleteConfirmDialog } from './SkillDeleteConfirmDialog';
 import { SkillRenameDialog } from './SkillRenameDialog';
 import { InspectorPortal } from './InspectorPortal';
@@ -44,10 +45,12 @@ export type RepositorySkill = {
 };
 
 type RepositoryTab = 'created' | 'drafts';
+type RepositoryScope = 'agents' | 'skills';
 
 type Props = {
   skills: RepositorySkill[];
   sessions: GuidedCreationSession[];
+  token: string;
   search: string;
   onSearch: (value: string) => void;
   onSelectSkill: (skill: RepositorySkill) => void;
@@ -57,11 +60,14 @@ type Props = {
   onDeleteSkills: (skills: RepositorySkill[]) => Promise<void>;
   onRenameSkill: (skill: RepositorySkill, displayName: string) => Promise<void>;
   onNew: () => void;
+  onOpenAgent: (agentId: string) => void;
+  onCreateAgent: () => void;
 };
 
 export function SkillRepositoryWorkspace({
   skills,
   sessions,
+  token,
   search,
   onSearch,
   onSelectSkill,
@@ -71,12 +77,15 @@ export function SkillRepositoryWorkspace({
   onDeleteSkills,
   onRenameSkill,
   onNew,
+  onOpenAgent,
+  onCreateAgent,
 }: Props) {
   const {
     state: inspectorState,
     openInspector,
     closeInspector,
   } = useWorkspaceInspector();
+  const [scope, setScope] = useState<RepositoryScope>('skills');
   const [activeTab, setActiveTab] = useState<RepositoryTab>('created');
   const [page, setPage] = useState(1);
   const [managing, setManaging] = useState(false);
@@ -204,9 +213,9 @@ export function SkillRepositoryWorkspace({
     >
       <header className="skill-repository-header">
         <div>
-          <span className="skill-eyebrow">技能库</span>
-          <h1>管理你的教学 Skill</h1>
-          <p>Skill 是 Agent 的能力来源，在这里整理好，再挂载给 Agent。</p>
+          <span className="skill-eyebrow">仓库</span>
+          <h1>Agent 与 Skill 仓库</h1>
+          <p>Agent 由核心指令和 Skill 模块装配而成，两者都在这里统一管理。</p>
         </div>
         <button className="skill-primary-button" onClick={onNew}>
           <Plus size={16} aria-hidden="true" />
@@ -215,9 +224,45 @@ export function SkillRepositoryWorkspace({
       </header>
 
       <div
+        className="repository-scope-tabs"
+        role="tablist"
+        aria-label="仓库内容"
+      >
+        <button
+          type="button"
+          role="tab"
+          aria-selected={scope === 'agents'}
+          className={scope === 'agents' ? 'is-active' : ''}
+          onClick={() => {
+            setScope('agents');
+            stopManaging();
+          }}
+        >
+          Agent 仓库
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={scope === 'skills'}
+          className={scope === 'skills' ? 'is-active' : ''}
+          onClick={() => setScope('skills')}
+        >
+          Skill 仓库 <span>{skills.length}</span>
+        </button>
+      </div>
+
+      {scope === 'agents' ? (
+        <AgentRepositoryPanel
+          token={token}
+          onOpenAgent={onOpenAgent}
+          onCreateAgent={onCreateAgent}
+        />
+      ) : (
+        <>
+      <div
         className="skill-repository-tabs"
         role="tablist"
-        aria-label="技能库内容"
+        aria-label="Skill 仓库内容"
       >
         <button
           type="button"
@@ -410,6 +455,8 @@ export function SkillRepositoryWorkspace({
             </div>
           )}
         </section>
+      )}
+        </>
       )}
 
       {pendingDeletion.length > 0 ? (

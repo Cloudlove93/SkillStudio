@@ -688,6 +688,194 @@
   .skill-repository-header .skill-primary-button {
     align-self: flex-start;
   }
+}
+
+/* 仓库视角切换 */
+.repository-scope-tabs {
+  display: inline-flex;
+  gap: 4px;
+  margin-top: 18px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--muted);
+  padding: 3px;
+}
+.repository-scope-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  padding: 7px 14px;
+  color: var(--muted-foreground);
+  font-size: var(--workspace-text-xs);
+  cursor: pointer;
+}
+.repository-scope-tabs button:hover {
+  color: var(--foreground);
+}
+.repository-scope-tabs button.is-active {
+  background: var(--card);
+  color: var(--foreground);
+  font-weight: 620;
+  box-shadow: var(--shadow-sm);
+}
+.repository-scope-tabs span {
+  display: inline-grid;
+  min-width: 18px;
+  height: 18px;
+  place-items: center;
+  border-radius: 99px;
+  background: var(--muted);
+  padding: 0 5px;
+  color: var(--muted-foreground);
+  font-size: var(--workspace-text-xs);
+}
+
+/* Agent 仓库 */
+.agent-repository-section {
+  margin-top: 18px;
+}
+.agent-repository-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.agent-repository-card {
+  display: flex;
+  width: 100%;
+  align-items: flex-start;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card);
+  padding: 16px;
+  color: var(--foreground);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+.agent-repository-card:hover {
+  border-color: color-mix(in srgb, var(--primary) 32%, var(--border));
+  box-shadow: 0 10px 24px
+    color-mix(in srgb, var(--primary) 12%, transparent);
+  transform: translateY(-1px);
+}
+.agent-repository-icon {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+.agent-repository-body {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+}
+.agent-repository-body strong {
+  font-size: 14px;
+  font-weight: 620;
+}
+.agent-repository-desc {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--muted-foreground);
+  font-size: var(--workspace-text-xs);
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.agent-repository-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+.agent-repository-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.agent-repository-action {
+  flex: none;
+  align-self: center;
+  color: var(--primary);
+  font-size: 11px;
+  font-weight: 600;
+}
+.agent-repository-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 28px;
+  color: var(--muted-foreground);
+  font-size: var(--workspace-text-xs);
+}
+.agent-repository-state.is-error {
+  color: var(--destructive);
+}
+.agent-repository-state button {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  padding: 5px 10px;
+  color: var(--foreground);
+  font-size: var(--workspace-text-xs);
+  cursor: pointer;
+}
+.agent-repository-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 32px;
+  border: 1px dashed var(--border);
+  border-radius: 16px;
+  background: var(--card);
+  padding: 38px 24px;
+  color: var(--muted-foreground);
+  text-align: center;
+}
+.agent-repository-empty strong {
+  color: var(--foreground);
+  font-size: 14px;
+}
+.agent-repository-empty p {
+  margin: 0;
+  font-size: var(--workspace-text-xs);
+}
+.agent-repository-empty .skill-primary-button {
+  margin-top: 6px;
+}
+
+@container skill-repository-stage (max-width: 900px) {
+  .agent-repository-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 620px) {
+  .agent-repository-card {
+    flex-wrap: wrap;
+  }
+  .agent-repository-action {
+    align-self: flex-start;
+  }
+}
+
+@media (max-width: 620px) {
   .skill-repository-toolbar {
     align-items: stretch;
     flex-direction: column;

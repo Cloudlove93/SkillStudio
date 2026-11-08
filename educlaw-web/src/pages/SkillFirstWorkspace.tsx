@@ -1725,6 +1725,7 @@ function SkillFirstWorkspaceContent() {
                 <SkillRepositoryWorkspace
                   skills={repositorySkills}
                   sessions={sessions}
+                  token={token}
                   search={search}
                   onSearch={handleWorkspaceSearch}
                   onSelectSkill={useSkillAsAgent}
@@ -1737,6 +1738,10 @@ function SkillFirstWorkspaceContent() {
                   onDeleteSkills={deleteRepositorySkills}
                   onRenameSkill={renameRepositorySkill}
                   onNew={newSkill}
+                  onOpenAgent={(agentId) =>
+                    navigate(`/agents?agentId=${encodeURIComponent(agentId)}`)
+                  }
+                  onCreateAgent={() => navigate('/agents')}
                 />
               ) : activeSkill ? (
                 <SkillDetailWorkspace
