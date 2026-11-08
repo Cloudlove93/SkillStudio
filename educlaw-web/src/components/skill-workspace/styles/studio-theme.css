@@ -1,0 +1,389 @@
+/* SkillStudio · 统一视觉层
+   纸面底色 / 墨色文字 / 装配编号，把仓库、装配台与生成流程收进同一套语言。 */
+
+.skill-workspace-root {
+  --studio-ink: #1b1b23;
+  --studio-ink-soft: #5f6368;
+  --studio-violet: #584cff;
+  --studio-violet-deep: #4338ca;
+  --studio-violet-wash: #eeecff;
+  --studio-violet-line: #dcd9f7;
+  --studio-paper: #f6f6fb;
+  --studio-paper-warm: #fbfaff;
+  --studio-line: #e8e8f2;
+  --studio-rule: rgba(27, 27, 35, 0.055);
+  --studio-cinnabar: #b9562e;
+  --studio-mono: 'Cascadia Code', 'SFMono-Regular', Consolas, monospace;
+  --studio-sheet-shadow: 0 22px 54px rgba(27, 27, 35, 0.07);
+}
+
+.dark .skill-workspace-root {
+  --studio-ink: #f1eff8;
+  --studio-ink-soft: #a7a2b8;
+  --studio-violet: #a99cff;
+  --studio-violet-deep: #c7bfff;
+  --studio-violet-wash: rgba(88, 76, 255, 0.18);
+  --studio-violet-line: rgba(169, 156, 255, 0.3);
+  --studio-paper: #14131f;
+  --studio-paper-warm: #1b1a26;
+  --studio-line: #2e2c3d;
+  --studio-rule: rgba(241, 239, 248, 0.05);
+  --studio-cinnabar: #e08a63;
+  --studio-sheet-shadow: 0 24px 64px rgba(0, 0, 0, 0.36);
+}
+
+/* 画布：极淡工程网格，给“装配”一点可读的秩序感 */
+.skill-workspace-root {
+  background:
+    radial-gradient(
+      780px 420px at 5% -12%,
+      color-mix(in srgb, var(--studio-violet) 12%, transparent),
+      transparent 66%
+    ),
+    radial-gradient(
+      620px 360px at 97% 0%,
+      color-mix(in srgb, var(--studio-cinnabar) 6%, transparent),
+      transparent 62%
+    ),
+    repeating-linear-gradient(
+      90deg,
+      var(--studio-rule) 0 1px,
+      transparent 1px 72px
+    ),
+    repeating-linear-gradient(
+      0deg,
+      var(--studio-rule) 0 1px,
+      transparent 1px 72px
+    ),
+    linear-gradient(180deg, var(--studio-paper-warm), var(--studio-paper));
+}
+
+.dark .skill-workspace-root {
+  background:
+    radial-gradient(
+      780px 420px at 5% -12%,
+      color-mix(in srgb, var(--studio-violet) 20%, transparent),
+      transparent 66%
+    ),
+    repeating-linear-gradient(
+      90deg,
+      var(--studio-rule) 0 1px,
+      transparent 1px 72px
+    ),
+    repeating-linear-gradient(
+      0deg,
+      var(--studio-rule) 0 1px,
+      transparent 1px 72px
+    ),
+    linear-gradient(180deg, var(--studio-paper-warm), var(--studio-paper));
+}
+
+/* 内容是一张纸，而不是一块屏幕 */
+.skill-content-column {
+  border-color: var(--studio-line);
+  background: var(--workspace-surface);
+  box-shadow: var(--studio-sheet-shadow);
+}
+
+.dark .skill-content-column {
+  border-color: var(--studio-line);
+}
+
+/* 侧栏：去掉色块感，只留轻纸面与紫色墨线 */
+.isk-sidebar {
+  background: transparent;
+  padding: 6px 12px 12px;
+}
+
+.isk-sidebar-nav .isk-nav-button {
+  border-radius: 9px;
+  letter-spacing: 0.01em;
+}
+
+.isk-sidebar-nav .isk-nav-button.is-active {
+  background: var(--studio-violet-wash);
+  color: var(--studio-violet-deep);
+}
+
+.isk-sidebar-nav .isk-nav-button.is-active b,
+.isk-sidebar-nav .isk-nav-button.is-active em {
+  color: var(--studio-violet-deep);
+}
+
+.isk-sidebar-section-label,
+.skill-eyebrow {
+  font-family: var(--studio-mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.skill-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--studio-violet-deep);
+}
+
+.skill-eyebrow::before {
+  content: '';
+  width: 18px;
+  height: 1px;
+  background: var(--studio-violet);
+}
+
+/* 仓库：更明确的编辑式层级 */
+.skill-repository {
+  padding: 40px 48px 56px;
+}
+
+.skill-repository-header {
+  border-bottom: 1px solid var(--studio-line);
+  padding-bottom: 28px;
+}
+
+.skill-repository-header h1 {
+  margin: 10px 0 8px;
+  font-size: 30px;
+  font-weight: 640;
+  letter-spacing: -0.035em;
+  line-height: 1.2;
+}
+
+.skill-repository-header p {
+  max-width: 560px;
+  color: var(--studio-ink-soft);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.repository-scope-tabs {
+  display: inline-flex;
+  gap: 30px;
+  margin-top: 20px;
+  border: 0;
+  border-bottom: 1px solid var(--studio-line);
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.repository-scope-tabs button {
+  position: relative;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 12px 2px 11px;
+  color: var(--studio-ink-soft);
+  font-family: var(--studio-mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.repository-scope-tabs button:hover {
+  background: transparent;
+  color: var(--studio-ink);
+}
+
+.repository-scope-tabs button.is-active {
+  background: transparent;
+  box-shadow: none;
+  color: var(--studio-ink);
+}
+
+.repository-scope-tabs button.is-active::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  background: var(--studio-violet);
+}
+
+.repository-scope-tabs span {
+  background: var(--studio-violet-wash);
+  color: var(--studio-violet-deep);
+  font-family: var(--studio-mono);
+}
+
+/* Agent 卡片：纸片 + 细描边 + 编号式元信息 */
+.agent-repository-grid {
+  gap: 14px;
+}
+
+.agent-repository-card {
+  border-color: var(--studio-line);
+  border-radius: 16px;
+  background: var(--studio-paper-warm);
+  padding: 18px;
+  gap: 14px;
+}
+
+.agent-repository-card:hover {
+  border-color: var(--studio-violet-line);
+  box-shadow: 0 16px 34px
+    color-mix(in srgb, var(--studio-violet) 13%, transparent);
+}
+
+.agent-repository-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: var(--studio-violet-wash);
+  color: var(--studio-violet-deep);
+}
+
+.agent-repository-body strong {
+  font-size: 15px;
+  font-weight: 640;
+  letter-spacing: -0.01em;
+}
+
+.agent-repository-desc {
+  color: var(--studio-ink-soft);
+  font-size: 12px;
+}
+
+.agent-repository-meta {
+  color: var(--studio-ink-soft);
+  font-family: var(--studio-mono);
+  font-size: 12px;
+  letter-spacing: 0.01em;
+}
+
+.agent-repository-action {
+  color: var(--studio-violet-deep);
+  font-family: var(--studio-mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+}
+
+.agent-repository-empty {
+  border-color: var(--studio-line);
+  border-radius: 18px;
+  background: var(--studio-paper-warm);
+  padding: 44px 24px;
+}
+
+/* Agent 装配台的视觉覆盖放在 agent-workspace/studio-agent.css，
+   与 agent-workspace.css 一起加载，保证覆盖顺序。 */
+
+/* 生成首页：让输入区成为一张可落笔的纸 */
+.skill-home-composer {
+  border-radius: 16px;
+  border-color: var(--studio-line);
+  background: var(--studio-paper-warm);
+  box-shadow: 0 18px 42px rgba(27, 27, 35, 0.06);
+}
+
+.dark .skill-home-composer {
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.26);
+}
+
+.skill-home-way-grid > button {
+  border-color: var(--studio-line);
+  border-radius: 14px;
+  background: var(--studio-paper-warm);
+}
+
+.skill-home-way-grid {
+  counter-reset: studio-way;
+}
+
+.skill-home-way-grid > button {
+  counter-increment: studio-way;
+}
+
+.skill-home-way-grid > button::after {
+  font-family: var(--studio-mono);
+}
+
+.skill-home-way-label {
+  font-family: var(--studio-mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* 主按钮：实心墨紫，不用通用渐变 */
+.skill-primary-button {
+  border: 0;
+  border-radius: 10px;
+  background: var(--studio-violet);
+  color: #ffffff;
+  box-shadow: 0 10px 22px
+    color-mix(in srgb, var(--studio-violet) 24%, transparent);
+}
+
+.skill-primary-button:hover:not(:disabled) {
+  background: var(--studio-violet-deep);
+}
+
+/* 暗色下主色变浅，只用于文字；实心按钮改用深紫，保证白字对比度 */
+.dark .skill-primary-button {
+  background: #6f5cf5;
+  color: #ffffff;
+}
+
+.dark .skill-primary-button:hover:not(:disabled) {
+  background: #7d6bff;
+}
+
+/* 焦点与选择 */
+.skill-workspace-root :focus-visible {
+  outline: 2px solid
+    color-mix(in srgb, var(--studio-violet) 55%, transparent);
+  outline-offset: 2px;
+}
+
+.skill-workspace-root ::selection {
+  background: color-mix(in srgb, var(--studio-violet) 22%, transparent);
+}
+
+/* 一次轻量的入场，不打扰操作 */
+@keyframes studio-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.skill-repository,
+.skill-creation-home-content {
+  animation: studio-rise 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skill-repository,
+  .skill-creation-home-content {
+    animation: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .skill-repository {
+    padding: 28px 24px 40px;
+  }
+
+  .skill-repository-header h1 {
+    font-size: 25px;
+  }
+}
+
+@media (max-width: 620px) {
+  .skill-repository {
+    padding: 24px 16px 36px;
+  }
+
+  .repository-scope-tabs {
+    gap: 18px;
+  }
+}

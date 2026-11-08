@@ -801,7 +801,7 @@
   gap: 10px;
   margin-top: 4px;
   color: var(--muted-foreground);
-  font-size: 11px;
+  font-size: var(--workspace-text-xs);
 }
 .agent-repository-meta span {
   display: inline-flex;
@@ -812,7 +812,7 @@
   flex: none;
   align-self: center;
   color: var(--primary);
-  font-size: 11px;
+  font-size: var(--workspace-text-xs);
   font-weight: 600;
 }
 .agent-repository-state {

@@ -17,6 +17,7 @@ import { AgentSkillPicker, type OpenAgentSkill } from './AgentSkillPicker';
 import { AgentConversation } from './AgentConversation';
 import '../skill-workspace/skill-workspace.css';
 import './agent-workspace.css';
+import './studio-agent.css';
 
 export type AgentWorkspacePanelProps = {
   token: string;
