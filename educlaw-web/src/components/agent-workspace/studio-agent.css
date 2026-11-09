@@ -690,6 +690,47 @@
   background: color-mix(in srgb, var(--studio-violet) 22%, transparent);
 }
 
+/* 独立的会话页：单列布局，装配侧栏不参与 */
+.skill-workspace-root.agent-workspace-panel.agent-chat-page {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.agent-chat-page .agent-main {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  overflow: hidden;
+}
+
+/* flex 列里的 auto 外边距会吃掉拉伸空间，这里显式给宽度 */
+.agent-chat-page .agent-header {
+  flex-shrink: 0;
+  width: 100%;
+}
+
+.agent-chat-page .agent-chat-layout {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+  width: 100%;
+  margin: 16px auto 0;
+}
+
+.agent-workspace-panel .agent-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 0 8px;
+  color: var(--studio-ink-soft);
+  font-size: 12px;
+  text-decoration: none;
+  transition: color 150ms ease;
+}
+
+.agent-workspace-panel .agent-back-link:hover {
+  color: var(--studio-violet-deep);
+}
+
 @keyframes studio-agent-rise {
   from {
     opacity: 0;

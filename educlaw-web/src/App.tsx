@@ -85,6 +85,7 @@ function AppRoutes() {
         <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />} />
         <Route path="/" element={<RequireAuth><SkillFirstWorkspace /></RequireAuth>} />
         <Route path="/agents" element={<RequireAuth><AgentWorkspacePage /></RequireAuth>} />
+        <Route path="/agents/chat" element={<RequireAuth><AgentWorkspacePage mode="chat" /></RequireAuth>} />
         <Route path="/skills" element={<RequireAuth><SkillFirstWorkspace /></RequireAuth>} />
         <Route path="/legacy" element={<Navigate to="/" replace />} />
         <Route path="/workflow" element={<WorkflowDemo />} />
