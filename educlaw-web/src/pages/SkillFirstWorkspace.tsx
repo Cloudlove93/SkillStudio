@@ -1000,6 +1000,7 @@ function SkillFirstWorkspaceContent() {
 
   useEffect(() => {
     if (
+      location.pathname !== '/' ||
       workspaceState.activeView !== 'create' ||
       session?.status !== 'completed'
     )
@@ -1789,12 +1790,14 @@ function SkillFirstWorkspaceContent() {
                   onSummarize={summarize}
                   onOpenAgent={() => void enterAgentWorkspace(session)}
                   onOpenSkill={() => {
-                    if (session.package_id && session.skill_id)
-                      navigateWorkspaceView(
-                        'versions',
-                        `${session.package_id}:${session.skill_id}`,
-                        true,
-                      );
+                    if (!session.package_id || !session.skill_id) return;
+                    const params = new URLSearchParams({
+                      tab: 'skills',
+                      previewSkill: session.skill_id,
+                      previewPackage: session.package_id,
+                    });
+                    if (session.skill_version_id) params.set('skillVersion', session.skill_version_id);
+                    navigate(`/agents?${params}`);
                   }}
                   onRetry={() => lastActionRef.current?.()}
                   onFiles={(files) => void addFiles(files)}

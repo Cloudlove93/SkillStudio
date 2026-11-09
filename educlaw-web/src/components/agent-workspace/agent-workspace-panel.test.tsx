@@ -256,6 +256,20 @@ function button(text: string) {
   expect(found, text).toBeDefined();
   return found!;
 }
+
+it('shows and retries list errors in the embedded detail view', async () => {
+  api.list
+    .mockRejectedValueOnce(new Error('Agent 列表暂时不可用'))
+    .mockResolvedValueOnce([agent()]);
+  await render({ embedded: true });
+  expect(container.querySelector('[role=alert]')?.textContent).toContain(
+    'Agent 列表暂时不可用',
+  );
+  await act(async () => button('重试 Agent 列表').click());
+  expect(
+    container.querySelector('[aria-label="Agent 只读详情"]'),
+  ).not.toBeNull();
+});
 async function click(text: string) {
   await act(async () => button(text).click());
 }
@@ -302,8 +316,22 @@ it('creates an Agent without skills under StrictMode and retains the saved selec
   expect(window.location.search).toContain('agentId=1');
   expect(button('新建运行对话').disabled).toBe(true);
 });
+it('opens an empty embedded create form even when the account already has Agents', async () => {
+  window.history.replaceState({}, '', '/agents?create=agent');
+  await render({ embedded: true, createNew: true });
+  expect(api.get).not.toHaveBeenCalled();
+  expect(field('Agent 名称').value).toBe('');
+  await change('Agent 名称', '独立新建助手');
+  await click('创建 Agent');
+  expect(api.create).toHaveBeenCalledWith(
+    'explicit-token',
+    expect.objectContaining({ name: '独立新建助手', skills: [] }),
+  );
+  expect(window.location.search).toContain('agentId=1');
+});
 it('edits with CAS, multiple skills, explicit versions and disabled bindings', async () => {
   await render();
+  await click('编辑配置');
   await change('Agent 指令', '新的协作规则');
   const add = [
     ...container.querySelectorAll<HTMLButtonElement>(
@@ -363,6 +391,7 @@ it('creates an explicit test conversation using its historical anchor and all bo
     packageId: '8',
     skillId: '12',
     name: '旧评价',
+    skillVersionId: '201',
     description: '设计课程',
   });
 });
@@ -418,6 +447,7 @@ it('keeps the saved Agent and reuses the conversation key after save-and-run tra
   window.history.replaceState({}, '', '/agents?skillId=11');
   await render();
   await settle();
+  await click('编辑配置');
   await change('Agent 名称', '新助手');
   await click('保存并使用');
   expect(api.update).toHaveBeenCalledTimes(1);
@@ -460,6 +490,7 @@ it('attaches generated skill to an existing Agent, then reselects it in a new dr
 it('retains unsaved edits after a CAS conflict and offers deliberate reload', async () => {
   api.update.mockRejectedValue(new AgentWorkspaceApiError('配置冲突', 409));
   await render();
+  await click('编辑配置');
   await change('Agent 名称', '未保存');
   await click('保存配置');
   expect(field('Agent 名称').value).toBe('未保存');
@@ -468,6 +499,63 @@ it('retains unsaved edits after a CAS conflict and offers deliberate reload', as
   expect(container.querySelector('[role=alertdialog]')).not.toBeNull();
   await click('继续编辑');
   expect(field('Agent 名称').value).toBe('未保存');
+});
+
+it('opens existing Agents read-only and mounts the picker only after editing', async () => {
+  await render({ embedded: true });
+  expect(
+    container.querySelector('[aria-label="Agent 只读详情"]'),
+  ).not.toBeNull();
+  expect(container.querySelector('.agent-editor')).toBeNull();
+  expect(container.querySelector('.agent-sidebar')).toBeNull();
+  expect(lite.listRepositorySkills).not.toHaveBeenCalled();
+  await click('编辑配置');
+  expect(container.querySelector('.agent-editor')).not.toBeNull();
+  expect(lite.listRepositorySkills).toHaveBeenCalledOnce();
+});
+
+it('preserves a disabled binding after saving and reloading', async () => {
+  await render();
+  await click('编辑配置');
+  await act(async () =>
+    container
+      .querySelector<HTMLInputElement>(
+        '.agent-attached-skill input[type=checkbox]',
+      )!
+      .click(),
+  );
+  await click('保存配置');
+  const saved = await api.update.mock.results[0].value;
+  api.get.mockResolvedValue(saved);
+  await act(async () => root.unmount());
+  root = createRoot(container);
+  await render();
+  expect(container.textContent).toContain('已停用');
+  await click('编辑配置');
+  expect(
+    container.querySelector<HTMLInputElement>(
+      '.agent-attached-skill input[type=checkbox]',
+    )!.checked,
+  ).toBe(false);
+});
+
+it('limits the picker to twenty bindings including disabled ones', async () => {
+  const full = agent({
+    skills: Array.from({ length: 20 }, (_, index) => ({
+      ...agent().skills[0],
+      skillId: String(index + 100),
+      enabled: false,
+    })),
+  });
+  api.get.mockResolvedValue(full);
+  await render();
+  await click('编辑配置');
+  expect(container.querySelectorAll('.agent-attached-skill')).toHaveLength(20);
+  for (const add of container.querySelectorAll<HTMLButtonElement>(
+    '.agent-skill-result button',
+  ))
+    expect(add.disabled).toBe(true);
+  expect(container.textContent).toContain('最多挂载 20 个 Skill');
 });
 it('refuses to render chat when the persisted anchor is absent from the Agent snapshot', async () => {
   const inconsistent = thread();

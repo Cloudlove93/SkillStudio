@@ -7,6 +7,7 @@ import { Toaster } from 'sonner'
 import { BASE } from '@/api/client'
 import { PRODUCT_NAME, PRODUCT_WORKSPACE_NAME } from '@/lib/brand'
 import { useAuthStore } from './stores/auth'
+import { legacySkillsDestination } from './components/asset-center/asset-center-state'
 
 const AdminPage = lazy(() => import('./pages/AdminPage'))
 const LoginPage = lazy(() => import('./pages/LoginPage'))
@@ -20,6 +21,18 @@ function RouteFallback() {
       正在加载…
     </div>
   )
+}
+
+function LegacySkillsRedirect() {
+  const location = useLocation()
+  return <Navigate to={legacySkillsDestination(location.search, location.hash)} replace />
+}
+
+function WorkspaceEntry() {
+  const location = useLocation()
+  const view = new URLSearchParams(location.search).get('view')
+  if (view === 'repository' || view === 'my-skills') return <LegacySkillsRedirect />
+  return <SkillFirstWorkspace />
 }
 
 function NotFoundPage() {
@@ -83,9 +96,9 @@ function AppRoutes() {
     <Suspense fallback={<RouteFallback />}>
       <Routes>
         <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />} />
-        <Route path="/" element={<RequireAuth><SkillFirstWorkspace /></RequireAuth>} />
+        <Route path="/" element={<RequireAuth><WorkspaceEntry /></RequireAuth>} />
         <Route path="/agents" element={<RequireAuth><AgentWorkspacePage /></RequireAuth>} />
-        <Route path="/skills" element={<RequireAuth><SkillFirstWorkspace /></RequireAuth>} />
+        <Route path="/skills" element={<RequireAuth><LegacySkillsRedirect /></RequireAuth>} />
         <Route path="/legacy" element={<Navigate to="/" replace />} />
         <Route path="/workflow" element={<WorkflowDemo />} />
         <Route path="/admin" element={<RequireAuth><AdminPage /></RequireAuth>} />

@@ -810,8 +810,10 @@ it('restores a completed generation result after refreshing its URL', async () =
     const params = new URLSearchParams(
       container.querySelector('[data-route]')!.textContent!,
     );
-    expect(params.get('view')).toBe('versions');
-    expect(params.get('skill')).toBe('7:11');
+    expect(params.get('tab')).toBe('skills');
+    expect(params.get('previewPackage')).toBe('7');
+    expect(params.get('previewSkill')).toBe('11');
+    expect(params.get('skillVersion')).toBe('1');
     expect(params.has('resultSession')).toBe(false);
   });
 });
