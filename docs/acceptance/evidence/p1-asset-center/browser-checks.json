@@ -1,0 +1,94 @@
+{
+  "fixture": true,
+  "database": false,
+  "modelCalls": false,
+  "checkedAt": "2026-11-09T06:25:28.073Z",
+  "checks": [
+    {
+      "name": "双页签独立搜索、筛选、排序、分页及刷新恢复，方向键切换焦点",
+      "passed": true
+    },
+    {
+      "name": "Agent 默认只读、版本记录、跨包 Skill 固定版本详情",
+      "passed": true
+    },
+    {
+      "name": "停用 Skill 保存并刷新后保持停用，保存携带 expectedUpdatedAt",
+      "passed": true
+    },
+    {
+      "name": "409 保留本地编辑，重新加载确认框焦点约束、Escape 取消及确认恢复",
+      "passed": true
+    },
+    {
+      "name": "/skills 旧列表和 agentId/conversation 深链兼容",
+      "passed": true
+    },
+    {
+      "name": "375px 对话历史折叠，输入法选词与 Shift+Enter 保留输入，Enter 发送一次",
+      "passed": true
+    },
+    {
+      "name": "375、768、1440px 无横向溢出，明暗主题可用",
+      "passed": true
+    },
+    {
+      "name": "P3 生成结果组件复用 Agent/Skill 卡片并打开固定版本 Skill",
+      "passed": true
+    }
+  ],
+  "contrastChecks": [
+    {
+      "theme": "light",
+      "ratios": [
+        {
+          "name": "辅助文字",
+          "ratio": 5.49,
+          "minimum": 4.5
+        },
+        {
+          "name": "主要按钮",
+          "ratio": 4.89,
+          "minimum": 4.5
+        },
+        {
+          "name": "当前页签",
+          "ratio": 4.62,
+          "minimum": 4.5
+        },
+        {
+          "name": "输入框边界",
+          "ratio": 3.3,
+          "minimum": 3
+        }
+      ]
+    },
+    {
+      "theme": "dark",
+      "ratios": [
+        {
+          "name": "辅助文字",
+          "ratio": 8.44,
+          "minimum": 4.5
+        },
+        {
+          "name": "主要按钮",
+          "ratio": 4.89,
+          "minimum": 4.5
+        },
+        {
+          "name": "当前页签",
+          "ratio": 9.03,
+          "minimum": 4.5
+        },
+        {
+          "name": "输入框边界",
+          "ratio": 4.2,
+          "minimum": 3
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "unknownRequests": []
+}

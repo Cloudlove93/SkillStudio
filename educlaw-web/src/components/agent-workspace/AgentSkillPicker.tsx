@@ -8,6 +8,7 @@ export type OpenAgentSkill = (skill: {
   skillId: string;
   name: string;
   description: string;
+  skillVersionId?: string;
 }) => void;
 
 export function AgentSkillPicker({
@@ -155,7 +156,9 @@ export function AgentSkillPicker({
                 <button
                   type="button"
                   disabled={!versionId || limitReached}
-                  title={limitReached ? '每个 Agent 最多挂载 20 个 Skill' : undefined}
+                  title={
+                    limitReached ? '每个 Agent 最多挂载 20 个 Skill' : undefined
+                  }
                   onClick={() => {
                     if (versionId && !limitReached)
                       onChange([
@@ -317,7 +320,12 @@ function AttachedSkill({
           </button>
         )}
         {onOpenSkill && info && (
-          <button type="button" onClick={() => onOpenSkill(info)}>
+          <button
+            type="button"
+            onClick={() =>
+              onOpenSkill({ ...info, skillVersionId: binding.skillVersionId })
+            }
+          >
             打开 Skill ↗
           </button>
         )}

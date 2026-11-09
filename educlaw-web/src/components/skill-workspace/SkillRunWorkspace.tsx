@@ -343,6 +343,7 @@ export function SkillRunWorkspace({
               if (
                 event.key === 'Enter' &&
                 !event.shiftKey &&
+                !event.nativeEvent.isComposing &&
                 !state.busy &&
                 !historyLoading
               ) {

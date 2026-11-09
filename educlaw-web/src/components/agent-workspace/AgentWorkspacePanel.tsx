@@ -5,22 +5,37 @@ import type {
   AgentWorkspaceInput,
   ArenaThread,
 } from '@educlaw/shared';
-import { Bot, ChevronLeft, MessageSquare, Plus } from 'lucide-react';
+import {
+  BookOpen,
+  Bot,
+  ChevronLeft,
+  MessageSquare,
+  Plus,
+  Settings2,
+} from 'lucide-react';
 import { agentsApi, AgentWorkspaceApiError } from '../../api/agents';
 import { liteApi, type RepositorySkillRecord } from '../../api/lite-api';
 import { AgentSkillPicker, type OpenAgentSkill } from './AgentSkillPicker';
 import { AgentConversation } from './AgentConversation';
+import { AgentOverview } from '../asset-center/AgentOverview';
+import { agentIsReady } from '../asset-center/asset-center-state';
 import '../skill-workspace/skill-workspace.css';
 import './agent-workspace.css';
 import './studio-agent.css';
 
+/** assemble = 只负责装配配置；chat = 只负责使用对话。 */
 export type AgentWorkspaceMode = 'assemble' | 'chat';
 export type AgentWorkspacePanelProps = {
   token: string;
   onOpenSkill?: OpenAgentSkill;
   initialSkillId?: string;
-  /** assemble = 只负责装配配置；chat = 只负责使用对话。 */
   mode?: AgentWorkspaceMode;
+  /** 嵌入资产中心时隐藏自带列表，只渲染当前 Agent 的详情与编辑。 */
+  embedded?: boolean;
+  /** 资产中心「创建 Agent」入口：即使已有 Agent 也打开空白表单。 */
+  createNew?: boolean;
+  /** 把未保存状态同步给外层，用于离开前确认。 */
+  onDirtyChange?: (dirty: boolean) => void;
 };
 export type { OpenAgentSkill } from './AgentSkillPicker';
 
@@ -96,8 +111,18 @@ function clearAutoChatParam() {
     `${url.pathname}${url.search}${url.hash}`,
   );
 }
+function clearNewParam() {
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has('new')) return;
+  url.searchParams.delete('new');
+  window.history.replaceState(
+    window.history.state,
+    '',
+    `${url.pathname}${url.search}${url.hash}`,
+  );
+}
 
-/** Mount inside the authenticated /agents page or an existing workspace shell. */
+/** Mount inside the authenticated /agents pages or the chat route. */
 export function AgentWorkspacePanel(props: AgentWorkspacePanelProps) {
   return <AgentWorkspaceSession key={props.token} {...props} />;
 }
@@ -107,6 +132,9 @@ function AgentWorkspaceSession({
   onOpenSkill,
   initialSkillId,
   mode = 'assemble',
+  embedded = false,
+  createNew = false,
+  onDirtyChange,
 }: AgentWorkspacePanelProps) {
   const isChat = mode === 'chat';
   const navigate = useNavigate();
@@ -144,6 +172,7 @@ function AgentWorkspaceSession({
   const [provisionFailed, setProvisionFailed] = useState(false);
   const [provisionRetry, setProvisionRetry] = useState(0);
   const [thread, setThread] = useState<ArenaThread | null>(null);
+  const [tab, setTab] = useState<'overview' | 'settings'>('overview');
   const [saving, setSaving] = useState(false);
   const [starting, setStarting] = useState(false);
   const [actionError, setActionError] = useState('');
@@ -175,6 +204,50 @@ function AgentWorkspaceSession({
   const dirty =
     JSON.stringify(draft) !==
     JSON.stringify(agent ? inputOf(agent) : emptyInput());
+
+  useEffect(() => {
+    onDirtyChange?.(dirty || saving || starting);
+    return () => onDirtyChange?.(false);
+  }, [dirty, saving, starting, onDirtyChange]);
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [dirty]);
+
+  useEffect(() => {
+    if (!discardTarget) return;
+    const previous = document.activeElement;
+    const dialog = document.querySelector<HTMLElement>('.agent-discard-dialog');
+    dialog?.querySelector<HTMLButtonElement>('button')?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setDiscardTarget(null);
+      }
+      if (event.key !== 'Tab') return;
+      const buttons = dialog?.querySelectorAll<HTMLButtonElement>('button');
+      const first = buttons?.[0];
+      const last = buttons?.[buttons.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      if (previous instanceof HTMLElement && previous.isConnected)
+        previous.focus();
+    };
+  }, [discardTarget]);
 
   useEffect(() => {
     mounted.current = true;
@@ -210,7 +283,8 @@ function AgentWorkspaceSession({
             'agentId',
           );
           const nextId =
-            requested ?? (querySkillId ? null : (items[0]?.id ?? null));
+            requested ??
+            (querySkillId || createNew ? null : (items[0]?.id ?? null));
           setSelectedId(nextId);
           if (!requested) writeSelection(nextId);
           setSelectionReady(true);
@@ -285,6 +359,7 @@ function AgentWorkspaceSession({
     setNotice('');
     setThread(null);
     setConversations([]);
+    setTab(selectedId ? 'overview' : 'settings');
     setDetailLoading(!!selectedId);
     if (selectedId) {
       void agentsApi
@@ -453,6 +528,7 @@ function AgentWorkspaceSession({
     }));
     setAttachmentError('');
     setProvisionFailed(false);
+    setTab('settings');
     setNotice(`已添加 ${pendingSkill.name}，保存后生效。`);
   }
 
@@ -468,10 +544,7 @@ function AgentWorkspaceSession({
     setSaving(true);
     setActionError('');
     setNotice('');
-    if (andRun) {
-      autoChatStarted.current = true;
-      clearAutoChatParam();
-    }
+    if (andRun) autoChatStarted.current = true;
     const generation = scope.current;
     const input = {
       ...draft,
@@ -529,15 +602,13 @@ function AgentWorkspaceSession({
     if (
       !agent ||
       dirty ||
-      !agent.skills.some((s) => s.enabled && s.available !== false) ||
+      !agentIsReady(agent) ||
       actionLock.current
     )
       return;
     actionLock.current = true;
     setStarting(true);
     setActionError('');
-    autoChatStarted.current = true;
-    clearAutoChatParam();
     const generation = scope.current;
     if (requestId) {
       requestKey.current = {
@@ -567,15 +638,7 @@ function AgentWorkspaceSession({
       ]);
       setThread(next);
       writeSelection(agent.id, next.id);
-      const url = new URL(window.location.href);
-      if (url.searchParams.has('new')) {
-        url.searchParams.delete('new');
-        window.history.replaceState(
-          window.history.state,
-          '',
-          `${url.pathname}${url.search}${url.hash}`,
-        );
-      }
+      clearNewParam();
     } catch (e) {
       if (mounted.current && generation === scope.current)
         setActionError(errorMessage(e));
@@ -594,7 +657,7 @@ function AgentWorkspaceSession({
     (!isChat || !conversationLoading) &&
     !starting &&
     !saving &&
-    agent.skills.some((s) => s.enabled && s.available !== false);
+    agentIsReady(agent);
 
   // 装配台收到 autochat 旧链接时，转交给独立的会话页，不在装配流程里混入对话。
   useEffect(() => {
@@ -626,7 +689,7 @@ function AgentWorkspaceSession({
       (conversationLoadedFor !== agent.id && !conversationError)
     )
       return;
-    if (!agent.skills.some((s) => s.enabled && s.available !== false)) return;
+    if (!agentIsReady(agent)) return;
     autoChatStarted.current = true;
     void start('run');
     // 只在首次进入时自动开一次对话，后续由用户主动操作。
@@ -648,68 +711,82 @@ function AgentWorkspaceSession({
     <div
       className={`skill-workspace-root agent-workspace-panel${
         isChat ? ' agent-chat-page' : ''
-      }`}
+      }${embedded ? ' is-embedded' : ''}`}
     >
-      {!isChat && (
+      {!isChat && !embedded && (
         <aside className="agent-sidebar" aria-label="我的 Agent">
-        <div className="agent-section-heading">
-          <h2>
-            <Bot size={20} />
-            我的 Agent
-          </h2>
+          <div className="agent-section-heading">
+            <h2>
+              <Bot size={20} />
+              我的 Agent
+            </h2>
+            <button
+              type="button"
+              aria-label="创建 Agent"
+              onClick={() => choose(null)}
+              disabled={saving || starting}
+            >
+              <Plus size={17} />
+            </button>
+          </div>
+          <p className="agent-muted">
+            把可复用的 Skill 组合成自己的教学 Agent。
+          </p>
+          {listLoading && <p role="status">正在加载 Agent…</p>}
+          {listError && (
+            <div role="alert" className="agent-error">
+              {listError}
+              <button type="button" onClick={() => setListRetry((r) => r + 1)}>
+                重试 Agent 列表
+              </button>
+            </div>
+          )}
+          <nav className="agent-list">
+            {agents.map((item) => (
+              <button
+                type="button"
+                key={item.id}
+                aria-current={selectedId === item.id ? 'true' : undefined}
+                disabled={saving || starting}
+                onClick={() => choose(item.id)}
+              >
+                <strong>{item.name}</strong>
+                <span>{item.description || '教学助手'}</span>
+                <small>
+                  {item.skills.filter((s) => s.enabled).length} 个启用的 Skill
+                </small>
+              </button>
+            ))}
+          </nav>
+          {!listLoading && !listError && !agents.length && (
+            <div className="agent-empty-inline">
+              创建第一个 Agent，绑定你已有的 Skill。
+            </div>
+          )}
           <button
             type="button"
-            aria-label="创建 Agent"
+            className="agent-new-button"
             onClick={() => choose(null)}
             disabled={saving || starting}
           >
-            <Plus size={17} />
+            <Plus size={15} />
+            新建 Agent
           </button>
-        </div>
-        <p className="agent-muted">把可复用的 Skill 组合成自己的教学 Agent。</p>
-        {listLoading && <p role="status">正在加载 Agent…</p>}
-        {listError && (
+        </aside>
+      )}
+      <main className="agent-main" aria-label="Agent 工作区">
+        {embedded && listLoading && <p role="status">正在加载 Agent…</p>}
+        {embedded && listError && (
           <div role="alert" className="agent-error">
             {listError}
-            <button type="button" onClick={() => setListRetry((r) => r + 1)}>
+            <button
+              type="button"
+              onClick={() => setListRetry((value) => value + 1)}
+            >
               重试 Agent 列表
             </button>
           </div>
         )}
-        <nav className="agent-list">
-          {agents.map((item) => (
-            <button
-              type="button"
-              key={item.id}
-              aria-current={selectedId === item.id ? 'true' : undefined}
-              disabled={saving || starting}
-              onClick={() => choose(item.id)}
-            >
-              <strong>{item.name}</strong>
-              <span>{item.description || '教学助手'}</span>
-              <small>
-                {item.skills.filter((s) => s.enabled).length} 个启用的 Skill
-              </small>
-            </button>
-          ))}
-        </nav>
-        {!listLoading && !listError && !agents.length && (
-          <div className="agent-empty-inline">
-            创建第一个 Agent，绑定你已有的 Skill。
-          </div>
-        )}
-        <button
-          type="button"
-          className="agent-new-button"
-          onClick={() => choose(null)}
-          disabled={saving || starting}
-        >
-          <Plus size={15} />
-          新建 Agent
-        </button>
-      </aside>
-      )}
-      <main className="agent-main" aria-label="Agent 工作区">
         <header className="agent-header">
           <div>
             {isChat && (
@@ -732,19 +809,21 @@ function AgentWorkspaceSession({
                 ? '对话固定创建时的 Agent 指令、模型与 Skill 版本。'
                 : '定义 Agent 核心，再把 Skill 模块自由装配成可运行的包。'}
             </p>
-            <div className="agent-hero-stats" aria-label="Agent 概览">
-              <span className="agent-stat is-primary">
-                <strong>{draft.skills.filter((s) => s.enabled).length}</strong>
-                启用模块
-              </span>
-              <span className="agent-stat">
-                <strong>{draft.skills.length}</strong>
-                已装配
-              </span>
-              <span className="agent-stat is-model">
-                {draft.model.trim() || '默认模型'}
-              </span>
-            </div>
+            {!isChat && (
+              <div className="agent-hero-stats" aria-label="Agent 概览">
+                <span className="agent-stat is-primary">
+                  <strong>{draft.skills.filter((s) => s.enabled).length}</strong>
+                  启用模块
+                </span>
+                <span className="agent-stat">
+                  <strong>{draft.skills.length}</strong>
+                  已装配
+                </span>
+                <span className="agent-stat is-model">
+                  {draft.model.trim() || '默认模型'}
+                </span>
+              </div>
+            )}
           </div>
           <div className="agent-actions">
             {isChat ? (
@@ -855,213 +934,261 @@ function AgentWorkspaceSession({
             </button>
           </div>
         ) : selectionReady ? (
-          <>
-            {!isChat && (
-              <form
-                className="agent-editor"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  void save();
-                }}
+          isChat ? (
+            <section className="agent-chat-layout">
+              <aside
+                className="agent-conversation-list"
+                aria-label="Agent 对话历史"
               >
-                <fieldset disabled={saving || starting}>
-                  <div className="agent-editor-layout">
-                    <section className="agent-panel agent-core-panel">
-                      <header className="agent-panel-head">
-                        <span className="agent-panel-index">01</span>
-                        <div>
-                          <h2>Agent 核心</h2>
-                          <p>身份、模型与工作方式</p>
-                        </div>
-                      </header>
-                      <div className="agent-form-grid">
-                        <label className="agent-field">
-                          Agent 名称
-                          <input
-                            required
-                            maxLength={100}
-                            value={draft.name}
-                            placeholder="例如：课程设计助手"
-                            onChange={(e) =>
-                              setDraft({ ...draft, name: e.target.value })
-                            }
-                          />
-                        </label>
-                        <label className="agent-field">
-                          模型
-                          <input
-                            maxLength={256}
-                            value={draft.model}
-                            placeholder="留空使用服务端默认模型"
-                            onChange={(e) =>
-                              setDraft({ ...draft, model: e.target.value })
-                            }
-                          />
-                        </label>
-                      </div>
-                      <label className="agent-field">
-                        描述
-                        <textarea
-                          maxLength={2000}
-                          rows={2}
-                          value={draft.description}
-                          placeholder="这个助手适合完成什么任务？"
-                          onChange={(e) =>
-                            setDraft({ ...draft, description: e.target.value })
-                          }
-                        />
-                      </label>
-                      <label className="agent-field">
-                        Agent 指令
-                        <textarea
-                          maxLength={16000}
-                          rows={5}
-                          value={draft.instructions}
-                          placeholder="定义角色、工作方式和多个 Skill 的协作规则…"
-                          onChange={(e) =>
-                            setDraft({ ...draft, instructions: e.target.value })
-                          }
-                        />
-                      </label>
-                    </section>
-                    <section className="agent-panel agent-module-panel">
-                      <header className="agent-panel-head">
-                        <span className="agent-panel-index is-module">02</span>
-                        <div>
-                          <h2>Skill 模块</h2>
-                          <p>从仓库挑选能力，自由组合到当前 Agent</p>
-                        </div>
-                      </header>
-                      <AgentSkillPicker
-                        token={token}
-                        skills={draft.skills}
-                        resolvedSkills={agent?.skills ?? []}
-                        onOpenSkill={openSkill}
-                        onChange={(skills) => setDraft({ ...draft, skills })}
-                      />
-                    </section>
-                  </div>
-                </fieldset>
-                <footer className="agent-editor-footer">
-                  <p className="agent-muted">
-                    {dirty
-                      ? '保存并开始对话会把当前配置绑定到新对话。'
-                      : !draft.skills.some((s) => s.enabled)
-                        ? '可以保存；开始对话前需启用至少一个 Skill。'
-                        : '新对话固定当前指令、模型与 Skill 版本。'}
+                <div className="agent-section-heading">
+                  <h3>对话历史</h3>
+                  <button
+                    type="button"
+                    disabled={conversationLoading}
+                    onClick={() => setConversationRetry((r) => r + 1)}
+                  >
+                    刷新
+                  </button>
+                </div>
+                {conversationLoading && <p role="status">正在加载对话…</p>}
+                {conversationError && (
+                  <p role="alert" className="agent-error">
+                    {conversationError}
                   </p>
-                  <div className="agent-actions">
-                    <button
-                      type="submit"
-                      disabled={
-                        saving ||
-                        starting ||
-                        !draft.name.trim() ||
-                        (!!agent && !dirty)
-                      }
+                )}
+                {conversations.map((item) => (
+                  <button
+                    type="button"
+                    key={item.id}
+                    aria-current={thread?.id === item.id ? 'true' : undefined}
+                    onClick={() => {
+                      setThread(item);
+                      writeSelection(selectedId, item.id);
+                    }}
+                  >
+                    <span>{item.title}</span>
+                    <small>
+                      {item.skillArenaConfig?.surface === 'test'
+                        ? '测试'
+                        : '运行'}{' '}
+                      · {new Date(item.updatedAt).toLocaleDateString('zh-CN')}
+                    </small>
+                  </button>
+                ))}
+                {!conversationLoading && !conversations.length && (
+                  <p className="agent-empty-inline">
+                    还没有对话。点击「新对话」开始。
+                  </p>
+                )}
+              </aside>
+              {thread ? (
+                <AgentConversation
+                  key={`${token}:${thread.id}`}
+                  token={token}
+                  thread={thread}
+                  onOpenSkill={openSkill}
+                />
+              ) : (
+                <div className="agent-chat-empty">
+                  <Bot size={32} />
+                  <h2>
+                    {canStart
+                      ? '选择一个对话，或开始新对话'
+                      : '还没有可运行的 Skill 模块'}
+                  </h2>
+                  <p>
+                    {canStart
+                      ? '历史对话保留创建时的 Agent 配置与 Skill 版本。'
+                      : '先在装配台启用至少一个 Skill，再回来开始对话。'}
+                  </p>
+                  {!canStart && agent && (
+                    <Link
+                      className="agent-back-link"
+                      to={`/agents?agentId=${agent.id}`}
                     >
-                      {saving ? '正在保存…' : agent ? '保存配置' : '创建 Agent'}
-                    </button>
-                    <button
-                      type="button"
-                      className="agent-primary"
-                      disabled={
-                        saving ||
-                        starting ||
-                        !draft.name.trim() ||
-                        !draft.skills.some((s) => s.enabled)
-                      }
-                      onClick={() => void save(true)}
-                    >
-                      {agent ? '保存并开始对话' : '创建并开始对话'}
-                    </button>
-                  </div>
-                </footer>
-              </form>
-            )}
-            {isChat && (
-              <section
-                className="agent-chat-layout"
-              >
-                <aside
-                  className="agent-conversation-list"
-                  aria-label="Agent 对话历史"
+                      <ChevronLeft size={14} />
+                      去装配台启用 Skill
+                    </Link>
+                  )}
+                </div>
+              )}
+            </section>
+          ) : (
+            <>
+              <div className="agent-tabs" role="tablist" aria-label="Agent 面板">
+                {agent && (
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={tab === 'overview'}
+                    id="agent-overview-tab"
+                    aria-controls="agent-overview"
+                    onClick={() => setTab('overview')}
+                  >
+                    <BookOpen size={15} />
+                    概览
+                  </button>
+                )}
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === 'settings'}
+                  id="agent-settings-tab"
+                  aria-controls="agent-settings"
+                  onClick={() => setTab('settings')}
                 >
-                  <div className="agent-section-heading">
-                    <h3>对话历史</h3>
-                    <button
-                      type="button"
-                      disabled={conversationLoading}
-                      onClick={() => setConversationRetry((r) => r + 1)}
-                    >
-                      刷新
-                    </button>
-                  </div>
-                  {conversationLoading && <p role="status">正在加载对话…</p>}
-                  {conversationError && (
-                    <p role="alert" className="agent-error">
-                      {conversationError}
-                    </p>
-                  )}
-                  {conversations.map((item) => (
-                    <button
-                      type="button"
-                      key={item.id}
-                      aria-current={thread?.id === item.id ? 'true' : undefined}
-                      onClick={() => {
-                        setThread(item);
-                        writeSelection(selectedId, item.id);
-                      }}
-                    >
-                      <span>{item.title}</span>
-                      <small>
-                        {item.skillArenaConfig?.surface === 'test'
-                          ? '测试'
-                          : '运行'}{' '}
-                        · {new Date(item.updatedAt).toLocaleDateString('zh-CN')}
-                      </small>
-                    </button>
-                  ))}
-                  {!conversationLoading && !conversations.length && (
-                    <p className="agent-empty-inline">
-                      还没有对话。点击「新对话」开始。
-                    </p>
-                  )}
-                </aside>
-                {thread ? (
-                  <AgentConversation
-                    key={`${token}:${thread.id}`}
+                  <Settings2 size={15} />
+                  编辑配置{dirty ? ' · 未保存' : ''}
+                </button>
+              </div>
+              {tab === 'overview' && agent ? (
+                <div
+                  id="agent-overview"
+                  role="tabpanel"
+                  aria-labelledby="agent-overview-tab"
+                >
+                  <AgentOverview
+                    key={agent.updatedAt}
                     token={token}
-                    thread={thread}
+                    agent={agent}
+                    onEdit={() => setTab('settings')}
                     onOpenSkill={openSkill}
                   />
-                ) : (
-                  <div className="agent-chat-empty">
-                    <Bot size={32} />
-                    <h2>
-                      {canStart
-                        ? '选择一个对话，或开始新对话'
-                        : '还没有可运行的 Skill 模块'}
-                    </h2>
-                    <p>
-                      {canStart
-                        ? '历史对话保留创建时的 Agent 配置与 Skill 版本。'
-                        : '先在装配台启用至少一个 Skill，再回来开始对话。'}
+                </div>
+              ) : tab === 'settings' ? (
+                <form
+                  id="agent-settings"
+                  role="tabpanel"
+                  aria-labelledby="agent-settings-tab"
+                  className="agent-editor"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void save();
+                  }}
+                >
+                  <fieldset disabled={saving || starting}>
+                    <div className="agent-editor-layout">
+                      <section className="agent-panel agent-core-panel">
+                        <header className="agent-panel-head">
+                          <span className="agent-panel-index">01</span>
+                          <div>
+                            <h2>Agent 核心</h2>
+                            <p>身份、模型与工作方式</p>
+                          </div>
+                        </header>
+                        <div className="agent-form-grid">
+                          <label className="agent-field">
+                            Agent 名称
+                            <input
+                              required
+                              maxLength={100}
+                              value={draft.name}
+                              placeholder="例如：课程设计助手"
+                              onChange={(e) =>
+                                setDraft({ ...draft, name: e.target.value })
+                              }
+                            />
+                          </label>
+                          <label className="agent-field">
+                            模型
+                            <input
+                              maxLength={256}
+                              value={draft.model}
+                              placeholder="留空使用服务端默认模型"
+                              onChange={(e) =>
+                                setDraft({ ...draft, model: e.target.value })
+                              }
+                            />
+                          </label>
+                        </div>
+                        <label className="agent-field">
+                          描述
+                          <textarea
+                            maxLength={2000}
+                            rows={2}
+                            value={draft.description}
+                            placeholder="这个助手适合完成什么任务？"
+                            onChange={(e) =>
+                              setDraft({
+                                ...draft,
+                                description: e.target.value,
+                              })
+                            }
+                          />
+                        </label>
+                        <label className="agent-field">
+                          Agent 指令
+                          <textarea
+                            maxLength={16000}
+                            rows={5}
+                            value={draft.instructions}
+                            placeholder="定义角色、工作方式和多个 Skill 的协作规则…"
+                            onChange={(e) =>
+                              setDraft({
+                                ...draft,
+                                instructions: e.target.value,
+                              })
+                            }
+                          />
+                        </label>
+                      </section>
+                      <section className="agent-panel agent-module-panel">
+                        <header className="agent-panel-head">
+                          <span className="agent-panel-index is-module">02</span>
+                          <div>
+                            <h2>Skill 模块</h2>
+                            <p>从仓库挑选能力，自由组合到当前 Agent</p>
+                          </div>
+                        </header>
+                        <AgentSkillPicker
+                          token={token}
+                          skills={draft.skills}
+                          resolvedSkills={agent?.skills ?? []}
+                          onOpenSkill={openSkill}
+                          onChange={(skills) => setDraft({ ...draft, skills })}
+                        />
+                      </section>
+                    </div>
+                  </fieldset>
+                  <footer className="agent-editor-footer">
+                    <p className="agent-muted">
+                      {dirty
+                        ? '保存并开始对话会把当前配置绑定到新对话。'
+                        : !draft.skills.some((s) => s.enabled)
+                          ? '可以保存；开始对话前需启用至少一个 Skill。'
+                          : '新对话固定当前指令、模型与 Skill 版本。'}
                     </p>
-                    {!canStart && agent && (
-                      <Link
-                        className="agent-back-link"
-                        to={`/agents?agentId=${agent.id}`}
+                    <div className="agent-actions">
+                      <button
+                        type="submit"
+                        disabled={
+                          saving ||
+                          starting ||
+                          !draft.name.trim() ||
+                          (!!agent && !dirty)
+                        }
                       >
-                        <ChevronLeft size={14} />
-                        去装配台启用 Skill
-                      </Link>
-                    )}
-                  </div>
-                )}
-              </section>
-            )}
-          </>
+                        {saving ? '正在保存…' : agent ? '保存配置' : '创建 Agent'}
+                      </button>
+                      <button
+                        type="button"
+                        className="agent-primary"
+                        disabled={
+                          saving ||
+                          starting ||
+                          !draft.name.trim() ||
+                          !draft.skills.some((s) => s.enabled)
+                        }
+                        onClick={() => void save(true)}
+                      >
+                        {agent ? '保存并开始对话' : '创建并开始对话'}
+                      </button>
+                    </div>
+                  </footer>
+                </form>
+              ) : null}
+            </>
+          )
         ) : null}
       </main>
       {discardTarget && (

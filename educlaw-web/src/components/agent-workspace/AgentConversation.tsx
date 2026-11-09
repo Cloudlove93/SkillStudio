@@ -129,6 +129,7 @@ export function AgentConversation({
                     onOpenSkill({
                       packageId: skill.packageId,
                       skillId: skill.skillId,
+                      skillVersionId: skill.skillVersionId,
                       name: skill.name,
                       description: skill.description,
                     })
