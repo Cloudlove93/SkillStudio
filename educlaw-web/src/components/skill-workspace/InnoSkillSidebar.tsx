@@ -148,7 +148,7 @@ export function InnoSkillSidebar(props: Props) {
           <NavButton
             active={false}
             icon={<Bot />}
-            label="我的 Agent"
+            label="资产中心"
             onClick={props.onAgents}
           />
         )}

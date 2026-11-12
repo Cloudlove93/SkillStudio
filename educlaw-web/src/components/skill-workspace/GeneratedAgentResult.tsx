@@ -1,5 +1,6 @@
 import type { GuidedCreationSession } from '@educlaw/shared';
-import { Bot, BookOpen, MessageSquare } from 'lucide-react';
+import { BookOpen, MessageSquare } from 'lucide-react';
+import { AssetCard } from '../asset-center/AssetCard';
 
 /** 生成结果内容，不拥有资产中心布局或对话运行逻辑。 */
 export function GeneratedAgentResult({
@@ -20,41 +21,34 @@ export function GeneratedAgentResult({
       aria-label="生成结果"
     >
       <span className="skill-eyebrow">生成完成</span>
-      <h1>
-        <Bot size={24} aria-hidden="true" />{' '}
-        {result?.name ||
+      <AssetCard
+        detail
+        kind={result ? 'agent' : 'skill'}
+        name={
+          result?.name ||
           session.display_name ||
           session.draft.goal ||
-          '教学 Skill'}
-      </h1>
-      <p className="skill-page-subtitle">
-        {result
-          ? result.description ||
-            'Agent 和教学 Skill 已保存，可以开始对话或查看 Skill。'
-          : '这是一条历史 Skill 生成记录。可转为 Agent 使用，原 Skill 和版本继续保留。'}
-      </p>
-      {result && (
-        <>
-          <p>模型：{result.model}</p>
-          <details className="skill-file-preview">
-            <summary>查看 Agent 指令</summary>
-            <pre>{result.instructions}</pre>
-          </details>
-          <h2>已包含的 Skill</h2>
-          <ul>
-            {result.skills.map((skill) => (
-              <li key={skill.id}>
-                <strong>{skill.name}</strong>
-                {skill.description && <p>{skill.description}</p>}
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-      <div className="skill-confirm-actions">
+          '教学 Skill'
+        }
+        description={
+          result
+            ? result.description ||
+              'Agent 和教学 Skill 已保存，可以开始对话或查看 Skill。'
+            : '这是一条历史 Skill 生成记录。可转为 Agent 使用，原 Skill 和版本继续保留。'
+        }
+        metadata={
+          result
+            ? [
+                { label: '模型', value: result.model || '服务端默认模型' },
+                { label: '当前版本', value: `#${result.packageVersionId}` },
+                { label: 'Skill', value: `${result.skills.length} 个` },
+              ]
+            : undefined
+        }
+      >
         <button
           type="button"
-          className="skill-primary-button"
+          className="asset-primary"
           onClick={onOpenAgent}
           disabled={busy || (!session.package_id && !session.skill_id)}
         >
@@ -63,14 +57,32 @@ export function GeneratedAgentResult({
         </button>
         <button
           type="button"
-          className="skill-secondary-button"
           onClick={onOpenSkill}
           disabled={!session.package_id || !session.skill_id}
         >
           <BookOpen size={16} aria-hidden="true" />
           查看 Skill
         </button>
-      </div>
+      </AssetCard>
+      {result && (
+        <>
+          <details className="skill-file-preview">
+            <summary>查看 Agent 指令</summary>
+            <pre>{result.instructions}</pre>
+          </details>
+          <h2>已包含的 Skill</h2>
+          <div className="asset-skill-links">
+            {result.skills.map((skill) => (
+              <AssetCard
+                key={skill.id}
+                kind="skill"
+                name={skill.name}
+                description={skill.description}
+              />
+            ))}
+          </div>
+        </>
+      )}
     </section>
   );
 }

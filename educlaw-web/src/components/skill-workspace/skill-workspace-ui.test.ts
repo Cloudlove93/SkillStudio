@@ -21,12 +21,14 @@ describe('Skill-first workspace UI contract', () => {
     const source = read('../../App.tsx');
 
     expect(source).toContain(
-      'path="/" element={<RequireAuth><SkillFirstWorkspace /></RequireAuth>}',
+      'path="/" element={<RequireAuth><WorkspaceEntry /></RequireAuth>}',
     );
     expect(source).toContain(
       'path="/legacy" element={<Navigate to="/" replace />}',
     );
     expect(source).not.toContain("import('./pages/Workspace')");
+    expect(source).toContain('return <SkillFirstWorkspace />');
+    expect(source).toContain('path="/skills" element={<RequireAuth><LegacySkillsRedirect /></RequireAuth>}');
   });
 
   it('provides one compact entry to the shared right inspector', () => {

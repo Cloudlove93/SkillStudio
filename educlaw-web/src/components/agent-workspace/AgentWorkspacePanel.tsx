@@ -10,11 +10,15 @@ import {
   MessageSquare,
   Plus,
   Settings2,
+  BookOpen,
+  PanelLeft,
 } from 'lucide-react';
 import { agentsApi, AgentWorkspaceApiError } from '../../api/agents';
 import { liteApi, type RepositorySkillRecord } from '../../api/lite-api';
 import { AgentSkillPicker, type OpenAgentSkill } from './AgentSkillPicker';
 import { AgentConversation } from './AgentConversation';
+import { AgentOverview } from '../asset-center/AgentOverview';
+import { agentIsReady } from '../asset-center/asset-center-state';
 import '../skill-workspace/skill-workspace.css';
 import './agent-workspace.css';
 
@@ -22,6 +26,9 @@ export type AgentWorkspacePanelProps = {
   token: string;
   onOpenSkill?: OpenAgentSkill;
   initialSkillId?: string;
+  embedded?: boolean;
+  createNew?: boolean;
+  onDirtyChange?: (dirty: boolean) => void;
 };
 export type { OpenAgentSkill } from './AgentSkillPicker';
 
@@ -107,6 +114,9 @@ function AgentWorkspaceSession({
   token,
   onOpenSkill,
   initialSkillId,
+  embedded = false,
+  createNew = false,
+  onDirtyChange,
 }: AgentWorkspacePanelProps) {
   const [querySkillId, setQuerySkillId] = useState(
     () =>
@@ -142,7 +152,8 @@ function AgentWorkspaceSession({
   const [provisionFailed, setProvisionFailed] = useState(false);
   const [provisionRetry, setProvisionRetry] = useState(0);
   const [thread, setThread] = useState<ArenaThread | null>(null);
-  const [tab, setTab] = useState<'settings' | 'chat'>('settings');
+  const [tab, setTab] = useState<'overview' | 'settings' | 'chat'>('overview');
+  const [historyCollapsed, setHistoryCollapsed] = useState(true);
   const [saving, setSaving] = useState(false);
   const [starting, setStarting] = useState(false);
   const [actionError, setActionError] = useState('');
@@ -154,6 +165,7 @@ function AgentWorkspaceSession({
   const actionLock = useRef(false);
   const scope = useRef(0);
   const mounted = useRef(true);
+  const discardDialog = useRef<HTMLElement>(null);
   const requestKey = useRef<{
     agentId: string;
     purpose: 'run' | 'test';
@@ -171,6 +183,50 @@ function AgentWorkspaceSession({
   const dirty =
     JSON.stringify(draft) !==
     JSON.stringify(agent ? inputOf(agent) : emptyInput());
+
+  useEffect(() => {
+    onDirtyChange?.(dirty || saving || starting);
+    return () => onDirtyChange?.(false);
+  }, [dirty, saving, starting, onDirtyChange]);
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [dirty]);
+
+  useEffect(() => {
+    if (!discardTarget) return;
+    const previous = document.activeElement;
+    discardDialog.current?.querySelector<HTMLButtonElement>('button')?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setDiscardTarget(null);
+      }
+      if (event.key !== 'Tab') return;
+      const buttons =
+        discardDialog.current?.querySelectorAll<HTMLButtonElement>('button');
+      const first = buttons?.[0];
+      const last = buttons?.[buttons.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      if (previous instanceof HTMLElement && previous.isConnected)
+        previous.focus();
+    };
+  }, [discardTarget]);
 
   useEffect(() => {
     mounted.current = true;
@@ -206,7 +262,8 @@ function AgentWorkspaceSession({
             'agentId',
           );
           const nextId =
-            requested ?? (querySkillId ? null : (items[0]?.id ?? null));
+            requested ??
+            (querySkillId || createNew ? null : (items[0]?.id ?? null));
           setSelectedId(nextId);
           if (!requested) writeSelection(nextId);
           setSelectionReady(true);
@@ -281,7 +338,7 @@ function AgentWorkspaceSession({
     setNotice('');
     setThread(null);
     setConversations([]);
-    setTab('settings');
+    setTab(selectedId ? 'overview' : 'settings');
     setDetailLoading(!!selectedId);
     if (selectedId) {
       void agentsApi
@@ -610,7 +667,7 @@ function AgentWorkspaceSession({
     !conversationLoading &&
     !starting &&
     !saving &&
-    agent.skills.some((s) => s.enabled && s.available !== false);
+    agentIsReady(agent);
 
   // 自动创建 Agent 后直接进入对话，让“生成”结果马上可用。
   // 必须等对话历史加载完成，否则会在历史存在时重复新建会话。
@@ -655,73 +712,98 @@ function AgentWorkspaceSession({
 
   const openSkill = onOpenSkill;
   return (
-    <div className="skill-workspace-root agent-workspace-panel">
-      <aside className="agent-sidebar" aria-label="我的 Agent">
-        <div className="agent-section-heading">
-          <h2>
-            <Bot size={20} />
-            我的 Agent
-          </h2>
+    <div
+      className={`skill-workspace-root agent-workspace-panel${embedded ? ' is-embedded' : ''}`}
+    >
+      {!embedded && (
+        <aside className="agent-sidebar" aria-label="我的 Agent">
+          <div className="agent-section-heading">
+            <h2>
+              <Bot size={20} />
+              我的 Agent
+            </h2>
+            <button
+              type="button"
+              aria-label="创建 Agent"
+              onClick={() => choose(null)}
+              disabled={saving || starting}
+            >
+              <Plus size={17} />
+            </button>
+          </div>
+          <p className="agent-muted">
+            把可复用的 Skill 组合成自己的教学 Agent。
+          </p>
+          {listLoading && <p role="status">正在加载 Agent…</p>}
+          {listError && (
+            <div role="alert" className="agent-error">
+              {listError}
+              <button type="button" onClick={() => setListRetry((r) => r + 1)}>
+                重试 Agent 列表
+              </button>
+            </div>
+          )}
+          <nav className="agent-list">
+            {agents.map((item) => (
+              <button
+                type="button"
+                key={item.id}
+                aria-current={selectedId === item.id ? 'true' : undefined}
+                disabled={saving || starting}
+                onClick={() => choose(item.id)}
+              >
+                <strong>{item.name}</strong>
+                <span>{item.description || '教学助手'}</span>
+                <small>
+                  {item.skills.filter((s) => s.enabled).length} 个启用的 Skill
+                </small>
+              </button>
+            ))}
+          </nav>
+          {!listLoading && !listError && !agents.length && (
+            <div className="agent-empty-inline">
+              创建第一个 Agent，绑定你已有的 Skill。
+            </div>
+          )}
           <button
             type="button"
-            aria-label="创建 Agent"
+            className="agent-new-button"
             onClick={() => choose(null)}
             disabled={saving || starting}
           >
-            <Plus size={17} />
+            <Plus size={15} />
+            新建 Agent
           </button>
-        </div>
-        <p className="agent-muted">把可复用的 Skill 组合成自己的教学 Agent。</p>
-        {listLoading && <p role="status">正在加载 Agent…</p>}
-        {listError && (
+        </aside>
+      )}
+      <div className="agent-main" aria-label="Agent 工作区">
+        {embedded && listLoading && <p role="status">正在加载 Agent…</p>}
+        {embedded && listError && (
           <div role="alert" className="agent-error">
             {listError}
-            <button type="button" onClick={() => setListRetry((r) => r + 1)}>
+            <button
+              type="button"
+              onClick={() => setListRetry((value) => value + 1)}
+            >
               重试 Agent 列表
             </button>
           </div>
         )}
-        <nav className="agent-list">
-          {agents.map((item) => (
-            <button
-              type="button"
-              key={item.id}
-              aria-current={selectedId === item.id ? 'true' : undefined}
-              disabled={saving || starting}
-              onClick={() => choose(item.id)}
-            >
-              <strong>{item.name}</strong>
-              <span>{item.description || '教学助手'}</span>
-              <small>
-                {item.skills.filter((s) => s.enabled).length} 个启用的 Skill
-              </small>
-            </button>
-          ))}
-        </nav>
-        {!listLoading && !listError && !agents.length && (
-          <div className="agent-empty-inline">
-            创建第一个 Agent，绑定你已有的 Skill。
-          </div>
-        )}
-        <button
-          type="button"
-          className="agent-new-button"
-          onClick={() => choose(null)}
-          disabled={saving || starting}
-        >
-          <Plus size={15} />
-          新建 Agent
-        </button>
-      </aside>
-      <main className="agent-main" aria-label="Agent 工作区">
         <header className="agent-header">
-          <div>
-            <p className="agent-eyebrow">AGENT 工作区</p>
-            <h1>{agent?.name ?? (selectedId ? 'Agent 配置' : '创建 Agent')}</h1>
-            <p className="agent-muted">
-              配置你的助手，明确它可以使用的 Skill。
-            </p>
-          </div>
+          {(tab !== 'overview' || !agent) && (
+            <div>
+              <p className="agent-eyebrow">
+                {tab === 'settings'
+                  ? '编辑配置'
+                  : tab === 'chat'
+                    ? 'Agent 对话'
+                    : 'Agent 详情'}
+              </p>
+              <h1>
+                {agent?.name ?? (selectedId ? 'Agent 配置' : '创建 Agent')}
+              </h1>
+            </div>
+          )}
           <div className="agent-actions">
             <button
               type="button"
@@ -820,6 +902,19 @@ function AgentWorkspaceSession({
         ) : selectionReady ? (
           <>
             <div className="agent-tabs" role="tablist" aria-label="Agent 面板">
+              {agent && (
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === 'overview'}
+                  id="agent-overview-tab"
+                  aria-controls="agent-overview"
+                  onClick={() => setTab('overview')}
+                >
+                  <BookOpen size={15} />
+                  概览
+                </button>
+              )}
               <button
                 type="button"
                 role="tab"
@@ -829,7 +924,7 @@ function AgentWorkspaceSession({
                 onClick={() => setTab('settings')}
               >
                 <Settings2 size={15} />
-                配置{dirty ? ' · 未保存' : ''}
+                编辑配置{dirty ? ' · 未保存' : ''}
               </button>
               <button
                 type="button"
@@ -844,7 +939,21 @@ function AgentWorkspaceSession({
                 对话 ({conversations.length})
               </button>
             </div>
-            {tab === 'settings' ? (
+            {tab === 'overview' && agent ? (
+              <div
+                id="agent-overview"
+                role="tabpanel"
+                aria-labelledby="agent-overview-tab"
+              >
+                <AgentOverview
+                  key={agent.updatedAt}
+                  token={token}
+                  agent={agent}
+                  onEdit={() => setTab('settings')}
+                  onOpenSkill={openSkill}
+                />
+              </div>
+            ) : tab === 'settings' ? (
               <form
                 id="agent-settings"
                 role="tabpanel"
@@ -956,8 +1065,19 @@ function AgentWorkspaceSession({
                 aria-labelledby="agent-chat-tab"
                 className="agent-chat-layout"
               >
+                <button
+                  type="button"
+                  className="agent-sidebar-toggle"
+                  aria-expanded={!historyCollapsed}
+                  aria-controls="agent-conversation-history"
+                  onClick={() => setHistoryCollapsed((value) => !value)}
+                >
+                  <PanelLeft size={16} />
+                  对话历史
+                </button>
                 <aside
-                  className="agent-conversation-list"
+                  id="agent-conversation-history"
+                  className={`agent-conversation-list${historyCollapsed ? ' is-collapsed' : ''}`}
                   aria-label="Agent 对话历史"
                 >
                   <div className="agent-section-heading">
@@ -983,6 +1103,7 @@ function AgentWorkspaceSession({
                       aria-current={thread?.id === item.id ? 'true' : undefined}
                       onClick={() => {
                         setThread(item);
+                        setHistoryCollapsed(true);
                         writeSelection(selectedId, item.id);
                       }}
                     >
@@ -1019,10 +1140,11 @@ function AgentWorkspaceSession({
             )}
           </>
         ) : null}
-      </main>
+      </div>
       {discardTarget && (
         <div className="agent-dialog-backdrop">
           <section
+            ref={discardDialog}
             className="agent-discard-dialog"
             role="alertdialog"
             aria-modal="true"
