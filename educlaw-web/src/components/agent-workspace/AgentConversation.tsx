@@ -2,16 +2,13 @@ import { useEffect, useMemo, useState } from 'react';
 import type { ArenaThread, SkillVersionDetail } from '@educlaw/shared';
 import { liteApi } from '../../api/lite-api';
 import { SkillRunWorkspace } from '../skill-workspace/SkillRunWorkspace';
-import type { OpenAgentSkill } from './AgentSkillPicker';
 
 export function AgentConversation({
   token,
   thread,
-  onOpenSkill,
 }: {
   token: string;
   thread: ArenaThread;
-  onOpenSkill?: OpenAgentSkill;
 }) {
   const [legacyVersion, setLegacyVersion] = useState<SkillVersionDetail>();
   const [error, setError] = useState('');
@@ -102,70 +99,6 @@ export function AgentConversation({
 
   return (
     <div className="agent-conversation">
-      <details className="agent-bound-skills" open>
-        <summary>
-          本对话绑定 · {execution?.name ?? '历史 Skill 对话'} ·{' '}
-          {execution?.skills.length ?? (anchor ? 1 : 0)} 个 Skills
-        </summary>
-        <p className="agent-muted">
-          模型：{execution?.model || thread.model || '服务端默认'} ·{' '}
-          {thread.skillArenaConfig?.surface === 'test'
-            ? '测试对话'
-            : '运行对话'}
-          。修改 Agent 配置不会改变本对话。
-        </p>
-        <div className="agent-binding-chips">
-          {execution?.skills.map((skill) => (
-            <details key={skill.skillId} className="agent-pinned-skill">
-              <summary>
-                {skill.name} · v{skill.versionNumber}
-              </summary>
-              <p className="agent-muted">固定版本 ID：{skill.skillVersionId}</p>
-              <pre className="agent-pinned-instructions">{skill.skillMd}</pre>
-              {onOpenSkill ? (
-                <button
-                  type="button"
-                  onClick={() =>
-                    onOpenSkill({
-                      packageId: skill.packageId,
-                      skillId: skill.skillId,
-                      skillVersionId: skill.skillVersionId,
-                      name: skill.name,
-                      description: skill.description,
-                    })
-                  }
-                  title="打开原 Skill 工作区，可查看版本和优化 Skill"
-                >
-                  查看 Skill 资产：{skill.name} ↗
-                </button>
-              ) : null}
-            </details>
-          ))}
-          {!execution && anchor && (
-            <details className="agent-pinned-skill">
-              <summary>
-                {anchor.skillName} · v{anchor.versionNumber}（历史固定版本）
-              </summary>
-              <p className="agent-muted">
-                固定版本 ID：{anchor.skillVersionId}
-              </p>
-              {version && (
-                <pre className="agent-pinned-instructions">
-                  {version.skill.skillMd}
-                </pre>
-              )}
-            </details>
-          )}
-        </div>
-        {execution?.instructions && (
-          <details>
-            <summary>本对话 Agent 指令</summary>
-            <p className="agent-pinned-instructions">
-              {execution.instructions}
-            </p>
-          </details>
-        )}
-      </details>
       {error ? (
         <div className="agent-error" role="alert">
           {error}

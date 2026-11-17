@@ -240,10 +240,16 @@
 .skill-detail-tabs {
   display: flex;
   gap: 3px;
+  overflow-x: auto;
   border-bottom: 1px solid var(--border);
+  scrollbar-width: none;
+}
+.skill-detail-tabs::-webkit-scrollbar {
+  display: none;
 }
 .skill-detail-tabs button {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: 6px;
   border: 0;
@@ -1639,6 +1645,57 @@
   .skill-generation-view,
   .skill-detail-view {
     padding-inline: 28px;
+  }
+}
+
+/* 右侧摘要打开或窗口较窄时，详情页的固定双栏会自动收成单栏。 */
+@container (max-width: 680px) {
+  .skill-detail-header {
+    flex-wrap: wrap;
+  }
+
+  .skill-confirm-grid,
+  .skill-overview-grid,
+  .skill-overview-sections,
+  .skill-test-compare-result,
+  .arena-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .skill-overview-sections section {
+    padding-right: 0;
+  }
+
+  .skill-overview-sections section:nth-child(even) {
+    border-left: 0;
+    padding-left: 0;
+  }
+
+  .skill-test-compare-result section + section {
+    border-top: 1px solid var(--border);
+    border-left: 0;
+    padding-left: 0;
+  }
+
+  .arena-grid .arena-side {
+    padding-right: 0;
+  }
+
+  .arena-grid .arena-side + .arena-side {
+    border-top: 1px solid var(--border);
+    border-left: 0;
+    padding-top: 16px;
+    padding-left: 0;
+  }
+
+  .skill-version-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: 8px;
+  }
+
+  .skill-version-row > time,
+  .skill-version-status {
+    display: none;
   }
 }
 

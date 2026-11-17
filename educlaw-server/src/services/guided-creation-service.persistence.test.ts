@@ -16,6 +16,7 @@ vi.mock('./db.js', () => ({
 
 vi.mock('./llm-service.js', () => ({ generateJson: mocks.generateJson }));
 vi.mock('./package-service.js', () => ({
+  MAX_GENERATED_SKILLS: 4,
   buildGeneratedPackageSnapshot: mocks.buildGeneratedPackageSnapshot,
   createPackageWithSnapshotTx: mocks.createPackageWithSnapshotTx,
 }));
@@ -362,6 +363,9 @@ function createMemoryDb() {
       }
       if (sql.startsWith('select skill_id, skill_version_id')) {
         return result([{ skill_id: '42', skill_version_id: '43' }]);
+      }
+      if (sql.startsWith('select s.id, s.skill_uid')) {
+        return result([{ id: '42', skill_uid: 'lesson' }]);
       }
       if (
         sql.startsWith('update skill_guided_creation_sessions') &&
@@ -775,6 +779,9 @@ describe('guided creation persistence and retry', () => {
       model: 'chosen-model',
     });
     expect(result.generatedAgent?.instructions).toContain('教学助手');
+    expect(result.generatedAgent?.skills).toMatchObject([
+      { id: '42', name: '课堂活动' },
+    ]);
     expect(mocks.createPackageWithSnapshotTx.mock.calls[0]?.[4]).toBe(
       'chosen-model',
     );

@@ -1797,6 +1797,42 @@
   }
 }
 
+/* 结构化表单/材料提炼需要完整宽度，中等屏幕上让摘要栏参与布局而不是盖住表单。 */
+@media (min-width: 1000px) and (max-width: 1279px) {
+  .skill-workspace-root.is-context-open:has(.skill-main-stage.is-create-form) {
+    --skill-context-current: var(--workspace-inspector-width) !important;
+  }
+
+  .skill-workspace-root.is-context-open:has(.skill-main-stage.is-create-form)
+    .workspace-inspector,
+  .skill-workspace-root.is-context-open:has(.skill-main-stage.is-create-form)
+    .workspace-inspector.is-open {
+    flex-basis: var(--workspace-inspector-width);
+    width: var(--workspace-inspector-width);
+    border-left-color: var(--workspace-border);
+  }
+
+  .skill-workspace-root.is-context-open:has(.skill-main-stage.is-create-form)
+    .workspace-inspector.is-open
+    .workspace-inspector-panel {
+    position: relative;
+    z-index: auto;
+    inset: auto;
+    width: 100%;
+    height: 100%;
+    border-left: 0;
+    box-shadow: none;
+  }
+}
+
+/* 中等屏幕上 inspector 是抽屉：给主内容预留同样宽度的安全区，避免正文被盖住。 */
+@media (min-width: 1000px) and (max-width: 1279px) {
+  .skill-workspace-root.is-context-open
+    .skill-main-stage:not(.is-create-form):not(.is-workflow) {
+    padding-right: min(var(--workspace-inspector-overlay-width, 0px), 40vw);
+  }
+}
+
 @media (max-width: 767px) {
   .skill-workspace-root.is-context-open .workspace-inspector {
     flex-basis: 0;

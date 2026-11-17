@@ -55,7 +55,7 @@ export function MultimodalReleaseStep(props: Props) {
               onClick={props.onOpenRepository}
             >
               <Library size={15} aria-hidden="true" />
-              进入 Skill 仓库
+              进入仓库
             </button>
           </div>
         </section>

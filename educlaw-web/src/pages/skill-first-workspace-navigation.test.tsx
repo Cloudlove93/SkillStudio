@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { MemoryRouter, useLocation } from 'react-router';
+import { MemoryRouter, useLocation, useNavigate } from 'react-router';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const api = vi.hoisted(() => ({
@@ -22,6 +22,16 @@ const api = vi.hoisted(() => ({
   applyInteractiveChanges: vi.fn(),
 }));
 vi.mock('../api/lite-api', () => ({ liteApi: api }));
+const agents = vi.hoisted(() => ({
+  provision: vi.fn(),
+  get: vi.fn(),
+  listConversations: vi.fn(),
+  createConversation: vi.fn(),
+}));
+vi.mock('../api/agents', () => ({ agentsApi: agents }));
+vi.mock('../components/skill-workspace/HomeAgentChat', () => ({
+  HomeAgentChat: () => <output data-home-chat>HOME CHAT</output>,
+}));
 vi.mock('../stores/auth', () => ({
   useAuthStore: (select: (state: object) => unknown) =>
     select({
@@ -108,7 +118,22 @@ const unfinishedGuidedDraft = {
 let root: Root;
 let container: HTMLDivElement;
 function RouteEvidence() {
-  return <output data-route>{useLocation().search}</output>;
+  const location = useLocation();
+  const navigate = useNavigate();
+  return (
+    <>
+      <output data-route data-path={location.pathname}>
+        {location.search}
+      </output>
+      <button
+        type="button"
+        data-go-repo
+        onClick={() => navigate('/?view=my-skills')}
+      >
+        go-repo
+      </button>
+    </>
+  );
 }
 function button(label: string) {
   return [...container.querySelectorAll('button')].find(
@@ -133,6 +158,21 @@ beforeEach(() => {
     nextCursor: null,
   });
   api.listGuidedCreations.mockResolvedValue({ items: [] });
+  agents.provision.mockResolvedValue({ id: '9' });
+  agents.get.mockResolvedValue({
+    id: '9',
+    name: 'Fixture Agent',
+    description: '',
+    instructions: '',
+    model: '',
+    skills: [],
+  });
+  agents.listConversations.mockResolvedValue([]);
+  agents.createConversation.mockResolvedValue({
+    ...threads[0],
+    id: 91,
+    title: '新对话',
+  });
   api.getGuidedCreationDetail.mockResolvedValue(unfinishedGuidedDraft);
   api.listThreadPage.mockResolvedValue({ items: threads, nextCursor: null });
   api.listSkillVersions.mockResolvedValue({
@@ -352,11 +392,12 @@ it('routes a Skill entry to its Agent while keeping unfinished drafts reachable'
   await act(async () => button('Fixture')!.click());
   await vi.waitFor(async () => {
     await act(async () => {});
-    const params = new URLSearchParams(
-      container.querySelector('[data-route]')!.textContent!,
-    );
-    expect(params.get('skillId')).toBe('11');
-    expect(params.get('autochat')).toBe('1');
+    expect(agents.provision).toHaveBeenCalledWith('test-token', {
+      skillId: '11',
+    });
+    const route = container.querySelector('[data-route]')!;
+    expect(route.getAttribute('data-path')).toBe('/');
+    expect(new URLSearchParams(route.textContent!).get('agent')).toBe('9');
   });
 
   await act(async () => draftButton()!.click());
@@ -371,9 +412,31 @@ it('routes a Skill entry to its Agent while keeping unfinished drafts reachable'
   });
 });
 
-it('resumes an unfinished guided draft after opening the Skill repository', async () => {
+it('resumes an Agent conversation on the home route', async () => {
+  agents.listConversations.mockResolvedValue([threads[0]]);
+  await act(async () =>
+    root.render(
+      <MemoryRouter initialEntries={['/?agent=9']}>
+        <SkillFirstWorkspace />
+        <RouteEvidence />
+      </MemoryRouter>,
+    ),
+  );
+  await vi.waitFor(async () => {
+    await act(async () => {});
+    expect(container.textContent).toContain('当前 Agent');
+    expect(container.textContent).toContain('HOME CHAT');
+    expect(agents.createConversation).not.toHaveBeenCalled();
+    const params = new URLSearchParams(
+      container.querySelector('[data-route]')!.textContent!,
+    );
+    expect(params.get('agent')).toBe('9');
+    expect(params.get('conversation')).toBe('91');
+  });
+});
+
+it('resumes an unfinished guided draft after opening the asset center', async () => {
   await configureUnfinishedDraft();
-  await import('../components/skill-workspace/SkillRepositoryWorkspace');
   await act(async () =>
     root.render(
       <MemoryRouter initialEntries={['/?view=create']}>
@@ -386,15 +449,14 @@ it('resumes an unfinished guided draft after opening the Skill repository', asyn
   await vi.waitFor(async () => {
     await act(async () => {});
     expect(button('仓库')).toBeDefined();
+    expect(button('Agent 档案')).toBeUndefined();
   });
   await act(async () => button('仓库')!.click());
   await vi.waitFor(async () => {
     await act(async () => {});
     expect(
-      new URLSearchParams(
-        container.querySelector('[data-route]')!.textContent!,
-      ).get('view'),
-    ).toBe('my-skills');
+      container.querySelector('[data-route]')!.getAttribute('data-path'),
+    ).toBe('/agents');
     expect(draftButton()).not.toBeNull();
   });
 
@@ -505,6 +567,7 @@ it('refreshes the repository summary after saving through the actual optimizatio
     root.render(
       <MemoryRouter initialEntries={['/?view=optimize&skill=7%3A11']}>
         <SkillFirstWorkspace />
+        <RouteEvidence />
       </MemoryRouter>,
     ),
   );
@@ -550,7 +613,9 @@ it('refreshes the repository summary after saving through the actual optimizatio
   expect(api.applyInteractiveChanges.mock.calls[0]?.[3]?.[0]?.modified).toBe(
     'Updated',
   );
-  await act(async () => button('仓库')!.click());
+  await act(async () =>
+    container.querySelector<HTMLButtonElement>('[data-go-repo]')!.click(),
+  );
   await vi.waitFor(async () => {
     await act(async () => {});
     expect(
@@ -573,6 +638,7 @@ it('leaves the optimize loading state after failure and can retry safely', async
     root.render(
       <MemoryRouter initialEntries={['/?view=optimize&skill=7%3A11']}>
         <SkillFirstWorkspace />
+        <RouteEvidence />
       </MemoryRouter>,
     ),
   );
@@ -622,6 +688,7 @@ it('keeps the newest repository summary when refresh responses arrive out of ord
     root.render(
       <MemoryRouter initialEntries={['/?view=versions&skill=7%3A11']}>
         <SkillFirstWorkspace />
+        <RouteEvidence />
       </MemoryRouter>,
     ),
   );
@@ -631,7 +698,9 @@ it('keeps the newest repository summary when refresh responses arrive out of ord
   });
   await act(async () => button('刷新版本')!.click());
   await act(async () => button('刷新版本')!.click());
-  await act(async () => button('仓库')!.click());
+  await act(async () =>
+    container.querySelector<HTMLButtonElement>('[data-go-repo]')!.click(),
+  );
   await vi.waitFor(async () => {
     await act(async () => {});
     expect(
@@ -700,6 +769,7 @@ it.each(['rollback', 'discard', 'restore'] as const)(
       root.render(
         <MemoryRouter initialEntries={['/?view=versions&skill=7%3A11']}>
           <SkillFirstWorkspace />
+          <RouteEvidence />
         </MemoryRouter>,
       ),
     );
@@ -740,7 +810,9 @@ it.each(['rollback', 'discard', 'restore'] as const)(
       await act(async () => {});
       expect(container.querySelector('.skill-version-confirm')).toBeNull();
     });
-    await act(async () => button('仓库')!.click());
+    await act(async () =>
+    container.querySelector<HTMLButtonElement>('[data-go-repo]')!.click(),
+  );
     await vi.waitFor(async () => {
       await act(async () => {});
       expect(

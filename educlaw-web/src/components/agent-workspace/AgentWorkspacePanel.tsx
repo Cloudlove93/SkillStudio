@@ -1,38 +1,29 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router';
-import type {
-  AgentWorkspace,
-  AgentWorkspaceInput,
-  ArenaThread,
-} from '@educlaw/shared';
+import { useNavigate } from 'react-router';
+import type { AgentWorkspace, AgentWorkspaceInput } from '@educlaw/shared';
 import {
   BookOpen,
   Bot,
-  ChevronLeft,
   MessageSquare,
   Plus,
   Settings2,
 } from 'lucide-react';
 import { agentsApi, AgentWorkspaceApiError } from '../../api/agents';
-import { liteApi, type RepositorySkillRecord } from '../../api/lite-api';
+import { routes } from '../../lib/routes';
 import { AgentSkillPicker, type OpenAgentSkill } from './AgentSkillPicker';
-import { AgentConversation } from './AgentConversation';
 import { AgentOverview } from '../asset-center/AgentOverview';
 import { agentIsReady } from '../asset-center/asset-center-state';
 import '../skill-workspace/skill-workspace.css';
 import './agent-workspace.css';
 import './studio-agent.css';
 
-/** assemble = 只负责装配配置；chat = 只负责使用对话。 */
-export type AgentWorkspaceMode = 'assemble' | 'chat';
+/** 只负责装配配置；对话在主页进行。 */
 export type AgentWorkspacePanelProps = {
   token: string;
   onOpenSkill?: OpenAgentSkill;
-  initialSkillId?: string;
-  mode?: AgentWorkspaceMode;
-  /** 嵌入资产中心时隐藏自带列表，只渲染当前 Agent 的详情与编辑。 */
+  /** 嵌入仓库时隐藏自带列表，只渲染当前 Agent 的详情与编辑。 */
   embedded?: boolean;
-  /** 资产中心「创建 Agent」入口：即使已有 Agent 也打开空白表单。 */
+  /** 仓库「创建 Agent」入口：即使已有 Agent 也打开空白表单。 */
   createNew?: boolean;
   /** 把未保存状态同步给外层，用于离开前确认。 */
   onDirtyChange?: (dirty: boolean) => void;
@@ -59,62 +50,13 @@ const inputOf = (agent: AgentWorkspace): AgentWorkspaceInput => ({
 });
 const errorMessage = (error: unknown) =>
   error instanceof Error ? error.message : '操作失败，请重试';
-const newRequestId = () =>
-  typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-    ? crypto.randomUUID()
-    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-const pendingRequestStorageKey = (agentId: string, purpose: 'run' | 'test') =>
-  `skillstudio:pending-conversation:${agentId}:${purpose}`;
-function conversationRequestId(
-  agentId: string,
-  purpose: 'run' | 'test',
-  preferred?: string,
-) {
-  const key = pendingRequestStorageKey(agentId, purpose);
-  try {
-    const requestId =
-      sessionStorage.getItem(key) || preferred || newRequestId();
-    sessionStorage.setItem(key, requestId);
-    return requestId;
-  } catch {
-    return preferred || newRequestId();
-  }
-}
-function completeConversationRequest(agentId: string, purpose: 'run' | 'test') {
-  try {
-    sessionStorage.removeItem(pendingRequestStorageKey(agentId, purpose));
-  } catch {
-    // The in-memory key still prevents duplicate requests when storage is unavailable.
-  }
-}
-function writeSelection(agentId: string | null, conversationId?: number) {
+function writeSelection(agentId: string | null) {
   const url = new URL(window.location.href);
-  if (agentId) url.searchParams.set('agentId', agentId);
-  else url.searchParams.delete('agentId');
-  if (conversationId)
-    url.searchParams.set('conversation', String(conversationId));
-  else url.searchParams.delete('conversation');
-  window.history.replaceState(
-    window.history.state,
-    '',
-    `${url.pathname}${url.search}${url.hash}`,
-  );
-}
-/** 自动开聊只生效一次，成功后移除参数，避免刷新页面重复建会话。 */
-function clearAutoChatParam() {
-  const url = new URL(window.location.href);
-  if (!url.searchParams.has('autochat')) return;
-  url.searchParams.delete('autochat');
-  window.history.replaceState(
-    window.history.state,
-    '',
-    `${url.pathname}${url.search}${url.hash}`,
-  );
-}
-function clearNewParam() {
-  const url = new URL(window.location.href);
-  if (!url.searchParams.has('new')) return;
-  url.searchParams.delete('new');
+  if (agentId) {
+    url.searchParams.set('agentId', agentId);
+    // 新建表单已经落到具体 Agent，地址栏不再保留创建入口标记。
+    url.searchParams.delete('create');
+  } else url.searchParams.delete('agentId');
   window.history.replaceState(
     window.history.state,
     '',
@@ -122,7 +64,7 @@ function clearNewParam() {
   );
 }
 
-/** Mount inside the authenticated /agents pages or the chat route. */
+/** Mount inside the authenticated /agents page. */
 export function AgentWorkspacePanel(props: AgentWorkspacePanelProps) {
   return <AgentWorkspaceSession key={props.token} {...props} />;
 }
@@ -130,24 +72,11 @@ export function AgentWorkspacePanel(props: AgentWorkspacePanelProps) {
 function AgentWorkspaceSession({
   token,
   onOpenSkill,
-  initialSkillId,
-  mode = 'assemble',
   embedded = false,
   createNew = false,
   onDirtyChange,
 }: AgentWorkspacePanelProps) {
-  const isChat = mode === 'chat';
   const navigate = useNavigate();
-  const [querySkillId, setQuerySkillId] = useState(
-    () =>
-      initialSkillId ??
-      new URLSearchParams(window.location.search).get('skillId') ??
-      '',
-  );
-  const [pendingSkill, setPendingSkill] =
-    useState<RepositorySkillRecord | null>(null);
-  const [attachmentError, setAttachmentError] = useState('');
-  const [attachmentLoading, setAttachmentLoading] = useState(false);
   const [agents, setAgents] = useState<AgentWorkspace[]>([]);
   const [listLoading, setListLoading] = useState(true);
   const [listError, setListError] = useState('');
@@ -161,20 +90,8 @@ function AgentWorkspaceSession({
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailRetry, setDetailRetry] = useState(0);
   const [detailError, setDetailError] = useState('');
-  const [conversations, setConversations] = useState<ArenaThread[]>([]);
-  const [conversationError, setConversationError] = useState('');
-  const [conversationLoading, setConversationLoading] = useState(false);
-  const [conversationRetry, setConversationRetry] = useState(0);
-  /** 对话历史加载完成的 Agent；自动开聊必须等它匹配后才允许启动。 */
-  const [conversationLoadedFor, setConversationLoadedFor] = useState<
-    string | null
-  >(null);
-  const [provisionFailed, setProvisionFailed] = useState(false);
-  const [provisionRetry, setProvisionRetry] = useState(0);
-  const [thread, setThread] = useState<ArenaThread | null>(null);
   const [tab, setTab] = useState<'overview' | 'settings'>('overview');
   const [saving, setSaving] = useState(false);
-  const [starting, setStarting] = useState(false);
   const [actionError, setActionError] = useState('');
   const [notice, setNotice] = useState('');
   const [conflict, setConflict] = useState(false);
@@ -184,31 +101,15 @@ function AgentWorkspaceSession({
   const actionLock = useRef(false);
   const scope = useRef(0);
   const mounted = useRef(true);
-  const requestKey = useRef<{
-    agentId: string;
-    purpose: 'run' | 'test';
-    requestId: string;
-  } | null>(null);
   const adoptedAgentId = useRef<string | null>(null);
-  const provisionAttempt = useRef<{
-    skillId: string;
-    promise: ReturnType<typeof agentsApi.provision>;
-  } | null>(null);
-  const autoChatStarted = useRef(false);
-  const [autoChat] = useState(
-    () => new URLSearchParams(window.location.search).get('autochat') === '1',
-  );
-  const [autoNew] = useState(
-    () => new URLSearchParams(window.location.search).get('new') === '1',
-  );
   const dirty =
     JSON.stringify(draft) !==
     JSON.stringify(agent ? inputOf(agent) : emptyInput());
 
   useEffect(() => {
-    onDirtyChange?.(dirty || saving || starting);
+    onDirtyChange?.(dirty || saving);
     return () => onDirtyChange?.(false);
-  }, [dirty, saving, starting, onDirtyChange]);
+  }, [dirty, saving, onDirtyChange]);
   useEffect(() => {
     if (!dirty) return;
     const warn = (event: BeforeUnloadEvent) => {
@@ -260,14 +161,12 @@ function AgentWorkspaceSession({
   useEffect(() => {
     const sync = () => {
       const params = new URLSearchParams(window.location.search);
-      setQuerySkillId(initialSkillId ?? params.get('skillId') ?? '');
       setSelectedId(params.get('agentId'));
       setDetailRetry((r) => r + 1);
-      setConversationRetry((r) => r + 1);
     };
     window.addEventListener('popstate', sync);
     return () => window.removeEventListener('popstate', sync);
-  }, [initialSkillId]);
+  }, []);
 
   useEffect(() => {
     let current = true;
@@ -283,8 +182,7 @@ function AgentWorkspaceSession({
             'agentId',
           );
           const nextId =
-            requested ??
-            (querySkillId || createNew ? null : (items[0]?.id ?? null));
+            requested ?? (createNew ? null : (items[0]?.id ?? null));
           setSelectedId(nextId);
           if (!requested) writeSelection(nextId);
           setSelectionReady(true);
@@ -304,46 +202,6 @@ function AgentWorkspaceSession({
   }, [token, listRetry]);
 
   useEffect(() => {
-    let current = true;
-    setPendingSkill(null);
-    setAttachmentError('');
-    setAttachmentLoading(!!querySkillId);
-    if (!querySkillId) return;
-    void (async () => {
-      let cursor: string | undefined;
-      const seen = new Set<string>();
-      do {
-        const page = await liteApi.listRepositorySkills(token, {
-          limit: 100,
-          cursor,
-        });
-        if (!current) return;
-        const skill = page.items.find((s) => s.id === querySkillId);
-        if (skill) {
-          setPendingSkill(skill);
-          return;
-        }
-        cursor = page.nextCursor ?? undefined;
-        if (cursor && seen.has(cursor)) break;
-        if (cursor) seen.add(cursor);
-      } while (cursor);
-      if (current)
-        setAttachmentError(
-          '待绑定的 Skill 不在当前仓库中，请检查访问权限或从仓库重新选择。',
-        );
-    })()
-      .catch((e: unknown) => {
-        if (current) setAttachmentError(errorMessage(e));
-      })
-      .finally(() => {
-        if (current) setAttachmentLoading(false);
-      });
-    return () => {
-      current = false;
-    };
-  }, [token, querySkillId]);
-
-  useEffect(() => {
     if (!selectionReady) return;
     if (selectedId && adoptedAgentId.current === selectedId) {
       adoptedAgentId.current = null;
@@ -357,8 +215,6 @@ function AgentWorkspaceSession({
     setActionError('');
     setConflict(false);
     setNotice('');
-    setThread(null);
-    setConversations([]);
     setTab(selectedId ? 'overview' : 'settings');
     setDetailLoading(!!selectedId);
     if (selectedId) {
@@ -381,122 +237,8 @@ function AgentWorkspaceSession({
     };
   }, [token, selectedId, selectionReady, detailRetry]);
 
-  useEffect(() => {
-    if (!selectionReady || !isChat) {
-      setConversations([]);
-      setConversationError('');
-      setConversationLoading(false);
-      setConversationLoadedFor(null);
-      return;
-    }
-    let current = true;
-    setConversationError('');
-    setConversationLoading(!!selectedId);
-    setConversationLoadedFor(null);
-    if (!selectedId) {
-      setConversations([]);
-      return;
-    }
-    void agentsApi
-      .listConversations(token, selectedId)
-      .then((items) => {
-        if (!current) return;
-        setConversations(items);
-        setConversationLoadedFor(selectedId);
-        const requested = new URLSearchParams(window.location.search).get(
-          'conversation',
-        );
-        const restored = items.find((item) => String(item.id) === requested);
-        if (restored) setThread(restored);
-      })
-      .catch((e: unknown) => {
-        if (current) setConversationError(errorMessage(e));
-      })
-      .finally(() => {
-        if (current) setConversationLoading(false);
-      });
-    return () => {
-      current = false;
-    };
-  }, [token, selectedId, conversationRetry, selectionReady, isChat]);
-
-  useEffect(() => {
-    if (!pendingSkill || !selectionReady || selectedId) return;
-    const versionId =
-      pendingSkill.currentVersionId ?? pendingSkill.latestVersionId;
-    if (!versionId) return;
-    setDraft((previous) =>
-      previous.skills.some((s) => s.skillId === pendingSkill.id)
-        ? previous
-        : {
-            ...previous,
-            skills: [
-              ...previous.skills,
-              {
-                skillId: pendingSkill.id,
-                skillVersionId: versionId,
-                enabled: true,
-              },
-            ],
-          },
-    );
-  }, [pendingSkill, querySkillId, selectionReady, selectedId, detailRetry]);
-
-  // 从生成流程或仓库带着 skillId 进入时，直接把 Skill 转成可对话的 Agent。
-  useEffect(() => {
-    if (!selectionReady || selectedId || !querySkillId) return;
-    let current = true;
-    if (provisionAttempt.current?.skillId !== querySkillId) {
-      provisionAttempt.current = {
-        skillId: querySkillId,
-        promise: agentsApi.provision(token, { skillId: querySkillId }),
-      };
-    }
-    setProvisionFailed(false);
-    setAttachmentLoading(true);
-    setAttachmentError('');
-    void provisionAttempt.current.promise
-      .then((created) => {
-        if (!current) return;
-        setAgents((previous) => [
-          created,
-          ...previous.filter((item) => item.id !== created.id),
-        ]);
-        setSelectedId(created.id);
-        setSelectionReady(true);
-        setQuerySkillId('');
-        setPendingSkill(null);
-        const url = new URL(window.location.href);
-        url.searchParams.delete('skillId');
-        url.searchParams.set('agentId', created.id);
-        window.history.replaceState(
-          window.history.state,
-          '',
-          `${url.pathname}${url.search}${url.hash}`,
-        );
-      })
-      .catch((e: unknown) => {
-        if (!current) return;
-        setProvisionFailed(true);
-        setAttachmentError(errorMessage(e));
-      })
-      .finally(() => {
-        if (current) setAttachmentLoading(false);
-      });
-    return () => {
-      current = false;
-    };
-  }, [token, querySkillId, selectionReady, selectedId, provisionRetry]);
-
-  function retryProvision() {
-    provisionAttempt.current = null;
-    setProvisionFailed(false);
-    setAttachmentError('');
-    setProvisionRetry((r) => r + 1);
-  }
-
   function choose(id: string | null) {
-    if (saving || starting || (selectionReady && id === selectedId)) return;
+    if (saving || (selectionReady && id === selectedId)) return;
     if (dirty) {
       setDiscardTarget({ id });
       return;
@@ -504,32 +246,6 @@ function AgentWorkspaceSession({
     setSelectedId(id);
     writeSelection(id);
     setSelectionReady(true);
-  }
-
-  function attachPending() {
-    const versionId =
-      pendingSkill?.currentVersionId ?? pendingSkill?.latestVersionId;
-    if (
-      !pendingSkill ||
-      !versionId ||
-      draft.skills.some((s) => s.skillId === pendingSkill.id)
-    )
-      return;
-    if (draft.skills.length >= 20) {
-      setActionError('每个 Agent 最多挂载 20 个 Skill');
-      return;
-    }
-    setDraft((previous) => ({
-      ...previous,
-      skills: [
-        ...previous.skills,
-        { skillId: pendingSkill.id, skillVersionId: versionId, enabled: true },
-      ],
-    }));
-    setAttachmentError('');
-    setProvisionFailed(false);
-    setTab('settings');
-    setNotice(`已添加 ${pendingSkill.name}，保存后生效。`);
   }
 
   async function save(andRun = false) {
@@ -544,7 +260,6 @@ function AgentWorkspaceSession({
     setSaving(true);
     setActionError('');
     setNotice('');
-    if (andRun) autoChatStarted.current = true;
     const generation = scope.current;
     const input = {
       ...draft,
@@ -581,9 +296,7 @@ function AgentWorkspaceSession({
         andRun &&
         saved.skills.some((s) => s.enabled && s.available !== false)
       ) {
-        navigate(
-          `/agents/chat?agentId=${encodeURIComponent(saved.id)}&new=1`,
-        );
+        navigate(routes.chat(saved.id));
         return;
       }
       setNotice('Agent 配置已保存。新对话会使用当前配置。');
@@ -598,122 +311,20 @@ function AgentWorkspaceSession({
     }
   }
 
-  async function start(purpose: 'run' | 'test', requestId?: string) {
-    if (
-      !agent ||
-      dirty ||
-      !agentIsReady(agent) ||
-      actionLock.current
-    )
-      return;
-    actionLock.current = true;
-    setStarting(true);
-    setActionError('');
-    const generation = scope.current;
-    if (requestId) {
-      requestKey.current = {
-        agentId: agent.id,
-        purpose,
-        requestId: conversationRequestId(agent.id, purpose, requestId),
-      };
-    } else if (
-      requestKey.current?.agentId !== agent.id ||
-      requestKey.current.purpose !== purpose
-    ) {
-      requestKey.current = {
-        agentId: agent.id,
-        purpose,
-        requestId: conversationRequestId(agent.id, purpose),
-      };
-    }
-    const input = { purpose, requestId: requestKey.current.requestId };
-    try {
-      const next = await agentsApi.createConversation(token, agent.id, input);
-      if (!mounted.current || generation !== scope.current) return;
-      completeConversationRequest(agent.id, purpose);
-      requestKey.current = null;
-      setConversations((previous) => [
-        next,
-        ...previous.filter((c) => c.id !== next.id),
-      ]);
-      setThread(next);
-      writeSelection(agent.id, next.id);
-      clearNewParam();
-    } catch (e) {
-      if (mounted.current && generation === scope.current)
-        setActionError(errorMessage(e));
-      // Retain the key so a retry cannot duplicate a conversation after a lost response.
-    } finally {
-      actionLock.current = false;
-      if (mounted.current) setStarting(false);
-    }
-  }
-
-  const canStart =
+  const canChat =
     !!agent &&
     !dirty &&
     !detailLoading &&
     !detailError &&
-    (!isChat || !conversationLoading) &&
-    !starting &&
     !saving &&
     agentIsReady(agent);
-
-  // 装配台收到 autochat 旧链接时，转交给独立的会话页，不在装配流程里混入对话。
-  useEffect(() => {
-    if (isChat || !autoChat || autoChatStarted.current) return;
-    if (!agent || detailLoading || detailError) return;
-    autoChatStarted.current = true;
-    const params = new URLSearchParams(window.location.search);
-    const conversation = params.get('conversation');
-    const target = `/agents/chat?agentId=${encodeURIComponent(agent.id)}${
-      conversation
-        ? `&conversation=${encodeURIComponent(conversation)}`
-        : '&new=1'
-    }`;
-    clearAutoChatParam();
-    navigate(target, { replace: true });
-  }, [isChat, autoChat, agent, detailLoading, detailError, navigate]);
-
-  // 会话页带 new=1 进入时，等历史加载完成后自动开一个新对话。
-  useEffect(() => {
-    if (
-      !isChat ||
-      !autoNew ||
-      autoChatStarted.current ||
-      !agent ||
-      dirty ||
-      starting ||
-      saving ||
-      conversationLoading ||
-      (conversationLoadedFor !== agent.id && !conversationError)
-    )
-      return;
-    if (!agentIsReady(agent)) return;
-    autoChatStarted.current = true;
-    void start('run');
-    // 只在首次进入时自动开一次对话，后续由用户主动操作。
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    isChat,
-    autoNew,
-    agent,
-    dirty,
-    starting,
-    saving,
-    conversationLoading,
-    conversationLoadedFor,
-    conversationError,
-  ]);
 
   const openSkill = onOpenSkill;
   return (
     <div
-      className={`skill-workspace-root agent-workspace-panel${
-        isChat ? ' agent-chat-page' : ''
-      }${embedded ? ' is-embedded' : ''}`}
+      className={`skill-workspace-root agent-workspace-panel${embedded ? ' is-embedded' : ''}`}
     >
-      {!isChat && !embedded && (
+      {!embedded && (
         <aside className="agent-sidebar" aria-label="我的 Agent">
           <div className="agent-section-heading">
             <h2>
@@ -724,7 +335,7 @@ function AgentWorkspaceSession({
               type="button"
               aria-label="创建 Agent"
               onClick={() => choose(null)}
-              disabled={saving || starting}
+              disabled={saving}
             >
               <Plus size={17} />
             </button>
@@ -747,7 +358,7 @@ function AgentWorkspaceSession({
                 type="button"
                 key={item.id}
                 aria-current={selectedId === item.id ? 'true' : undefined}
-                disabled={saving || starting}
+                disabled={saving}
                 onClick={() => choose(item.id)}
               >
                 <strong>{item.name}</strong>
@@ -767,7 +378,7 @@ function AgentWorkspaceSession({
             type="button"
             className="agent-new-button"
             onClick={() => choose(null)}
-            disabled={saving || starting}
+            disabled={saving}
           >
             <Plus size={15} />
             新建 Agent
@@ -788,28 +399,15 @@ function AgentWorkspaceSession({
           </div>
         )}
         <header className="agent-header">
-          <div>
-            {isChat && (
-              <Link
-                className="agent-back-link"
-                to={`/agents${selectedId ? `?agentId=${selectedId}` : ''}`}
-              >
-                <ChevronLeft size={14} />
-                返回装配台
-              </Link>
-            )}
-            <p className="agent-eyebrow">
-              {isChat ? 'AGENT 会话' : 'AGENT 装配台'}
-            </p>
-            <h1>
-              {agent?.name ?? (selectedId ? 'Agent 配置' : '创建 Agent')}
-            </h1>
-            <p className="agent-muted">
-              {isChat
-                ? '对话固定创建时的 Agent 指令、模型与 Skill 版本。'
-                : '定义 Agent 核心，再把 Skill 模块自由装配成可运行的包。'}
-            </p>
-            {!isChat && (
+          <div className="agent-header-main">
+            <div className="agent-header-copy">
+              <p className="agent-eyebrow">AGENT 装配台</p>
+              <h1>
+                {agent?.name ?? (selectedId ? 'Agent 配置' : '创建 Agent')}
+              </h1>
+              <p className="agent-muted">
+                定义 Agent 核心，再把 Skill 模块自由装配成可运行的包。
+              </p>
               <div className="agent-hero-stats" aria-label="Agent 概览">
                 <span className="agent-stat is-primary">
                   <strong>{draft.skills.filter((s) => s.enabled).length}</strong>
@@ -823,85 +421,20 @@ function AgentWorkspaceSession({
                   {draft.model.trim() || '默认模型'}
                 </span>
               </div>
-            )}
+            </div>
           </div>
           <div className="agent-actions">
-            {isChat ? (
-              <button
-                type="button"
-                className="agent-primary"
-                disabled={!canStart}
-                onClick={() => void start('run')}
-              >
-                <Plus size={16} />
-                新对话
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="agent-primary"
-                disabled={!canStart}
-                onClick={() =>
-                  navigate(
-                    `/agents/chat?agentId=${encodeURIComponent(agent!.id)}&new=1`,
-                  )
-                }
-              >
-                <MessageSquare size={16} />
-                开始对话
-              </button>
-            )}
+            <button
+              type="button"
+              className="agent-primary"
+              disabled={!canChat}
+              onClick={() => navigate(routes.chat(agent!.id))}
+            >
+              <MessageSquare size={16} />
+              开始对话
+            </button>
           </div>
         </header>
-        {!isChat && (
-          <>
-            {attachmentLoading && (
-              <p role="status" className="agent-banner">
-                {querySkillId
-                  ? '正在把 Skill 转换成 Agent…'
-                  : '正在查找待绑定 Skill…'}
-              </p>
-            )}
-            {attachmentError && (
-              <div role="alert" className="agent-error">
-                {attachmentError}
-                {provisionFailed && querySkillId && (
-                  <button type="button" onClick={retryProvision}>
-                    重新尝试自动创建
-                  </button>
-                )}
-              </div>
-            )}
-            {pendingSkill && (
-              <div className="agent-banner">
-                <div>
-                  <strong>待绑定：{pendingSkill.name}</strong>
-                  <p>自动创建 Agent 未成功，可把这个 Skill 手动加入后继续。</p>
-                </div>
-                <button
-                  type="button"
-                  disabled={
-                    detailLoading ||
-                    saving ||
-                    starting ||
-                    !selectionReady ||
-                    !!detailError ||
-                    !(
-                      pendingSkill.currentVersionId ??
-                      pendingSkill.latestVersionId
-                    ) ||
-                    draft.skills.some((s) => s.skillId === pendingSkill.id)
-                  }
-                  onClick={attachPending}
-                >
-                  {draft.skills.some((s) => s.skillId === pendingSkill.id)
-                    ? '已加入当前配置'
-                    : '添加待绑定 Skill'}
-                </button>
-              </div>
-            )}
-          </>
-        )}
         {actionError && (
           <div role="alert" className="agent-error">
             {actionError}
@@ -934,88 +467,8 @@ function AgentWorkspaceSession({
             </button>
           </div>
         ) : selectionReady ? (
-          isChat ? (
-            <section className="agent-chat-layout">
-              <aside
-                className="agent-conversation-list"
-                aria-label="Agent 对话历史"
-              >
-                <div className="agent-section-heading">
-                  <h3>对话历史</h3>
-                  <button
-                    type="button"
-                    disabled={conversationLoading}
-                    onClick={() => setConversationRetry((r) => r + 1)}
-                  >
-                    刷新
-                  </button>
-                </div>
-                {conversationLoading && <p role="status">正在加载对话…</p>}
-                {conversationError && (
-                  <p role="alert" className="agent-error">
-                    {conversationError}
-                  </p>
-                )}
-                {conversations.map((item) => (
-                  <button
-                    type="button"
-                    key={item.id}
-                    aria-current={thread?.id === item.id ? 'true' : undefined}
-                    onClick={() => {
-                      setThread(item);
-                      writeSelection(selectedId, item.id);
-                    }}
-                  >
-                    <span>{item.title}</span>
-                    <small>
-                      {item.skillArenaConfig?.surface === 'test'
-                        ? '测试'
-                        : '运行'}{' '}
-                      · {new Date(item.updatedAt).toLocaleDateString('zh-CN')}
-                    </small>
-                  </button>
-                ))}
-                {!conversationLoading && !conversations.length && (
-                  <p className="agent-empty-inline">
-                    还没有对话。点击「新对话」开始。
-                  </p>
-                )}
-              </aside>
-              {thread ? (
-                <AgentConversation
-                  key={`${token}:${thread.id}`}
-                  token={token}
-                  thread={thread}
-                  onOpenSkill={openSkill}
-                />
-              ) : (
-                <div className="agent-chat-empty">
-                  <Bot size={32} />
-                  <h2>
-                    {canStart
-                      ? '选择一个对话，或开始新对话'
-                      : '还没有可运行的 Skill 模块'}
-                  </h2>
-                  <p>
-                    {canStart
-                      ? '历史对话保留创建时的 Agent 配置与 Skill 版本。'
-                      : '先在装配台启用至少一个 Skill，再回来开始对话。'}
-                  </p>
-                  {!canStart && agent && (
-                    <Link
-                      className="agent-back-link"
-                      to={`/agents?agentId=${agent.id}`}
-                    >
-                      <ChevronLeft size={14} />
-                      去装配台启用 Skill
-                    </Link>
-                  )}
-                </div>
-              )}
-            </section>
-          ) : (
-            <>
-              <div className="agent-tabs" role="tablist" aria-label="Agent 面板">
+          <>
+            <div className="agent-tabs" role="tablist" aria-label="Agent 面板">
                 {agent && (
                   <button
                     type="button"
@@ -1066,7 +519,7 @@ function AgentWorkspaceSession({
                     void save();
                   }}
                 >
-                  <fieldset disabled={saving || starting}>
+                  <fieldset disabled={saving}>
                     <div className="agent-editor-layout">
                       <section className="agent-panel agent-core-panel">
                         <header className="agent-panel-head">
@@ -1163,7 +616,6 @@ function AgentWorkspaceSession({
                         type="submit"
                         disabled={
                           saving ||
-                          starting ||
                           !draft.name.trim() ||
                           (!!agent && !dirty)
                         }
@@ -1175,7 +627,6 @@ function AgentWorkspaceSession({
                         className="agent-primary"
                         disabled={
                           saving ||
-                          starting ||
                           !draft.name.trim() ||
                           !draft.skills.some((s) => s.enabled)
                         }
@@ -1188,7 +639,6 @@ function AgentWorkspaceSession({
                 </form>
               ) : null}
             </>
-          )
         ) : null}
       </main>
       {discardTarget && (

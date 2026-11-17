@@ -213,7 +213,7 @@ export function SkillRepositoryWorkspace({
     >
       <header className="skill-repository-header">
         <div>
-          <span className="skill-eyebrow">仓库</span>
+          <span className="skill-eyebrow">REPOSITORY · 装配档案</span>
           <h1>Agent 与 Skill 仓库</h1>
           <p>Agent 由核心指令和 Skill 模块装配而成，两者都在这里统一管理。</p>
         </div>
@@ -222,6 +222,24 @@ export function SkillRepositoryWorkspace({
           创建 Agent
         </button>
       </header>
+
+      <section className="repository-ledger" aria-label="仓库概览">
+        <div>
+          <span>SKILL</span>
+          <strong>{skills.length}</strong>
+          <small>可复用模块</small>
+        </div>
+        <div>
+          <span>DRAFT</span>
+          <strong>{drafts.length}</strong>
+          <small>未完成草稿</small>
+        </div>
+        <div>
+          <span>VIEW</span>
+          <strong>{scope === 'agents' ? 'Agent' : 'Skill'}</strong>
+          <small>当前仓库</small>
+        </div>
+      </section>
 
       <div
         className="repository-scope-tabs"
@@ -259,6 +277,9 @@ export function SkillRepositoryWorkspace({
         />
       ) : (
         <>
+          <p className="repository-hint">
+            点开 Skill 会连同它的 Agent 一起打开；版本、导出与重命名在卡片右上角。
+          </p>
       <div
         className="skill-repository-tabs"
         role="tablist"
@@ -368,10 +389,11 @@ export function SkillRepositoryWorkspace({
               role="list"
               aria-label="已创建的 Skill"
             >
-              {pageItems.map((skill) => (
+              {pageItems.map((skill, index) => (
                 <RepositorySkillCard
                   key={skill.key}
                   skill={skill}
+                  index={(safePage - 1) * REPOSITORY_PAGE_SIZE + index}
                   managing={managing}
                   selected={selectedSkillIds.has(skill.skillId)}
                   menuOpen={menuSkillId === skill.skillId}
@@ -445,10 +467,11 @@ export function SkillRepositoryWorkspace({
               role="list"
               aria-label="未完成草稿"
             >
-              {drafts.map((item) => (
+              {drafts.map((item, index) => (
                 <RepositoryDraftCard
                   key={item.id}
                   session={item}
+                  index={index}
                   onOpen={() => onSelectDraft(item)}
                 />
               ))}

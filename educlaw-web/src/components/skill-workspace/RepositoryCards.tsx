@@ -22,6 +22,7 @@ const repositoryDateFormatter = new Intl.DateTimeFormat('zh-CN', {
 
 export function RepositorySkillCard({
   skill,
+  index,
   managing,
   selected,
   menuOpen,
@@ -35,6 +36,7 @@ export function RepositorySkillCard({
   onRequestDelete,
 }: {
   skill: RepositorySkill;
+  index?: number;
   managing: boolean;
   selected: boolean;
   menuOpen: boolean;
@@ -65,7 +67,11 @@ export function RepositorySkillCard({
           <span className="skill-repository-card-icon" aria-hidden="true">
             <BookOpen size={18} />
           </span>
-          <span className="skill-repository-card-status">已创建</span>
+          {typeof index === 'number' ? (
+            <span className="skill-repository-card-index" aria-hidden="true">
+              {String(index + 1).padStart(2, '0')}
+            </span>
+          ) : null}
           <span className="skill-repository-card-version">
             {skill.latestVersionNumber === null
               ? '暂无正常版本'
@@ -176,9 +182,11 @@ export function RepositorySkillCard({
 
 export function RepositoryDraftCard({
   session,
+  index,
   onOpen,
 }: {
   session: GuidedCreationSession;
+  index?: number;
   onOpen: () => void;
 }) {
   const name = getSessionName(session);
@@ -195,6 +203,11 @@ export function RepositoryDraftCard({
           <span className="skill-repository-card-icon" aria-hidden="true">
             <Clock3 size={18} />
           </span>
+          {typeof index === 'number' ? (
+            <span className="skill-repository-card-index" aria-hidden="true">
+              {String(index + 1).padStart(2, '0')}
+            </span>
+          ) : null}
           <span className="skill-repository-card-status">未完成草稿</span>
         </span>
         <strong>{name}</strong>

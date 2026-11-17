@@ -1,4 +1,4 @@
-import { useRef, useState, type DragEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import type { GuidedCreationDocument } from '@educlaw/shared';
 import {
   ArrowRight,
@@ -10,6 +10,13 @@ import {
   Plus,
   X,
 } from 'lucide-react';
+import {
+  recommendPresets,
+  type StudioPreset,
+} from '../../lib/studio-presets';
+import { PresetRecommendation } from './PresetRecommendation';
+
+type PromptSeed = { id: string; text: string };
 
 type SkillCreationHomeProps = {
   documents: GuidedCreationDocument[];
@@ -20,6 +27,9 @@ type SkillCreationHomeProps = {
   onOpenDocument: () => void;
   onOpenManual: () => void;
   onOpenWorkflow: () => void;
+  promptSeed?: PromptSeed | null;
+  onUsePreset?: (preset: StudioPreset) => void;
+  onRemixPreset?: (preset: StudioPreset) => void;
 };
 
 export function SkillCreationHome({
@@ -31,10 +41,27 @@ export function SkillCreationHome({
   onOpenDocument,
   onOpenManual,
   onOpenWorkflow,
+  promptSeed,
+  onUsePreset,
+  onRemixPreset,
 }: SkillCreationHomeProps) {
   const [input, setInput] = useState('');
   const [dragActive, setDragActive] = useState(false);
+  const [dismissedQuery, setDismissedQuery] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (promptSeed?.text) setInput(promptSeed.text);
+  }, [promptSeed?.id, promptSeed?.text]);
+
+  const recommendedPresets = useMemo(
+    () => (input.trim().length >= 4 ? recommendPresets(input) : []),
+    [input],
+  );
+  const showRecommendations =
+    recommendedPresets.length > 0 &&
+    dismissedQuery !== input &&
+    Boolean(onUsePreset && onRemixPreset);
 
   const send = () => {
     const value = input.trim();
@@ -116,8 +143,8 @@ export function SkillCreationHome({
               className="skill-home-send"
               onClick={send}
               disabled={busy || !input.trim()}
-              aria-label="开始对话共创"
-              title="开始对话共创"
+              aria-label="开始创建 Agent"
+              title="开始创建 Agent"
             >
               <ArrowUp size={18} strokeWidth={2.4} aria-hidden="true" />
             </button>
@@ -144,14 +171,21 @@ export function SkillCreationHome({
           <div className="skill-home-composer-meta">
             <span className="skill-home-mode-chip">
               <MessageCircle size={15} aria-hidden="true" />
-              对话共创 · 默认方式
+              对话创建 Agent · 默认方式
             </span>
-            <small>一个对话入口，系统自动匹配提炼路径</small>
           </div>
         </div>
 
+        {showRecommendations && onUsePreset && onRemixPreset ? (
+          <PresetRecommendation
+            presets={recommendedPresets}
+            onUse={onUsePreset}
+            onRemix={onRemixPreset}
+            onDismiss={() => setDismissedQuery(input)}
+          />
+        ) : null}
+
         <section className="skill-home-ways" aria-label="更多触发方式">
-          <p className="skill-home-way-label">其他生成 Agent 包的方式</p>
           <div className="skill-home-way-grid">
             <button
               type="button"

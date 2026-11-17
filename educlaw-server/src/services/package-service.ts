@@ -112,7 +112,7 @@ function emptyPackageSnapshot(): AgentPackageSnapshot {
 
 const MAX_BASE_DOCUMENT_CHARS = 12_000;
 const MAX_SKILL_DOCUMENT_CHARS = 8_000;
-const MAX_GENERATED_SKILLS = 2;
+export const MAX_GENERATED_SKILLS = 4;
 const MAX_SOURCE_RUBRIC_CHARS = 12_000;
 const MAX_GENERATED_PACKAGE_NAME_CHARS = 10;
 // AI 兜底定位 rubric 的窗口大小与触发阈值
@@ -1851,7 +1851,7 @@ export function extractExplicitSkillName(
   return (
     instruction
       .match(
-        /(?:^|\n)\s*Skill\s*名称[：:]\s*([^\n。！？]{1,80})(?=[\n。！？]|$)/i,
+        /(?:^|\n)\s*(?:Agent|Skill)\s*名称[：:]\s*([^\n。！？]{1,80})(?=[\n。！？]|$)/i,
       )?.[1]
       ?.trim() || undefined
   );
@@ -2484,7 +2484,9 @@ export async function buildGeneratedPackageSnapshot(input: {
           ? [
               '本次只生成一个完整教学任务的 Skill，skills 数组恰好一项；将材料中的诊断、设计、支架与复核组织为同一工作流程，不要拆分成多个 Skill。',
             ]
-          : []),
+          : [
+              `按任务边界拆分 Skill：若材料包含多个可独立复用的教学环节或能力，生成 2-${maxSkills} 个职责单一的 Skill，每个 Skill 只负责一个教学动作；若任务本身是不可拆分的完整流程，则只生成 1 个 Skill。skills 数组至少一项、最多 ${maxSkills} 项，不要为凑数量而拆分。`,
+            ]),
       ].join('\n'),
       userPrompt: buildBaseMetadataUserPrompt({
         hasInstruction,

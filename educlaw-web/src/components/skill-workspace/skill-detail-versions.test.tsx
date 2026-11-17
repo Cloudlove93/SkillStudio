@@ -108,15 +108,15 @@ it('offers only a read-only preview and skips discarded versions for new Skill e
   expect(container.querySelector('output')).toBeNull();
   expect(container.textContent).toContain('Skill 只读预览');
   expect(container.querySelector('a')?.getAttribute('href')).toBe(
-    '/agents?skillId=11&autochat=1',
+    '/agents?tab=skills&previewPackage=7&previewSkill=11',
   );
 });
 it('does not mount the single Skill arena from the legacy test entry', async () => {
   await render(props({ view: 'arena', selectedConversationId: null }));
   expect(container.querySelector('output, textarea')).toBeNull();
   expect(container.textContent).toContain('Skill 只读预览');
-  expect(container.querySelector('a')?.getAttribute('href')).toContain(
-    '/agents?skillId=11',
+  expect(container.querySelector('a')?.getAttribute('href')).toBe(
+    '/agents?tab=skills&previewPackage=7&previewSkill=11',
   );
 });
 it('opens both sides of a legacy Arena history with its pinned versions and no new composer', async () => {

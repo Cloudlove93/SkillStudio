@@ -90,14 +90,48 @@ function dbReport(value: unknown): WorkflowRunReport | null {
     : null;
 }
 
+type WorkflowSkillSnapshot = AgentPackageDetail['snapshot']['skills'][number];
+
+export async function listUserSkillIds(userId: string) {
+  const result = await query<{ id: string }>(
+    `select s.id::text as id
+       from agent_package_skills s
+       join agent_packages p on p.id = s.package_id
+      where p.user_id = $1 and s.status = 'active'`,
+    [userId],
+  );
+  return new Set(result.rows.map(row => row.id));
+}
+
+async function resolveUserSkill(userId: string, skillId: string): Promise<WorkflowSkillSnapshot | null> {
+  const result = await query<{ skill_snapshot_json: unknown }>(
+    `select sv.skill_snapshot_json
+       from agent_package_skills s
+       join agent_packages p on p.id = s.package_id
+       join agent_package_version_skills link
+         on link.package_version_id = p.current_version_id and link.skill_id = s.id
+       join agent_skill_versions sv on sv.id = link.skill_version_id
+      where s.id = $1 and p.user_id = $2 and s.status = 'active'
+      limit 1`,
+    [skillId, userId],
+  );
+  const snapshot = result.rows[0]?.skill_snapshot_json;
+  return snapshot && typeof snapshot === 'object'
+    ? snapshot as WorkflowSkillSnapshot
+    : null;
+}
+
 export function validateWorkflowForSnapshot(
   definition: unknown,
   snapshot: AgentPackageDetail['snapshot'],
-  options: { requireSkillBindings?: boolean } = {},
+  options: { requireSkillBindings?: boolean; availableSkillIds?: Set<string> } = {},
 ) {
   const parsed = asDefinition(definition);
   const errors = [];
-  const skills = new Set(snapshot.skills.map(skill => skill.id));
+  const skills = new Set([
+    ...snapshot.skills.map(skill => skill.id),
+    ...(options.availableSkillIds ?? []),
+  ]);
   for (const node of parsed.nodes) {
     if (node.type !== 'skill') continue;
     const skillId = typeof node.params.skillId === 'string'
@@ -130,7 +164,10 @@ export async function saveWorkflow(
   input: { expectedPackageVersionId: string; definition: unknown; note?: string },
 ) {
   const pkg = await getPackage(userId, packageId);
-  const definition = validateWorkflowForSnapshot(input.definition, pkg.snapshot);
+  const availableSkillIds = await listUserSkillIds(userId);
+  const definition = validateWorkflowForSnapshot(input.definition, pkg.snapshot, {
+    availableSkillIds,
+  });
   await withTransaction(client => createPackageVersionWithSnapshotTx(client, {
     userId,
     packageId,
@@ -158,7 +195,9 @@ export async function createWorkflow(
     rubricMd: '',
     skills: [],
   } satisfies AgentPackageDetail['snapshot'];
-  const parsed = validateWorkflowForSnapshot(definition, snapshot);
+  const parsed = validateWorkflowForSnapshot(definition, snapshot, {
+    availableSkillIds: await listUserSkillIds(userId),
+  });
   const created = await withTransaction(client => createPackageWithSnapshotTx(
     client,
     userId,
@@ -193,6 +232,7 @@ export async function runWorkflow(
   }
   const definition = validateWorkflowForSnapshot(version.snapshot.workflow, version.snapshot, {
     requireSkillBindings: true,
+    availableSkillIds: await listUserSkillIds(userId),
   });
   const now = new Date().toISOString();
   const report: WorkflowRunReport = {
@@ -248,11 +288,15 @@ export async function runWorkflow(
           ? current.params.inputTemplate
           : current.params.promptTemplate;
         const prompt = renderTemplate(template, input.content, nodeResults);
+        const boundSkillId = typeof current.params.skillId === 'string'
+          ? current.params.skillId.trim()
+          : '';
         const skill = current.type === 'skill'
-          ? version.snapshot.skills.find(item => item.id === current.params.skillId)
+          ? version.snapshot.skills.find(item => item.id === boundSkillId)
+            ?? (boundSkillId ? await resolveUserSkill(userId, boundSkillId) : null)
           : undefined;
         if (current.type === 'skill' && !skill) {
-          throw new WorkflowServiceError('试跑时找不到固定版本的 Skill。', 'WORKFLOW_SKILL_UNAVAILABLE');
+          throw new WorkflowServiceError('试跑时找不到可用的 Skill。', 'WORKFLOW_SKILL_UNAVAILABLE');
         }
         output = {
           text: await generateText({

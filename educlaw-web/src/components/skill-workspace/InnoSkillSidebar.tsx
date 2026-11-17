@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { ArenaThread, GuidedCreationSession } from '@educlaw/shared';
 import {
   Bot,
-  BookOpen,
   ChevronDown,
   FileText,
   FileUp,
@@ -16,7 +15,6 @@ import {
   PanelLeftOpen,
   PencilLine,
   Plus,
-  Settings,
 } from 'lucide-react';
 import { PRODUCT_NAME } from '../../lib/brand';
 import { ThemeToggle } from '../theme-toggle';
@@ -38,7 +36,6 @@ type Props = {
   activeSection: InnoSkillNavSection;
   collapsed: boolean;
   userName: string;
-  isAdmin: boolean;
   skills: RepositorySkill[];
   activeSkillKey?: string | null;
   activeSkillName?: string | null;
@@ -47,6 +44,8 @@ type Props = {
   conversationLoading?: boolean;
   conversationRunningIds?: ReadonlySet<string>;
   completedConversationIds?: ReadonlySet<string>;
+  conversationLabel?: string;
+  conversationSurfaceBadge?: boolean;
   onToggle: () => void;
   onNavigate: (
     section: Exclude<InnoSkillNavSection, 'create'>,
@@ -68,12 +67,11 @@ type Props = {
   ) => Promise<void> | void;
   onConversationDelete?: (thread: ArenaThread) => Promise<void> | void;
   onAgents?: () => void;
-  onAdmin: () => void;
   onLogout: () => void;
 };
 
 const creationModes = [
-  { mode: 'conversation', label: '对话共创', icon: MessageSquareText },
+  { mode: 'conversation', label: '对话创建 Agent', icon: MessageSquareText },
   { mode: 'document', label: '文档生成', icon: FileText },
   { mode: 'manual', label: '结构视图', icon: PencilLine },
   { mode: 'import', label: '导入 Skill ZIP', icon: FileUp },
@@ -98,9 +96,7 @@ export function InnoSkillSidebar(props: Props) {
   const showConversations = Boolean(
     props.activeSkillName &&
     props.onConversationSelect &&
-    props.onNewConversation &&
-    props.onConversationRename &&
-    props.onConversationDelete,
+    props.onNewConversation,
   );
 
   useEffect(() => {
@@ -146,16 +142,10 @@ export function InnoSkillSidebar(props: Props) {
           <NavButton
             active={false}
             icon={<Bot />}
-            label="资产中心"
+            label="仓库"
             onClick={props.onAgents}
           />
         )}
-        <NavButton
-          active={props.activeSection === 'my-skills'}
-          icon={<BookOpen />}
-          label="仓库"
-          onClick={() => props.onNavigate('my-skills')}
-        />
         <NavButton
           active={props.activeSection === 'workflow-library'}
           icon={<GitBranch />}
@@ -175,7 +165,7 @@ export function InnoSkillSidebar(props: Props) {
             <span>新建 Agent</span>
           </button>
           <details ref={menuRef}>
-            <summary aria-label="选择创建方式">
+            <summary aria-label="选择创建方式" title="选择创建方式">
               <ChevronDown />
             </summary>
             <div>
@@ -325,7 +315,7 @@ export function InnoSkillSidebar(props: Props) {
 
         {showConversations ? (
           <div className="isk-sidebar-current-skill">
-            <span>当前 Skill</span>
+            <span>{props.conversationLabel ?? '当前 Skill'}</span>
             <strong>
               <Layers3 size={14} />
               {props.activeSkillName}
@@ -336,23 +326,13 @@ export function InnoSkillSidebar(props: Props) {
               runningConversationIds={props.conversationRunningIds}
               completedConversationIds={props.completedConversationIds}
               loading={props.conversationLoading ?? false}
+              showSurfaceBadge={props.conversationSurfaceBadge}
               onConversationSelect={props.onConversationSelect!}
               onNewConversation={props.onNewConversation!}
-              onRename={props.onConversationRename!}
-              onDelete={props.onConversationDelete!}
+              onRename={props.onConversationRename}
+              onDelete={props.onConversationDelete}
             />
           </div>
-        ) : null}
-
-        {props.isAdmin ? (
-          <>
-            <span className="isk-sidebar-section-label">管理</span>
-            <NavButton
-              icon={<Settings />}
-              label="管理后台"
-              onClick={props.onAdmin}
-            />
-          </>
         ) : null}
       </nav>
 
@@ -417,7 +397,7 @@ export function InnoSkillSidebar(props: Props) {
                 onChange={(event) => setDraftName(event.target.value)}
               />
             ) : (
-              <p>草稿及对应共创记录将被删除。</p>
+              <p>草稿及对应创建记录将被删除。</p>
             )}
             <footer>
               <button type="button" onClick={() => setDraftDialog(null)}>
@@ -462,6 +442,8 @@ function NavButton({
       type="button"
       className={`isk-nav-button ${active ? 'is-active' : ''}`}
       onClick={onClick}
+      aria-current={active ? 'page' : undefined}
+      title={label}
     >
       <span>{icon}</span>
       <b>{label}</b>

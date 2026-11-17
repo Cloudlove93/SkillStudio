@@ -13,6 +13,7 @@ import type {
   AnswerOptimizationSelection,
 } from './answer-optimization-selection';
 import { liteApi } from '../../api/lite-api';
+import { routes } from '../../lib/routes';
 import { getConversationSurface } from './skill-conversation-list';
 
 const LegacyArenaHistory = lazy(() =>
@@ -219,10 +220,8 @@ export function SkillDetailWorkspace(props: Props) {
               进入 Agent 工作区
             </button>
           ) : (
-            <a
-              href={`/agents?skillId=${encodeURIComponent(props.skill.skillId)}&autochat=1`}
-            >
-              进入 Agent 工作区
+            <a href={routes.skill(props.skill.packageId, props.skill.skillId)}>
+              查看 Skill 资产
             </a>
           )}
           {props.selectedConversationId && (

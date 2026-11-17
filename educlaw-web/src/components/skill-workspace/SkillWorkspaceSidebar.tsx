@@ -83,7 +83,7 @@ const creationModes = [
   },
   {
     mode: 'conversation',
-    label: '对话共创',
+    label: '对话创建 Agent',
     description: '边聊边完善，也可从常用场景开始',
     icon: MessageSquareText,
   },

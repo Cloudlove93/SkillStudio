@@ -3,7 +3,6 @@ import { Link, useNavigate, useSearchParams } from 'react-router';
 import type { AgentSummary } from '@educlaw/shared';
 import {
   ArrowLeft,
-  ArrowUpRight,
   BookOpen,
   Bot,
   Plus,
@@ -14,6 +13,8 @@ import { agentsApi } from '../../api/agents';
 import { liteApi, type RepositorySkillRecord } from '../../api/lite-api';
 import { BASE } from '../../api/client';
 import { PRODUCT_NAME } from '../../lib/brand';
+import { routes } from '../../lib/routes';
+import { toast } from 'sonner';
 import { ThemeToggle } from '../theme-toggle';
 import { AgentWorkspacePanel } from '../agent-workspace/AgentWorkspacePanel';
 import { AssetCard } from './AssetCard';
@@ -35,11 +36,10 @@ export function AssetCenter({ token }: { token: string }) {
 function AssetCenterSession({ token }: { token: string }) {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
-  const tab: AssetTab = params.get('tab') === 'skills' ? 'skills' : 'agents';
+  const tab: AssetTab =
+    params.get('tab') === 'skills' ? 'skills' : 'agents';
   const agentOpen =
-    params.has('agentId') ||
-    params.has('skillId') ||
-    params.get('create') === 'agent';
+    params.has('agentId') || params.get('create') === 'agent';
   const previewId = params.get('previewSkill');
   const previewPackage = params.get('previewPackage');
   const [agents, setAgents] = useState<AgentSummary[]>([]);
@@ -59,6 +59,7 @@ function AssetCenterSession({ token }: { token: string }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const [usingSkillId, setUsingSkillId] = useState<string | null>(null);
 
   useEffect(() => {
     let current = true;
@@ -169,17 +170,33 @@ function AssetCenterSession({ token }: { token: string }) {
     setDirty(false);
     navigate(url);
   }
+  async function openSkillInAgent(skill: RepositorySkillRecord) {
+    if (usingSkillId) return;
+    setUsingSkillId(skill.id);
+    const toastId = 'asset-use-in-agent';
+    toast.loading('正在打开 Agent…', { id: toastId });
+    try {
+      const agent = await agentsApi.provision(token, { skillId: skill.id });
+      toast.dismiss(toastId);
+      navigateSafely(routes.chat(agent.id));
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : 'Agent 打开失败，请稍后重试',
+        { id: toastId },
+      );
+    } finally {
+      setUsingSkillId(null);
+    }
+  }
   function open(updates: Record<string, string>) {
     const next = new URLSearchParams(window.location.search);
     [
       'agentId',
-      'skillId',
       'previewSkill',
       'previewPackage',
       'skillVersion',
       'create',
       'conversation',
-      'autochat',
     ].forEach((key) => next.delete(key));
     Object.entries(updates).forEach(([key, value]) => next.set(key, value));
     navigateSafely(`/agents?${next}`);
@@ -238,19 +255,36 @@ function AssetCenterSession({ token }: { token: string }) {
   const previewError = previewPackage ? linkedError : skillsError;
   const state = readAssetListState(params, tab);
   const detail = agentOpen || !!previewId;
+  const agentAttention = agents.filter((agent) => !agentIsReady(agent)).length;
+  const skillAttention = skills.filter((skill) => !skillIsReady(skill)).length;
   return (
     <div className="asset-center">
       <header className="asset-topbar">
-        <Link
-          to="/"
-          onClick={(e) => {
-            if (dirty && !window.confirm('配置尚未保存，放弃修改并离开？'))
-              e.preventDefault();
-          }}
-        >
-          <img src={`${BASE}/logo.png`} alt="" />
-          {PRODUCT_NAME}
-        </Link>
+        <div className="asset-topbar-main">
+          <Link
+            to="/"
+            className="asset-brand"
+            onClick={(e) => {
+              if (dirty && !window.confirm('配置尚未保存，放弃修改并离开？'))
+                e.preventDefault();
+            }}
+          >
+            <img src={`${BASE}/logo.png`} alt="" />
+            {PRODUCT_NAME}
+          </Link>
+          <span className="asset-topbar-divider" aria-hidden="true" />
+          <Link
+            to="/"
+            className="asset-home-link"
+            onClick={(e) => {
+              if (dirty && !window.confirm('配置尚未保存，放弃修改并离开？'))
+                e.preventDefault();
+            }}
+          >
+            <ArrowLeft size={15} />
+            返回主页
+          </Link>
+        </div>
         <ThemeToggle />
       </header>
       <main id="main-content" className="asset-content" tabIndex={-1}>
@@ -258,22 +292,27 @@ function AssetCenterSession({ token }: { token: string }) {
           {detail ? (
             <button
               type="button"
+              className="asset-back"
               onClick={() => {
                 open({ tab });
                 setRevision((n) => n + 1);
               }}
             >
               <ArrowLeft size={16} />
-              返回资产中心
+              返回目录
             </button>
           ) : (
-            <h1>资产中心</h1>
+            <div className="asset-heading-copy">
+              <span className="asset-eyebrow">REPOSITORY · 装配目录</span>
+              <h1>仓库</h1>
+              <p>查看 Agent 的装配关系与 Skill 版本，也可以直接对话。</p>
+            </div>
           )}
           {!detail && (
             <div className="asset-actions">
-              <button type="button" onClick={() => navigate('/?view=create')}>
+              <button type="button" onClick={() => navigate(routes.create)}>
                 <Plus size={16} />
-                生成资产
+                新建 Skill
               </button>
               <button
                 type="button"
@@ -286,9 +325,28 @@ function AssetCenterSession({ token }: { token: string }) {
             </div>
           )}
         </header>
+        {!detail && (
+          <section className="asset-summary" aria-label="档案概览">
+            <div>
+              <span>AGENT</span>
+              <strong>{agentsLoading ? '—' : agents.length}</strong>
+              <small>已装配</small>
+            </div>
+            <div>
+              <span>SKILL</span>
+              <strong>{skillsLoading ? '—' : skills.length}</strong>
+              <small>可复用模块</small>
+            </div>
+            <div>
+              <span>ATTENTION</span>
+              <strong>{agentsLoading || skillsLoading ? '—' : agentAttention + skillAttention}</strong>
+              <small>待配置</small>
+            </div>
+          </section>
+        )}
         {agentOpen ? (
           <AgentWorkspacePanel
-            key={`${token}:${params.get('agentId') || params.get('skillId') || 'new'}`}
+            key={`${token}:${params.get('agentId') || 'new'}`}
             token={token}
             embedded
             createNew={params.get('create') === 'agent'}
@@ -320,6 +378,8 @@ function AssetCenterSession({ token }: { token: string }) {
               token={token}
               skill={preview}
               pinnedVersion={params.get('skillVersion')}
+              usingInAgent={usingSkillId === preview.id}
+              onUseInAgent={() => void openSkillInAgent(preview)}
               onNavigate={navigateSafely}
               onChanged={() => setRevision((n) => n + 1)}
               onDeleted={() => {
@@ -334,7 +394,7 @@ function AssetCenterSession({ token }: { token: string }) {
           )
         ) : (
           <>
-            <div className="asset-tabs" role="tablist" aria-label="资产类型">
+            <div className="asset-tabs" role="tablist" aria-label="目录类型">
               {(['agents', 'skills'] as const).map((item) => (
                 <button
                   key={item}
@@ -344,6 +404,7 @@ function AssetCenterSession({ token }: { token: string }) {
                   aria-controls="asset-list-panel"
                   aria-selected={tab === item}
                   tabIndex={tab === item ? 0 : -1}
+                  data-count={item === 'agents' ? agents.length : skills.length}
                   onKeyDown={(e) => tabKey(e, item)}
                   onClick={() => open({ tab: item })}
                 >
@@ -407,16 +468,15 @@ function AssetCenterSession({ token }: { token: string }) {
                   loading={agentsLoading}
                   error={agentsError}
                   onRetry={() => setRevision((n) => n + 1)}
-                  renderItem={(agent) => (
+                  renderItem={(agent, index) => (
                     <AgentAssetCard
                       key={agent.id}
                       token={token}
                       agent={agent}
+                      index={index}
                       onOpen={() => open({ agentId: agent.id })}
                       onChat={() =>
-                        navigateSafely(
-                          `/agents/chat?agentId=${encodeURIComponent(agent.id)}&new=1`,
-                        )
+                        navigateSafely(routes.chat(agent.id))
                       }
                     />
                   )}
@@ -432,12 +492,18 @@ function AssetCenterSession({ token }: { token: string }) {
                   loading={skillsLoading}
                   error={skillsError}
                   onRetry={() => setRevision((n) => n + 1)}
-                  renderItem={(skill) => (
+                  renderItem={(skill, index) => (
                     <AssetCard
                       key={skill.id}
                       kind="skill"
                       name={skill.name}
                       description={skill.description}
+                      index={index}
+                      status={
+                        skillIsReady(skill)
+                          ? { label: '可使用', tone: 'ready' }
+                          : { label: '待配置', tone: 'attention' }
+                      }
                       onOpen={() => open({ previewSkill: skill.id })}
                       metadata={[
                         {
@@ -451,10 +517,6 @@ function AssetCenterSession({ token }: { token: string }) {
                           value:
                             skill.packageName ||
                             `Package #${skill.originPackageId || skill.packageId}`,
-                        },
-                        {
-                          label: '状态',
-                          value: skillIsReady(skill) ? '可使用' : '待配置',
                         },
                         {
                           label: '最近更新',
@@ -486,14 +548,6 @@ function AssetCenterSession({ token }: { token: string }) {
                           选择
                         </label>
                       )}
-                      <button
-                        type="button"
-                        disabled={deleting}
-                        onClick={() => open({ previewSkill: skill.id })}
-                      >
-                        <ArrowUpRight size={15} />
-                        查看 Skill
-                      </button>
                     </AssetCard>
                   )}
                 />

@@ -675,7 +675,7 @@ describe('guided creation conversation service', () => {
     expect(instruction).not.toContain('experience_id');
   });
 
-  it('turns the confirmed draft into a one-Skill generation instruction', () => {
+  it('turns the confirmed draft into an Agent plus Skills generation instruction', () => {
     const instruction = buildGuidedGenerationInstruction({
       roles: '教师助手',
       goal: '生成课堂反馈',
@@ -690,10 +690,11 @@ describe('guided creation conversation service', () => {
       completion_evidence: '反馈可直接使用',
     });
 
-    expect(instruction).toContain('只生成 1 个 Skill');
+    expect(instruction).toContain('用户最终获得和使用的主体是一个 Agent');
+    expect(instruction).toContain('生成 1-');
     expect(instruction).toContain('生成课堂反馈');
     expect(instruction).toContain('不编造课堂事实');
-    expect(instruction).not.toContain('创建多个 Skill');
+    expect(instruction).not.toContain('只生成 1 个 Skill，不要拆分成多个 Skill');
   });
 
   it('accepts only bounded draft operations from model output', () => {
@@ -759,7 +760,7 @@ describe('guided creation conversation service', () => {
     });
 
     expect(turn.next_blocking_field).toBe('goal');
-    expect(turn.content).toContain('最希望这个 Skill 帮你完成什么目标');
+    expect(turn.content).toContain('最希望这个 Agent 帮你完成什么目标');
     expect(turn.content.match(/[？?]/g)).toHaveLength(1);
   });
 

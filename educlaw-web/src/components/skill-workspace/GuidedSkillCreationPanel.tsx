@@ -20,6 +20,11 @@ import {
 } from 'lucide-react';
 import { educationScenarios } from './education-scenarios';
 import {
+  presetToPrompt,
+  recommendPresets,
+} from '../../lib/studio-presets';
+import { PresetRecommendation } from './PresetRecommendation';
+import {
   shouldDisplayPendingGuidedMessage,
   type PendingGuidedMessage,
 } from './guided-optimistic-message';
@@ -48,7 +53,7 @@ type Props = {
   onFiles: (files: FileList) => void;
   onRemoveDocument: (index: number) => void;
   onOpenAgent?: () => void;
-  onOpenSkill?: () => void;
+  onOpenSkill?: (skillId?: string) => void;
 };
 
 const phaseSteps = [
@@ -69,6 +74,7 @@ const guidedStageLabels: Record<GuidedCreationStage, string> = {
 export function GuidedSkillCreationPanel(props: Props) {
   const [input, setInput] = useState('');
   const [showConversation, setShowConversation] = useState(false);
+  const [dismissedPresetKey, setDismissedPresetKey] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messageListRef = useRef<HTMLDivElement>(null);
   const isConfirmation = props.session?.status === 'ready_for_confirmation';
@@ -133,6 +139,23 @@ export function GuidedSkillCreationPanel(props: Props) {
           currentLabel: guidedStageLabels[guidedStage],
         }
       : null;
+  const presetRecommendationKey = [
+    props.session?.id ?? 'new',
+    props.session?.messages.length ?? 0,
+    input,
+  ].join('|');
+  const recommendedPresets = useMemo(() => {
+    const recent = (props.session?.messages ?? [])
+      .slice(-4)
+      .map((message) => message.content)
+      .join(' ');
+    return recommendPresets(`${recent} ${input}`, 2);
+  }, [input, props.session?.messages]);
+  const showPresetRecommendation =
+    !isConfirmation &&
+    !props.busy &&
+    recommendedPresets.length > 0 &&
+    dismissedPresetKey !== presetRecommendationKey;
 
   const send = () => {
     const value = input.trim();
@@ -317,7 +340,7 @@ export function GuidedSkillCreationPanel(props: Props) {
                   <Sparkles size={24} aria-hidden="true" />
                 </div>
                 <h2>从一个教学目标开始</h2>
-                <p>描述你的教学目标，我会协助梳理需求并生成可运行的 Skill。</p>
+                <p>描述你的教学目标，我会协助梳理需求并生成可运行的 Agent 与 Skill。</p>
                 <div className="skill-starter-section">
                   <span>精选教学场景</span>
                   <div className="skill-starter-chips">
@@ -392,25 +415,36 @@ export function GuidedSkillCreationPanel(props: Props) {
         )}
 
         <div className="skill-composer-wrap">
+          {showPresetRecommendation ? (
+            <PresetRecommendation
+              presets={recommendedPresets}
+              compact
+              onUse={(preset) => setInput(presetToPrompt(preset))}
+              onRemix={(preset) =>
+                setInput(`基于「${preset.name}」改造：\n${presetToPrompt(preset)}`)
+              }
+              onDismiss={() => setDismissedPresetKey(presetRecommendationKey)}
+            />
+          ) : null}
           {educationProgress ? (
-            <div className="skill-guided-progress" aria-label="共创进度">
-              <span>共创进度</span>
+            <div className="skill-guided-progress" aria-label="Agent 创建进度">
+              <span>Agent 创建进度</span>
               <strong>
                 已完成 {educationProgress.completedStepCount}/
                 {educationProgress.totalStepCount}
               </strong>
               <small>
                 {educationProgress.currentStepLabel
-                  ? `当前环节：${educationProgress.currentStepLabel}`
+                  ? `当前创建环节：${educationProgress.currentStepLabel}`
                   : educationProgress.completedStepCount ===
                       educationProgress.totalStepCount
-                    ? '全部步骤已完成'
-                    : '等待确认下一步'}
+                    ? '全部 Agent 创建步骤已完成'
+                    : '等待确认下一创建步骤'}
               </small>
             </div>
           ) : guidedStageProgress ? (
-            <div className="skill-guided-progress" aria-label="共创进度">
-              <span>共创进度</span>
+            <div className="skill-guided-progress" aria-label="Agent 创建进度">
+              <span>Agent 创建进度</span>
               <strong>
                 已完成 {guidedStageProgress.completed}/
                 {guidedStageProgress.total}
@@ -419,7 +453,7 @@ export function GuidedSkillCreationPanel(props: Props) {
             </div>
           ) : null}
           {educationProgress && props.session && (
-            <nav className="skill-interview-steps" aria-label="Skill 引导阶段">
+            <nav className="skill-interview-steps" aria-label="Agent 创建阶段">
               {GUIDED_CREATION_STEP_DEFINITIONS.map((step, index) => {
                 const progressStep = educationProgress?.steps[index];
                 const completed = progressStep?.status === 'completed';
@@ -459,7 +493,7 @@ export function GuidedSkillCreationPanel(props: Props) {
           )}
           <div className="skill-composer">
             <textarea
-              aria-label="共创建议与补充说明"
+              aria-label="创建建议与补充说明"
               name="guided-skill-message"
               autoComplete="off"
               value={input}
@@ -473,7 +507,7 @@ export function GuidedSkillCreationPanel(props: Props) {
               placeholder={
                 props.session
                   ? '补充你的想法，或选择上方建议…'
-                  : '描述你想创建的 Skill…'
+                  : '描述你想创建的 Agent…'
               }
               rows={2}
             />
@@ -521,7 +555,7 @@ export function GuidedSkillCreationPanel(props: Props) {
                 className="skill-send-button"
                 onClick={send}
                 disabled={!input.trim() || props.busy}
-                aria-label="发送共创消息"
+                aria-label="发送创建消息"
               >
                 {props.busy ? (
                   <Loader2 size={16} className="spin" aria-hidden="true" />

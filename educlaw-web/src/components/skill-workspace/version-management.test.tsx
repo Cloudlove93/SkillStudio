@@ -143,10 +143,10 @@ it('disables comparison when only one valid version exists', async () => {
   expect(compareButton?.title).toContain('至少需要两个版本');
 });
 
-it('returns directly to the Skill repository without relying on browser history', async () => {
+it('returns directly to the repository without relying on browser history', async () => {
   const onBackToRepository = vi.fn();
   await render({ onBackToRepository });
-  await click('返回 Skill 仓库');
+  await click('返回仓库');
   expect(onBackToRepository).toHaveBeenCalledOnce();
 });
 it('rolls back against the package head, not the Skill creation package', async () => {

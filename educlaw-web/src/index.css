@@ -559,12 +559,12 @@ body::after {
 
 /* ── Right-sidebar editorial console helpers ── */
 .font-serif-display {
-  font-family: "Lora", "Noto Serif SC", Georgia, "Source Han Serif SC", serif;
+  font-family: "PingFang SC", "Microsoft YaHei UI", "Hiragino Sans GB", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-feature-settings: "liga" 1, "kern" 1;
 }
 
 .font-mono-meta {
-  font-family: "JetBrains Mono", "SF Mono", "Cascadia Code", "Roboto Mono", ui-monospace, monospace;
+  font-family: "JetBrains Mono", "SF Mono", "Cascadia Code", "Roboto Mono", "Microsoft YaHei UI", "PingFang SC", sans-serif;
 }
 
 /* eyebrow:等宽小标签 + 圆点 */
@@ -572,7 +572,7 @@ body::after {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-family: "JetBrains Mono", "SF Mono", "Cascadia Code", "Roboto Mono", ui-monospace, monospace;
+  font-family: "JetBrains Mono", "SF Mono", "Cascadia Code", "Roboto Mono", "Microsoft YaHei UI", "PingFang SC", sans-serif;
   font-size: 10.5px;
   font-weight: 500;
   letter-spacing: 0.06em;
@@ -634,7 +634,7 @@ body::after {
 /* meta 副信息:等宽 + 分隔点 */
 .ec-meta {
   margin-top: 4px;
-  font-family: "JetBrains Mono", "SF Mono", "Cascadia Code", "Roboto Mono", ui-monospace, monospace;
+  font-family: "JetBrains Mono", "SF Mono", "Cascadia Code", "Roboto Mono", "Microsoft YaHei UI", "PingFang SC", sans-serif;
   font-size: 11px;
   color: var(--muted-foreground);
   letter-spacing: 0.01em;

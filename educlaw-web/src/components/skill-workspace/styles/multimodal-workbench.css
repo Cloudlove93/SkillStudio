@@ -1193,6 +1193,52 @@
   }
 }
 
+/* 右侧摘要打开或中心列较窄时，媒体区与任务区改为上下排列。 */
+@container (max-width: 760px) {
+  .skill-mm-header {
+    flex-wrap: wrap;
+  }
+
+  .skill-mm-header p {
+    display: none;
+  }
+
+  .skill-mm-main {
+    display: block;
+  }
+
+  .skill-mm-media {
+    position: static;
+    margin-bottom: 12px;
+  }
+
+  .skill-mm-task {
+    padding: 16px;
+  }
+
+  .skill-mm-steps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .skill-mm-overview-layers,
+  .skill-mm-candidate-grid,
+  .skill-mm-url-import,
+  .skill-mm-generation-list {
+    grid-template-columns: 1fr;
+  }
+
+  .skill-mm-url-import > label,
+  .skill-mm-generation-list li:nth-child(even) {
+    grid-column: 1;
+    border-left: 0;
+    padding-left: 0;
+  }
+
+  .skill-mm-actionbar {
+    flex-wrap: wrap;
+  }
+}
+
 @media (max-width: 620px) {
   .skill-multimodal-view {
     padding: 10px;

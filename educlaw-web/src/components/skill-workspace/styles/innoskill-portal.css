@@ -1383,6 +1383,11 @@
 }
 
 @media (max-width: 1100px) {
+  /* 窄屏侧栏只显示图标，网格列宽也必须同步收窄，否则主内容被挤到 150px。 */
+  .skill-workspace-root {
+    --skill-sidebar-current: 58px;
+  }
+
   .isk-sidebar .isk-sidebar-section-label,
   .isk-sidebar .isk-nav-button b,
   .isk-sidebar .isk-nav-button em,

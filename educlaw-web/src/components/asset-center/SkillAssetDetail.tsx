@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { SkillVersionDetail } from '@educlaw/shared';
 import { Download, History, MessageSquare, Pencil, Trash2 } from 'lucide-react';
 import { liteApi, type RepositorySkillRecord } from '../../api/lite-api';
+import { routes } from '../../lib/routes';
 import { useSkillVersions } from '../skill-workspace/use-skill-versions';
 import { SkillExportDialog } from '../skill-workspace/SkillExportDialog';
 import { AssetCard } from './AssetCard';
@@ -10,6 +11,8 @@ export function SkillAssetDetail({
   token,
   skill,
   pinnedVersion,
+  usingInAgent = false,
+  onUseInAgent,
   onNavigate,
   onChanged,
   onDeleted,
@@ -17,6 +20,8 @@ export function SkillAssetDetail({
   token: string;
   skill: RepositorySkillRecord;
   pinnedVersion?: string | null;
+  usingInAgent?: boolean;
+  onUseInAgent: () => void;
   onNavigate: (url: string) => void;
   onChanged: () => void;
   onDeleted: () => void;
@@ -122,21 +127,21 @@ export function SkillAssetDetail({
         <button
           type="button"
           className="asset-primary"
-          disabled={busy}
-          onClick={() =>
-            onNavigate(
-              `/agents?skillId=${encodeURIComponent(skill.id)}&autochat=1`,
-            )
-          }
+          disabled={busy || usingInAgent}
+          onClick={onUseInAgent}
         >
-          <MessageSquare size={15} />在 Agent 中使用
+          <MessageSquare size={15} />
+          {usingInAgent ? '正在打开…' : '在 Agent 中使用'}
         </button>
         <button
           type="button"
           disabled={busy}
           onClick={() =>
             onNavigate(
-              `/?view=versions&skill=${encodeURIComponent(`${skill.packageId}:${skill.id}`)}`,
+              routes.workspaceSkill(
+                `${skill.packageId}:${skill.id}`,
+                'versions',
+              ),
             )
           }
         >

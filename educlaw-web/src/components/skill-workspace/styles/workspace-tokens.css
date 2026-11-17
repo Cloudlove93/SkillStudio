@@ -2,9 +2,12 @@
 .skill-content-dialog {
   --workspace-font-ui:
     'PingFang SC', 'Microsoft YaHei UI', 'Hiragino Sans GB', sans-serif;
-  --workspace-font-mono: 'SFMono-Regular', 'Cascadia Code', Consolas, monospace;
+  --workspace-font-mono:
+    'SFMono-Regular', 'Cascadia Code', Consolas, 'Microsoft YaHei UI',
+    'PingFang SC', sans-serif;
   --workspace-font-display:
-    'Iowan Old Style', 'Palatino Linotype', 'Songti SC', serif;
+    'PingFang SC', 'Microsoft YaHei UI', 'Hiragino Sans GB', -apple-system,
+    BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --workspace-canvas: #f6f6fb;
   --workspace-surface: #ffffff;
   --workspace-ink: #1b1b23;

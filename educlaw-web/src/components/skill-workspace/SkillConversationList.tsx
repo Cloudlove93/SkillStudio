@@ -13,10 +13,11 @@ type Props = {
   runningConversationIds?: ReadonlySet<string>;
   completedConversationIds?: ReadonlySet<string>;
   loading?: boolean;
+  showSurfaceBadge?: boolean;
   onConversationSelect: (id: string) => void;
   onNewConversation: () => void;
-  onRename: (thread: ArenaThread, title: string) => Promise<void> | void;
-  onDelete: (thread: ArenaThread) => Promise<void> | void;
+  onRename?: (thread: ArenaThread, title: string) => Promise<void> | void;
+  onDelete?: (thread: ArenaThread) => Promise<void> | void;
 };
 
 export function SkillConversationList({
@@ -26,6 +27,7 @@ export function SkillConversationList({
   runningConversationIds,
   completedConversationIds,
   loading = false,
+  showSurfaceBadge = true,
   onConversationSelect,
   onNewConversation,
   onRename,
@@ -43,12 +45,13 @@ export function SkillConversationList({
   };
 
   const submitRename = async (thread: ArenaThread) => {
-    await onRename(thread, getConversationTitle(editingTitle));
+    await onRename?.(thread, getConversationTitle(editingTitle));
     setEditingId(null);
   };
+  const canManage = Boolean(onRename && onDelete);
 
   return (
-    <section className="skill-conversation-list" aria-label="Skill 对话">
+    <section className="skill-conversation-list" aria-label="对话">
       {loading ? <div className="skill-conversation-empty">正在加载…</div> : null}
       {!loading && conversations.length === 0 ? (
         <div className="skill-conversation-empty">还没有对话</div>
@@ -62,7 +65,9 @@ export function SkillConversationList({
           const isComplete = completedConversationIds?.has(id) ?? false;
           const status = isRunning ? 'running' : isComplete ? 'complete' : null;
           const surface = getConversationSurface(thread);
-          const surfaceLabel = getSurfaceLabel(surface);
+          const surfaceLabel = showSurfaceBadge
+            ? getSurfaceLabel(surface)
+            : null;
           return (
             <div
               className={`skill-conversation-item ${selected ? 'is-selected' : ''}`}
@@ -113,18 +118,20 @@ export function SkillConversationList({
                   </span>
                 </>
               )}
-              <button
-                type="button"
-                className="skill-conversation-more"
-                title="更多操作"
-                aria-label="更多操作"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setMenu({ thread, x: event.clientX, y: event.clientY });
-                }}
-              >
-                <MoreHorizontal size={14} />
-              </button>
+              {canManage ? (
+                <button
+                  type="button"
+                  className="skill-conversation-more"
+                  title="更多操作"
+                  aria-label="更多操作"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setMenu({ thread, x: event.clientX, y: event.clientY });
+                  }}
+                >
+                  <MoreHorizontal size={14} />
+                </button>
+              ) : null}
             </div>
           );
         })}
@@ -133,7 +140,7 @@ export function SkillConversationList({
         <Plus size={13} />
         <span>新建对话</span>
       </button>
-      {menu ? (
+      {menu && canManage ? (
         <SkillContextMenu
           x={menu.x}
           y={menu.y}
@@ -146,7 +153,7 @@ export function SkillConversationList({
             const thread = menu.thread;
             setMenu(null);
             if (action === 'rename') beginRename(thread);
-            if (action === 'delete') void onDelete(thread);
+            if (action === 'delete') void onDelete?.(thread);
           }}
         />
       ) : null}

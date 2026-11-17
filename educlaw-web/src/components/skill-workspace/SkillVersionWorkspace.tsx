@@ -268,7 +268,7 @@ export function SkillVersionWorkspace(props: Props) {
             onClick={props.onBackToRepository}
           >
             <ArrowLeft size={15} aria-hidden="true" />
-            返回 Skill 仓库
+            返回仓库
           </button>
           <div>
             <span className="skill-eyebrow">Skill 生命周期</span>

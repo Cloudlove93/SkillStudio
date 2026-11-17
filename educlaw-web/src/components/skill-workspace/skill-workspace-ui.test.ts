@@ -112,7 +112,7 @@ describe('Skill-first workspace UI contract', () => {
     const sidebarRule = css.match(/\.skill-sidebar\s*\{([^}]*)\}/s)?.[1] ?? '';
     expect(sidebarRule).toContain('overflow: visible');
     expect(sidebarRule).toContain('z-index: 20');
-    expect(source).toContain('对话共创');
+    expect(source).toContain('对话创建 Agent');
     expect(source).toContain('文档生成');
     expect(source).toContain('完整填写');
     expect(source).toContain('导入 Skill');
@@ -130,7 +130,7 @@ describe('Skill-first workspace UI contract', () => {
 
     expect(source).toContain('从一个教学目标开始');
     expect(source).toContain(
-      '描述你的教学目标，我会协助梳理需求并生成可运行的 Skill。',
+      '描述你的教学目标，我会协助梳理需求并生成可运行的 Agent 与 Skill。',
     );
     expect(source).toContain('精选教学场景');
     expect(source).not.toContain('先简单描述目标，我会通过对话帮你逐步补全。');
@@ -159,7 +159,7 @@ describe('Skill-first workspace UI contract', () => {
     expect(source).toContain('educationProgress.completedStepCount');
     expect(source).toContain('educationProgress.totalStepCount');
     expect(source).toContain(
-      '`当前环节：${educationProgress.currentStepLabel}`',
+      '`当前创建环节：${educationProgress.currentStepLabel}`',
     );
     expect(source).toContain('props.session.flow_version >= 3');
     expect(source).toContain('props.session.confirmed_stages.length');

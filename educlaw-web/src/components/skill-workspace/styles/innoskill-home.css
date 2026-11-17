@@ -330,39 +330,11 @@
   white-space: nowrap;
 }
 
-.skill-home-composer-meta small {
-  margin-left: auto;
-  color: #5f6368;
-  font-size: 11.5px;
-}
-
 .skill-home-ways {
   display: flex;
   width: min(820px, 100%);
   flex-direction: column;
   gap: 14px;
-}
-
-.skill-home-way-label {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin: 0;
-  color: #848791;
-  font-size: 11.5px;
-  letter-spacing: 0.14em;
-}
-
-.skill-home-way-label::before,
-.skill-home-way-label::after {
-  height: 1px;
-  flex: 1;
-  background: linear-gradient(90deg, rgba(227, 227, 238, 0), #e3e3ee);
-  content: '';
-}
-
-.skill-home-way-label::after {
-  background: linear-gradient(90deg, #e3e3ee, rgba(227, 227, 238, 0));
 }
 
 .skill-home-way-grid {
@@ -512,17 +484,11 @@
   background: rgba(255, 255, 255, 0.045);
 }
 
-.dark .skill-home-way-label {
-  color: #7f8593;
-}
-
-.dark .skill-home-way-label::before,
-.dark .skill-home-way-label::after {
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.08));
-}
-
-.dark .skill-home-way-label::after {
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0));
+.dark .skill-home-mode-chip {
+  border-color: var(--isk-accent-line);
+  background: var(--isk-accent-soft);
+  box-shadow: none;
+  color: var(--isk-accent);
 }
 
 .dark .skill-home-way-grid > button {
@@ -595,15 +561,6 @@
 
   .skill-home-composer-zone {
     width: 100%;
-  }
-
-  .skill-home-composer-meta {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .skill-home-composer-meta small {
-    margin-left: 0;
   }
 }
 

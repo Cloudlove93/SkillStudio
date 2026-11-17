@@ -8,14 +8,20 @@ const settingsSource = readFileSync(
   'utf8',
 );
 
-test('retired legacy and workflow screens are no longer reachable from the app', () => {
+test('retired legacy screens are no longer reachable and workflow demo stays routed', () => {
   assert.doesNotMatch(appSource, /import Workspace from/);
   assert.doesNotMatch(appSource, /import AgentProfileWorkflow from/);
   assert.match(appSource, /path="\/legacy" element=\{<Navigate to="\/" replace \/>\}/);
-  assert.match(appSource, /path="\/workflow" element=\{<Navigate to="\/" replace \/>\}/);
+  assert.match(appSource, /path="\/workflow" element=\{<WorkflowDemo \/>\}/);
   assert.doesNotMatch(settingsSource, /to="\/workflow"/);
 });
 
 test('unknown client routes have an explicit fallback', () => {
   assert.match(appSource, /path="\*"/);
+});
+
+test('conversation stays on the home route without a separate chat page', () => {
+  assert.doesNotMatch(appSource, /path="\/agents\/chat"/);
+  assert.doesNotMatch(appSource, /from-skill/);
+  assert.match(appSource, /path="\/"/);
 });

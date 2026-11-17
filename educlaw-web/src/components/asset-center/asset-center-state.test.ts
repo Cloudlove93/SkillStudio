@@ -10,9 +10,9 @@ describe('asset routes and list state', () => {
     ['', '/agents?tab=skills'],
     [
       '?agentId=4&conversation=6&autochat=1',
-      '/agents?agentId=4&conversation=6&autochat=1',
+      '/?agent=4&conversation=6',
     ],
-    ['?skillId=2&autochat=1', '/agents?skillId=2&autochat=1'],
+    ['?skillId=2&autochat=1', '/?view=my-skills'],
     [
       '?view=run&skill=1%3A2&conversation=4',
       '/?view=run&skill=1%3A2&conversation=4',

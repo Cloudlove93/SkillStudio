@@ -1422,6 +1422,7 @@
   height: 100vh;
   overflow: hidden;
   background: var(--card);
+  container-type: inline-size;
 }
 .skill-main-stage.is-workflow {
   overflow-y: auto;

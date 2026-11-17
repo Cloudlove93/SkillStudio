@@ -6,6 +6,7 @@ import {
   WorkflowServiceError,
   createWorkflow,
   getWorkflowRun,
+  listUserSkillIds,
   runWorkflow,
   saveWorkflow,
   validateWorkflowForSnapshot,
@@ -74,7 +75,9 @@ router.post('/packages/:packageId/workflow/validate', requireAuth, async (req, r
   try {
     const id = packageId(req as AuthedRequest);
     const pkg = await getPackage((req as AuthedRequest).userId || '', id);
-    const definition = validateWorkflowForSnapshot(req.body?.definition, pkg.snapshot);
+    const definition = validateWorkflowForSnapshot(req.body?.definition, pkg.snapshot, {
+      availableSkillIds: await listUserSkillIds((req as AuthedRequest).userId || ''),
+    });
     res.json({ valid: true, definition });
   } catch (error) {
     respondError(res, error);

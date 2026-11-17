@@ -688,7 +688,8 @@
 }
 
 .agent-stat.is-model {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, 'Microsoft YaHei UI',
+    'PingFang SC', sans-serif;
   font-size: 10.5px;
 }
 

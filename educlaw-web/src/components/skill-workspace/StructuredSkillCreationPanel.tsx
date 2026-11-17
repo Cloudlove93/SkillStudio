@@ -1,6 +1,12 @@
-import { useRef, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import type { GuidedCreationDocument } from '@educlaw/shared';
 import { ArrowRight, Loader2, Paperclip } from 'lucide-react';
+import {
+  presetToStructuredDraft,
+  recommendPresets,
+  type StudioPreset,
+} from '../../lib/studio-presets';
+import { PresetRecommendation } from './PresetRecommendation';
 import {
   emptyStructuredSkillDraft,
   formatStructuredSkillRequest,
@@ -17,6 +23,7 @@ type Props = {
   onSubmit: (content: string, fields: StructuredSkillDraft) => void;
   onFiles: (files: FileList) => void;
   onRemoveDocument: (index: number) => void;
+  seed?: { id: string; draft: StructuredSkillDraft } | null;
 };
 
 const materialTypes =
@@ -28,13 +35,62 @@ export function StructuredSkillCreationPanel({
   onSubmit,
   onFiles,
   onRemoveDocument,
+  seed,
 }: Props) {
   const { openInspector } = useWorkspaceInspector();
   const [draft, setDraft] = useState<StructuredSkillDraft>(
     emptyStructuredSkillDraft,
   );
+  const [dismissedPresetKey, setDismissedPresetKey] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inspectorOpenedRef = useRef(false);
+
+  useEffect(() => {
+    if (!seed) return;
+    setDraft(seed.draft);
+    if (!inspectorOpenedRef.current) {
+      inspectorOpenedRef.current = true;
+      openInspector({
+        owner: 'structured',
+        view: 'structured-summary',
+        title: '填写摘要',
+        description: '随表单更新，不会改变当前输入焦点。',
+      });
+    }
+  }, [openInspector, seed]);
+
+  const recommendedPresets = useMemo(() => {
+    const material = `${Object.values(draft).join(' ')} ${documents
+      .map((document) => document.name)
+      .join(' ')}`;
+    return recommendPresets(material, 2);
+  }, [documents, draft]);
+  const presetRecommendationKey = `${Object.values(draft).join('|')}`;
+  const showPresetRecommendation =
+    !busy &&
+    recommendedPresets.length > 0 &&
+    dismissedPresetKey !== presetRecommendationKey;
+
+  const applyPreset = (preset: StudioPreset, remix: boolean) => {
+    const next = presetToStructuredDraft(preset);
+    setDraft(
+      remix
+        ? {
+            ...next,
+            task: `在《${preset.name}》基础上改造：${next.task}`,
+          }
+        : next,
+    );
+    if (!inspectorOpenedRef.current) {
+      inspectorOpenedRef.current = true;
+      openInspector({
+        owner: 'structured',
+        view: 'structured-summary',
+        title: '填写摘要',
+        description: '随表单更新，不会改变当前输入焦点。',
+      });
+    }
+  };
 
   const ensureInspector = () => {
     if (inspectorOpenedRef.current) return;
@@ -69,6 +125,16 @@ export function StructuredSkillCreationPanel({
           <h1>完善 Agent 需求</h1>
           <p>一次写清楚，系统会继续检查遗漏并通过对话完善。</p>
         </header>
+
+        {showPresetRecommendation ? (
+          <PresetRecommendation
+            presets={recommendedPresets}
+            compact
+            onUse={(preset) => applyPreset(preset, false)}
+            onRemix={(preset) => applyPreset(preset, true)}
+            onDismiss={() => setDismissedPresetKey(presetRecommendationKey)}
+          />
+        ) : null}
 
         <div className="skill-structured-fields">
           <label className="skill-structured-row">

@@ -5,6 +5,10 @@ packages:
   - openagent
 allowBuilds:
   esbuild: true
+  # protobufjs 的 postinstall 只做版本方案校验，无副作用。
+  protobufjs: true
+  # @google/genai 的 prepare 脚本在发布包中缺少 scripts/prepare.js，禁止执行。
+  '@google/genai': false
 overrides:
   nanoid: 3.3.18
   postcss: 8.5.18

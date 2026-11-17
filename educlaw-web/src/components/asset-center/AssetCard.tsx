@@ -10,6 +10,8 @@ export function AssetCard({
   children,
   onOpen,
   detail = false,
+  index,
+  status,
 }: {
   kind: 'agent' | 'skill';
   name: string;
@@ -18,18 +20,34 @@ export function AssetCard({
   children?: ReactNode;
   onOpen?: () => void;
   detail?: boolean;
+  index?: number;
+  status?: { label: string; tone: 'ready' | 'attention' };
 }) {
   const Icon = kind === 'agent' ? Bot : BookOpen;
   const Heading = detail ? 'h1' : 'h2';
   return (
     <article className={`asset-card${detail ? ' asset-card-detail' : ''}`}>
+      {!detail && (
+        <div className="asset-card-topline">
+          <span className="asset-index" aria-hidden="true">
+            {typeof index === 'number'
+              ? String(index + 1).padStart(2, '0')
+              : '—'}
+          </span>
+          {status ? (
+            <span className={`asset-status is-${status.tone}`}>
+              {status.label}
+            </span>
+          ) : null}
+        </div>
+      )}
       <div className="asset-card-heading">
         <span className={`asset-symbol asset-symbol-${kind}`}>
-          <Icon size={21} aria-hidden="true" />
+          <Icon size={20} aria-hidden="true" />
         </span>
         <div>
           <span className="asset-kind">
-            {kind === 'agent' ? 'Agent' : 'Skill'}
+            {kind === 'agent' ? 'AGENT' : 'SKILL'}
           </span>
           <Heading>
             {onOpen ? (

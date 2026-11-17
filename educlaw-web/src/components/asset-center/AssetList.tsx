@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { ChevronLeft, ChevronRight, Search, RotateCw } from 'lucide-react';
 import {
+  ASSET_PAGE_SIZE,
   selectAssetPage,
   type AssetEntry,
   type AssetListState,
@@ -21,9 +22,10 @@ export function AssetList<T extends AssetEntry>({
   loading: boolean;
   error: string;
   onRetry: () => void;
-  renderItem: (item: T) => ReactNode;
+  renderItem: (item: T, index: number) => ReactNode;
 }) {
   const page = selectAssetPage(items, state);
+  const pageOffset = (page.page - 1) * ASSET_PAGE_SIZE;
   return (
     <>
       <div className="asset-toolbar">
@@ -99,7 +101,11 @@ export function AssetList<T extends AssetEntry>({
             共 {page.total} 项
           </p>
           {page.items.length ? (
-            <div className="asset-grid">{page.items.map(renderItem)}</div>
+            <div className="asset-grid">
+              {page.items.map((item, index) =>
+                renderItem(item, pageOffset + index),
+              )}
+            </div>
           ) : (
             <div className="asset-empty">
               <h2>{items.length ? '没有匹配的资产' : '暂无资产'}</h2>

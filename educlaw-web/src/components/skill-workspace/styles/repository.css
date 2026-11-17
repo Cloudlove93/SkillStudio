@@ -18,8 +18,8 @@
   padding-bottom: 25px;
 }
 .skill-repository-header h1 {
-  margin: 6px 0 5px;
-  font-size: 23px;
+  margin: 7px 0 5px;
+  font-size: 26px;
   font-weight: 620;
   letter-spacing: -0.025em;
   text-wrap: balance;
@@ -28,6 +28,51 @@
   margin: 0;
   color: var(--muted-foreground);
   font-size: var(--workspace-text-xs);
+}
+.repository-ledger {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 20px;
+  border: 1px solid var(--workspace-border);
+  border-radius: var(--workspace-radius-lg);
+  background: var(--workspace-surface);
+  overflow: hidden;
+}
+.repository-ledger > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1px;
+  border-left: 1px solid var(--workspace-border);
+  padding: 13px 18px;
+}
+.repository-ledger > div:first-child {
+  border-left: 0;
+}
+.repository-ledger span {
+  color: var(--workspace-muted);
+  font-family: var(--workspace-font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+}
+.repository-ledger strong {
+  color: var(--workspace-ink);
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+}
+.repository-ledger small {
+  color: var(--workspace-muted);
+  font-size: var(--workspace-text-xs);
+}
+.repository-hint {
+  margin: 14px 0 0;
+  color: var(--workspace-muted);
+  font-size: var(--workspace-text-xs);
+  line-height: 1.6;
 }
 .skill-repository-tabs {
   display: flex;
@@ -297,6 +342,12 @@
   font-size: var(--workspace-text-xs);
   font-weight: 560;
   letter-spacing: 0.02em;
+}
+.skill-repository-card-index {
+  color: var(--workspace-muted);
+  font-family: var(--workspace-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
 }
 .skill-repository-card-version {
   overflow: hidden;
@@ -671,6 +722,31 @@
   }
 }
 
+@container skill-repository-stage (max-width: 720px) {
+  .skill-repository-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .skill-repository-header .skill-primary-button {
+    align-self: flex-start;
+  }
+
+  .repository-ledger {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .repository-ledger > div,
+  .repository-ledger > div:first-child {
+    border-top: 1px solid var(--workspace-border);
+    border-left: 0;
+  }
+
+  .repository-ledger > div:first-child {
+    border-top: 0;
+  }
+}
+
 @container skill-repository-stage (max-width: 590px) {
   .skill-repository-card-grid {
     grid-template-columns: minmax(0, 1fr);
@@ -693,33 +769,34 @@
 /* 仓库视角切换 */
 .repository-scope-tabs {
   display: inline-flex;
-  gap: 4px;
-  margin-top: 18px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--muted);
+  gap: 3px;
+  margin-top: 22px;
+  border: 1px solid var(--workspace-border);
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--workspace-border) 38%, transparent);
   padding: 3px;
 }
 .repository-scope-tabs button {
   display: inline-flex;
+  height: 34px;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   border: 0;
   border-radius: 8px;
   background: transparent;
-  padding: 7px 14px;
-  color: var(--muted-foreground);
-  font-size: var(--workspace-text-xs);
+  padding: 0 15px;
+  color: var(--workspace-muted);
+  font-size: var(--workspace-text-sm);
   cursor: pointer;
 }
 .repository-scope-tabs button:hover {
-  color: var(--foreground);
+  color: var(--workspace-ink);
 }
 .repository-scope-tabs button.is-active {
-  background: var(--card);
-  color: var(--foreground);
+  background: var(--workspace-surface);
+  color: var(--workspace-ink);
   font-weight: 620;
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 1px 3px rgb(24 33 45 / 8%);
 }
 .repository-scope-tabs span {
   display: inline-grid;
@@ -727,10 +804,11 @@
   height: 18px;
   place-items: center;
   border-radius: 99px;
-  background: var(--muted);
+  background: color-mix(in srgb, var(--workspace-border) 55%, transparent);
   padding: 0 5px;
-  color: var(--muted-foreground);
-  font-size: var(--workspace-text-xs);
+  color: var(--workspace-muted);
+  font-family: var(--workspace-font-mono);
+  font-size: 10px;
 }
 
 /* Agent 仓库 */

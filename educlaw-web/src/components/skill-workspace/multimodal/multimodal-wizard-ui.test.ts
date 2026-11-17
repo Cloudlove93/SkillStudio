@@ -166,7 +166,7 @@ describe('multimodal wizard UI contract', () => {
     expect(source).not.toContain('Arena');
     expect(source).not.toContain('<details');
     expect(source).toContain('进入工作区试用');
-    expect(source).toContain('进入 Skill 仓库');
+    expect(source).toContain('进入仓库');
   });
 
   it('hides engineering package identifiers from the completion result', () => {

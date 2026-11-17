@@ -43,7 +43,7 @@ describe('SkillCreationHome', () => {
     const props = renderHome();
     const textarea = container.querySelector('textarea')!;
     const send = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="开始对话共创"]',
+      'button[aria-label="开始创建 Agent"]',
     )!;
 
     act(() => {
@@ -93,5 +93,47 @@ describe('SkillCreationHome', () => {
     );
 
     expect(onRemoveDocument).toHaveBeenCalledWith(0);
+  });
+
+  it('recommends existing lesson packs and skills while the teacher describes a need', () => {
+    const onUsePreset = vi.fn();
+    const onRemixPreset = vi.fn();
+    renderHome({ onUsePreset, onRemixPreset });
+    const textarea = container.querySelector('textarea')!;
+
+    act(() => {
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLTextAreaElement.prototype,
+        'value',
+      )?.set;
+      setter?.call(textarea, '三年级数学课例的提问链分析');
+      textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+
+    expect(container.textContent).toContain('已有相关资源');
+    expect(container.textContent).toContain('小学数学3年级课例包');
+    expect(container.textContent).toContain('提问链分析');
+
+    act(() =>
+      [...container.querySelectorAll<HTMLButtonElement>('button')]
+        .find((button) => button.textContent?.includes('用这个'))!
+        .click(),
+    );
+    expect(onUsePreset).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'lesson-pack-数学-3年级' }),
+    );
+  });
+
+  it('writes a preset prompt into the composer without sending it', () => {
+    const onSend = vi.fn();
+    renderHome({
+      onSend,
+      promptSeed: { id: 'seed-1', text: '使用提问链分析模板' },
+    });
+
+    expect(
+      container.querySelector<HTMLTextAreaElement>('textarea')!.value,
+    ).toBe('使用提问链分析模板');
+    expect(onSend).not.toHaveBeenCalled();
   });
 });

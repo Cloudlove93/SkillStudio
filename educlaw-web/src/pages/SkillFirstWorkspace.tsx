@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import type {
+  AgentWorkspace,
   ArenaRunSnapshot,
   ArenaThread,
   GuidedCreationDocument,
@@ -19,6 +20,7 @@ import type {
 import { toast } from 'sonner';
 import { liteApi, type GuidedCreationSseEvent } from '../api/lite-api';
 import { agentsApi } from '../api/agents';
+import { routes } from '../lib/routes';
 import { useAuthStore } from '../stores/auth';
 import { SkillImportDialog } from '../components/skill-workspace/SkillImportDialog';
 import { SkillExportDialog } from '../components/skill-workspace/SkillExportDialog';
@@ -76,6 +78,18 @@ import {
   MULTIMODAL_RESUME_KEY,
 } from '../components/skill-workspace/multimodal-guided-creation-state';
 import { SkillCreationHome } from '../components/skill-workspace/SkillCreationHome';
+import { HomeAgentChat } from '../components/skill-workspace/HomeAgentChat';
+import {
+  presetToPrompt,
+  presetToStructuredDraft,
+  type StudioPreset,
+} from '../lib/studio-presets';
+import type { StructuredSkillDraft } from '../components/skill-workspace/structured-skill-creation-state';
+import {
+  completeConversationRequest,
+  conversationRequestId,
+  newRequestId,
+} from '../components/agent-workspace/agent-conversation-request';
 
 const MultimodalSkillCreationPanel = lazy(() =>
   import('../components/skill-workspace/MultimodalSkillCreationPanel').then(
@@ -143,6 +157,43 @@ function createRequestId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+type HomeAgentChatState = {
+  agent: AgentWorkspace | null;
+  conversations: ArenaThread[];
+  selectedId: string | null;
+  loading: boolean;
+  creating: boolean;
+  error: string;
+};
+
+const EMPTY_HOME_AGENT_CHAT: HomeAgentChatState = {
+  agent: null,
+  conversations: [],
+  selectedId: null,
+  loading: false,
+  creating: false,
+  error: '',
+};
+
+/** 后端自动生成的对话标题没有辨识度，侧栏改用时间区分。 */
+function agentConversationLabel(thread: ArenaThread) {
+  const title = thread.title?.trim() || '';
+  const generic =
+    !title ||
+    title === 'New Arena Conversation' ||
+    title.startsWith('Skill 使用：') ||
+    /^.+ · (对话|测试)$/.test(title);
+  if (!generic) return title;
+  const date = new Date(thread.updatedAt || thread.createdAt);
+  if (Number.isNaN(date.getTime())) return '新对话';
+  return `对话 · ${date.toLocaleString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })}`;
+}
+
 export default function SkillFirstWorkspace() {
   return (
     <WorkspaceInspectorProvider>
@@ -163,7 +214,6 @@ function SkillFirstWorkspaceContent() {
   );
   const token = useAuthStore((state) => state.token) || '';
   const user = useAuthStore((state) => state.user);
-  const isAdmin = useAuthStore((state) => state.isAdmin);
   const logout = useAuthStore((state) => state.logout);
   const {
     state: inspectorState,
@@ -203,11 +253,38 @@ function SkillFirstWorkspaceContent() {
   );
   const [createMode, setCreateMode] =
     useState<SkillCreateMode>(initialCreateMode);
+  const [presetSeed, setPresetSeed] = useState<{
+    id: string;
+    text: string;
+  } | null>(null);
+  const [structuredSeed, setStructuredSeed] = useState<{
+    id: string;
+    draft: StructuredSkillDraft;
+  } | null>(null);
   const [multimodalCreationKey, setMultimodalCreationKey] = useState(0);
   const [leftCollapsed, setLeftCollapsed] = useState(false);
-  const [workflowOpen, setWorkflowOpen] = useState(false);
-  const [workflowLibraryOpen, setWorkflowLibraryOpen] = useState(false);
-  const [workflowPackageId, setWorkflowPackageId] = useState<string | undefined>();
+  const [agentChat, setAgentChat] =
+    useState<HomeAgentChatState>(EMPTY_HOME_AGENT_CHAT);
+  const [agentChatRetry, setAgentChatRetry] = useState(0);
+  const agentChatId = new URLSearchParams(location.search).get('agent');
+  const agentChatRequestRef = useRef(0);
+  const agentOpeningRef = useRef<string | null>(null);
+  const agentCreateLock = useRef(false);
+  const initialWorkflowMode = useRef(
+    new URLSearchParams(location.search).get('workflow'),
+  );
+  const initialWorkflowPackage = useRef(
+    new URLSearchParams(location.search).get('workflowPackage'),
+  );
+  const [workflowOpen, setWorkflowOpen] = useState(
+    initialWorkflowMode.current !== null,
+  );
+  const [workflowLibraryOpen, setWorkflowLibraryOpen] = useState(
+    initialWorkflowMode.current === 'library',
+  );
+  const [workflowPackageId, setWorkflowPackageId] = useState<string | undefined>(
+    initialWorkflowPackage.current ?? undefined,
+  );
   const [importOpen, setImportOpen] = useState(false);
   const [importBusy, setImportBusy] = useState(false);
   const [workspaceState, dispatchWorkspace] = useReducer(
@@ -297,6 +374,10 @@ function SkillFirstWorkspaceContent() {
       {
         const params = new URLSearchParams(baseSearch);
         params.delete('resultSession');
+        params.delete('agent');
+        // 进入任意工作区视图时收起工作流界面，避免地址栏残留 workflow 参数。
+        params.delete('workflow');
+        params.delete('workflowPackage');
         baseSearch = params.toString() ? `?${params.toString()}` : '';
       }
       if (clearInspector) {
@@ -335,6 +416,88 @@ function SkillFirstWorkspaceContent() {
     },
     [activeSkillKey, replaceWorkspaceRoute],
   );
+
+  const locationRef = useRef(location);
+  locationRef.current = location;
+  const syncAgentConversation = useCallback(
+    (agentId: string, conversationId: string | null) => {
+      const current = locationRef.current;
+      const params = new URLSearchParams(current.search);
+      params.set('agent', agentId);
+      if (conversationId) params.set('conversation', conversationId);
+      else params.delete('conversation');
+      const nextSearch = `?${params.toString()}`;
+      if (nextSearch === current.search) return;
+      navigate(
+        {
+          pathname: current.pathname,
+          search: nextSearch,
+          hash: current.hash,
+        },
+        { replace: true },
+      );
+    },
+    [navigate],
+  );
+
+  useEffect(() => {
+    if (!agentChatId) {
+      setAgentChat(EMPTY_HOME_AGENT_CHAT);
+      return;
+    }
+    let cancelled = false;
+    const request = ++agentChatRequestRef.current;
+    setAgentChat((current) => ({
+      ...current,
+      agent: current.agent?.id === agentChatId ? current.agent : null,
+      loading: true,
+      error: '',
+    }));
+    const requestedConversation = new URLSearchParams(
+      window.location.search,
+    ).get('conversation');
+    void (async () => {
+      const agent = await agentsApi.get(token, agentChatId);
+      const conversations = await agentsApi.listConversations(
+        token,
+        agentChatId,
+      );
+      const restored =
+        conversations.find(
+          (item) => String(item.id) === requestedConversation,
+        ) ??
+        conversations[0] ??
+        null;
+      const thread =
+        restored ??
+        (await agentsApi.createConversation(token, agentChatId, {
+          purpose: 'run',
+          requestId: conversationRequestId(agentChatId, 'run'),
+        }));
+      if (restored) completeConversationRequest(agentChatId, 'run');
+      if (cancelled || request !== agentChatRequestRef.current) return;
+      setAgentChat({
+        agent,
+        conversations: restored ? conversations : [thread, ...conversations],
+        selectedId: String(thread.id),
+        loading: false,
+        creating: false,
+        error: '',
+      });
+      syncAgentConversation(agentChatId, String(thread.id));
+    })().catch((loadError: unknown) => {
+      if (cancelled || request !== agentChatRequestRef.current) return;
+      setAgentChat((current) => ({
+        ...current,
+        loading: false,
+        error:
+          loadError instanceof Error ? loadError.message : '对话加载失败',
+      }));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [agentChatId, agentChatRetry, syncAgentConversation, token]);
 
   const handleWorkspaceSearch = useCallback(
     (value: string) => {
@@ -808,6 +971,7 @@ function SkillFirstWorkspaceContent() {
     content: string,
     structured_fields?: StructuredGuidedInput,
   ) => {
+    setPresetSeed(null);
     openInspector({ owner: 'guided', view: 'summary', title: '需求摘要' });
     const clientMessageId = createRequestId('message');
     setPendingGuidedMessage(
@@ -1085,6 +1249,8 @@ function SkillFirstWorkspaceContent() {
     cancelOpeningSession();
     activeRunRef.current = null;
     setPendingGuidedMessage(null);
+    setPresetSeed(null);
+    setStructuredSeed(null);
     setCreateMode(mode);
     if (mode === 'multimodal') {
       localStorage.removeItem(MULTIMODAL_RESUME_KEY);
@@ -1104,12 +1270,96 @@ function SkillFirstWorkspaceContent() {
     dispatchWorkspace({ type: 'dismiss-update' });
   };
 
+  const usePreset = (preset: StudioPreset) => {
+    if (preset.kind === 'lesson-pack') {
+      const existing = repositorySkills.find(
+        (skill) => skill.name === preset.name,
+      );
+      if (existing) {
+        navigate(routes.skill(existing.packageId, existing.skillId));
+        toast.success(`已打开「${preset.name}」，可直接使用或基于它创建`);
+        return;
+      }
+    }
+    setCreateMode('conversation');
+    setPresetSeed({
+      id: createRequestId('preset'),
+      text: presetToPrompt(preset),
+    });
+    navigateWorkspaceView('create', null, true);
+    toast.success(`已带入「${preset.name}」，可在输入框继续调整`);
+  };
+
+  const remixPreset = (preset: StudioPreset) => {
+    cancelOpeningSession();
+    activeRunRef.current = null;
+    setPendingGuidedMessage(null);
+    setSession(null);
+    setSelectedRepositorySkill(null);
+    setSelectedSessionId(null);
+    selectedRef.current = null;
+    setCreateMode('manual');
+    setStructuredSeed({
+      id: createRequestId('preset'),
+      draft: presetToStructuredDraft(preset),
+    });
+    setBusy(false);
+    setPhase(null);
+    setPreviews([]);
+    setError(null);
+    closeInspector({ force: true });
+    navigateWorkspaceView('create', null, true);
+    dispatchWorkspace({ type: 'dismiss-update' });
+    toast.success('已按模板填好结构视图，可继续修改');
+  };
+
   const openRepository = () => {
     cancelOpeningSession();
+    selectedRef.current = null;
+    setSelectedSessionId(null);
+    setSession(null);
+    setSelectedRepositorySkill(null);
     closeInspector({ force: true });
-    navigateWorkspaceView('repository', null, true);
     dispatchWorkspace({ type: 'dismiss-update' });
+    navigate(routes.assets('skills'));
   };
+
+  /** 工作流界面写进地址栏，刷新和前进/后退都能回到同一个界面。 */
+  const syncWorkflowMode = useCallback(
+    (mode: 'library' | 'editor' | null, packageId?: string) => {
+      setWorkflowOpen(mode !== null);
+      setWorkflowLibraryOpen(mode === 'library');
+      const params = new URLSearchParams(location.search);
+      if (mode) params.set('workflow', mode);
+      else params.delete('workflow');
+      if (mode === 'editor' && packageId) params.set('workflowPackage', packageId);
+      else params.delete('workflowPackage');
+      const nextSearch = params.toString() ? `?${params.toString()}` : '';
+      if (nextSearch === location.search) return;
+      navigate(
+        {
+          pathname: location.pathname,
+          search: nextSearch,
+          hash: location.hash,
+        },
+        { replace: true },
+      );
+    },
+    [location.pathname, location.search, location.hash, navigate],
+  );
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const mode = params.get('workflow');
+    setWorkflowOpen(mode !== null);
+    setWorkflowLibraryOpen(mode === 'library');
+    setWorkflowPackageId(params.get('workflowPackage') ?? undefined);
+  }, [location.search]);
+
+  useEffect(() => {
+    // 工作流是整页编辑体验，右侧的需求摘要会挤压画布，进入时统一收起。
+    if (workflowOpen) closeInspector({ force: true });
+  }, [workflowOpen, closeInspector]);
 
   const openPortalView = (view: 'home' | 'my-skills') => {
     cancelOpeningSession();
@@ -1132,9 +1382,12 @@ function SkillFirstWorkspaceContent() {
     dispatchWorkspace({ type: 'dismiss-update' });
 
     const params = new URLSearchParams(location.search);
+    params.delete('agent');
     params.delete('conversation');
     params.delete('inspector');
     params.delete('inspectorItem');
+    params.delete('workflow');
+    params.delete('workflowPackage');
     const baseSearch = params.toString() ? `?${params.toString()}` : '';
     const nextSearch = writeSkillWorkspaceSearch(baseSearch, {
       view,
@@ -1150,6 +1403,100 @@ function SkillFirstWorkspaceContent() {
         },
         { replace: true },
       );
+    }
+  };
+
+  /** 打开主页里的 Agent 对话；会话不存在时会自动建一个。 */
+  const openAgentChat = (agentId: string) => {
+    cancelOpeningSession();
+    activeRunRef.current = null;
+    setPendingGuidedMessage(null);
+    setSelectedRepositorySkill(null);
+    setSession(null);
+    setSelectedSessionId(null);
+    selectedRef.current = null;
+    setDocuments([]);
+    setBusy(false);
+    setPhase(null);
+    setPreviews([]);
+    setError(null);
+    setSelectedConversationId(null);
+    closeInspector({ force: true });
+    dispatchWorkspace({ type: 'navigate', view: 'home' });
+    dispatchWorkspace({ type: 'dismiss-update' });
+
+    const params = new URLSearchParams(location.search);
+    [
+      'view',
+      'skill',
+      'session',
+      'conversation',
+      'inspector',
+      'inspectorItem',
+      'workflow',
+      'workflowPackage',
+      'resultSession',
+    ].forEach((key) => params.delete(key));
+    params.set('agent', agentId);
+    navigate({
+      pathname: '/',
+      search: `?${params.toString()}`,
+      hash: location.hash,
+    });
+  };
+
+  /** 把 Skill 转成 Agent 后直接在主页开会话。 */
+  const openAgentForSkill = async (skillId: string) => {
+    if (agentOpeningRef.current) return;
+    agentOpeningRef.current = skillId;
+    const toastId = 'open-agent-from-skill';
+    toast.loading('正在打开 Agent…', { id: toastId });
+    try {
+      const agent = await agentsApi.provision(token, { skillId });
+      toast.dismiss(toastId);
+      openAgentChat(agent.id);
+    } catch (openError) {
+      toast.error(
+        openError instanceof Error ? openError.message : 'Agent 打开失败，请稍后重试',
+        { id: toastId },
+      );
+    } finally {
+      agentOpeningRef.current = null;
+    }
+  };
+
+  const selectAgentConversation = (id: string) => {
+    setAgentChat((current) => ({ ...current, selectedId: id }));
+    if (agentChatId) syncAgentConversation(agentChatId, id);
+  };
+
+  const newAgentConversation = async () => {
+    if (!agentChatId || agentCreateLock.current) return;
+    agentCreateLock.current = true;
+    setAgentChat((current) => ({ ...current, creating: true, error: '' }));
+    try {
+      const thread = await agentsApi.createConversation(token, agentChatId, {
+        purpose: 'run',
+        requestId: newRequestId(),
+      });
+      setAgentChat((current) => ({
+        ...current,
+        conversations: [thread, ...current.conversations],
+        selectedId: String(thread.id),
+        creating: false,
+      }));
+      syncAgentConversation(agentChatId, String(thread.id));
+    } catch (createError) {
+      setAgentChat((current) => ({
+        ...current,
+        creating: false,
+        error:
+          createError instanceof Error
+            ? createError.message
+            : '新对话创建失败，请稍后重试',
+      }));
+    } finally {
+      agentCreateLock.current = false;
     }
   };
 
@@ -1259,6 +1606,7 @@ function SkillFirstWorkspaceContent() {
   };
 
   useEffect(() => {
+    if (agentChatId) return;
     if (initialConversationId.current) return;
     // Let explicit view navigation commit before synchronizing its conversation.
     if (
@@ -1276,6 +1624,7 @@ function SkillFirstWorkspaceContent() {
         { replace: true },
       );
   }, [
+    agentChatId,
     workspaceState.activeView,
     selectedConversationId,
     location.search,
@@ -1365,11 +1714,11 @@ function SkillFirstWorkspaceContent() {
     }
   };
 
-  const useSkillAsAgent = (skill: RepositorySkill) => {
+  const openSkillAsAgent = (skill: RepositorySkill) => {
     cancelOpeningSession();
     closeInspector({ force: true });
     dispatchWorkspace({ type: 'dismiss-update' });
-    navigate(`/agents?skillId=${encodeURIComponent(skill.skillId)}&autochat=1`);
+    void openAgentForSkill(skill.skillId);
   };
 
   const openRepositorySkill = (skill: RepositorySkill) => {
@@ -1396,7 +1745,7 @@ function SkillFirstWorkspaceContent() {
       const agentId =
         summary.generatedAgent?.agentId ||
         (await agentsApi.provision(token, { sessionId: summary.id })).id;
-      navigate(`/agents?agentId=${encodeURIComponent(agentId)}&autochat=1`);
+      openAgentChat(agentId);
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : 'Agent 创建失败，请稍后重试',
@@ -1404,31 +1753,15 @@ function SkillFirstWorkspaceContent() {
     }
   }
 
-  const openGeneratedSkill = async (skillId: string) => {
-    try {
-      const skills = await refreshRepository();
-      const generated = skills.find((skill) => skill.skillId === skillId);
-      if (generated) {
-        navigate(
-          `/agents?skillId=${encodeURIComponent(generated.skillId)}&autochat=1`,
-        );
-        return;
-      }
-      openRepository();
-      toast.info('Skill 已生成，请在仓库中选择后试用');
-    } catch (loadError) {
-      openRepository();
-      toast.error(
-        loadError instanceof Error ? loadError.message : 'Skill 仓库同步失败',
-      );
-    }
+  const openGeneratedSkill = (skillId: string) => {
+    void openAgentForSkill(skillId);
   };
 
   const removeFromWorkspace = (skill: RepositorySkill) => {
     setWorkspaceSkillKeys((keys) => keys.filter((key) => key !== skill.key));
     if (selectedRepositorySkill?.key === skill.key) {
       setSelectedRepositorySkill(null);
-      openPortalView('my-skills');
+      openRepository();
     }
   };
 
@@ -1505,7 +1838,7 @@ function SkillFirstWorkspaceContent() {
       return;
     }
     if (action === 'open') {
-      useSkillAsAgent(skill);
+      openSkillAsAgent(skill);
       return;
     }
     openRepositorySkill(skill);
@@ -1561,12 +1894,13 @@ function SkillFirstWorkspaceContent() {
     workspaceState.activeView === 'repository' ||
     workspaceState.activeView === 'my-skills';
   const isCreationHome =
-    workspaceState.activeView === 'home' ||
-    (workspaceState.activeView === 'create' &&
-      !activeSkill &&
-      !session &&
-      createMode === 'conversation' &&
-      !visiblePendingGuidedMessage);
+    !agentChatId &&
+    (workspaceState.activeView === 'home' ||
+      (workspaceState.activeView === 'create' &&
+        !activeSkill &&
+        !session &&
+        createMode === 'conversation' &&
+        !visiblePendingGuidedMessage));
   const activeSidebarSection: InnoSkillNavSection = workflowOpen
     ? 'workflow-library'
     : isRepositoryView || activeSkill
@@ -1593,9 +1927,11 @@ function SkillFirstWorkspaceContent() {
         void enterAgentWorkspace(session);
         return;
       }
-      navigate(
-        `/agents${activeSkill ? `?skillId=${encodeURIComponent(activeSkill.skillId)}&autochat=1` : '?autochat=1'}`,
-      );
+      if (activeSkill) {
+        void openAgentForSkill(activeSkill.skillId);
+        return;
+      }
+      navigate(routes.assets());
       return;
     }
     openInspector({
@@ -1613,6 +1949,9 @@ function SkillFirstWorkspaceContent() {
           '--skill-context-current': inspectorState.open
             ? `${inspectorWidth}px`
             : '46px',
+          '--workspace-inspector-overlay-width': inspectorState.open
+            ? `${inspectorWidth}px`
+            : '0px',
         } as React.CSSProperties
       }
     >
@@ -1623,22 +1962,35 @@ function SkillFirstWorkspaceContent() {
         activeSection={activeSidebarSection}
         collapsed={leftCollapsed}
         userName={user?.username || '用户'}
-        isAdmin={isAdmin}
         skills={workspaceSkills}
-        activeSkillKey={activeSkillKey}
-        activeSkillName={activeSkillName}
-        conversations={conversations}
-        selectedConversationId={selectedConversationId}
-        conversationLoading={conversationLoading}
-        conversationRunningIds={runningConversationIds}
-        completedConversationIds={completedConversationIds}
+        activeSkillKey={agentChatId ? null : activeSkillKey}
+        activeSkillName={agentChatId ? (agentChat.agent?.name ?? null) : activeSkillName}
+        conversationLabel={agentChatId ? '当前 Agent' : undefined}
+        conversationSurfaceBadge={agentChatId ? false : undefined}
+        conversations={
+          agentChatId
+            ? agentChat.conversations.map((item) => ({
+                ...item,
+                title: agentConversationLabel(item),
+              }))
+            : conversations
+        }
+        selectedConversationId={
+          agentChatId ? agentChat.selectedId : selectedConversationId
+        }
+        conversationLoading={
+          agentChatId ? agentChat.loading : conversationLoading
+        }
+        conversationRunningIds={agentChatId ? undefined : runningConversationIds}
+        completedConversationIds={
+          agentChatId ? undefined : completedConversationIds
+        }
         onToggle={() => setLeftCollapsed((value) => !value)}
         onNavigate={(section) => {
           if (section === 'workflow-library') {
             closeInspector({ force: true });
             setWorkflowPackageId(undefined);
-            setWorkflowLibraryOpen(true);
-            setWorkflowOpen(true);
+            syncWorkflowMode('library');
             return;
           }
           setWorkflowOpen(false);
@@ -1646,26 +1998,31 @@ function SkillFirstWorkspaceContent() {
           openPortalView(section);
         }}
         onCreateMode={(mode) => {
-          setWorkflowOpen(false);
+          syncWorkflowMode(null);
           newSkill(mode);
         }}
         onSelectDraft={(item) => {
-          setWorkflowOpen(false);
+          syncWorkflowMode(null);
           void openSession(item);
         }}
         onRenameDraft={renameSession}
         onDeleteDraft={deleteSession}
         onSelectSkill={(skill) => {
-          setWorkflowOpen(false);
-          useSkillAsAgent(skill);
+          syncWorkflowMode(null);
+          openSkillAsAgent(skill);
         }}
         onSkillAction={handleSkillMenuAction}
-        onAgents={() => navigate('/agents')}
-        onConversationSelect={handleConversationSelect}
-        onNewConversation={handleNewConversation}
-        onConversationRename={renameConversation}
-        onConversationDelete={deleteConversation}
-        onAdmin={() => navigate('/admin')}
+        onAgents={() => navigate(routes.assets())}
+        onConversationSelect={
+          agentChatId ? selectAgentConversation : handleConversationSelect
+        }
+        onNewConversation={
+          agentChatId
+            ? () => void newAgentConversation()
+            : handleNewConversation
+        }
+        onConversationRename={agentChatId ? undefined : renameConversation}
+        onConversationDelete={agentChatId ? undefined : deleteConversation}
         onLogout={logout}
       />
       <div className="skill-content-column">
@@ -1680,7 +2037,15 @@ function SkillFirstWorkspaceContent() {
           <div
             id="main-content"
             tabIndex={-1}
-            className={`skill-main-stage ${isRepositoryView ? 'is-repository' : ''}${workflowOpen ? ' is-workflow' : ''}`}
+            className={`skill-main-stage ${isRepositoryView ? 'is-repository' : ''}${workflowOpen ? ' is-workflow' : ''}${
+              !workflowOpen &&
+              !session &&
+              !activeSkill &&
+              !isRepositoryView &&
+              (createMode === 'manual' || createMode === 'document')
+                ? ' is-create-form'
+                : ''
+            }`}
             key={
               workflowOpen
                 ? 'workflow'
@@ -1688,21 +2053,39 @@ function SkillFirstWorkspaceContent() {
                 ? 'my-skills'
                 : activeSkill
                   ? `skill-${activeSkill.packageId}-${activeSkill.skillId}`
-                  : session?.id ||
-                    (workspaceState.activeView === 'home' ? 'home' : 'new')
+                  : agentChatId
+                    ? `agent-chat-${agentChatId}`
+                    : session?.id ||
+                      (workspaceState.activeView === 'home' ? 'home' : 'new')
             }
           >
             <Suspense
               fallback={<SkillWorkspaceLoadingState label="正在打开工作区" />}
             >
               {workflowOpen ? (
-                workflowLibraryOpen ? <WorkflowLibrary token={token} onCreate={() => { setWorkflowPackageId(undefined); setWorkflowLibraryOpen(false); }} onOpen={(packageId) => { setWorkflowPackageId(packageId); setWorkflowLibraryOpen(false); }} /> : <WorkflowDemo
+                workflowLibraryOpen ? <WorkflowLibrary token={token} onCreate={() => { setWorkflowPackageId(undefined); syncWorkflowMode('editor'); }} onOpen={(packageId) => { setWorkflowPackageId(packageId); syncWorkflowMode('editor', packageId); }} /> : <WorkflowDemo
                   embedded
                   token={token}
                   packageId={workflowPackageId}
-                  onOpenLibrary={() => setWorkflowLibraryOpen(true)}
+                  onOpenLibrary={() => syncWorkflowMode('library')}
                 />
               ) : workspaceState.activeView === 'home' ? (
+                agentChatId ? (
+                  <HomeAgentChat
+                    token={token}
+                    agent={agentChat.agent}
+                    thread={
+                      agentChat.conversations.find(
+                        (item) => String(item.id) === agentChat.selectedId,
+                      ) ?? null
+                    }
+                    loading={agentChat.loading}
+                    creating={agentChat.creating}
+                    error={agentChat.error}
+                    onNewConversation={() => void newAgentConversation()}
+                    onRetry={() => setAgentChatRetry((value) => value + 1)}
+                  />
+                ) : (
                 <SkillCreationHome
                   documents={documents}
                   busy={busy}
@@ -1721,7 +2104,11 @@ function SkillFirstWorkspaceContent() {
                     setWorkflowLibraryOpen(false);
                     setWorkflowOpen(true);
                   }}
+                  promptSeed={presetSeed}
+                  onUsePreset={usePreset}
+                  onRemixPreset={remixPreset}
                 />
+                )
               ) : isRepositoryView ? (
                 <SkillRepositoryWorkspace
                   skills={repositorySkills}
@@ -1729,7 +2116,7 @@ function SkillFirstWorkspaceContent() {
                   token={token}
                   search={search}
                   onSearch={handleWorkspaceSearch}
-                  onSelectSkill={useSkillAsAgent}
+                  onSelectSkill={openSkillAsAgent}
                   onVersionManagement={(skill) => {
                     openRepositorySkill(skill);
                     navigateWorkspaceView('versions', skill.key, true);
@@ -1739,19 +2126,15 @@ function SkillFirstWorkspaceContent() {
                   onDeleteSkills={deleteRepositorySkills}
                   onRenameSkill={renameRepositorySkill}
                   onNew={newSkill}
-                  onOpenAgent={(agentId) =>
-                    navigate(`/agents?agentId=${encodeURIComponent(agentId)}`)
-                  }
-                  onCreateAgent={() => navigate('/agents')}
+                  onOpenAgent={(agentId) => navigate(routes.agent(agentId))}
+                  onCreateAgent={() => navigate(routes.assets())}
                 />
               ) : activeSkill ? (
                 <SkillDetailWorkspace
                   token={token}
                   skill={activeSkill}
                   onAttachToAgent={() =>
-                    navigate(
-                      `/agents?skillId=${encodeURIComponent(activeSkill.skillId)}&autochat=1`,
-                    )
+                    void openAgentForSkill(activeSkill.skillId)
                   }
                   view={detailView}
                   versions={versions}
@@ -1804,15 +2187,16 @@ function SkillFirstWorkspaceContent() {
                   onConfirm={confirm}
                   onSummarize={summarize}
                   onOpenAgent={() => void enterAgentWorkspace(session)}
-                  onOpenSkill={() => {
-                    if (!session.package_id || !session.skill_id) return;
-                    const params = new URLSearchParams({
-                      tab: 'skills',
-                      previewSkill: session.skill_id,
-                      previewPackage: session.package_id,
-                    });
-                    if (session.skill_version_id) params.set('skillVersion', session.skill_version_id);
-                    navigate(`/agents?${params}`);
+                  onOpenSkill={(skillId) => {
+                    const targetSkillId = skillId || session.skill_id;
+                    if (!session.package_id || !targetSkillId) return;
+                    navigate(
+                      routes.skill(
+                        session.package_id,
+                        targetSkillId,
+                        skillId ? undefined : session.skill_version_id || undefined,
+                      ),
+                    );
                   }}
                   onRetry={() => lastActionRef.current?.()}
                   onFiles={(files) => void addFiles(files)}
@@ -1841,20 +2225,19 @@ function SkillFirstWorkspaceContent() {
               ) : createMode === 'document' ? (
                 <DocumentSkillCreationPanel
                   token={token}
+                  onRemixPreset={remixPreset}
                   onGenerated={async (packageIds) => {
                     await refreshRepository();
                     closeInspector({ force: true });
                     const agentId = packageIds[0];
-                    if (agentId)
-                      navigate(
-                        `/agents?agentId=${encodeURIComponent(agentId)}&autochat=1`,
-                      );
+                    if (agentId) navigate(routes.chat(agentId));
                   }}
                 />
               ) : createMode === 'manual' ? (
                 <StructuredSkillCreationPanel
                   documents={documents}
                   busy={busy}
+                  seed={structuredSeed}
                   onSubmit={(content, fields) => start(content, fields)}
                   onFiles={(files) => void addFiles(files)}
                   onRemoveDocument={(index) =>
@@ -1902,6 +2285,9 @@ function SkillFirstWorkspaceContent() {
                     setWorkflowLibraryOpen(false);
                     setWorkflowOpen(true);
                   }}
+                  promptSeed={presetSeed}
+                  onUsePreset={usePreset}
+                  onRemixPreset={remixPreset}
                 />
               )}
             </Suspense>

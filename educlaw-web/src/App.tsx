@@ -9,7 +9,6 @@ import { PRODUCT_NAME, PRODUCT_WORKSPACE_NAME } from '@/lib/brand'
 import { useAuthStore } from './stores/auth'
 import { legacySkillsDestination } from './components/asset-center/asset-center-state'
 
-const AdminPage = lazy(() => import('./pages/AdminPage'))
 const LoginPage = lazy(() => import('./pages/LoginPage'))
 const AgentWorkspacePage = lazy(() => import('./pages/AgentWorkspacePage'))
 const SkillFirstWorkspace = lazy(() => import('./pages/SkillFirstWorkspace'))
@@ -29,9 +28,7 @@ function LegacySkillsRedirect() {
 }
 
 function WorkspaceEntry() {
-  const location = useLocation()
-  const view = new URLSearchParams(location.search).get('view')
-  if (view === 'repository' || view === 'my-skills') return <LegacySkillsRedirect />
+  // ?view=my-skills / repository 只作为历史深链保留，导航入口统一走仓库。
   return <SkillFirstWorkspace />
 }
 
@@ -98,11 +95,9 @@ function AppRoutes() {
         <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />} />
         <Route path="/" element={<RequireAuth><WorkspaceEntry /></RequireAuth>} />
         <Route path="/agents" element={<RequireAuth><AgentWorkspacePage /></RequireAuth>} />
-        <Route path="/agents/chat" element={<RequireAuth><AgentWorkspacePage mode="chat" /></RequireAuth>} />
         <Route path="/skills" element={<RequireAuth><LegacySkillsRedirect /></RequireAuth>} />
         <Route path="/legacy" element={<Navigate to="/" replace />} />
         <Route path="/workflow" element={<WorkflowDemo />} />
-        <Route path="/admin" element={<RequireAuth><AdminPage /></RequireAuth>} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </Suspense>

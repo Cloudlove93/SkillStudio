@@ -189,8 +189,8 @@ it('opens existing agent links without rendering a duplicate list', async () => 
   window.history.replaceState({}, '', '/agents?agentId=1&conversation=91');
   await render();
   expect(container.querySelector('[data-agent-panel]')).not.toBeNull();
-  expect(container.querySelector('[aria-label="资产类型"]')).toBeNull();
-  await click('返回资产中心');
+  expect(container.querySelector('[aria-label="目录类型"]')).toBeNull();
+  await click('返回目录');
   expect(container.querySelector('[data-agent-panel]')).toBeNull();
   expect(container.textContent).toContain('教学助手');
 });

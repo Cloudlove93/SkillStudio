@@ -291,7 +291,7 @@ function GuidedRequirementSummary({
         <div
           className="skill-context-progress-track"
           role="progressbar"
-          aria-label="需求共创完成进度"
+          aria-label="Agent 创建完成进度"
           aria-valuemin={0}
           aria-valuemax={progress.totalStepCount}
           aria-valuenow={progress.completedStepCount}
@@ -300,10 +300,10 @@ function GuidedRequirementSummary({
         </div>
         <p>
           {progress.currentStepLabel
-            ? `当前环节：${progress.currentStepLabel}`
+            ? `当前创建环节：${progress.currentStepLabel}`
             : progress.completedStepCount === progress.totalStepCount
-              ? '五个共创环节均已确认'
-              : '等待进入下一个共创环节'}
+              ? '五个 Agent 创建环节均已确认'
+              : '等待进入下一个 Agent 创建环节'}
         </p>
       </div>
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { AgentSummary, ArenaThread } from '@educlaw/shared';
-import { MessageSquare, ArrowUpRight } from 'lucide-react';
+import { MessageSquare } from 'lucide-react';
 import { agentsApi } from '../../api/agents';
 import { AssetCard } from './AssetCard';
 import { agentIsReady } from './asset-center-state';
@@ -8,11 +8,13 @@ import { agentIsReady } from './asset-center-state';
 export function AgentAssetCard({
   agent,
   token,
+  index,
   onOpen,
   onChat,
 }: {
   agent: AgentSummary;
   token: string;
+  index?: number;
   onOpen: () => void;
   onChat: () => void;
 }) {
@@ -45,6 +47,12 @@ export function AgentAssetCard({
       name={agent.name}
       description={agent.description}
       onOpen={onOpen}
+      index={index}
+      status={
+        agentIsReady(agent)
+          ? { label: '可使用', tone: 'ready' }
+          : { label: '待配置', tone: 'attention' }
+      }
       metadata={[
         { label: '模型', value: agent.model || '服务端默认模型' },
         {
@@ -57,7 +65,6 @@ export function AgentAssetCard({
             ? `#${agent.currentVersion}`
             : '暂无版本信息',
         },
-        { label: '状态', value: agentIsReady(agent) ? '可使用' : '待配置' },
         {
           label: '最近对话',
           value: loading ? (
@@ -74,10 +81,6 @@ export function AgentAssetCard({
         },
       ]}
     >
-      <button type="button" onClick={onOpen}>
-        <ArrowUpRight size={15} />
-        查看详情
-      </button>
       <button
         type="button"
         className="asset-primary"

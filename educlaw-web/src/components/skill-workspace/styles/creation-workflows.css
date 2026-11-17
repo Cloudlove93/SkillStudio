@@ -1,4 +1,6 @@
 .skill-center {
+  width: 100%;
+  min-width: 0;
   height: 100%;
   overflow-y: auto;
   scrollbar-width: none;
@@ -1019,8 +1021,10 @@
 }
 
 .skill-structured-form {
-  width: min(840px, 100%);
-  margin: 28px auto;
+  box-sizing: border-box;
+  width: auto;
+  max-width: 840px;
+  margin: 24px auto;
   padding: 0;
   overflow: hidden;
   border: 1px solid var(--border);
@@ -1059,7 +1063,7 @@
 }
 .skill-structured-pair {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   column-gap: 18px;
 }
 .skill-structured-row {
@@ -1235,7 +1239,7 @@
   }
 
   .skill-structured-form {
-    width: calc(100% - 34px);
+    width: auto;
     margin: 20px auto;
   }
 
@@ -1256,6 +1260,82 @@
   .skill-structured-pair .skill-structured-row,
   .skill-starter-chips {
     grid-template-columns: 1fr;
+  }
+}
+
+/* 右侧摘要打开后，中间内容区会明显变窄；按容器宽度而不是视口宽度收拢表单。 */
+@container (max-width: 760px) {
+  .skill-structured-form {
+    margin: 18px auto;
+    border-radius: 15px;
+  }
+
+  .skill-structured-header {
+    padding: 20px 20px 16px;
+  }
+
+  .skill-structured-header h1 {
+    font-size: 21px;
+  }
+
+  .skill-structured-fields {
+    gap: 15px;
+    padding: 18px 20px 8px;
+  }
+
+  .skill-structured-pair {
+    grid-template-columns: 1fr;
+    row-gap: 15px;
+  }
+
+  .skill-structured-actions {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 13px 20px 16px;
+  }
+
+  .skill-structured-actions > span {
+    flex-basis: 100%;
+    order: 2;
+  }
+
+  .skill-document-create-page {
+    box-sizing: border-box;
+    width: calc(100% - 32px);
+    padding: 26px 0 30px;
+  }
+
+  .skill-document-create-dropzone {
+    min-height: 0;
+    grid-template-columns: 46px minmax(0, 1fr);
+    gap: 12px;
+    padding: 20px;
+  }
+
+  .skill-document-create-dropzone > span:first-child {
+    width: 46px;
+    height: 46px;
+  }
+
+  .skill-document-create-dropzone b {
+    grid-column: 2;
+    justify-self: start;
+    padding: 7px 12px;
+  }
+
+  .skill-document-create-instruction {
+    padding: 15px 16px 16px;
+  }
+
+  .skill-document-create-footer {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .skill-document-create-footer .skill-primary-button {
+    width: 100%;
+    justify-content: center;
   }
 }
 

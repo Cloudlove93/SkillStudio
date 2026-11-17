@@ -29,6 +29,7 @@ import {
   buildGeneratedPackageSnapshot,
   extractExplicitSkillName,
   createPackageWithSnapshotTx,
+  MAX_GENERATED_SKILLS,
 } from './package-service.js';
 import {
   applyDraftOperations,
@@ -122,8 +123,8 @@ const GUIDED_EDUCATION_OP_SET = new Set<string>(['set', 'replace', 'remove']);
 const GUIDED_CREATION_STEP_SET = new Set<string>(GUIDED_CREATION_STEPS);
 
 const FALLBACK_QUESTIONS: Record<GuidedDraftField, string> = {
-  roles: '这个 Skill 主要给谁使用，并希望它扮演什么角色？',
-  goal: '你最希望这个 Skill 帮你完成什么目标？',
+  roles: '这个 Agent 主要给谁使用，并希望它扮演什么角色？',
+  goal: '你最希望这个 Agent 帮你完成什么目标？',
   usage_scenario: '通常会在什么教学场景中使用它？',
   input_contract: '使用时，你会提供哪些信息或材料？',
   output_contract: '你希望它最终输出什么内容和格式？',
@@ -349,7 +350,7 @@ export function buildGuidedAssistantTurn(input: {
       status: 'ready_for_confirmation',
       next_blocking_field: null,
       acknowledgement,
-      content: `${acknowledgement}\n\n信息已经完整，请检查确认内容。确认后我会生成这个 Skill。`,
+      content: `${acknowledgement}\n\n信息已经完整，请检查确认内容。确认后我会创建这个 Agent 和它需要的 Skill。`,
       suggested_options: [],
       confirmation: buildConfirmationCard(evaluation.normalized_draft),
       confirmed_stages: [],
@@ -536,7 +537,7 @@ export function buildGuidedAssistantTurnV2(input: {
       status: 'ready_for_confirmation',
       next_blocking_field: null,
       acknowledgement,
-      content: `${acknowledgement}\n\n你的想法已经梳理完整，请检查确认内容。确认后我会生成这个 Skill。`,
+      content: `${acknowledgement}\n\n你的想法已经梳理完整，请检查确认内容。确认后我会创建这个 Agent 和它需要的 Skill。`,
       suggested_options: [],
       confirmation: buildConfirmationCard(evaluation.normalized_draft),
       confirmed_stages: evaluation.confirmed_stages,
@@ -606,7 +607,7 @@ export function buildEducationSummarizeTurn(input: {
     status: 'ready_for_confirmation',
     next_blocking_field: null,
     acknowledgement,
-    content: `${acknowledgement}\n\n我们已经聊了较多轮次，我先把它整理成方案，请你确认或补充未明确的部分。确认后我会生成这个 Skill。`,
+    content: `${acknowledgement}\n\n我们已经聊了较多轮次，我先把它整理成方案，请你确认或补充未明确的部分。确认后我会创建这个 Agent 和它需要的 Skill。`,
     suggested_options: [],
     confirmation: buildEducationConfirmationCard(evaluation.normalized_draft),
     confirmed_stages: [],
@@ -628,15 +629,15 @@ const STEP_DIMENSIONS: Record<
 
 const STEP_FALLBACK_QUESTIONS: Record<GuidedCreationStep, string> = {
   intent_context:
-    '完成这个 Skill 后，你最希望学生发生什么变化，它会在怎样的真实教学情境中使用？',
+    '完成这个 Agent 后，你最希望学生发生什么变化，它会在怎样的真实教学情境中使用？',
   teacher_experience:
     '你实际教学时，学生最容易卡在哪里，你通常会怎样判断并处理？',
   strategy_co_creation:
-    '结合你的经验，你希望这个 Skill 采用怎样的教学方式来推动学生真正理解？',
+    '结合你的经验，你希望这个 Agent 采用怎样的教学方式来推动学生真正理解？',
   action_adjustment:
     '使用过程中要观察哪些表现，出现什么情况时应该调整做法或交给教师确认？',
   evidence_review:
-    '看到哪些具体表现或作品时，你会认为这个 Skill 在教育上真正有效？',
+    '看到哪些具体表现或作品时，你会认为这个 Agent 在教育上真正有效？',
 };
 
 const STEP_FALLBACK_OPTIONS: Record<GuidedCreationStep, string[]> = {
@@ -842,7 +843,7 @@ export function buildGuidedAssistantTurnV3(input: {
       status: 'ready_for_confirmation',
       next_blocking_field: null,
       acknowledgement,
-      content: `${acknowledgement}\n\n你的教学想法已经整理成完整方案，请检查确认。确认后我会生成这个 Skill。`,
+      content: `${acknowledgement}\n\n你的教学想法已经整理成完整方案，请检查确认。确认后我会创建这个 Agent 和它需要的 Skill。`,
       suggested_options: [],
       confirmation: buildEducationConfirmationCard(evaluation.normalized_draft),
       confirmed_stages: [],
@@ -1070,7 +1071,7 @@ function normalizeDocuments(
 
 function normalizeMessage(value: string): string {
   if (typeof value !== 'string' || !value.trim()) {
-    throw new GuidedCreationError('INVALID_MESSAGE', '请输入 Skill 需求', 400);
+    throw new GuidedCreationError('INVALID_MESSAGE', '请输入 Agent 需求', 400);
   }
   if (value.length > MAX_MESSAGE_CHARS) {
     throw new GuidedCreationError('MESSAGE_TOO_LONG', '消息内容过长', 400);
@@ -1106,7 +1107,7 @@ export async function getGuidedCreationDetail(input: {
   if (!row) {
     throw new GuidedCreationError(
       'GUIDED_SESSION_NOT_FOUND',
-      '没有找到这个 Skill 草稿',
+      '没有找到这个 Agent 草稿',
       404,
     );
   }
@@ -1119,7 +1120,37 @@ export async function getGuidedCreationDetail(input: {
       order by m.message_no asc`,
     [input.session_id, input.auth_user_id],
   );
-  return { ...mapSession(row), messages: messageResult.rows.map(mapMessage) };
+  const detail: GuidedCreationSessionDetail = {
+    ...mapSession(row),
+    messages: messageResult.rows.map(mapMessage),
+  };
+  if (detail.generatedAgent) {
+    // 包里保存的是 Skill 的稳定 uid；Agent 档案需要数据库 skill_id 才能预览。
+    const skillResult = await query<Record<string, unknown>>(
+      `select s.id, s.skill_uid
+         from agent_package_skills s
+         join agent_package_version_skills link
+           on link.skill_id = s.id and link.package_id = s.package_id
+        where s.package_id = $1 and link.package_version_id = $2`,
+      [
+        detail.generatedAgent.agentId,
+        detail.generatedAgent.packageVersionId,
+      ],
+    );
+    const skillIdByUid = new Map(
+      skillResult.rows.map((skill) => [
+        String(skill.skill_uid),
+        String(skill.id),
+      ]),
+    );
+    detail.generatedAgent.skills = detail.generatedAgent.skills.map(
+      (skill) => ({
+        ...skill,
+        id: skillIdByUid.get(skill.id) ?? skill.id,
+      }),
+    );
+  }
+  return detail;
 }
 
 export async function listGuidedCreations(input: {
@@ -1249,7 +1280,7 @@ function extractionPrompt(input: {
     .slice(0, MAX_DOCUMENT_CHARS);
   return {
     systemPrompt:
-      '你负责从教育 Skill 对话中提取结构化信息。只返回 JSON。operations 只能使用 set、replace、remove，path 只能来自给定字段；不要自行决定是否完成，也不要提出问题。state 只能是 explicit、inferred、conflicted。',
+      '你负责从教育 Agent 创建对话中提取结构化信息。只返回 JSON。operations 只能使用 set、replace、remove，path 只能来自给定字段；不要自行决定是否完成，也不要提出问题。state 只能是 explicit、inferred、conflicted。',
     userPrompt: `字段：${GUIDED_DRAFT_FIELDS.join(', ')}\n当前草案：${JSON.stringify(input.draft)}\n对话：\n${history}\n参考材料：\n${documentSummary || '无'}\n返回：{"operations":[],"acknowledgement":"一句简短确认"}`,
     maxTokens: 4_096,
   };
@@ -1275,7 +1306,7 @@ function extractionPromptV2(input: {
   );
   return {
     systemPrompt:
-      '你负责从教育 Skill 共创对话中提取用户真正表达的经验和要求，只返回 JSON。不得替用户补全想法。operations 的 path 只能来自给定字段；明确来自本轮用户原话时 state 才能为 explicit，并必须在 evidence 中逐字复制能够在本轮用户消息中找到的短语；合理推测只能标记 inferred。已有 explicit 内容必须保留：补充信息用 set，只有用户明确否定或纠正先前说法时才用 replace。stage_complete 只有在本轮用户确实回答了当前阶段问题且信息足以进入下一阶段时才为 true。“你决定”“都可以”等放弃表达不算完成。当前阶段为空时必须返回 false。不要提出问题。',
+      '你负责从教育 Agent 创建对话中提取用户真正表达的经验和要求，只返回 JSON。不得替用户补全想法。operations 的 path 只能来自给定字段；明确来自本轮用户原话时 state 才能为 explicit，并必须在 evidence 中逐字复制能够在本轮用户消息中找到的短语；合理推测只能标记 inferred。已有 explicit 内容必须保留：补充信息用 set，只有用户明确否定或纠正先前说法时才用 replace。stage_complete 只有在本轮用户确实回答了当前阶段问题且信息足以进入下一阶段时才为 true。“你决定”“都可以”等放弃表达不算完成。当前阶段为空时必须返回 false。不要提出问题。',
     userPrompt: `字段：${GUIDED_DRAFT_FIELDS.join(', ')}\n当前阶段：${input.currentStage ?? '尚未开始，先记录初始目标'}\n本阶段字段：${stage?.fields.join(', ') ?? '无'}\n当前草案：${JSON.stringify(input.draft)}\n对话：\n${history}\n本轮用户消息：${input.content}\n参考材料：\n${documentSummary || '无'}\n返回：{"operations":[{"op":"set","path":"goal","value":"提取值","state":"explicit","evidence":"本轮用户原话"}],"stage_complete":false,"acknowledgement":"一句简短确认"}`,
     maxTokens: 4_096,
   };
@@ -1311,8 +1342,8 @@ function extractionPromptV3(input: {
 
   return {
     systemPrompt:
-      '你负责通过自然对话帮助教师把真实教育经验提炼为可执行的 Skill。只返回 JSON。一次回答可以更新多个教育维度，但不得把 AI 推测冒充成用户意见。source=user_explicit 或 user_adopted 时，quote 必须逐字复制本轮用户消息的完整句子或整行（保留字段标签、否定词、数字、主体，不可只截取其中短语）；用户没有表达或采纳的候选经验只能帮助你提出更好的问题，绝不能写入 operations。不要重复询问草案中已经明确的内容。五个共创步骤必须逐个处理：先整理当前步骤，再明确询问“这样准确吗？需要补充吗？”，只有用户明确确认、表示准确或表示不需要补充后，才能进入下一步骤；如果用户刚补充了信息但没有确认，继续围绕当前步骤请求确认。信息含糊或冲突时才针对当前步骤补问一次。每轮只提出一个最有价值的问题，question 只能有一个问号，suggested_options 提供 2 到 4 个贴合当前情境的方向并允许用户自由表达。step_complete 只是辅助判断，后端会依据用户确认独立决定是否推进。\noperations 每项可带 op 字段：补充新信息用 set（默认，追加合并）；用户明确纠正或否定先前说法时用 replace（覆盖该维度 content 与证据，必须配 source=user_explicit/user_adopted）；用户明确撤回某个维度内容时用 remove（不需要 content/source，但 quote 必须完整引用含该维度名称与撤回意图的原句）。不要用 replace 覆盖你推测出来的内容。\n当本轮用户说法与草案已有内容明显冲突（例如对象从「小学生」改成「中学生」）且用户未明确表示纠正时，用 source=conflicted 标记该维度，content 留空，并在 question 中向用户确认真实意图；不要直接合并矛盾内容。',
-    userPrompt: `七个维度：${GUIDED_EDUCATION_DIMENSIONS.map((dimension) => `${dimension}（${GUIDED_EDUCATION_LABELS[dimension]}）`).join('，')}\n当前共创步骤：${input.currentStep ?? '尚未开始；先吸收初始需求，再从教育意图开始'}\n当前草案：${JSON.stringify(input.draft)}\n对话：\n${history}\n本轮用户消息：${input.content}\n参考材料：\n${documentSummary || '无'}\n最多两条内部候选经验（只用于启发追问）：${JSON.stringify(candidateContext)}\nSkill 转化提醒：${GUIDED_SKILL_CONVERSION_RULES.join('；')}\n返回：{"operations":[{"dimension":"educational_goal","op":"set","content":"提炼后的结论","source":"user_explicit","quote":"本轮用户原话"}],"step_complete":false,"acknowledgement":"一句具体承接，不要重复用户整句话","question":"下一步唯一的问题？","suggested_options":["方向1","方向2"]}`,
+      '你负责通过自然对话帮助教师把真实教育经验提炼为可执行的 Agent 能力与 Skill。只返回 JSON。一次回答可以更新多个教育维度，但不得把 AI 推测冒充成用户意见。source=user_explicit 或 user_adopted 时，quote 必须逐字复制本轮用户消息的完整句子或整行（保留字段标签、否定词、数字、主体，不可只截取其中短语）；用户没有表达或采纳的候选经验只能帮助你提出更好的问题，绝不能写入 operations。不要重复询问草案中已经明确的内容。五个创建步骤必须逐个处理：先整理当前步骤，再明确询问“这样准确吗？需要补充吗？”，只有用户明确确认、表示准确或表示不需要补充后，才能进入下一步骤；如果用户刚补充了信息但没有确认，继续围绕当前步骤请求确认。信息含糊或冲突时才针对当前步骤补问一次。每轮只提出一个最有价值的问题，question 只能有一个问号，suggested_options 提供 2 到 4 个贴合当前情境的方向并允许用户自由表达。step_complete 只是辅助判断，后端会依据用户确认独立决定是否推进。\noperations 每项可带 op 字段：补充新信息用 set（默认，追加合并）；用户明确纠正或否定先前说法时用 replace（覆盖该维度 content 与证据，必须配 source=user_explicit/user_adopted）；用户明确撤回某个维度内容时用 remove（不需要 content/source，但 quote 必须完整引用含该维度名称与撤回意图的原句）。不要用 replace 覆盖你推测出来的内容。\n当本轮用户说法与草案已有内容明显冲突（例如对象从「小学生」改成「中学生」）且用户未明确表示纠正时，用 source=conflicted 标记该维度，content 留空，并在 question 中向用户确认真实意图；不要直接合并矛盾内容。',
+    userPrompt: `七个维度：${GUIDED_EDUCATION_DIMENSIONS.map((dimension) => `${dimension}（${GUIDED_EDUCATION_LABELS[dimension]}）`).join('，')}\n当前创建步骤：${input.currentStep ?? '尚未开始；先吸收初始需求，再从教育意图开始'}\n当前草案：${JSON.stringify(input.draft)}\n对话：\n${history}\n本轮用户消息：${input.content}\n参考材料：\n${documentSummary || '无'}\n最多两条内部候选经验（只用于启发追问）：${JSON.stringify(candidateContext)}\nAgent / Skill 转化提醒：${GUIDED_SKILL_CONVERSION_RULES.join('；')}\n返回：{"operations":[{"dimension":"educational_goal","op":"set","content":"提炼后的结论","source":"user_explicit","quote":"本轮用户原话"}],"step_complete":false,"acknowledgement":"一句具体承接，不要重复用户整句话","question":"下一步唯一的问题？","suggested_options":["方向1","方向2"]}`,
     maxTokens: 4_096,
   };
 }
@@ -1835,7 +1866,7 @@ export async function processGuidedCreationMessage(input: {
     ) {
       throw new GuidedCreationError(
         'GUIDED_SESSION_NOT_EDITABLE',
-        '当前 Skill 草稿不能继续编辑',
+        '当前 Agent 草稿不能继续编辑',
         409,
       );
     }
@@ -1859,7 +1890,7 @@ export async function processGuidedCreationMessage(input: {
       if (!lockedRow) {
         throw new GuidedCreationError(
           'GUIDED_SESSION_NOT_FOUND',
-          '没有找到这个 Skill 草稿',
+          '没有找到这个 Agent 草稿',
           404,
         );
       }
@@ -2098,7 +2129,7 @@ export async function startGuidedCreation(input: {
   if (!sessionId) {
     throw new GuidedCreationError(
       'GUIDED_SESSION_CREATE_FAILED',
-      '创建 Skill 草稿失败',
+      '创建 Agent 草稿失败',
       500,
       true,
     );
@@ -2162,7 +2193,7 @@ export async function summarizeGuidedCreation(input: {
   if (session.status !== 'collecting' && session.status !== 'failed') {
     throw new GuidedCreationError(
       'GUIDED_SESSION_NOT_EDITABLE',
-      '当前 Skill 草稿不能继续编辑',
+      '当前 Agent 草稿不能继续编辑',
       409,
     );
   }
@@ -2273,9 +2304,10 @@ export function buildGuidedGenerationInstruction(
     (field) => `- ${field}: ${draft[field] ?? ''}`,
   );
   return [
-    '请创建一个教育场景使用的 Skill。',
-    '只生成 1 个 Skill，不要拆分成多个 Skill。',
-    'Package 和 agent.md 仅作为内部运行容器，用户看到和使用的主体必须是这个 Skill。',
+    '请创建一个教育场景使用的 Agent，并为它装配职责单一的 Skill。',
+    `按任务边界生成 1-${MAX_GENERATED_SKILLS} 个 Skill：若已确认需求包含多个可独立复用的教学环节或能力，拆成 2-${MAX_GENERATED_SKILLS} 个 Skill；若本身是一个不可拆分的完整流程，只生成 1 个 Skill。`,
+    'agent.md 负责角色、工作流程、边界、输出风格，以及在这些 Skill 之间做路由；每个 Skill 只负责一个教学动作。',
+    '用户最终获得和使用的主体是一个 Agent，以及它装配的多个 Skill。',
     '请严格遵守以下已确认需求：',
     ...lines,
   ].join('\n');
@@ -2286,12 +2318,13 @@ export function buildGuidedEducationGenerationInstruction(
   explicitName?: string,
 ): string {
   return [
-    '请创建一个教育场景使用的 Skill。',
-    ...(explicitName ? [`Skill 名称：${explicitName}`] : []),
-    '只生成 1 个 Skill，不要拆分成多个 Skill。',
-    'Package 和 agent.md 仅作为内部运行容器，用户看到和使用的主体必须是这个 Skill。',
-    '请把已确认的教育经验转成清晰、可执行、可检查的规则。',
-    '每条重要规则尽量写清楚适用条件、行动步骤、观察信号、调整方式和教师确认节点。',
+    '请创建一个教育场景使用的 Agent，并为它装配职责单一的 Skill。',
+    ...(explicitName ? [`Agent 名称：${explicitName}`] : []),
+    `按任务边界生成 1-${MAX_GENERATED_SKILLS} 个 Skill：若已确认的教育方案包含多个可独立复用的教学环节或能力，拆成 2-${MAX_GENERATED_SKILLS} 个 Skill；若方案本身是一个不可拆分的完整流程，只生成 1 个 Skill。`,
+    'agent.md 负责角色、工作流程、边界、输出风格，以及在这些 Skill 之间做路由；每个 Skill 只负责一个教学动作。',
+    '用户最终获得和使用的主体是一个 Agent，以及它装配的多个 Skill。',
+    '请把已确认的教育经验转成清晰、可执行、可检查的 Skill 规则。',
+    '每个 Skill 的重要规则尽量写清楚适用条件、行动步骤、观察信号、调整方式和教师确认节点。',
     '不要在 Skill 中暴露内部经验 ID、证据状态或系统提示。',
     '以下是教师已经确认的教育方案：',
     educationDraftToGenerationBrief(draft),
@@ -2379,7 +2412,7 @@ export async function confirmGuidedCreation(input: {
     if (leaseAge < GUIDED_FINALIZE_LEASE_MS) {
       throw new GuidedCreationError(
         'FINALIZATION_IN_PROGRESS',
-        'Skill 正在生成中',
+        'Agent 与 Skill 正在生成中',
         409,
         true,
       );
@@ -2413,7 +2446,7 @@ export async function confirmGuidedCreation(input: {
   if (claimed.rowCount !== 1) {
     throw new GuidedCreationError(
       'FINALIZATION_IN_PROGRESS',
-      'Skill 正在生成中',
+      'Agent 与 Skill 正在生成中',
       409,
       true,
     );
@@ -2438,14 +2471,14 @@ export async function confirmGuidedCreation(input: {
         name: document.name,
         content: document.content,
       })),
-      max_skills: 1,
+      max_skills: MAX_GENERATED_SKILLS,
       onPreview: input.on_preview,
     });
     input.on_phase?.('validating');
-    if (snapshot.skills.length !== 1) {
+    if (snapshot.skills.length < 1) {
       throw new GuidedCreationError(
         'INVALID_GENERATED_SKILL_COUNT',
-        '生成结果必须且只能包含一个 Skill',
+        '生成结果至少需要包含一个 Skill',
         422,
         true,
       );
@@ -2537,7 +2570,10 @@ export async function confirmGuidedCreation(input: {
           input.request_id,
           input.revision_no,
           JSON.stringify(snapshot),
-          JSON.stringify({ valid: true, skill_count: 1 }),
+          JSON.stringify({
+            valid: true,
+            skill_count: snapshot!.skills.length,
+          }),
           created.packageId,
           skillId,
           skillVersionId,

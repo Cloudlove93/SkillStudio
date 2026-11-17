@@ -1,19 +1,16 @@
 import { useState } from 'react';
-import { Settings, Shield, LogOut } from 'lucide-react';
+import { Settings, LogOut } from 'lucide-react';
 import { useAuthStore } from '../../stores/auth';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/theme-toggle';
 import SettingsDialog from '../settings/SettingsDialog';
 import { useT } from '../../i18n';
-import { useNavigate } from 'react-router';
 
 export default function AgentList() {
   const t = useT();
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
   const authUser = useAuthStore((s) => s.user);
-  const isAdmin = useAuthStore((s) => s.isAdmin);
   const logout = useAuthStore((s) => s.logout);
-  const navigate = useNavigate();
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -35,17 +32,6 @@ export default function AgentList() {
                 </div>
               </div>
               <div className="flex items-center gap-1">
-                {isAdmin && (
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    onClick={() => navigate('/admin')}
-                    title={t('admin.title')}
-                    className="rounded-[8px] hover:bg-primary-soft"
-                  >
-                    <Shield className="size-3.5 text-primary" />
-                  </Button>
-                )}
                 <Button
                   variant="ghost"
                   size="icon-xs"

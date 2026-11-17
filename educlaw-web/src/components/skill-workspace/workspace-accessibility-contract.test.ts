@@ -34,7 +34,7 @@ describe('workspace accessibility contract', () => {
     const run = read('./SkillRunWorkspace.tsx');
     const arena = read('./SkillArenaWorkspace.tsx');
 
-    expect(guided).toContain('aria-label="共创建议与补充说明"');
+    expect(guided).toContain('aria-label="创建建议与补充说明"');
     expect(run).toContain('aria-label={');
     expect(run).toContain("'输入测试任务'");
     expect(run).toContain("'输入 Skill 使用任务'");

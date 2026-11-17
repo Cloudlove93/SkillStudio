@@ -150,11 +150,13 @@ describe('guided creation progress UI', () => {
       );
     });
 
-    const conversationProgress = container.querySelector('[aria-label="共创进度"]');
+    const conversationProgress = container.querySelector('[aria-label="Agent 创建进度"]');
     const requirementProgress = container.querySelector('.skill-context-progress');
 
     expect(conversationProgress?.textContent).toContain('已完成 0/5');
-    expect(conversationProgress?.textContent).toContain('当前环节：目标与对象');
+    expect(conversationProgress?.textContent).toContain(
+      '当前创建环节：目标与对象',
+    );
     expect(requirementProgress?.textContent).toContain('需求完整度');
     expect(requirementProgress?.textContent).toContain('已完成 0/5');
 
@@ -268,10 +270,10 @@ describe('guided creation progress UI', () => {
     await act(async () => {
       root.render(<GuidedSkillCreationPanel {...panelProps(v2Session)} />);
     });
-    expect(container.querySelector('[aria-label="共创进度"]')?.textContent).toContain(
+    expect(container.querySelector('[aria-label="Agent 创建进度"]')?.textContent).toContain(
       '已完成 2/6',
     );
-    expect(container.querySelector('[aria-label="共创进度"]')?.textContent).toContain(
+    expect(container.querySelector('[aria-label="Agent 创建进度"]')?.textContent).toContain(
       '当前：说清理想结果',
     );
   });

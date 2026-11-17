@@ -14,7 +14,8 @@
   --studio-line: #e8e8f2;
   --studio-rule: rgba(27, 27, 35, 0.055);
   --studio-cinnabar: #b9562e;
-  --studio-mono: 'Cascadia Code', 'SFMono-Regular', Consolas, monospace;
+  --studio-mono: 'Cascadia Code', 'SFMono-Regular', Consolas,
+    'Microsoft YaHei UI', 'PingFang SC', sans-serif;
 
   --agent-accent: var(--studio-violet);
   --agent-accent-strong: var(--studio-violet-deep);
@@ -775,5 +776,583 @@
 
   .agent-workspace-panel .agent-panel {
     padding: 16px;
+  }
+}
+
+/* 会话页头部展示当前 Agent 已装配的 Skill，明确「1 个 Agent + N 个 Skill」的运行结构 */
+.agent-workspace-panel .agent-chat-skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.agent-workspace-panel .agent-skill-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  max-width: 100%;
+  padding: 3px 9px;
+  border: 1px solid var(--agent-line);
+  border-radius: 999px;
+  background: var(--agent-surface);
+  color: var(--agent-muted);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.agent-workspace-panel .agent-skill-chip em {
+  color: var(--agent-accent-strong);
+  font-family: var(--studio-mono);
+  font-size: 10px;
+  font-style: normal;
+}
+
+.agent-workspace-panel .agent-skill-chip.is-missing {
+  border-style: dashed;
+  color: var(--agent-muted);
+  opacity: 0.7;
+}
+
+/* ---------- 会话页：把装配结果呈现成一份可读的运行档案 ---------- */
+.agent-chat-topbar {
+  display: grid;
+  min-height: 52px;
+  flex-shrink: 0;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  border-bottom: 1px solid #e8e8f2;
+  background: #fbfaff;
+  padding: 0 24px;
+}
+
+.dark .agent-chat-topbar {
+  border-color: #2e2c3d;
+  background: #1b1a26;
+}
+
+.agent-chat-topbar-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  justify-self: start;
+  color: #5f6368;
+  font-size: 12px;
+  text-decoration: none;
+  transition: color 150ms ease;
+}
+
+.agent-chat-topbar-back:hover {
+  color: #4338ca;
+}
+
+.dark .agent-chat-topbar-back {
+  color: #a7a2b8;
+}
+
+.dark .agent-chat-topbar-back:hover {
+  color: #c7bfff;
+}
+
+.agent-chat-topbar-label {
+  color: #8a8da0;
+  font-family: var(--studio-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.3em;
+}
+
+.agent-chat-topbar > :last-child {
+  justify-self: end;
+}
+
+.agent-workspace-panel .agent-header-main {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 18px;
+}
+
+.agent-workspace-panel .agent-header-copy {
+  min-width: 0;
+}
+
+.agent-workspace-panel .agent-monogram {
+  position: relative;
+  display: grid;
+  width: 60px;
+  min-width: 60px;
+  height: 68px;
+  place-items: center;
+  border: 1px solid var(--studio-line);
+  border-radius: 12px;
+  background:
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--studio-violet) 9%, transparent),
+      transparent 58%
+    ),
+    var(--studio-paper-warm);
+  box-shadow: 3px 3px 0
+    color-mix(in srgb, var(--studio-violet) 7%, transparent);
+  color: var(--studio-violet-deep);
+  font-family: var(--workspace-font-display, 'PingFang SC', 'Microsoft YaHei UI', sans-serif);
+  font-size: 30px;
+  line-height: 1;
+}
+
+.agent-workspace-panel .agent-monogram::after {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  color: var(--studio-cinnabar);
+  content: 'AGENT';
+  font-family: var(--studio-mono);
+  font-size: 5.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  opacity: 0.72;
+}
+
+.agent-workspace-panel.agent-chat-page .agent-header {
+  border-bottom: 0;
+  padding-bottom: 8px;
+  align-items: flex-start;
+}
+
+.agent-workspace-panel.agent-chat-page .agent-header h1 {
+  margin-top: 6px;
+  font-family: var(--workspace-font-display, 'PingFang SC', 'Microsoft YaHei UI', sans-serif);
+  font-size: clamp(30px, 3.2vw, 40px);
+  font-weight: 600;
+  letter-spacing: -0.04em;
+}
+
+.agent-workspace-panel .agent-chat-skills {
+  counter-reset: agent-skill;
+  align-items: center;
+  gap: 7px;
+  margin-top: 13px;
+  border-top: 1px dashed var(--studio-line);
+  padding-top: 12px;
+}
+
+.agent-workspace-panel .agent-chat-skills-label,
+.agent-workspace-panel .agent-chat-skills-count {
+  color: var(--studio-ink-soft);
+  font-family: var(--studio-mono);
+  font-size: 8.5px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.agent-workspace-panel .agent-chat-skills-label {
+  margin-right: 2px;
+}
+
+.agent-workspace-panel .agent-chat-skills-count {
+  margin-left: auto;
+  color: var(--studio-violet-deep);
+}
+
+.agent-workspace-panel .agent-skill-chip {
+  counter-increment: agent-skill;
+  gap: 7px;
+  border-color: var(--studio-line);
+  border-radius: 7px;
+  background: var(--studio-paper-warm);
+  padding: 5px 10px;
+  color: var(--studio-ink);
+  font-size: 12px;
+  line-height: 1.45;
+  box-shadow: 0 1px 0 rgba(27, 27, 35, 0.03);
+}
+
+.agent-workspace-panel .agent-skill-chip::before {
+  color: var(--studio-cinnabar);
+  content: counter(agent-skill, decimal-leading-zero);
+  font-family: var(--studio-mono);
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.agent-workspace-panel .agent-skill-chip em {
+  padding-left: 6px;
+  border-left: 1px solid var(--studio-line);
+  color: var(--studio-ink-soft);
+  font-size: 9.5px;
+}
+
+.agent-workspace-panel.agent-chat-page .agent-chat-layout {
+  border: 1px solid var(--studio-line);
+  border-radius: 18px;
+  background: var(--studio-paper-warm);
+  box-shadow: 0 22px 54px rgba(27, 27, 35, 0.07);
+  overflow: hidden;
+}
+
+.dark .agent-workspace-panel.agent-chat-page .agent-chat-layout {
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.36);
+}
+
+.agent-workspace-panel .agent-conversation-list {
+  padding: 18px 13px;
+  border-right-color: var(--studio-line);
+  background: color-mix(in srgb, var(--studio-paper) 56%, var(--studio-paper-warm));
+}
+
+.agent-workspace-panel .agent-conversation-list .agent-section-heading {
+  padding: 0 4px 10px;
+  border-bottom: 1px dashed var(--studio-line);
+}
+
+.agent-workspace-panel .agent-conversation-list .agent-section-heading h3 {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--studio-ink);
+  font-family: var(--studio-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.agent-workspace-panel .agent-history-count {
+  display: inline-grid;
+  min-width: 17px;
+  height: 17px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--studio-violet-wash);
+  color: var(--studio-violet-deep);
+  font-size: 8.5px;
+  letter-spacing: 0;
+}
+
+.agent-workspace-panel .agent-conversation-list .agent-section-heading button {
+  color: var(--studio-ink-soft);
+  font-size: 11px;
+}
+
+.agent-workspace-panel .agent-conversation-list > button {
+  position: relative;
+  margin-top: 4px;
+  padding: 10px 10px 10px 15px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+}
+
+.agent-workspace-panel .agent-conversation-list > button::before {
+  position: absolute;
+  top: 11px;
+  bottom: 11px;
+  left: 4px;
+  width: 2px;
+  border-radius: 2px;
+  background: transparent;
+  content: '';
+}
+
+.agent-workspace-panel .agent-conversation-list > button:hover {
+  border-color: var(--studio-line);
+  background: var(--studio-paper-warm);
+}
+
+.agent-workspace-panel .agent-conversation-list > button[aria-current='true'] {
+  border-color: var(--studio-violet-line);
+  background: var(--studio-paper-warm);
+  box-shadow: none;
+}
+
+.agent-workspace-panel
+  .agent-conversation-list
+  > button[aria-current='true']::before {
+  background: var(--studio-violet);
+}
+
+.agent-workspace-panel .agent-conversation-list > button span {
+  color: var(--studio-ink);
+  font-size: 12.5px;
+  font-weight: 550;
+}
+
+.agent-workspace-panel .agent-conversation-list > button small {
+  margin-top: 3px;
+  color: var(--studio-ink-soft);
+  font-family: var(--studio-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.03em;
+}
+
+.agent-workspace-panel .agent-conversation {
+  min-width: 0;
+  padding: 18px 20px 20px;
+}
+
+.agent-workspace-panel .agent-bound-skills {
+  margin-bottom: 14px;
+  border: 1px solid var(--studio-line);
+  border-radius: 12px;
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--studio-violet) 5%, transparent),
+      transparent 66%
+    ),
+    var(--studio-paper-warm);
+  padding: 12px 14px;
+}
+
+.agent-workspace-panel .agent-bound-skills > summary {
+  color: var(--studio-ink);
+  font-family: var(--studio-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.agent-workspace-panel .agent-bound-skills .agent-muted {
+  margin: 7px 0 0;
+  font-size: 11.5px;
+  line-height: 1.6;
+}
+
+.agent-workspace-panel .agent-binding-chips {
+  display: grid;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.agent-workspace-panel .agent-pinned-skill {
+  border: 1px solid var(--studio-line);
+  border-radius: 8px;
+  background: var(--studio-paper);
+  padding: 7px 9px;
+}
+
+.agent-workspace-panel .agent-pinned-skill > summary {
+  color: var(--studio-ink);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.agent-workspace-panel .agent-pinned-instructions {
+  max-height: 220px;
+  overflow: auto;
+  margin: 7px 0 0;
+  color: var(--studio-ink-soft);
+  font-family: var(--studio-mono);
+  font-size: 10.5px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
+.agent-workspace-panel .agent-bound-skills > details:not(.agent-pinned-skill) {
+  margin-top: 9px;
+  border-top: 1px dashed var(--studio-line);
+  padding-top: 9px;
+}
+
+.agent-workspace-panel .agent-bound-skills > details:not(.agent-pinned-skill) > summary {
+  color: var(--studio-ink-soft);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.agent-workspace-panel.agent-chat-page .agent-chat-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: auto;
+  border: 1px dashed var(--studio-line);
+  border-radius: 18px;
+  background:
+    radial-gradient(
+      240px 120px at 50% 0%,
+      color-mix(in srgb, var(--studio-violet) 8%, transparent),
+      transparent 70%
+    ),
+    transparent;
+  padding: 46px 32px;
+}
+
+.agent-workspace-panel .agent-chat-empty-eyebrow {
+  margin-bottom: 14px;
+  color: var(--studio-cinnabar);
+  font-family: var(--studio-mono);
+  font-size: 8.5px;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+}
+
+.agent-workspace-panel.agent-chat-page .agent-chat-empty > svg {
+  color: var(--studio-violet-deep);
+  opacity: 0.9;
+}
+
+.agent-workspace-panel.agent-chat-page .agent-chat-empty h2 {
+  margin-top: 12px;
+  font-family: var(--workspace-font-display, 'PingFang SC', 'Microsoft YaHei UI', sans-serif);
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.agent-workspace-panel.agent-chat-page .agent-chat-empty p {
+  max-width: 340px;
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.agent-workspace-panel.agent-chat-page .agent-back-link {
+  margin-top: 12px;
+  color: var(--studio-violet-deep);
+  font-family: var(--studio-mono);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+
+/* 对话正文：纸张上的问答 */
+.agent-workspace-panel.agent-chat-page .skill-flat-messages {
+  padding: 26px 24px 20px;
+}
+
+.agent-workspace-panel.agent-chat-page .skill-user-message {
+  border: 1px solid var(--studio-violet-line);
+  border-radius: 14px 14px 3px 14px;
+  background: var(--studio-violet-wash);
+  color: var(--studio-ink);
+  padding: 10px 14px;
+  font-size: 13.5px;
+  line-height: 1.65;
+}
+
+.agent-workspace-panel.agent-chat-page .skill-assistant-message {
+  color: var(--studio-ink);
+  font-size: 13.5px;
+  line-height: 1.75;
+}
+
+.agent-workspace-panel.agent-chat-page .skill-flat-empty {
+  border: 1px dashed var(--studio-line);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--studio-paper-warm) 68%, transparent);
+  padding: 28px 26px;
+}
+
+.agent-workspace-panel.agent-chat-page .skill-flat-empty h2 {
+  font-family: var(--workspace-font-display, 'PingFang SC', 'Microsoft YaHei UI', sans-serif);
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.agent-workspace-panel.agent-chat-page .skill-test-composer {
+  border: 1px solid var(--studio-line);
+  border-radius: 16px;
+  background: var(--studio-paper-warm);
+  box-shadow: 0 16px 36px rgba(27, 27, 35, 0.07);
+  padding: 10px;
+}
+
+.agent-workspace-panel.agent-chat-page .skill-test-composer:focus-within {
+  border-color: var(--studio-violet-line);
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--studio-violet) 11%, transparent),
+    0 16px 36px rgba(27, 27, 35, 0.07);
+}
+
+.agent-workspace-panel.agent-chat-page .skill-test-composer textarea {
+  color: var(--studio-ink);
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+
+.agent-workspace-panel.agent-chat-page
+  .skill-composer-input-row
+  > button:not(.skill-composer-stop) {
+  border-radius: 50%;
+  background: var(--studio-violet);
+  color: #ffffff;
+  box-shadow: 0 6px 14px
+    color-mix(in srgb, var(--studio-violet) 24%, transparent);
+}
+
+.agent-workspace-panel.agent-chat-page
+  .skill-composer-input-row
+  > button:not(.skill-composer-stop):hover:enabled {
+  background: var(--studio-violet-deep);
+}
+
+.agent-workspace-panel.agent-chat-page
+  .skill-composer-input-row
+  > button:not(.skill-composer-stop):disabled {
+  background: var(--studio-line);
+  color: var(--studio-ink-soft);
+  box-shadow: none;
+}
+
+.agent-workspace-panel.agent-chat-page .skill-composer-helper-row {
+  color: var(--studio-ink-soft);
+  font-size: 10.5px;
+}
+
+.dark .agent-workspace-panel.agent-chat-page .agent-chat-layout {
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.36);
+}
+
+.dark .agent-workspace-panel.agent-chat-page .skill-test-composer {
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.32);
+}
+
+@media (max-width: 900px) {
+  .agent-chat-topbar {
+    padding: 0 16px;
+  }
+
+  .agent-workspace-panel .agent-monogram {
+    width: 52px;
+    min-width: 52px;
+    height: 60px;
+    font-size: 26px;
+  }
+
+  .agent-workspace-panel.agent-chat-page .skill-flat-messages {
+    padding: 20px 16px 16px;
+  }
+}
+
+@media (max-width: 720px) {
+  .agent-chat-topbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .agent-chat-topbar-label {
+    display: none;
+  }
+
+  .agent-workspace-panel .agent-chat-skills-count {
+    display: none;
+  }
+
+  .agent-workspace-panel.agent-chat-page .agent-main {
+    padding: 16px 12px 18px;
+  }
+
+  .agent-workspace-panel.agent-chat-page .agent-chat-layout {
+    height: calc(100dvh - 330px);
+    min-height: 480px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-workspace-panel.agent-chat-page .agent-chat-layout {
+    animation: none;
   }
 }

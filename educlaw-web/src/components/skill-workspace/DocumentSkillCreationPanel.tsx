@@ -1,10 +1,16 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   DOCUMENT_CONTENT_QUALITY_ERROR,
   hasMeaningfulDocumentContent,
 } from '@educlaw/shared';
 import { FileUp, Loader2, Sparkles } from 'lucide-react';
 import { liteApi } from '../../api/lite-api';
+import {
+  presetToPrompt,
+  recommendPresets,
+  type StudioPreset,
+} from '../../lib/studio-presets';
+import { PresetRecommendation } from './PresetRecommendation';
 import {
   createDocumentBatchPlan,
   type DocumentBatchRun,
@@ -17,6 +23,7 @@ import { useWorkspaceInspector } from './WorkspaceInspectorProvider';
 type Props = {
   token: string;
   onGenerated: (packageIds: string[]) => Promise<void> | void;
+  onRemixPreset?: (preset: StudioPreset) => void;
 };
 
 const DOCUMENT_ACCEPT =
@@ -25,7 +32,11 @@ const DOCX_MIME_TYPE =
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 const BATCH_CONCURRENCY = 2;
 
-export function DocumentSkillCreationPanel({ token, onGenerated }: Props) {
+export function DocumentSkillCreationPanel({
+  token,
+  onGenerated,
+  onRemixPreset,
+}: Props) {
   const { openInspector } = useWorkspaceInspector();
   const inputRef = useRef<HTMLInputElement>(null);
   const [documents, setDocuments] = useState<DocumentSource[]>([]);
@@ -35,6 +46,19 @@ export function DocumentSkillCreationPanel({ token, onGenerated }: Props) {
   const [runs, setRuns] = useState<DocumentBatchRun[]>([]);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [dismissedPresetKey, setDismissedPresetKey] = useState('');
+  const recommendedPresets = useMemo(() => {
+    if (!documents.length) return [];
+    const material = documents
+      .map((document) => `${document.name} ${document.content.slice(0, 2000)}`)
+      .join(' ');
+    return recommendPresets(material, 2);
+  }, [documents]);
+  const presetRecommendationKey = `${documents.length}:${instruction}`;
+  const showPresetRecommendation =
+    !busy &&
+    recommendedPresets.length > 0 &&
+    dismissedPresetKey !== presetRecommendationKey;
 
   const updateRun = (id: string, patch: Partial<DocumentBatchRun>) => {
     setRuns((current) =>
@@ -202,6 +226,22 @@ export function DocumentSkillCreationPanel({ token, onGenerated }: Props) {
           </span>
           <b>选择文档</b>
         </button>
+
+        {showPresetRecommendation ? (
+          <PresetRecommendation
+            presets={recommendedPresets}
+            compact
+            onUse={(preset) => setInstruction(presetToPrompt(preset))}
+            onRemix={(preset) => {
+              if (onRemixPreset) {
+                onRemixPreset(preset);
+                return;
+              }
+              setInstruction(`基于「${preset.name}」改造：\n${presetToPrompt(preset)}`);
+            }}
+            onDismiss={() => setDismissedPresetKey(presetRecommendationKey)}
+          />
+        ) : null}
 
         <label className="skill-document-create-instruction">
           <span>补充要求（可选）</span>

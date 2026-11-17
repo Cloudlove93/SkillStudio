@@ -1,5 +1,6 @@
 import type { AgentSummary } from '@educlaw/shared';
 import type { RepositorySkillRecord } from '../../api/lite-api';
+import { routes } from '../../lib/routes';
 
 export type AssetTab = 'agents' | 'skills';
 export type AssetFilter = 'all' | 'ready' | 'attention';
@@ -74,8 +75,15 @@ export const skillIsReady = (skill: RepositorySkillRecord) =>
 
 export function legacySkillsDestination(search: string, hash = '') {
   const params = new URLSearchParams(search);
-  if (params.has('agentId') || params.has('skillId'))
-    return `/agents?${params}${hash}`;
+  const agentId = params.get('agentId');
+  if (agentId) {
+    const conversation = params.get('conversation');
+    return conversation
+      ? `${routes.chat(agentId, conversation)}${hash}`
+      : `${routes.agent(agentId)}${hash}`;
+  }
+  // 旧链接里的 skillId 需要服务端转换成 Agent，统一回到仓库重新选择。
+  if (params.has('skillId')) return `${routes.repository}${hash}`;
   const view = params.get('view');
   const listView = view === 'repository' || view === 'my-skills';
   if (

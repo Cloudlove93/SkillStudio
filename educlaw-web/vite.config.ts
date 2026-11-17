@@ -17,6 +17,28 @@ export default defineConfig({
       '@openagent/core': path.resolve(__dirname, '../openagent/src/index.ts'),
     },
   },
+  build: {
+    // mammoth 只提供预构建的浏览器单文件（约 500 kB），无法再拆分；
+    // 它仅在用户导入 .docx 时按需加载，不进入首屏。
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        // 只把 React 基础库单独成块：其余依赖已随路由懒加载拆分，
+        // 强行归并反而会产生更大的 chunk。
+        manualChunks(id) {
+          const file = id.replace(/\\/g, '/');
+          if (
+            /\/node_modules\/(react|react-dom|react-router|scheduler)\//.test(
+              file,
+            )
+          )
+            return 'vendor-react';
+          // docx 解析只在导入文档时按需加载，单独成块避免与其他按需依赖混在一起。
+          if (/\/node_modules\/mammoth\//.test(file)) return 'vendor-docx';
+        },
+      },
+    },
+  },
   server: {
     host: '0.0.0.0',
     proxy: {
