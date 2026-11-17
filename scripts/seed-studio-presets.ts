@@ -146,8 +146,7 @@ function snapshotForLessonPacks(stage: string, name: string): AgentPackageSnapsh
 function snapshotForAnalysisSkills(): AgentPackageSnapshot {
   return {
     name: analysisPackageName,
-    description:
-      '课堂 ASR 课例分析的 8 个方法 Skill：清洗、分段、提问链、师生话语、目标对齐、课例对比、教研报告、课例检索。',
+    description: `课堂 ASR 课例分析的 ${ANALYSIS_SKILL_PRESETS.length} 个方法 Skill：${ANALYSIS_SKILL_PRESETS.map((item) => item.name).join('、')}。`,
     versionLabel: 'v1',
     agentMd:
       '你是一位课堂分析方法助手。根据教师提供的课例与分析目标，选择合适的方法 Skill，引用课例原文作为证据，并标注需要回看原文的存疑点。',
@@ -182,8 +181,27 @@ function desiredPackages(): DesiredPackage[] {
   ];
 }
 
+const SUBJECT_AGENT_ANALYSIS_SKILL_IDS = [
+  'analysis-asr-cleanup',
+  'analysis-lesson-segments',
+  'analysis-question-chain',
+  'analysis-classroom-discourse',
+  'analysis-goal-alignment',
+  'analysis-lesson-compare',
+  'analysis-research-report',
+  'analysis-unit-design',
+  'analysis-learner-diagnosis',
+  'analysis-classroom-observation',
+];
+
 function agentSeeds(): AgentSeed[] {
-  const analysisSkillNames = ANALYSIS_SKILL_PRESETS.map((item) => item.name);
+  const subjectAgentAnalysisSkillNames = SUBJECT_AGENT_ANALYSIS_SKILL_IDS.map(
+    (presetId) => {
+      const preset = ANALYSIS_SKILL_PRESETS.find((item) => item.id === presetId);
+      if (!preset) throw new Error(`找不到方法 Skill：${presetId}`);
+      return preset.name;
+    },
+  );
   return [
     ...AGENT_TEMPLATE_PRESETS.map((preset) => ({
       name: preset.name,
@@ -211,7 +229,7 @@ function agentSeeds(): AgentSeed[] {
           ].join('\n'),
           skillNames: [
             ...packs.map((pack) => pack.name),
-            ...analysisSkillNames.filter((name) => name !== '课例检索与匹配'),
+            ...subjectAgentAnalysisSkillNames,
           ],
         };
       }),
@@ -389,6 +407,7 @@ function appendMaintenanceLog(rows: string[][]) {
 function resolveRepositorySkill(
   repository: RepositorySkill[],
   name: string,
+  allowMissing = false,
 ) {
   const preferredPackage = skillPackageForName(name);
   const candidates = repository.filter((skill) => skill.name === name);
@@ -396,14 +415,37 @@ function resolveRepositorySkill(
     candidates.find((skill) => skill.packageName === preferredPackage) ||
     candidates.find((skill) => presetPackageNames.has(skill.packageName)) ||
     candidates[0];
-  if (!chosen) throw new Error(`仓库中找不到预置 Skill：${name}`);
+  if (!chosen) {
+    if (allowMissing) {
+      return {
+        skillId: `pending:${name}`,
+        skillVersionId: '0',
+        enabled: true,
+        versionNumber: 0,
+        pending: true,
+      };
+    }
+    throw new Error(`仓库中找不到预置 Skill：${name}`);
+  }
   const versionId = chosen.currentVersionId || chosen.latestVersionId;
-  if (!versionId) throw new Error(`Skill 没有可用版本：${name}`);
+  if (!versionId) {
+    if (allowMissing) {
+      return {
+        skillId: `pending:${name}`,
+        skillVersionId: '0',
+        enabled: true,
+        versionNumber: 0,
+        pending: true,
+      };
+    }
+    throw new Error(`Skill 没有可用版本：${name}`);
+  }
   return {
     skillId: chosen.id,
     skillVersionId: versionId,
     enabled: true,
     versionNumber: chosen.currentVersionNumber ?? chosen.latestVersionNumber ?? 0,
+    pending: false,
   };
 }
 
@@ -430,13 +472,16 @@ async function createAgent(seed: AgentSeed, repository: RepositorySkill[]) {
   if (!response.ok) {
     throw new Error(`创建 Agent 失败：${seed.name} ${response.status} ${await response.text()}`);
   }
+  const created = (await response.json()) as AgentDetail;
   console.log(`created agent: ${seed.name} (${bindings.length} skills)`);
+  return created;
 }
 
 function buildAgentBindings(
   detail: AgentDetail,
   seed: AgentSeed,
   repository: RepositorySkill[],
+  allowMissing = false,
 ) {
   const presetNames = new Set(seed.skillNames);
   const userSkills = detail.skills.filter((skill) => !presetNames.has(skill.name));
@@ -447,7 +492,7 @@ function buildAgentBindings(
     );
   }
   const presetBindings = seed.skillNames.map((name) =>
-    resolveRepositorySkill(repository, name),
+    resolveRepositorySkill(repository, name, allowMissing),
   );
   return {
     presetBindings,
@@ -481,13 +526,23 @@ async function rebindAgents(
       if (options.dryRun) {
         console.log(`agent 将创建: ${seed.name}`);
       } else {
-        await createAgent(seed, repository);
+        const created = await createAgent(seed, repository);
+        logRows.push([
+          new Date().toISOString(),
+          options.batch,
+          `Agent：${seed.name}`,
+          'v0 -> v1',
+          `${created.skills.length}`,
+          '—',
+          operator,
+          `新建预置 Agent；${options.note}`,
+        ]);
       }
       continue;
     }
 
     let detail = await getAgent(existing.id);
-    const first = buildAgentBindings(detail, seed, repository);
+    const first = buildAgentBindings(detail, seed, repository, options.dryRun);
     const currentPreset = detail.skills.filter((skill) =>
       seed.skillNames.includes(skill.name),
     );
@@ -501,7 +556,7 @@ async function rebindAgents(
       (skill) => !seed.skillNames.includes(skill.name),
     );
     const versionChanged = currentPreset.filter((skill) => {
-      const resolved = resolveRepositorySkill(repository, skill.name);
+      const resolved = resolveRepositorySkill(repository, skill.name, options.dryRun);
       return skill.versionNumber !== resolved.versionNumber;
     });
 

@@ -34,11 +34,56 @@ const lesson = {
 } satisfies LessonIndexItem;
 
 describe('studio presets', () => {
-  it('defines 36 lesson packs, 8 analysis skills and 4 agent templates', () => {
+  it('defines 36 lesson packs, 14 analysis skills and 7 agent templates', () => {
     expect(LESSON_PACK_PRESETS).toHaveLength(36);
-    expect(ANALYSIS_SKILL_PRESETS).toHaveLength(8);
-    expect(AGENT_TEMPLATE_PRESETS).toHaveLength(4);
-    expect(STUDIO_PRESETS).toHaveLength(48);
+    expect(ANALYSIS_SKILL_PRESETS).toHaveLength(14);
+    expect(AGENT_TEMPLATE_PRESETS).toHaveLength(7);
+    expect(STUDIO_PRESETS).toHaveLength(57);
+  });
+
+  it('includes the unit, assessment, learner and observation methods', () => {
+    const analysisIds = ANALYSIS_SKILL_PRESETS.map((preset) => preset.id);
+    expect(analysisIds).toEqual(
+      expect.arrayContaining([
+        'analysis-unit-design',
+        'analysis-learner-diagnosis',
+        'analysis-homework-assessment',
+        'analysis-classroom-observation',
+        'analysis-interdisciplinary-design',
+        'analysis-test-blueprint',
+      ]),
+    );
+    const agentIds = AGENT_TEMPLATE_PRESETS.map((preset) => preset.id);
+    expect(agentIds).toEqual(
+      expect.arrayContaining([
+        'agent-unit-designer',
+        'agent-assessment-designer',
+        'agent-learner-diagnostician',
+      ]),
+    );
+  });
+
+  it('recommends the new method skills by their task language', () => {
+    expect(
+      recommendPresets('帮我做单元整体教学设计').some(
+        (match) => match.preset.id === 'analysis-unit-design',
+      ),
+    ).toBe(true);
+    expect(
+      recommendPresets('设计分层作业和评价任务').some(
+        (match) => match.preset.id === 'analysis-homework-assessment',
+      ),
+    ).toBe(true);
+    expect(
+      recommendPresets('根据前测做学情诊断').some(
+        (match) => match.preset.id === 'analysis-learner-diagnosis',
+      ),
+    ).toBe(true);
+    expect(
+      recommendPresets('编制双向细目表和命题').some(
+        (match) => match.preset.id === 'analysis-test-blueprint',
+      ),
+    ).toBe(true);
   });
 
   it('keeps preset lesson counts aligned with the generated manifest counts', () => {
