@@ -1,17 +1,17 @@
 const DEFAULT_MAX_CONCURRENT_RUNS = 4;
 
-export type PiRunBusyReason = "thread_busy" | "process_capacity";
+export type PiRunBusyReason = 'thread_busy' | 'process_capacity';
 
 export class PiRunBusyError extends Error {
-  readonly code = "RUN_BUSY";
+  readonly code = 'RUN_BUSY';
 
   constructor(readonly reason: PiRunBusyReason) {
     super(
-      reason === "thread_busy"
-        ? "当前对话已有运行中的任务，请等待完成后重试。"
-        : "当前运行任务较多，请稍后重试。",
+      reason === 'thread_busy'
+        ? '当前对话已有运行中的任务，请等待完成后重试。'
+        : '当前运行任务较多，请稍后重试。',
     );
-    this.name = "PiRunBusyError";
+    this.name = 'PiRunBusyError';
   }
 }
 
@@ -27,18 +27,18 @@ export class PiRunCoordinator {
   private readonly maxConcurrentRuns: number;
 
   constructor(maxConcurrentRuns = DEFAULT_MAX_CONCURRENT_RUNS) {
-    this.maxConcurrentRuns = Number.isSafeInteger(maxConcurrentRuns)
-      && maxConcurrentRuns > 0
-      ? maxConcurrentRuns
-      : DEFAULT_MAX_CONCURRENT_RUNS;
+    this.maxConcurrentRuns =
+      Number.isSafeInteger(maxConcurrentRuns) && maxConcurrentRuns > 0
+        ? maxConcurrentRuns
+        : DEFAULT_MAX_CONCURRENT_RUNS;
   }
 
   acquire(input: { runId: string; threadKey: string }): PiRunLease {
     if (this.activeThreadKeys.has(input.threadKey)) {
-      throw new PiRunBusyError("thread_busy");
+      throw new PiRunBusyError('thread_busy');
     }
     if (this.activeRunIds.size >= this.maxConcurrentRuns) {
-      throw new PiRunBusyError("process_capacity");
+      throw new PiRunBusyError('process_capacity');
     }
 
     this.activeRunIds.add(input.runId);
@@ -63,4 +63,3 @@ export class PiRunCoordinator {
     };
   }
 }
-

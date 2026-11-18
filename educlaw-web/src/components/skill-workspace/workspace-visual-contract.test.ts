@@ -11,14 +11,18 @@ describe('Skill workspace visual contract', () => {
     };
     const main = read('../../main.tsx');
 
-    expect(pkg.dependencies['@fontsource-variable/noto-sans-sc']).toBeUndefined();
+    expect(
+      pkg.dependencies['@fontsource-variable/noto-sans-sc'],
+    ).toBeUndefined();
     expect(main).not.toContain('@fontsource-variable/noto-sans-sc');
   });
 
   it('defines workspace typography and semantic color tokens', () => {
     const tokens = read('./styles/workspace-tokens.css');
 
-    expect(tokens).toContain("--workspace-font-ui:\n    'PingFang SC', 'Microsoft YaHei UI', 'Hiragino Sans GB', sans-serif");
+    expect(tokens).toContain(
+      "--workspace-font-ui:\n    'PingFang SC', 'Microsoft YaHei UI', 'Hiragino Sans GB', sans-serif",
+    );
     expect(tokens).toContain('--workspace-primary: #4658c9');
     expect(tokens).toContain('--workspace-evidence: #28766f');
     expect(tokens).toContain('--workspace-text-xs: 12px');

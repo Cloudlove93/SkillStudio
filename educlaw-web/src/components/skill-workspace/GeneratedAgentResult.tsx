@@ -1,5 +1,11 @@
 import type { GuidedCreationSession } from '@educlaw/shared';
-import { ArrowUpRight, BookOpen, ChevronDown, FileText, MessageSquare } from 'lucide-react';
+import {
+  ArrowUpRight,
+  BookOpen,
+  ChevronDown,
+  FileText,
+  MessageSquare,
+} from 'lucide-react';
 
 /** 生成结果内容，不拥有仓库布局或对话运行逻辑。 */
 export function GeneratedAgentResult({
@@ -15,10 +21,7 @@ export function GeneratedAgentResult({
 }) {
   const result = session.generatedAgent;
   const displayName =
-    result?.name ||
-    session.display_name ||
-    session.draft.goal ||
-    'Agent 包';
+    result?.name || session.display_name || session.draft.goal || 'Agent 包';
   const skillCount = result?.skills.length ?? 0;
   const initial = displayName.trim().slice(0, 1) || 'A';
 

@@ -1,5 +1,9 @@
 import { ArrowRight, Layers3, Sparkles, Wand2 } from 'lucide-react';
-import type { PresetMatch, StudioPreset, StudioPresetKind } from '../../lib/studio-presets';
+import type {
+  PresetMatch,
+  StudioPreset,
+  StudioPresetKind,
+} from '../../lib/studio-presets';
 import './preset-recommendation.css';
 
 const kindLabels: Record<StudioPresetKind, string> = {
@@ -39,9 +43,7 @@ export function PresetRecommendation({
             <Sparkles size={13} aria-hidden="true" />
             {title}
           </span>
-          <p>
-            我们已有相关的 Agent / Skill / 课例包，要直接用，还是基于它改？
-          </p>
+          <p>我们已有相关的 Agent / Skill / 课例包，要直接用，还是基于它改？</p>
         </div>
         <button
           type="button"
@@ -68,7 +70,9 @@ export function PresetRecommendation({
               )}
             </span>
             <div className="preset-recommendation-copy">
-              <span className={`preset-recommendation-kind is-${match.preset.kind}`}>
+              <span
+                className={`preset-recommendation-kind is-${match.preset.kind}`}
+              >
                 {kindLabels[match.preset.kind]}
               </span>
               <strong>{match.preset.name}</strong>

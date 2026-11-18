@@ -44,85 +44,196 @@ describe('manual Skill version editing', () => {
     let insertedSnapshot: { skills: Array<{ skillMd: string }> } | null = null;
     let basedOnVersionId: unknown;
     queryMock.mockImplementation(async (sql: string, values?: unknown[]) => {
-      if (sql.startsWith('delete from api_idempotency_keys')) return { rows: [], rowCount: 0 };
-      if (sql.startsWith('insert into api_idempotency_keys')) return { rows: [{ id: 'idem-1' }], rowCount: 1 };
+      if (sql.startsWith('delete from api_idempotency_keys'))
+        return { rows: [], rowCount: 0 };
+      if (sql.startsWith('insert into api_idempotency_keys'))
+        return { rows: [{ id: 'idem-1' }], rowCount: 1 };
       if (sql.startsWith('select * from agent_packages')) {
-        return { rows: [{ id: '1', user_id: 'user-1', name: 'Package', description: '', current_version_id: '10' }], rowCount: 1 };
-      }
-      if (sql.includes('from agent_package_versions') && sql.includes('order by version_number asc')) {
-        return { rows: [{ id: '10', package_id: '1', version_number: 4, source: 'manual', snapshot_json: currentSnapshot(originalMd) }], rowCount: 1 };
-      }
-      if (sql.startsWith('select distinct package_version_id')) return { rows: [{ package_version_id: '10' }], rowCount: 1 };
-      if (sql.includes('from agent_package_skills s')) return { rows: [skillRow()], rowCount: 1 };
-      if (sql.includes('select sv.*')) {
         return {
-          rows: [{
-            id: '21', skill_id: '11', package_id: '1', created_in_package_version_id: '8',
-            version_number: 2, source: 'generated', based_on_version_id: null,
-            skill_snapshot_json: currentSnapshot(originalMd).skills[0], content_hash: 'old-hash',
-            status: 'active', note: '', created_at: '', discarded_at: null,
-            discarded_by: null, discard_reason: null, restored_at: null, restored_by: null,
-          }],
+          rows: [
+            {
+              id: '1',
+              user_id: 'user-1',
+              name: 'Package',
+              description: '',
+              current_version_id: '10',
+            },
+          ],
           rowCount: 1,
         };
       }
-      if (sql.startsWith('select * from agent_package_versions where id = $1')) {
-        return { rows: [{ id: '10', package_id: '1', version_number: 4, source: 'manual', snapshot_json: currentSnapshot(originalMd) }], rowCount: 1 };
+      if (
+        sql.includes('from agent_package_versions') &&
+        sql.includes('order by version_number asc')
+      ) {
+        return {
+          rows: [
+            {
+              id: '10',
+              package_id: '1',
+              version_number: 4,
+              source: 'manual',
+              snapshot_json: currentSnapshot(originalMd),
+            },
+          ],
+          rowCount: 1,
+        };
+      }
+      if (sql.startsWith('select distinct package_version_id'))
+        return { rows: [{ package_version_id: '10' }], rowCount: 1 };
+      if (sql.includes('from agent_package_skills s'))
+        return { rows: [skillRow()], rowCount: 1 };
+      if (sql.includes('select sv.*')) {
+        return {
+          rows: [
+            {
+              id: '21',
+              skill_id: '11',
+              package_id: '1',
+              created_in_package_version_id: '8',
+              version_number: 2,
+              source: 'generated',
+              based_on_version_id: null,
+              skill_snapshot_json: currentSnapshot(originalMd).skills[0],
+              content_hash: 'old-hash',
+              status: 'active',
+              note: '',
+              created_at: '',
+              discarded_at: null,
+              discarded_by: null,
+              discard_reason: null,
+              restored_at: null,
+              restored_by: null,
+            },
+          ],
+          rowCount: 1,
+        };
+      }
+      if (
+        sql.startsWith('select * from agent_package_versions where id = $1')
+      ) {
+        return {
+          rows: [
+            {
+              id: '10',
+              package_id: '1',
+              version_number: 4,
+              source: 'manual',
+              snapshot_json: currentSnapshot(originalMd),
+            },
+          ],
+          rowCount: 1,
+        };
       }
       if (sql.startsWith('insert into agent_package_versions')) {
         insertedSnapshot = JSON.parse(String(values?.[2]));
         return { rows: [{ id: '12' }], rowCount: 1 };
       }
-      if (sql.includes('select skill_uid, dir_name')) return { rows: [{ skill_uid: 'lesson-skill', dir_name: 'lesson-skill' }], rowCount: 1 };
-      if (sql.startsWith('insert into agent_package_skills')) return { rows: [skillRow()], rowCount: 1 };
-      if (sql.startsWith('update agent_package_skills') && sql.includes('returning next_version_number')) return { rows: [{ version_number: 5 }], rowCount: 1 };
+      if (sql.includes('select skill_uid, dir_name'))
+        return {
+          rows: [{ skill_uid: 'lesson-skill', dir_name: 'lesson-skill' }],
+          rowCount: 1,
+        };
+      if (sql.startsWith('insert into agent_package_skills'))
+        return { rows: [skillRow()], rowCount: 1 };
+      if (
+        sql.startsWith('update agent_package_skills') &&
+        sql.includes('returning next_version_number')
+      )
+        return { rows: [{ version_number: 5 }], rowCount: 1 };
       if (sql.startsWith('insert into agent_skill_versions')) {
         basedOnVersionId = values?.[5];
         return { rows: [{ id: '25' }], rowCount: 1 };
       }
-      if (sql.startsWith('insert into agent_package_version_skills')) return { rows: [], rowCount: 1 };
-      if (sql.startsWith("update agent_package_skills set status = 'removed'")) return { rows: [], rowCount: 0 };
-      if (sql.startsWith('update agent_packages')) return { rows: [], rowCount: 1 };
-      if (sql.startsWith('update api_idempotency_keys')) return { rows: [], rowCount: 1 };
+      if (sql.startsWith('insert into agent_package_version_skills'))
+        return { rows: [], rowCount: 1 };
+      if (sql.startsWith("update agent_package_skills set status = 'removed'"))
+        return { rows: [], rowCount: 0 };
+      if (sql.startsWith('update agent_packages'))
+        return { rows: [], rowCount: 1 };
+      if (sql.startsWith('update api_idempotency_keys'))
+        return { rows: [], rowCount: 1 };
       throw new Error(`Unexpected query: ${sql}`);
     });
     const { createManualSkillVersion } = await loadService();
 
     const result = await createManualSkillVersion({
-      authUserId: 'user-1', packageId: '1', skillId: '11', baseVersionId: '21',
-      expectedPackageVersionId: '10', idempotencyKey: 'manual-edit-1', skillMd: editedMd,
+      authUserId: 'user-1',
+      packageId: '1',
+      skillId: '11',
+      baseVersionId: '21',
+      expectedPackageVersionId: '10',
+      idempotencyKey: 'manual-edit-1',
+      skillMd: editedMd,
     });
 
     expect(result).toMatchObject({
-      packageVersionId: '12', packageVersionNumber: 5, skillVersionId: '25',
-      skillVersionNumber: 5, basedOnVersionId: '21',
+      packageVersionId: '12',
+      packageVersionNumber: 5,
+      skillVersionId: '25',
+      skillVersionNumber: 5,
+      basedOnVersionId: '21',
     });
     expect(basedOnVersionId).toBe('21');
     expect(insertedSnapshot?.skills[0]?.skillMd).toBe(editedMd);
-    expect(queryMock.mock.calls.some(([sql]) => String(sql).startsWith('update agent_skill_versions'))).toBe(false);
+    expect(
+      queryMock.mock.calls.some(([sql]) =>
+        String(sql).startsWith('update agent_skill_versions'),
+      ),
+    ).toBe(false);
   });
 
   it('fails before creating a version when the package head changed', async () => {
     queryMock.mockImplementation(async (sql: string) => {
-      if (sql.startsWith('delete from api_idempotency_keys')) return { rows: [], rowCount: 0 };
-      if (sql.startsWith('insert into api_idempotency_keys')) return { rows: [{ id: 'idem-2' }], rowCount: 1 };
+      if (sql.startsWith('delete from api_idempotency_keys'))
+        return { rows: [], rowCount: 0 };
+      if (sql.startsWith('insert into api_idempotency_keys'))
+        return { rows: [{ id: 'idem-2' }], rowCount: 1 };
       if (sql.startsWith('select * from agent_packages')) {
-        return { rows: [{ id: '1', user_id: 'user-1', current_version_id: '12' }], rowCount: 1 };
+        return {
+          rows: [{ id: '1', user_id: 'user-1', current_version_id: '12' }],
+          rowCount: 1,
+        };
       }
-      if (sql.includes('from agent_package_versions') && sql.includes('order by version_number asc')) {
-        return { rows: [{ id: '12', package_id: '1', version_number: 6, source: 'manual', snapshot_json: currentSnapshot(validSkillMd('并发版本')) }], rowCount: 1 };
+      if (
+        sql.includes('from agent_package_versions') &&
+        sql.includes('order by version_number asc')
+      ) {
+        return {
+          rows: [
+            {
+              id: '12',
+              package_id: '1',
+              version_number: 6,
+              source: 'manual',
+              snapshot_json: currentSnapshot(validSkillMd('并发版本')),
+            },
+          ],
+          rowCount: 1,
+        };
       }
-      if (sql.startsWith('select distinct package_version_id')) return { rows: [{ package_version_id: '12' }], rowCount: 1 };
+      if (sql.startsWith('select distinct package_version_id'))
+        return { rows: [{ package_version_id: '12' }], rowCount: 1 };
       throw new Error(`Unexpected query: ${sql}`);
     });
     const { createManualSkillVersion } = await loadService();
 
-    await expect(createManualSkillVersion({
-      authUserId: 'user-1', packageId: '1', skillId: '11', baseVersionId: '21',
-      expectedPackageVersionId: '10', idempotencyKey: 'manual-edit-2',
-      skillMd: validSkillMd('不会写入'),
-    })).rejects.toMatchObject({ code: 'PACKAGE_VERSION_CONFLICT', status: 409 });
-    expect(queryMock.mock.calls.some(([sql]) => String(sql).startsWith('insert into agent_package_versions'))).toBe(false);
+    await expect(
+      createManualSkillVersion({
+        authUserId: 'user-1',
+        packageId: '1',
+        skillId: '11',
+        baseVersionId: '21',
+        expectedPackageVersionId: '10',
+        idempotencyKey: 'manual-edit-2',
+        skillMd: validSkillMd('不会写入'),
+      }),
+    ).rejects.toMatchObject({ code: 'PACKAGE_VERSION_CONFLICT', status: 409 });
+    expect(
+      queryMock.mock.calls.some(([sql]) =>
+        String(sql).startsWith('insert into agent_package_versions'),
+      ),
+    ).toBe(false);
   });
 });
 
@@ -132,32 +243,63 @@ function validSkillMd(marker: string) {
 
 function currentSnapshot(skillMd: string) {
   return {
-    name: 'Package', description: '', versionLabel: 'v4', agentMd: '', rubricMd: '',
-    skills: [{ id: 'lesson-skill', dirName: 'lesson-skill', name: 'Lesson Skill', description: '用于课堂任务', skillMd }],
+    name: 'Package',
+    description: '',
+    versionLabel: 'v4',
+    agentMd: '',
+    rubricMd: '',
+    skills: [
+      {
+        id: 'lesson-skill',
+        dirName: 'lesson-skill',
+        name: 'Lesson Skill',
+        description: '用于课堂任务',
+        skillMd,
+      },
+    ],
   };
 }
 
 function skillRow() {
   return {
-    id: '11', package_id: '1', skill_uid: 'lesson-skill', dir_name: 'lesson-skill',
-    name: 'Lesson Skill', display_name: null, description: '用于课堂教学任务的规则',
-    status: 'active', next_version_number: 5, created_at: '', updated_at: '',
+    id: '11',
+    package_id: '1',
+    skill_uid: 'lesson-skill',
+    dir_name: 'lesson-skill',
+    name: 'Lesson Skill',
+    display_name: null,
+    description: '用于课堂教学任务的规则',
+    status: 'active',
+    next_version_number: 5,
+    created_at: '',
+    updated_at: '',
   };
 }
 
 describe('skill version service', () => {
   it('returns the current package head independently of Skill creation history', async () => {
     queryMock.mockImplementation(async (sql: string) => {
-      if (sql.includes('select * from agent_packages')) return { rows: [{ id: '7', current_version_id: '99' }] };
-      if (sql.includes('select * from agent_package_versions')) return { rows: [] };
-      if (sql.includes('select s.*')) return { rows: [{ id: '11', package_id: '7' }] };
+      if (sql.includes('select * from agent_packages'))
+        return { rows: [{ id: '7', current_version_id: '99' }] };
+      if (sql.includes('select * from agent_package_versions'))
+        return { rows: [] };
+      if (sql.includes('select s.*'))
+        return { rows: [{ id: '11', package_id: '7' }] };
       if (sql.includes('select sv.*')) return { rows: [] };
-      if (sql.includes('select skill_version_id')) return { rows: [{ skill_version_id: '21' }] };
+      if (sql.includes('select skill_version_id'))
+        return { rows: [{ skill_version_id: '21' }] };
       throw new Error(`Unexpected query: ${sql}`);
     });
     const service = await loadService();
-    const result = await service.listSkillVersions({ authUserId: 'u', packageId: '7', skillId: '11' });
-    expect(result).toMatchObject({ currentPackageVersionId: '99', currentVersionId: '21' });
+    const result = await service.listSkillVersions({
+      authUserId: 'u',
+      packageId: '7',
+      skillId: '11',
+    });
+    expect(result).toMatchObject({
+      currentPackageVersionId: '99',
+      currentVersionId: '21',
+    });
   });
   it('stores a user-facing Skill name without creating a new version', async () => {
     queryMock.mockImplementation(async (sql: string, params?: unknown[]) => {
@@ -656,7 +798,10 @@ describe('skill version service', () => {
           rowCount: 1,
         };
       }
-      if (sql.includes('from agent_package_versions') && sql.includes('id = $1')) {
+      if (
+        sql.includes('from agent_package_versions') &&
+        sql.includes('id = $1')
+      ) {
         return {
           rows: [
             {
@@ -716,7 +861,9 @@ describe('skill version service', () => {
       if (sql.startsWith('insert into agent_package_version_skills')) {
         return { rows: [], rowCount: 1 };
       }
-      if (sql.startsWith("update agent_package_skills set status = 'removed'")) {
+      if (
+        sql.startsWith("update agent_package_skills set status = 'removed'")
+      ) {
         return { rows: [], rowCount: 1 };
       }
       if (sql.startsWith('update agent_packages')) {
@@ -738,10 +885,14 @@ describe('skill version service', () => {
         (skill: { id: string }) => skill.id,
       ),
     ).toEqual(['keep-me']);
-    const packageLockIndex = queryMock.mock.calls.findIndex(([sql]) =>
-      String(sql).includes('from agent_packages') && String(sql).includes('for update'));
+    const packageLockIndex = queryMock.mock.calls.findIndex(
+      ([sql]) =>
+        String(sql).includes('from agent_packages') &&
+        String(sql).includes('for update'),
+    );
     const skillLockIndex = queryMock.mock.calls.findIndex(([sql]) =>
-      String(sql).includes('for update of s'));
+      String(sql).includes('for update of s'),
+    );
     expect(packageLockIndex).toBeLessThan(skillLockIndex);
   });
 
@@ -827,7 +978,12 @@ describe('skill version service', () => {
   it('does not advance a removed-only package in a mixed idempotent retry', async () => {
     const targets = [
       { id: '11', package_id: '1', skill_uid: 'active-one', status: 'active' },
-      { id: '22', package_id: '2', skill_uid: 'removed-two', status: 'removed' },
+      {
+        id: '22',
+        package_id: '2',
+        skill_uid: 'removed-two',
+        status: 'removed',
+      },
     ];
     const insertedPackageIds: string[] = [];
     queryMock.mockImplementation(async (sql: string, values?: unknown[]) => {
@@ -843,21 +999,40 @@ describe('skill version service', () => {
           rowCount: 2,
         };
       }
-      if (sql.includes('from agent_package_versions') && sql.includes('id = $1')) {
+      if (
+        sql.includes('from agent_package_versions') &&
+        sql.includes('id = $1')
+      ) {
         const packageId = String(values?.[1]);
         if (packageId !== '1') {
-          throw new Error('removed-only package must not receive a new version');
+          throw new Error(
+            'removed-only package must not receive a new version',
+          );
         }
         return {
-          rows: [{
-            id: '10',
-            package_id: '1',
-            version_number: 1,
-            snapshot_json: {
-              name: 'Skills', description: '', versionLabel: 'v1', agentMd: '', rubricMd: '',
-              skills: [{ id: 'active-one', dirName: 'active-one', name: 'Active', description: '', skillMd: '' }],
+          rows: [
+            {
+              id: '10',
+              package_id: '1',
+              version_number: 1,
+              snapshot_json: {
+                name: 'Skills',
+                description: '',
+                versionLabel: 'v1',
+                agentMd: '',
+                rubricMd: '',
+                skills: [
+                  {
+                    id: 'active-one',
+                    dirName: 'active-one',
+                    name: 'Active',
+                    description: '',
+                    skillMd: '',
+                  },
+                ],
+              },
             },
-          }],
+          ],
           rowCount: 1,
         };
       }
@@ -866,9 +1041,14 @@ describe('skill version service', () => {
         return { rows: [{ id: '20' }], rowCount: 1 };
       }
       if (sql.includes('select skill_uid, dir_name')) {
-        return { rows: [{ skill_uid: 'active-one', dir_name: 'active-one' }], rowCount: 1 };
+        return {
+          rows: [{ skill_uid: 'active-one', dir_name: 'active-one' }],
+          rowCount: 1,
+        };
       }
-      if (sql.startsWith("update agent_package_skills set status = 'removed'")) {
+      if (
+        sql.startsWith("update agent_package_skills set status = 'removed'")
+      ) {
         return { rows: [], rowCount: 1 };
       }
       if (sql.startsWith('update agent_packages')) {
@@ -892,7 +1072,14 @@ describe('skill version service', () => {
     queryMock.mockImplementation(async (sql: string) => {
       if (sql.includes('from agent_package_skills s')) {
         return {
-          rows: [{ id: '11', package_id: '1', skill_uid: 'removed', status: 'removed' }],
+          rows: [
+            {
+              id: '11',
+              package_id: '1',
+              skill_uid: 'removed',
+              status: 'removed',
+            },
+          ],
           rowCount: 1,
         };
       }
@@ -926,7 +1113,10 @@ describe('skill version service', () => {
       { id: '11', package_id: '1', skill_uid: 'only-one', status: 'active' },
       { id: '22', package_id: '2', skill_uid: 'only-two', status: 'active' },
     ];
-    const insertedSnapshots: Array<{ packageId: string; snapshot: { skills: unknown[] } }> = [];
+    const insertedSnapshots: Array<{
+      packageId: string;
+      snapshot: { skills: unknown[] };
+    }> = [];
     queryMock.mockImplementation(async (sql: string, values?: unknown[]) => {
       if (sql.includes('from agent_package_skills s')) {
         return { rows: targets, rowCount: 2 };
@@ -940,19 +1130,36 @@ describe('skill version service', () => {
           rowCount: 2,
         };
       }
-      if (sql.includes('from agent_package_versions') && sql.includes('id = $1')) {
+      if (
+        sql.includes('from agent_package_versions') &&
+        sql.includes('id = $1')
+      ) {
         const packageId = String(values?.[1]);
         const skillUid = packageId === '1' ? 'only-one' : 'only-two';
         return {
-          rows: [{
-            id: packageId === '1' ? '10' : '30',
-            package_id: packageId,
-            version_number: 1,
-            snapshot_json: {
-              name: 'Skills', description: '', versionLabel: 'v1', agentMd: '', rubricMd: '',
-              skills: [{ id: skillUid, dirName: skillUid, name: skillUid, description: '', skillMd: '' }],
+          rows: [
+            {
+              id: packageId === '1' ? '10' : '30',
+              package_id: packageId,
+              version_number: 1,
+              snapshot_json: {
+                name: 'Skills',
+                description: '',
+                versionLabel: 'v1',
+                agentMd: '',
+                rubricMd: '',
+                skills: [
+                  {
+                    id: skillUid,
+                    dirName: skillUid,
+                    name: skillUid,
+                    description: '',
+                    skillMd: '',
+                  },
+                ],
+              },
             },
-          }],
+          ],
           rowCount: 1,
         };
       }
@@ -961,14 +1168,22 @@ describe('skill version service', () => {
           packageId: String(values?.[0]),
           snapshot: JSON.parse(String(values?.[2])),
         });
-        return { rows: [{ id: String(values?.[0]) === '1' ? '20' : '40' }], rowCount: 1 };
+        return {
+          rows: [{ id: String(values?.[0]) === '1' ? '20' : '40' }],
+          rowCount: 1,
+        };
       }
       if (sql.includes('select skill_uid, dir_name')) {
         const packageId = String(values?.[0]);
         const skillUid = packageId === '1' ? 'only-one' : 'only-two';
-        return { rows: [{ skill_uid: skillUid, dir_name: skillUid }], rowCount: 1 };
+        return {
+          rows: [{ skill_uid: skillUid, dir_name: skillUid }],
+          rowCount: 1,
+        };
       }
-      if (sql.startsWith("update agent_package_skills set status = 'removed'")) {
+      if (
+        sql.startsWith("update agent_package_skills set status = 'removed'")
+      ) {
         return { rows: [], rowCount: 1 };
       }
       if (sql.startsWith('update agent_packages')) {
@@ -985,30 +1200,63 @@ describe('skill version service', () => {
       batchDeleteSkills({ authUserId: 'user-1', skillIds: ['22', '11'] }),
     ).resolves.toEqual({ deletedSkillIds: ['11', '22'], deletedCount: 2 });
     expect(insertedSnapshots).toHaveLength(2);
-    expect(insertedSnapshots.map((entry) => entry.snapshot.skills)).toEqual([[], []]);
-    const packageLock = queryMock.mock.calls.find(([sql]) =>
-      String(sql).includes('from agent_packages') && String(sql).includes('for update'));
+    expect(insertedSnapshots.map((entry) => entry.snapshot.skills)).toEqual([
+      [],
+      [],
+    ]);
+    const packageLock = queryMock.mock.calls.find(
+      ([sql]) =>
+        String(sql).includes('from agent_packages') &&
+        String(sql).includes('for update'),
+    );
     expect(packageLock?.[1]).toEqual(['user-1', ['1', '2']]);
   });
 
   it('rejects the transaction when the current package pointer changes', async () => {
-    const target = { id: '11', package_id: '1', skill_uid: 'only-one', status: 'active' };
+    const target = {
+      id: '11',
+      package_id: '1',
+      skill_uid: 'only-one',
+      status: 'active',
+    };
     queryMock.mockImplementation(async (sql: string, values?: unknown[]) => {
       if (sql.includes('from agent_package_skills s')) {
         return { rows: [target], rowCount: 1 };
       }
       if (sql.includes('from agent_packages') && sql.includes('for update')) {
-        return { rows: [{ id: '1', user_id: 'user-1', current_version_id: '10' }], rowCount: 1 };
-      }
-      if (sql.includes('from agent_package_versions') && sql.includes('id = $1')) {
         return {
-          rows: [{
-            id: '10', package_id: '1', version_number: 1,
-            snapshot_json: {
-              name: 'Skills', description: '', versionLabel: 'v1', agentMd: '', rubricMd: '',
-              skills: [{ id: 'only-one', dirName: 'only-one', name: 'Only', description: '', skillMd: '' }],
+          rows: [{ id: '1', user_id: 'user-1', current_version_id: '10' }],
+          rowCount: 1,
+        };
+      }
+      if (
+        sql.includes('from agent_package_versions') &&
+        sql.includes('id = $1')
+      ) {
+        return {
+          rows: [
+            {
+              id: '10',
+              package_id: '1',
+              version_number: 1,
+              snapshot_json: {
+                name: 'Skills',
+                description: '',
+                versionLabel: 'v1',
+                agentMd: '',
+                rubricMd: '',
+                skills: [
+                  {
+                    id: 'only-one',
+                    dirName: 'only-one',
+                    name: 'Only',
+                    description: '',
+                    skillMd: '',
+                  },
+                ],
+              },
             },
-          }],
+          ],
           rowCount: 1,
         };
       }
@@ -1016,9 +1264,14 @@ describe('skill version service', () => {
         return { rows: [{ id: '20' }], rowCount: 1 };
       }
       if (sql.includes('select skill_uid, dir_name')) {
-        return { rows: [{ skill_uid: 'only-one', dir_name: 'only-one' }], rowCount: 1 };
+        return {
+          rows: [{ skill_uid: 'only-one', dir_name: 'only-one' }],
+          rowCount: 1,
+        };
       }
-      if (sql.startsWith("update agent_package_skills set status = 'removed'")) {
+      if (
+        sql.startsWith("update agent_package_skills set status = 'removed'")
+      ) {
         return { rows: [], rowCount: 1 };
       }
       if (sql.startsWith('update agent_packages')) {
@@ -1033,7 +1286,9 @@ describe('skill version service', () => {
       batchDeleteSkills({ authUserId: 'user-1', skillIds: ['11'] }),
     ).rejects.toMatchObject({ code: 'SKILL_DELETE_CONFLICT', status: 409 });
     expect(
-      queryMock.mock.calls.some(([sql]) => String(sql).includes("remove_reason = 'deleted by user'")),
+      queryMock.mock.calls.some(([sql]) =>
+        String(sql).includes("remove_reason = 'deleted by user'"),
+      ),
     ).toBe(false);
   });
 });

@@ -1,9 +1,4 @@
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type {
   AgentPackageSnapshot,
   ArenaAnswerOptimizationSummary,
@@ -110,11 +105,7 @@ const markdownComponents: Components = {
   },
 };
 
-export function MarkdownContent({
-  content,
-}: {
-  content: string;
-}) {
+export function MarkdownContent({ content }: { content: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const components = useMemo<Components>(() => markdownComponents, []);
@@ -269,7 +260,9 @@ function DiffLineView({
     return (
       <div key={index} className="flex items-center gap-2 py-2 px-3">
         <div className="h-px flex-1 bg-border/60" />
-        <span className="text-[10px] text-muted-foreground/40 select-none">省略</span>
+        <span className="text-[10px] text-muted-foreground/40 select-none">
+          省略
+        </span>
         <div className="h-px flex-1 bg-border/60" />
       </div>
     );
@@ -650,7 +643,9 @@ export function OptimizationDiffView({
     <div className="space-y-3">
       <div className="rounded-xl border border-border/80 bg-card overflow-hidden">
         <div className="px-4 py-2.5 border-b border-border/60">
-          <span className="text-sm font-medium text-foreground">agent.md 变更</span>
+          <span className="text-sm font-medium text-foreground">
+            agent.md 变更
+          </span>
         </div>
         <div className="py-2">
           <DiffLinesView diffs={agentDiff} />
@@ -658,7 +653,9 @@ export function OptimizationDiffView({
       </div>
       <div className="rounded-xl border border-border/80 bg-card overflow-hidden">
         <div className="px-4 py-2.5 border-b border-border/60">
-          <span className="text-sm font-medium text-foreground">rubric.md 变更</span>
+          <span className="text-sm font-medium text-foreground">
+            rubric.md 变更
+          </span>
         </div>
         <div className="py-2">
           <DiffLinesView diffs={rubricDiff} />

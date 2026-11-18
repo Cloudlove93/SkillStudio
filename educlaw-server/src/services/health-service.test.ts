@@ -3,10 +3,15 @@ import { describe, expect, it, vi } from 'vitest';
 import { createHealthService } from './health-service.js';
 
 describe('health service', () => {
-  it('marks cached and pending readiness unavailable once drain begins',async()=>{
-    let release!:()=>void;const pending=new Promise<void>(r=>{release=r;});
-    const service=createHealthService({checkDatabase:()=>pending});
-    const reading=service.check();service.beginDrain();release();
+  it('marks cached and pending readiness unavailable once drain begins', async () => {
+    let release!: () => void;
+    const pending = new Promise<void>((r) => {
+      release = r;
+    });
+    const service = createHealthService({ checkDatabase: () => pending });
+    const reading = service.check();
+    service.beginDrain();
+    release();
     expect((await reading).ok).toBe(false);
     expect((await service.check()).status).toBe('unavailable');
   });

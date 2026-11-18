@@ -13,18 +13,13 @@ export function SkillReasoningBlock({
   expandedByDefault = false,
 }: Props) {
   const contentId = useId();
-  const [expanded, setExpanded] = useState(
-    streaming || expandedByDefault,
-  );
+  const [expanded, setExpanded] = useState(streaming || expandedByDefault);
   const [copied, setCopied] = useState(false);
   const changedByUser = useRef(false);
   const previousStreaming = useRef(streaming);
 
   useEffect(() => {
-    if (
-      previousStreaming.current !== streaming &&
-      !changedByUser.current
-    ) {
+    if (previousStreaming.current !== streaming && !changedByUser.current) {
       setExpanded(streaming || expandedByDefault);
     }
     previousStreaming.current = streaming;

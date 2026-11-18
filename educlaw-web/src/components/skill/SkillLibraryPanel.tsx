@@ -1,5 +1,29 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
-import { Search, ArrowLeft, Loader2, BookOpen, FileText, ChevronRight, Trash2, Lock, User, Pencil, X, Save, Plus, Scale, Monitor, Tag, Wrench, Info, Globe, Settings, CheckSquare, Square, Sparkles } from 'lucide-react';
+import {
+  Search,
+  ArrowLeft,
+  Loader2,
+  BookOpen,
+  FileText,
+  ChevronRight,
+  Trash2,
+  Lock,
+  User,
+  Pencil,
+  X,
+  Save,
+  Plus,
+  Scale,
+  Monitor,
+  Tag,
+  Wrench,
+  Info,
+  Globe,
+  Settings,
+  CheckSquare,
+  Square,
+  Sparkles,
+} from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -11,11 +35,22 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import {
-  getSkillDetail, deleteUserSkill, updateUserSkill, createUserSkill,
-  listSkillFiles, readSkillFile, writeSkillFile, uploadSkillFiles,
-  createSkillFile, createSkillDir, deleteSkillPath, renameSkillPath,
-  publishSkill, unpublishSkill,
-  type SkillSummary, type SkillDetail,
+  getSkillDetail,
+  deleteUserSkill,
+  updateUserSkill,
+  createUserSkill,
+  listSkillFiles,
+  readSkillFile,
+  writeSkillFile,
+  uploadSkillFiles,
+  createSkillFile,
+  createSkillDir,
+  deleteSkillPath,
+  renameSkillPath,
+  publishSkill,
+  unpublishSkill,
+  type SkillSummary,
+  type SkillDetail,
 } from '../../api/manager';
 import { useT } from '../../i18n';
 import { useLibraryStore } from '../../stores/library';
@@ -35,7 +70,10 @@ interface SkillFrontmatter {
   'allowed-tools'?: string;
 }
 
-function parseSkillMd(raw: string): { frontmatter: SkillFrontmatter; body: string } {
+function parseSkillMd(raw: string): {
+  frontmatter: SkillFrontmatter;
+  body: string;
+} {
   const fm: SkillFrontmatter = {};
   const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
   if (!match) return { frontmatter: fm, body: raw };
@@ -50,7 +88,8 @@ function parseSkillMd(raw: string): { frontmatter: SkillFrontmatter; body: strin
     // Nested metadata value (indented)
     if (metadataMap !== null && /^\s{2,}\S/.test(line)) {
       const kv = line.trim().match(/^([^:]+):\s*(.*)$/);
-      if (kv) metadataMap[kv[1].trim()] = kv[2].replace(/^["']|["']$/g, '').trim();
+      if (kv)
+        metadataMap[kv[1].trim()] = kv[2].replace(/^["']|["']$/g, '').trim();
       continue;
     }
     // End of metadata block if we hit a non-indented line
@@ -78,8 +117,18 @@ function parseSkillMd(raw: string): { frontmatter: SkillFrontmatter; body: strin
 /* 閳光偓閳光偓閳光偓 SKILL.md structured renderer 閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓 */
 
 function SkillMdRenderer({ content }: { content: string }) {
-  const { frontmatter: fm, body } = useMemo(() => parseSkillMd(content), [content]);
-  const hasFrontmatter = !!(fm.name || fm.description || fm.license || fm.compatibility || fm.metadata || fm['allowed-tools']);
+  const { frontmatter: fm, body } = useMemo(
+    () => parseSkillMd(content),
+    [content],
+  );
+  const hasFrontmatter = !!(
+    fm.name ||
+    fm.description ||
+    fm.license ||
+    fm.compatibility ||
+    fm.metadata ||
+    fm['allowed-tools']
+  );
 
   return (
     <div className="space-y-5">
@@ -92,11 +141,15 @@ function SkillMdRenderer({ content }: { content: string }) {
               {fm.name && (
                 <div className="flex items-center gap-2 mb-1">
                   <Tag className="size-3.5 text-emerald-500 shrink-0" />
-                  <code className="text-sm font-semibold text-foreground">{fm.name}</code>
+                  <code className="text-sm font-semibold text-foreground">
+                    {fm.name}
+                  </code>
                 </div>
               )}
               {fm.description && (
-                <p className="text-sm leading-relaxed text-muted-foreground mt-1.5 pl-[22px]">{fm.description}</p>
+                <p className="text-sm leading-relaxed text-muted-foreground mt-1.5 pl-[22px]">
+                  {fm.description}
+                </p>
               )}
             </div>
           )}
@@ -108,8 +161,12 @@ function SkillMdRenderer({ content }: { content: string }) {
                 <div className="flex items-start gap-2.5 rounded-lg border border-border/30 bg-muted/10 px-3.5 py-2.5">
                   <Scale className="size-3.5 text-amber-500 shrink-0 mt-0.5" />
                   <div className="min-w-0">
-                    <span className="block text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60 mb-0.5">License</span>
-                    <span className="text-xs text-foreground">{fm.license}</span>
+                    <span className="block text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60 mb-0.5">
+                      License
+                    </span>
+                    <span className="text-xs text-foreground">
+                      {fm.license}
+                    </span>
                   </div>
                 </div>
               )}
@@ -117,8 +174,12 @@ function SkillMdRenderer({ content }: { content: string }) {
                 <div className="flex items-start gap-2.5 rounded-lg border border-border/30 bg-muted/10 px-3.5 py-2.5">
                   <Monitor className="size-3.5 text-blue-500 shrink-0 mt-0.5" />
                   <div className="min-w-0">
-                    <span className="block text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60 mb-0.5">Compatibility</span>
-                    <span className="text-xs text-foreground">{fm.compatibility}</span>
+                    <span className="block text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60 mb-0.5">
+                      Compatibility
+                    </span>
+                    <span className="text-xs text-foreground">
+                      {fm.compatibility}
+                    </span>
                   </div>
                 </div>
               )}
@@ -126,11 +187,21 @@ function SkillMdRenderer({ content }: { content: string }) {
                 <div className="flex items-start gap-2.5 rounded-lg border border-border/30 bg-muted/10 px-3.5 py-2.5 sm:col-span-2">
                   <Wrench className="size-3.5 text-violet-500 shrink-0 mt-0.5" />
                   <div className="min-w-0">
-                    <span className="block text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60 mb-0.5">Allowed Tools</span>
+                    <span className="block text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60 mb-0.5">
+                      Allowed Tools
+                    </span>
                     <div className="flex flex-wrap gap-1 mt-1">
-                      {fm['allowed-tools'].split(/\s+/).filter(Boolean).map((tool) => (
-                        <code key={tool} className="rounded bg-violet-500/10 px-1.5 py-0.5 text-[11px] font-mono text-violet-600 dark:text-violet-400">{tool}</code>
-                      ))}
+                      {fm['allowed-tools']
+                        .split(/\s+/)
+                        .filter(Boolean)
+                        .map((tool) => (
+                          <code
+                            key={tool}
+                            className="rounded bg-violet-500/10 px-1.5 py-0.5 text-[11px] font-mono text-violet-600 dark:text-violet-400"
+                          >
+                            {tool}
+                          </code>
+                        ))}
                     </div>
                   </div>
                 </div>
@@ -143,12 +214,16 @@ function SkillMdRenderer({ content }: { content: string }) {
             <div className="rounded-lg border border-border/30 bg-muted/10 px-3.5 py-2.5">
               <div className="flex items-center gap-2 mb-2">
                 <Info className="size-3.5 text-muted-foreground/60 shrink-0" />
-                <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">Metadata</span>
+                <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
+                  Metadata
+                </span>
               </div>
               <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 pl-[22px]">
                 {Object.entries(fm.metadata).map(([k, v]) => (
                   <React.Fragment key={k}>
-                    <span className="text-xs text-muted-foreground font-mono">{k}</span>
+                    <span className="text-xs text-muted-foreground font-mono">
+                      {k}
+                    </span>
                     <span className="text-xs text-foreground">{v}</span>
                   </React.Fragment>
                 ))}
@@ -161,7 +236,10 @@ function SkillMdRenderer({ content }: { content: string }) {
       {/* Body markdown */}
       {body.trim() && (
         <div className="prose prose-sm dark:prose-invert max-w-none prose-headings:font-semibold prose-h2:text-lg prose-h3:text-base prose-p:leading-relaxed prose-pre:p-0 prose-pre:bg-transparent prose-hr:border-border">
-          <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm, remarkMath]}
+            rehypePlugins={[rehypeKatex]}
+          >
             {body}
           </ReactMarkdown>
         </div>
@@ -191,7 +269,10 @@ function SkillDetailView({
   // Publish state
   const [publishingSkill, setPublishingSkill] = useState(false);
   const allSkills = useLibraryStore((s) => s.skills);
-  const publicSkills = useMemo(() => allSkills.filter((s) => s.source === 'public'), [allSkills]);
+  const publicSkills = useMemo(
+    () => allSkills.filter((s) => s.source === 'public'),
+    [allSkills],
+  );
   const isSkillPublished = useMemo(
     () => isUser && publicSkills.some((s) => s.dirName === detail.dirName),
     [isUser, publicSkills, detail.dirName],
@@ -208,11 +289,17 @@ function SkillDetailView({
       // Refresh skill list so public tab updates
       useLibraryStore.getState().fetchSkills(true);
       onUpdated?.({ ...detail });
-      toast.success(isSkillPublished ? t('shared.unpublish') : t('shared.published'));
+      toast.success(
+        isSkillPublished ? t('shared.unpublish') : t('shared.published'),
+      );
     } catch (err) {
-      toast.error(isSkillPublished ? t('shared.unpublish') : t('shared.publish'), { description: err instanceof Error ? err.message : undefined });
+      toast.error(
+        isSkillPublished ? t('shared.unpublish') : t('shared.publish'),
+        { description: err instanceof Error ? err.message : undefined },
+      );
+    } finally {
+      setPublishingSkill(false);
     }
-    finally { setPublishingSkill(false); }
   };
 
   // Hero editing state
@@ -225,19 +312,26 @@ function SkillDetailView({
   const [editContent, setEditContent] = useState(detail.content);
 
   // File content preview state
-  const [openFile, setOpenFile] = useState<{ path: string; content: string; dirty: boolean } | null>(null);
+  const [openFile, setOpenFile] = useState<{
+    path: string;
+    content: string;
+    dirty: boolean;
+  } | null>(null);
   const [openFileLoading, setOpenFileLoading] = useState(false);
   const [fileSaving, setFileSaving] = useState(false);
 
   // Build FileOps for skill files
-  const skillFileOps: FileOps = useMemo(() => ({
-    listFiles: (dirPath) => listSkillFiles(source, detail.dirName, dirPath),
-    createFile: (filePath) => createSkillFile(detail.dirName, filePath),
-    createDir: (dirPath) => createSkillDir(detail.dirName, dirPath),
-    renamePath: (oldP, newP) => renameSkillPath(detail.dirName, oldP, newP),
-    deletePath: (path) => deleteSkillPath(detail.dirName, path),
-    uploadFiles: (dir, files) => uploadSkillFiles(detail.dirName, dir, files),
-  }), [source, detail.dirName]);
+  const skillFileOps: FileOps = useMemo(
+    () => ({
+      listFiles: (dirPath) => listSkillFiles(source, detail.dirName, dirPath),
+      createFile: (filePath) => createSkillFile(detail.dirName, filePath),
+      createDir: (dirPath) => createSkillDir(detail.dirName, dirPath),
+      renamePath: (oldP, newP) => renameSkillPath(detail.dirName, oldP, newP),
+      deletePath: (path) => deleteSkillPath(detail.dirName, path),
+      uploadFiles: (dir, files) => uploadSkillFiles(detail.dirName, dir, files),
+    }),
+    [source, detail.dirName],
+  );
 
   const openFileContent = async (filePath: string) => {
     setOpenFileLoading(true);
@@ -257,7 +351,7 @@ function SkillDetailView({
     if (isCreateMode || autoOpened.current) return;
     autoOpened.current = true;
     openFileContent('SKILL.md');
-  }, []);  // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleFileSave = async () => {
     if (!openFile || !openFile.dirty) return;
@@ -277,8 +371,13 @@ function SkillDetailView({
           });
         }
       }
-    } catch (err) { toast.error(t('skill.saveFile'), { description: err instanceof Error ? err.message : undefined }); }
-    finally { setFileSaving(false); }
+    } catch (err) {
+      toast.error(t('skill.saveFile'), {
+        description: err instanceof Error ? err.message : undefined,
+      });
+    } finally {
+      setFileSaving(false);
+    }
   };
 
   const startEditing = () => {
@@ -304,9 +403,20 @@ function SkillDetailView({
         await createUserSkill(dirName, editName, editDesc, editContent);
         toast.success(t('skill.saveSuccess'));
         onBack();
-        onUpdated?.({ dirName, name: editName, description: editDesc, content: editContent, source: 'user' });
+        onUpdated?.({
+          dirName,
+          name: editName,
+          description: editDesc,
+          content: editContent,
+          source: 'user',
+        });
       } else {
-        const res = await updateUserSkill(detail.dirName, editName, editDesc, detail.content);
+        const res = await updateUserSkill(
+          detail.dirName,
+          editName,
+          editDesc,
+          detail.content,
+        );
         const newDirName = res.dirName ?? detail.dirName;
         toast.success(t('skill.saveSuccess'));
         setEditing(false);
@@ -317,55 +427,91 @@ function SkillDetailView({
           description: editDesc,
         });
       }
-    } catch (err) { toast.error(t('skill.save'), { description: err instanceof Error ? err.message : undefined }); }
-    finally { setSaving(false); }
+    } catch (err) {
+      toast.error(t('skill.save'), {
+        description: err instanceof Error ? err.message : undefined,
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const isSkillMd = openFile?.path === 'SKILL.md';
-  const openFileIsMarkdown = openFile ? /\.(md|mdx)$/.test(openFile.path) : false;
+  const openFileIsMarkdown = openFile
+    ? /\.(md|mdx)$/.test(openFile.path)
+    : false;
 
   return (
-      <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col">
       <div className="flex items-center gap-3 border-b border-border/70 px-6 py-4">
-        <Button variant="outline" size="sm" onClick={onBack} className="gap-1.5 rounded-full">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onBack}
+          className="gap-1.5 rounded-full"
+        >
           <ArrowLeft className="size-4" />
           {t('skill.back')}
         </Button>
         <div className="flex-1" />
         {!isCreateMode && !editing && (
-          <Button variant="outline" size="sm" onClick={() => void createSkillRun(detail.dirName)} disabled={optimizationCreating} className="gap-1.5 rounded-full">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void createSkillRun(detail.dirName)}
+            disabled={optimizationCreating}
+            className="gap-1.5 rounded-full"
+          >
             <Sparkles className="size-3.5" />
             {t('optimize.action')}
           </Button>
         )}
         {isUser && !editing && (
           <>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleTogglePublishSkill}
-            disabled={publishingSkill}
-            className={`gap-1.5 rounded-full ${isSkillPublished ? 'border-emerald-500/30 text-emerald-600 dark:text-emerald-400' : ''}`}
-          >
-            <Globe className="size-3.5" />
-            {publishingSkill
-              ? (isSkillPublished ? t('shared.unpublishing') : t('shared.publishing'))
-              : (isSkillPublished ? t('shared.unpublish') : t('shared.publish'))
-            }
-          </Button>
-          <Button variant="outline" size="sm" onClick={startEditing} className="gap-1.5 rounded-full">
-            <Pencil className="size-3.5" />
-            {t('skill.edit')}
-          </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleTogglePublishSkill}
+              disabled={publishingSkill}
+              className={`gap-1.5 rounded-full ${isSkillPublished ? 'border-emerald-500/30 text-emerald-600 dark:text-emerald-400' : ''}`}
+            >
+              <Globe className="size-3.5" />
+              {publishingSkill
+                ? isSkillPublished
+                  ? t('shared.unpublishing')
+                  : t('shared.publishing')
+                : isSkillPublished
+                  ? t('shared.unpublish')
+                  : t('shared.publish')}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={startEditing}
+              className="gap-1.5 rounded-full"
+            >
+              <Pencil className="size-3.5" />
+              {t('skill.edit')}
+            </Button>
           </>
         )}
         {editing && (
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={cancelEditing} className="gap-1.5 rounded-full">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={cancelEditing}
+              className="gap-1.5 rounded-full"
+            >
               <X className="size-3.5" />
               {t('skill.cancel')}
             </Button>
-            <Button size="sm" onClick={handleSave} disabled={saving} className="gap-1.5 rounded-full">
+            <Button
+              size="sm"
+              onClick={handleSave}
+              disabled={saving}
+              className="gap-1.5 rounded-full"
+            >
               <Save className="size-3.5" />
               {t('skill.save')}
             </Button>
@@ -384,14 +530,22 @@ function SkillDetailView({
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 mb-1.5">
                   {detail.source && (
-                    <span className={`inline-flex items-center gap-1 rounded-full border border-border/70 px-3 py-1 text-[10px] font-medium shadow-sm ${
-                      detail.source === 'user'
-                        ? 'bg-primary/8 text-primary/80'
-                        : detail.source === 'public'
-                          ? 'bg-blue-500/8 text-blue-600 dark:text-blue-400'
-                          : 'bg-muted/60 text-muted-foreground'
-                    }`}>
-                      {detail.source === 'preset' ? <Lock className="size-2.5" /> : detail.source === 'public' ? <Globe className="size-2.5" /> : <User className="size-2.5" />}
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-full border border-border/70 px-3 py-1 text-[10px] font-medium shadow-sm ${
+                        detail.source === 'user'
+                          ? 'bg-primary/8 text-primary/80'
+                          : detail.source === 'public'
+                            ? 'bg-blue-500/8 text-blue-600 dark:text-blue-400'
+                            : 'bg-muted/60 text-muted-foreground'
+                      }`}
+                    >
+                      {detail.source === 'preset' ? (
+                        <Lock className="size-2.5" />
+                      ) : detail.source === 'public' ? (
+                        <Globe className="size-2.5" />
+                      ) : (
+                        <User className="size-2.5" />
+                      )}
                       {t(`skill.${detail.source}`)}
                     </span>
                   )}
@@ -417,9 +571,13 @@ function SkillDetailView({
                   </>
                 ) : (
                   <>
-                    <h1 className="text-3xl font-semibold tracking-[-0.04em] text-foreground">{detail.name}</h1>
+                    <h1 className="text-3xl font-semibold tracking-[-0.04em] text-foreground">
+                      {detail.name}
+                    </h1>
                     {detail.description && (
-                      <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{detail.description}</p>
+                      <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                        {detail.description}
+                      </p>
                     )}
                   </>
                 )}
@@ -443,7 +601,9 @@ function SkillDetailView({
             <section className="mb-6">
               <div className="flex items-center justify-center rounded-[24px] border border-border bg-card py-8 shadow-sm dark:bg-card">
                 <Loader2 className="size-4 animate-spin text-emerald-500 mr-2" />
-                <span className="text-xs text-muted-foreground">{t('skill.loading')}</span>
+                <span className="text-xs text-muted-foreground">
+                  {t('skill.loading')}
+                </span>
               </div>
             </section>
           )}
@@ -453,14 +613,26 @@ function SkillDetailView({
               {/* File header */}
               <div className="flex items-center gap-2 mb-2">
                 <FileText className="size-4 text-muted-foreground" />
-                <span className="text-sm font-medium text-foreground flex-1 truncate">{openFile.path}</span>
+                <span className="text-sm font-medium text-foreground flex-1 truncate">
+                  {openFile.path}
+                </span>
                 {isUser && editing && openFile.dirty && (
-                <Button size="sm" onClick={handleFileSave} disabled={fileSaving} className="h-8 gap-1 rounded-full px-3 text-xs">
+                  <Button
+                    size="sm"
+                    onClick={handleFileSave}
+                    disabled={fileSaving}
+                    className="h-8 gap-1 rounded-full px-3 text-xs"
+                  >
                     <Save className="size-3" />
                     {fileSaving ? t('skill.loading') : t('skill.saveFile')}
                   </Button>
                 )}
-                <Button variant="ghost" size="sm" onClick={() => setOpenFile(null)} className="h-8 gap-1 rounded-full px-3 text-xs">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setOpenFile(null)}
+                  className="h-8 gap-1 rounded-full px-3 text-xs"
+                >
                   <X className="size-3" />
                   {t('skill.closeFile')}
                 </Button>
@@ -471,7 +643,13 @@ function SkillDetailView({
                 {isUser && editing ? (
                   <Textarea
                     value={openFile.content}
-                    onChange={(e) => setOpenFile({ ...openFile, content: e.target.value, dirty: true })}
+                    onChange={(e) =>
+                      setOpenFile({
+                        ...openFile,
+                        content: e.target.value,
+                        dirty: true,
+                      })
+                    }
                     rows={20}
                     className="font-mono text-sm border-0 rounded-none resize-y focus-visible:ring-0"
                   />
@@ -482,7 +660,10 @@ function SkillDetailView({
                 ) : openFileIsMarkdown ? (
                   <div className="p-5">
                     <div className="prose prose-sm dark:prose-invert max-w-none prose-headings:font-semibold prose-h2:text-lg prose-h3:text-base prose-p:leading-relaxed prose-pre:p-0 prose-pre:bg-transparent prose-hr:border-border">
-                      <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm, remarkMath]}
+                        rehypePlugins={[rehypeKatex]}
+                      >
                         {openFile.content}
                       </ReactMarkdown>
                     </div>
@@ -497,26 +678,32 @@ function SkillDetailView({
           )}
 
           {/* Used by profiles */}
-          {!isCreateMode && (() => {
-            const profiles = useAgentStore.getState().profiles;
-            const usedBy = profiles.filter((p) => p.skills?.includes(detail.dirName));
-            if (usedBy.length === 0) return null;
-            return (
-              <section className="mb-6">
-                <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground mb-3">
-                  <Info className="size-4 text-muted-foreground" />
-                  {t('skill.usedBy')}
-                </h2>
-                <div className="flex flex-wrap gap-2">
-                  {usedBy.map((p) => (
-                    <span key={p.fileName} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground/80 shadow-sm dark:bg-card">
-                      {p.name}
-                    </span>
-                  ))}
-                </div>
-              </section>
-            );
-          })()}
+          {!isCreateMode &&
+            (() => {
+              const profiles = useAgentStore.getState().profiles;
+              const usedBy = profiles.filter((p) =>
+                p.skills?.includes(detail.dirName),
+              );
+              if (usedBy.length === 0) return null;
+              return (
+                <section className="mb-6">
+                  <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground mb-3">
+                    <Info className="size-4 text-muted-foreground" />
+                    {t('skill.usedBy')}
+                  </h2>
+                  <div className="flex flex-wrap gap-2">
+                    {usedBy.map((p) => (
+                      <span
+                        key={p.fileName}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground/80 shadow-sm dark:bg-card"
+                      >
+                        {p.name}
+                      </span>
+                    ))}
+                  </div>
+                </section>
+              );
+            })()}
 
           {/* Create mode: content textarea (legacy compat) */}
           {isCreateMode && (
@@ -581,7 +768,10 @@ function SkillCard({
       {/* Delete button for user skills */}
       {!batchMode && onDelete && (
         <button
-          onClick={(e) => { e.stopPropagation(); onDelete(e); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(e);
+          }}
           className="absolute right-3 top-3 z-10 flex size-7 items-center justify-center rounded-full border border-red-500/15 bg-red-500/10 text-red-500 opacity-0 transition-all duration-200 group-hover:opacity-100 hover:bg-red-500/20"
         >
           <Trash2 className="size-3" />
@@ -591,7 +781,10 @@ function SkillCard({
       {/* Published badge 閳?clickable to unpublish */}
       {!batchMode && published && (
         <button
-          onClick={(e) => { e.stopPropagation(); onUnpublish?.(e); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onUnpublish?.(e);
+          }}
           className="absolute top-3 left-3 z-10 inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400 transition-colors hover:border-red-500/20 hover:bg-red-500/10 hover:text-red-500"
           title={t('shared.unpublish')}
         >
@@ -640,16 +833,35 @@ export default function SkillLibraryPanel() {
   const [batchMode, setBatchMode] = useState(false);
   const [batchSelected, setBatchSelected] = useState<Set<string>>(new Set());
 
-  useEffect(() => { fetchSummaries(); }, [fetchSummaries]);
+  useEffect(() => {
+    fetchSummaries();
+  }, [fetchSummaries]);
 
   // Split by source
-  const presetSkills = useMemo(() => summaries.filter((s) => s.source === 'preset' || (!s.source)), [summaries]);
-  const publicSkills = useMemo(() => summaries.filter((s) => s.source === 'public'), [summaries]);
-  const userSkills = useMemo(() => summaries.filter((s) => s.source === 'user'), [summaries]);
-  const currentSkills = sourceTab === 'preset' ? presetSkills : sourceTab === 'public' ? publicSkills : userSkills;
+  const presetSkills = useMemo(
+    () => summaries.filter((s) => s.source === 'preset' || !s.source),
+    [summaries],
+  );
+  const publicSkills = useMemo(
+    () => summaries.filter((s) => s.source === 'public'),
+    [summaries],
+  );
+  const userSkills = useMemo(
+    () => summaries.filter((s) => s.source === 'user'),
+    [summaries],
+  );
+  const currentSkills =
+    sourceTab === 'preset'
+      ? presetSkills
+      : sourceTab === 'public'
+        ? publicSkills
+        : userSkills;
 
   // Published skill lookup (user skills that also exist in public)
-  const publishedSkillDirNames = useMemo(() => new Set(publicSkills.map((s) => s.dirName)), [publicSkills]);
+  const publishedSkillDirNames = useMemo(
+    () => new Set(publicSkills.map((s) => s.dirName)),
+    [publicSkills],
+  );
 
   const filtered = useMemo(() => {
     if (!search) return currentSkills;
@@ -688,13 +900,16 @@ export default function SkillLibraryPanel() {
   }, [pendingSkillDirName, summaries, setPendingSkillDirName, fetchSummaries]);
 
   const handleDelete = async (skill: SkillSummary) => {
-    if (!confirm(t('skill.confirmDelete').replace('{name}', skill.name))) return;
+    if (!confirm(t('skill.confirmDelete').replace('{name}', skill.name)))
+      return;
     try {
       await deleteUserSkill(skill.dirName);
       toast.success(t('skill.deleteFile'));
       fetchSummaries(true);
     } catch (err) {
-      toast.error(t('skill.deleteFile'), { description: err instanceof Error ? err.message : undefined });
+      toast.error(t('skill.deleteFile'), {
+        description: err instanceof Error ? err.message : undefined,
+      });
     }
   };
 
@@ -704,13 +919,23 @@ export default function SkillLibraryPanel() {
       toast.success(t('shared.unpublish'));
       fetchSummaries(true);
     } catch (err) {
-      toast.error(t('shared.unpublish'), { description: err instanceof Error ? err.message : undefined });
+      toast.error(t('shared.unpublish'), {
+        description: err instanceof Error ? err.message : undefined,
+      });
     }
   };
 
   const handleBatchDelete = async () => {
     if (batchSelected.size === 0) return;
-    if (!confirm(t('skill.confirmBatchDelete').replace('{n}', String(batchSelected.size)))) return;
+    if (
+      !confirm(
+        t('skill.confirmBatchDelete').replace(
+          '{n}',
+          String(batchSelected.size),
+        ),
+      )
+    )
+      return;
     const items = Array.from(batchSelected);
     await Promise.all(items.map((dirName) => deleteUserSkill(dirName)));
     setBatchMode(false);
@@ -754,7 +979,10 @@ export default function SkillLibraryPanel() {
       <SkillDetailView
         detail={emptySkill}
         onBack={() => setCreating(false)}
-        onUpdated={() => { fetchSummaries(true); setSourceTab('user'); }}
+        onUpdated={() => {
+          fetchSummaries(true);
+          setSourceTab('user');
+        }}
         mode="create"
       />
     );
@@ -762,7 +990,16 @@ export default function SkillLibraryPanel() {
 
   // Detail view
   if (selected) {
-    return <SkillDetailView detail={selected} onBack={() => setSelected(null)} onUpdated={(updated) => { setSelected(updated); fetchSummaries(true); }} />;
+    return (
+      <SkillDetailView
+        detail={selected}
+        onBack={() => setSelected(null)}
+        onUpdated={(updated) => {
+          setSelected(updated);
+          fetchSummaries(true);
+        }}
+      />
+    );
   }
 
   // List view
@@ -774,34 +1011,56 @@ export default function SkillLibraryPanel() {
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex items-center gap-2">
                 <div className="flex items-center gap-0.5 rounded-full border border-border/70 bg-card p-1 shadow-sm dark:bg-card">
-            {(['preset', 'public', 'user'] as const).map((tab) => {
-              const icon = tab === 'preset' ? Lock : tab === 'public' ? Globe : User;
-              const Icon = icon;
-              const count = tab === 'preset' ? presetSkills.length : tab === 'public' ? publicSkills.length : userSkills.length;
-              return (
-                <button
-                  key={tab}
-                  onClick={() => { setSourceTab(tab); if (tab !== 'user') exitBatchMode(); }}
+                  {(['preset', 'public', 'user'] as const).map((tab) => {
+                    const icon =
+                      tab === 'preset' ? Lock : tab === 'public' ? Globe : User;
+                    const Icon = icon;
+                    const count =
+                      tab === 'preset'
+                        ? presetSkills.length
+                        : tab === 'public'
+                          ? publicSkills.length
+                          : userSkills.length;
+                    return (
+                      <button
+                        key={tab}
+                        onClick={() => {
+                          setSourceTab(tab);
+                          if (tab !== 'user') exitBatchMode();
+                        }}
                         className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-medium transition-all duration-200 ${
-                    sourceTab === tab
+                          sourceTab === tab
                             ? 'bg-primary text-primary-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  <Icon className="size-3" />
-                  {t(`skill.${tab}`)}
-                  <span className="text-[10px] tabular-nums text-muted-foreground/50">{count}</span>
-                </button>
-              );
-            })}
+                            : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        <Icon className="size-3" />
+                        {t(`skill.${tab}`)}
+                        <span className="text-[10px] tabular-nums text-muted-foreground/50">
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
-                {sourceTab === 'user' && !batchMode && userSkills.length > 0 && (
-                  <Button variant="outline" size="sm" onClick={() => setBatchMode(true)} className="h-9 gap-1.5 rounded-full text-xs">
-                    <Settings className="size-3" />
-                    {t('skill.manage')}
-                  </Button>
-                )}
-                <Button size="sm" onClick={() => setCreating(true)} className="h-9 gap-1.5 rounded-full text-xs bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-sm hover:shadow-md hover:shadow-emerald-500/20 dark:from-emerald-400 dark:to-emerald-500">
+                {sourceTab === 'user' &&
+                  !batchMode &&
+                  userSkills.length > 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setBatchMode(true)}
+                      className="h-9 gap-1.5 rounded-full text-xs"
+                    >
+                      <Settings className="size-3" />
+                      {t('skill.manage')}
+                    </Button>
+                  )}
+                <Button
+                  size="sm"
+                  onClick={() => setCreating(true)}
+                  className="h-9 gap-1.5 rounded-full text-xs bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-sm hover:shadow-md hover:shadow-emerald-500/20 dark:from-emerald-400 dark:to-emerald-500"
+                >
                   <Plus className="size-3.5" />
                   {t('skill.new')}
                 </Button>
@@ -835,7 +1094,9 @@ export default function SkillLibraryPanel() {
               }}
               className="text-xs text-primary hover:text-primary/80 transition-colors shrink-0"
             >
-              {batchSelected.size === filtered.length && filtered.length > 0 ? t('skill.deselectAll') : t('skill.selectAll')}
+              {batchSelected.size === filtered.length && filtered.length > 0
+                ? t('skill.deselectAll')
+                : t('skill.selectAll')}
             </button>
             <span className="text-xs text-muted-foreground">
               {t('skill.selected').replace('{n}', String(batchSelected.size))}
@@ -851,7 +1112,12 @@ export default function SkillLibraryPanel() {
               <Trash2 className="size-3" />
               {t('skill.batchDelete')}
             </Button>
-            <Button variant="ghost" size="sm" onClick={exitBatchMode} className="h-7 text-xs">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={exitBatchMode}
+              className="h-7 text-xs"
+            >
               {t('skill.cancelManage')}
             </Button>
           </div>
@@ -863,15 +1129,23 @@ export default function SkillLibraryPanel() {
         {loading ? (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="size-5 animate-spin text-emerald-500 mr-2" />
-            <span className="text-sm text-muted-foreground">{t('skill.loading')}</span>
+            <span className="text-sm text-muted-foreground">
+              {t('skill.loading')}
+            </span>
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16">
             <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-2xl bg-card shadow-sm dark:bg-card">
-              {sourceTab === 'user' ? <User className="size-5 text-muted-foreground/30" /> : <Search className="size-5 text-muted-foreground/30" />}
+              {sourceTab === 'user' ? (
+                <User className="size-5 text-muted-foreground/30" />
+              ) : (
+                <Search className="size-5 text-muted-foreground/30" />
+              )}
             </div>
             <p className="text-sm text-muted-foreground/60">
-              {sourceTab === 'user' ? t('skill.noUserSkills') : t('skill.noMatch')}
+              {sourceTab === 'user'
+                ? t('skill.noUserSkills')
+                : t('skill.noMatch')}
             </p>
           </div>
         ) : (
@@ -888,11 +1162,23 @@ export default function SkillLibraryPanel() {
                       handleSelect(skill);
                     }
                   }}
-                  onDelete={skill.source === 'user' ? () => handleDelete(skill) : undefined}
+                  onDelete={
+                    skill.source === 'user'
+                      ? () => handleDelete(skill)
+                      : undefined
+                  }
                   batchMode={batchMode && skill.source === 'user'}
                   selected={batchSelected.has(skill.dirName)}
-                  published={skill.source === 'user' && publishedSkillDirNames.has(skill.dirName)}
-                  onUnpublish={skill.source === 'user' && publishedSkillDirNames.has(skill.dirName) ? () => handleUnpublish(skill) : undefined}
+                  published={
+                    skill.source === 'user' &&
+                    publishedSkillDirNames.has(skill.dirName)
+                  }
+                  onUnpublish={
+                    skill.source === 'user' &&
+                    publishedSkillDirNames.has(skill.dirName)
+                      ? () => handleUnpublish(skill)
+                      : undefined
+                  }
                 />
               ))}
             </div>

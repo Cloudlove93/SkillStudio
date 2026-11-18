@@ -8,10 +8,7 @@ import {
 describe('asset routes and list state', () => {
   it.each([
     ['', '/agents?tab=skills'],
-    [
-      '?agentId=4&conversation=6&autochat=1',
-      '/?agent=4&conversation=6',
-    ],
+    ['?agentId=4&conversation=6&autochat=1', '/?agent=4&conversation=6'],
     ['?skillId=2&autochat=1', '/?view=my-skills'],
     [
       '?view=run&skill=1%3A2&conversation=4',

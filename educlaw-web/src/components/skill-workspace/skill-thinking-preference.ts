@@ -1,5 +1,4 @@
-export const SKILL_THINKING_PREFERENCE_KEY =
-  'educlaw.skill-chat.thinking.v1';
+export const SKILL_THINKING_PREFERENCE_KEY = 'educlaw.skill-chat.thinking.v1';
 
 function browserStorage(): Storage | undefined {
   if (typeof window === 'undefined') return undefined;

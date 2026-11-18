@@ -46,7 +46,11 @@ export function useHomeChatSessionLifecycle({
       .then((msgs) => {
         if (cancelled) return;
 
-        const chatMessages: { id: string; role: 'user' | 'assistant'; content: string }[] = [];
+        const chatMessages: {
+          id: string;
+          role: 'user' | 'assistant';
+          content: string;
+        }[] = [];
         let savedSuggestions: string[] = [];
 
         for (const message of msgs) {
@@ -81,7 +85,13 @@ export function useHomeChatSessionLifecycle({
   }, [sessionId, resetDiaryStatus, setMessages, setSuggestions]);
 
   useEffect(() => {
-    if (initialMsgSent.current || !modelsReady || !sessionId || status !== 'ready') return;
+    if (
+      initialMsgSent.current ||
+      !modelsReady ||
+      !sessionId ||
+      status !== 'ready'
+    )
+      return;
 
     const pending = consumePendingMessage();
     if (!pending) return;

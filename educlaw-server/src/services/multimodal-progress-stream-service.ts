@@ -37,18 +37,14 @@ type ServiceDependencies = {
     ReturnType<typeof createMultimodalGuidedCreationService>,
     'getSessionProgress' | 'getSessionDetail'
   >;
-  getSessionProgress?: (
-    input: {
-      authUserId: string;
-      sessionId: string;
-    },
-  ) => Promise<MultimodalSessionProgress>;
-  getSessionDetail?: (
-    input: {
-      authUserId: string;
-      sessionId: string;
-    },
-  ) => Promise<MultimodalSessionDetail>;
+  getSessionProgress?: (input: {
+    authUserId: string;
+    sessionId: string;
+  }) => Promise<MultimodalSessionProgress>;
+  getSessionDetail?: (input: {
+    authUserId: string;
+    sessionId: string;
+  }) => Promise<MultimodalSessionDetail>;
   wait?: (milliseconds: number) => Promise<void>;
   pollIntervalMs?: number;
 };

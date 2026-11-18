@@ -8,9 +8,8 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../utils/sse.js', async () => {
-  const actual = await vi.importActual<typeof import('../utils/sse.js')>(
-    '../utils/sse.js',
-  );
+  const actual =
+    await vi.importActual<typeof import('../utils/sse.js')>('../utils/sse.js');
   return {
     ...actual,
     initSse: mocks.initSse,
@@ -78,14 +77,22 @@ describe('multimodal progress stream route', () => {
   });
 
   it('serializes confirmation stream events as JSON objects without data: undefined', async () => {
-    mocks.streamProgress.mockImplementation(async ({ emit }: { emit: (event: string, data: unknown) => Promise<void> }) => {
-      await emit('progress', { progress: { sessionId: '101', mediaStage: 'extracting_candidates' } });
-      await emit('confirmation', {
-        session: { sessionId: '101', mediaStage: 'awaiting_candidates' },
-        confirmationStage: 'evidence_and_candidates',
-      });
-      await emit('stream_end', {});
-    });
+    mocks.streamProgress.mockImplementation(
+      async ({
+        emit,
+      }: {
+        emit: (event: string, data: unknown) => Promise<void>;
+      }) => {
+        await emit('progress', {
+          progress: { sessionId: '101', mediaStage: 'extracting_candidates' },
+        });
+        await emit('confirmation', {
+          session: { sessionId: '101', mediaStage: 'awaiting_candidates' },
+          confirmationStage: 'evidence_and_candidates',
+        });
+        await emit('stream_end', {});
+      },
+    );
     const response = createResponse();
 
     await handleGuidedCreationStreamAction({
@@ -130,7 +137,9 @@ describe('multimodal progress stream route', () => {
   });
 
   it('returns a safe SSE error and a single stream_end when the progress service throws', async () => {
-    mocks.streamProgress.mockRejectedValueOnce(new Error('secret-owner-and-sql'));
+    mocks.streamProgress.mockRejectedValueOnce(
+      new Error('secret-owner-and-sql'),
+    );
     const response = createResponse();
 
     await handleGuidedCreationStreamAction({
@@ -150,7 +159,11 @@ describe('multimodal progress stream route', () => {
   it('serializes terminal and draft stream_end payloads as JSON objects', async () => {
     const terminalResponse = createResponse();
     mocks.streamProgress.mockImplementationOnce(
-      async ({ emit }: { emit: (event: string, data: unknown) => Promise<void> }) => {
+      async ({
+        emit,
+      }: {
+        emit: (event: string, data: unknown) => Promise<void>;
+      }) => {
         await emit('done', {
           session: { sessionId: '101', mediaStage: 'published' },
         });
@@ -182,7 +195,11 @@ describe('multimodal progress stream route', () => {
 
     const draftResponse = createResponse();
     mocks.streamProgress.mockImplementationOnce(
-      async ({ emit }: { emit: (event: string, data: unknown) => Promise<void> }) => {
+      async ({
+        emit,
+      }: {
+        emit: (event: string, data: unknown) => Promise<void>;
+      }) => {
         await emit('progress', {
           progress: { sessionId: '101', mediaStage: 'draft' },
         });
@@ -216,7 +233,11 @@ describe('multimodal progress stream route', () => {
   it('does not write or end again after the response closes mid-stream', async () => {
     const response = createResponse();
     mocks.streamProgress.mockImplementation(
-      async ({ emit }: { emit: (event: string, data: unknown) => Promise<void> }) => {
+      async ({
+        emit,
+      }: {
+        emit: (event: string, data: unknown) => Promise<void>;
+      }) => {
         await emit('progress', {
           progress: { sessionId: '101', mediaStage: 'awaiting_candidates' },
         });

@@ -1,14 +1,14 @@
-import type { Response } from "express";
+import type { Response } from 'express';
 
 type FlushableResponse = Response & { flush?: () => void };
 type HeartbeatHandle = ReturnType<typeof setInterval> | null;
 
 export function initSse(res: Response) {
   res.writeHead(200, {
-    "Content-Type": "text/event-stream",
-    "Cache-Control": "no-cache, no-transform",
-    "X-Accel-Buffering": "no",
-    Connection: "keep-alive",
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache, no-transform',
+    'X-Accel-Buffering': 'no',
+    Connection: 'keep-alive',
   });
   res.flushHeaders?.();
 }
@@ -28,7 +28,7 @@ export function startSseHeartbeat(
   }
   return setInterval(() => {
     try {
-      writeSseEvent(res, "ping", {});
+      writeSseEvent(res, 'ping', {});
     } catch {
       // ignore disconnected clients
     }

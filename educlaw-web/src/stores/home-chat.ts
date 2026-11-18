@@ -77,7 +77,11 @@ export const useHomeChatStore = create<HomeChatStore>((set, get) => ({
       sessions: s.sessions.filter((sess) => sess.id !== id),
       activeSessionId: s.activeSessionId === id ? null : s.activeSessionId,
     }));
-    try { await chatApi.deleteChatSession(id); } catch { /* best effort */ }
+    try {
+      await chatApi.deleteChatSession(id);
+    } catch {
+      /* best effort */
+    }
   },
 
   setActiveSession(id: string | null) {

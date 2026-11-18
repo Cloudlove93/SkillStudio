@@ -1,5 +1,5 @@
-import { createHash, randomUUID } from "node:crypto";
-import type { PoolClient } from "pg";
+import { createHash, randomUUID } from 'node:crypto';
+import type { PoolClient } from 'pg';
 import type {
   AgentPackageSnapshot,
   ArenaAnswerOptimizationUnavailableReason,
@@ -7,8 +7,8 @@ import type {
   ArenaMessage,
   PackageSkill,
   PackageVersion,
-} from "@educlaw/shared";
-import { config } from "../config.js";
+} from '@educlaw/shared';
+import { config } from '../config.js';
 import {
   buildAnswerSkillAlternativeRegenerationPrompt,
   buildAnswerSkillOptimizationLocalizationPrompt,
@@ -16,15 +16,15 @@ import {
   buildAnswerSkillRepairPrompt,
   buildAnswerSkillRefinementLocalizationPrompt,
   buildAnswerSkillRefinementPrompt,
-} from "../prompts/answer-skill-optimization.js";
+} from '../prompts/answer-skill-optimization.js';
 import {
   AnswerSkillTestEvaluationContractError,
   buildAnswerSkillTestEvaluationLocalizationPrompt,
   buildAnswerSkillTestEvaluationPrompt,
   parseAnswerSkillTestEvaluationOutput,
   type AnswerSkillTestEvaluationOutput,
-} from "../prompts/answer-skill-test-evaluation.js";
-import { parseJsonObject } from "../utils/json.js";
+} from '../prompts/answer-skill-test-evaluation.js';
+import { parseJsonObject } from '../utils/json.js';
 import {
   ArenaAnswerRunNotFoundError,
   buildArenaSidePromptContext,
@@ -37,31 +37,28 @@ import {
   selectRelevantSkills,
   type ArenaAnswerRun,
   type ArenaSidePromptContext,
-} from "./arena-service.js";
-import { query, withTransaction } from "./db.js";
+} from './arena-service.js';
+import { query, withTransaction } from './db.js';
 import {
   generateJson,
   generateText,
   LlmInvalidJsonError,
-} from "./llm-service.js";
-import {
-  getVersion,
-  validateSkillMdStandard,
-} from "./package-service.js";
+} from './llm-service.js';
+import { getVersion, validateSkillMdStandard } from './package-service.js';
 import {
   getSkillVersionDetail,
   syncPackageVersionSkillsFromSnapshot,
-} from "./skill-version-service.js";
+} from './skill-version-service.js';
 import {
   applyAnswerSkillPatch,
   AnswerSkillPatchApplicationError,
   type AppliedAnswerSkillPatch,
-} from "./answer-skill-patch-service.js";
+} from './answer-skill-patch-service.js';
 import {
   buildAnswerSkillRefinementTransition,
   getAnswerSkillConfirmIssue,
   getAnswerSkillPreviewIssueEvidence,
-} from "./answer-skill-optimization-policy.js";
+} from './answer-skill-optimization-policy.js';
 import {
   ANSWER_OPTIMIZATION_CANCEL_REASONS,
   ANSWER_SKILL_OPTIMIZATION_STATUSES,
@@ -96,14 +93,14 @@ import {
   type AnswerSkillPatch,
   type ParseAnswerOptimizationModelOutputOptions,
   type PublicAnswerOptimizationTestResult,
-} from "./answer-skill-optimization-contract.js";
+} from './answer-skill-optimization-contract.js';
 import type {
   DbRowAnswerSkillOptimizationRun,
   DbRowMessage,
   DbRowPackage,
   DbRowPackageVersion,
   DbRowThread,
-} from "../types.js";
+} from '../types.js';
 
 export {
   ANSWER_OPTIMIZATION_CANCEL_REASONS,
@@ -124,7 +121,7 @@ export interface AnswerSkillOptimizationRun {
   questionMessageId: number;
   enhancedAnswerMessageId: number;
   baselineAnswerMessageId: number | null;
-  answerSide: "baseline" | "enhanced";
+  answerSide: 'baseline' | 'enhanced';
   answerMessageId: number;
   evidenceVersionId: number;
   answerSkillVersionId: number | null;
@@ -146,7 +143,7 @@ export interface CreateAnswerSkillOptimizationRunInput {
   questionMessageId: number;
   enhancedAnswerMessageId: number;
   baselineAnswerMessageId?: number | null;
-  answerSide?: "baseline" | "enhanced";
+  answerSide?: 'baseline' | 'enhanced';
   answerMessageId?: number;
   feedback: string;
   idempotencyKey: string;
@@ -155,47 +152,44 @@ export interface CreateAnswerSkillOptimizationRunInput {
 export class AnswerSkillOptimizationValidationError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = "AnswerSkillOptimizationValidationError";
+    this.name = 'AnswerSkillOptimizationValidationError';
   }
 }
 
 export class AnswerSkillOptimizationNotFoundError extends Error {
-  constructor(message = "Answer skill optimization run not found") {
+  constructor(message = 'Answer skill optimization run not found') {
     super(message);
-    this.name = "AnswerSkillOptimizationNotFoundError";
+    this.name = 'AnswerSkillOptimizationNotFoundError';
   }
 }
 
 export class AnswerSkillOptimizationConflictError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = "AnswerSkillOptimizationConflictError";
+    this.name = 'AnswerSkillOptimizationConflictError';
   }
 }
 
 export class AnswerSkillOptimizationAlreadyExistsError extends AnswerSkillOptimizationConflictError {
   readonly code:
-    | "answer_optimization_already_exists"
-    | "answer_already_optimized";
+    | 'answer_optimization_already_exists'
+    | 'answer_already_optimized';
   readonly existingOptimizationId: number;
   readonly status: AnswerSkillOptimizationStatus;
   readonly finalVersionId: number | null;
   readonly versionNumber: number | null;
 
-  constructor(
-    run: AnswerSkillOptimizationRun,
-    versionNumber: number | null,
-  ) {
-    const completed = run.status === "completed";
+  constructor(run: AnswerSkillOptimizationRun, versionNumber: number | null) {
+    const completed = run.status === 'completed';
     super(
       completed
-        ? "This answer has already been optimized"
-        : "An optimization already exists for this answer",
+        ? 'This answer has already been optimized'
+        : 'An optimization already exists for this answer',
     );
-    this.name = "AnswerSkillOptimizationAlreadyExistsError";
+    this.name = 'AnswerSkillOptimizationAlreadyExistsError';
     this.code = completed
-      ? "answer_already_optimized"
-      : "answer_optimization_already_exists";
+      ? 'answer_already_optimized'
+      : 'answer_optimization_already_exists';
     this.existingOptimizationId = run.id;
     this.status = run.status;
     this.finalVersionId = run.finalVersionId;
@@ -204,14 +198,14 @@ export class AnswerSkillOptimizationAlreadyExistsError extends AnswerSkillOptimi
 }
 
 export class AnswerSkillOptimizationDraftError extends Error {
-  readonly failureCode: AnswerOptimizationFailure["code"];
+  readonly failureCode: AnswerOptimizationFailure['code'];
 
   constructor(
     message: string,
-    failureCode: AnswerOptimizationFailure["code"] = "model_output_invalid",
+    failureCode: AnswerOptimizationFailure['code'] = 'model_output_invalid',
   ) {
     super(message);
-    this.name = "AnswerSkillOptimizationDraftError";
+    this.name = 'AnswerSkillOptimizationDraftError';
     this.failureCode = failureCode;
   }
 }
@@ -219,10 +213,10 @@ export class AnswerSkillOptimizationDraftError extends Error {
 export class AnswerSkillRefinementRejectedError extends AnswerSkillOptimizationDraftError {
   constructor(
     message: string,
-    failureCode: "feedback_not_reusable" | "feedback_unclear",
+    failureCode: 'feedback_not_reusable' | 'feedback_unclear',
   ) {
     super(message, failureCode);
-    this.name = "AnswerSkillRefinementRejectedError";
+    this.name = 'AnswerSkillRefinementRejectedError';
   }
 }
 
@@ -234,7 +228,7 @@ export class AnswerSkillRefinementTechnicalError extends Error {
     message: string,
   ) {
     super(message);
-    this.name = "AnswerSkillRefinementTechnicalError";
+    this.name = 'AnswerSkillRefinementTechnicalError';
     this.code = code;
   }
 }
@@ -242,17 +236,17 @@ export class AnswerSkillRefinementTechnicalError extends Error {
 export class AnswerSkillOptimizationReplayUnavailableError extends Error {
   readonly reason: Exclude<
     ArenaAnswerOptimizationUnavailableReason,
-    "missing_answer_run"
+    'missing_answer_run'
   >;
 
   constructor(
     reason: Exclude<
       ArenaAnswerOptimizationUnavailableReason,
-      "missing_answer_run"
+      'missing_answer_run'
     >,
   ) {
-    super("The answer does not contain reliable replay provenance");
-    this.name = "AnswerSkillOptimizationReplayUnavailableError";
+    super('The answer does not contain reliable replay provenance');
+    this.name = 'AnswerSkillOptimizationReplayUnavailableError';
     this.reason = reason;
   }
 }
@@ -262,7 +256,7 @@ export class AnswerSkillOptimizationUpstreamError extends Error {
 
   constructor(message: string, statusCode: 502 | 503 = 503) {
     super(message);
-    this.name = "AnswerSkillOptimizationUpstreamError";
+    this.name = 'AnswerSkillOptimizationUpstreamError';
     this.statusCode = statusCode;
   }
 }
@@ -279,8 +273,7 @@ interface ReviseAnswerSkillOptimizationBaseInput {
   idempotencyKey: string;
 }
 
-export interface RegenerateAnswerSkillOptimizationInput
-  extends ReviseAnswerSkillOptimizationBaseInput {
+export interface RegenerateAnswerSkillOptimizationInput extends ReviseAnswerSkillOptimizationBaseInput {
   feedback: string;
   targetSkillId?: string;
   targetSkillIds?: string[];
@@ -289,14 +282,14 @@ export interface RegenerateAnswerSkillOptimizationInput
 export type RefineAnswerSkillOptimizationInput =
   | (ReviseAnswerSkillOptimizationBaseInput & {
       additionalFeedback: string;
-      revisionSource: "draft_review";
+      revisionSource: 'draft_review';
     })
   | (ReviseAnswerSkillOptimizationBaseInput & {
       additionalFeedback?: string;
-      revisionSource: "test_failure";
+      revisionSource: 'test_failure';
     })
   | (ReviseAnswerSkillOptimizationBaseInput & {
-      revisionSource: "alternative_regeneration";
+      revisionSource: 'alternative_regeneration';
     });
 
 export type ReviseAnswerSkillOptimizationInput =
@@ -337,7 +330,7 @@ export interface AnswerSkillOptimizationDetailDto {
   threadId: number;
   baseVersionId: number;
   evidenceVersionId: number;
-  answerSide: "baseline" | "enhanced";
+  answerSide: 'baseline' | 'enhanced';
   answerMessageId: number;
   answerSkillVersionId: number | null;
   workingSkillVersionId: number | null;
@@ -355,7 +348,7 @@ export interface AnswerSkillOptimizationDetailDto {
   diff: AnswerOptimizationDiff | null;
   testResult: PublicAnswerOptimizationTestResult | null;
   refinementHistory: AnswerSkillRefinementTurn[];
-  failureCode: AnswerOptimizationFailure["code"] | null;
+  failureCode: AnswerOptimizationFailure['code'] | null;
   finalVersionId: number | null;
   plannedTargets: AnswerOptimizationPlannedTarget[];
   replayAvailability: {
@@ -368,7 +361,7 @@ export interface AnswerSkillOptimizationDetailDto {
 
 export interface TestAnswerSkillOptimizationDto {
   optimizationId: number;
-  status: "test_ready";
+  status: 'test_ready';
   revision: number;
   testResult: PublicAnswerOptimizationTestResult;
   updatedAt: string;
@@ -376,12 +369,12 @@ export interface TestAnswerSkillOptimizationDto {
 
 export interface ConfirmAnswerSkillOptimizationDto {
   optimizationId: number;
-  status: "completed" | "draft_ready";
+  status: 'completed' | 'draft_ready';
   baseVersionId: number;
   finalVersionId: number;
   versionNumber: number;
   skillVersionNumber: number;
-  source: "interactive";
+  source: 'interactive';
   completedAt: string;
   advancedToNextTarget?: boolean;
 }
@@ -405,7 +398,7 @@ export interface ReviseAnswerSkillOptimizationDto {
 
 export interface CancelAnswerSkillOptimizationDto {
   optimizationId: number;
-  status: "cancelled";
+  status: 'cancelled';
   revision: number;
   reason: AnswerOptimizationCancelReason;
   cancelledAt: string;
@@ -436,19 +429,18 @@ interface AnswerSkillOptimizationReplayContext {
 
 interface TestClaim {
   claimed: AnswerSkillOptimizationRun;
-  previousStatus: "draft_ready" | "test_ready";
+  previousStatus: 'draft_ready' | 'test_ready';
   previousResult: AnswerSkillOptimizationResult;
   idempotencySlot: string;
 }
 
 interface AnalysisResult {
-  status: "draft_ready" | "target_selection_required" | "failed";
+  status: 'draft_ready' | 'target_selection_required' | 'failed';
   targetSkillId: string | null;
   result: AnswerSkillOptimizationResult;
 }
 
-interface DbRowExistingAnswerOptimization
-  extends DbRowAnswerSkillOptimizationRun {
+interface DbRowExistingAnswerOptimization extends DbRowAnswerSkillOptimizationRun {
   final_version_number: number | string | null;
 }
 
@@ -466,26 +458,26 @@ interface DbRowAnswerOptimizationSummary {
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CREATE_REQUEST_KEY_UNIQUE_CONSTRAINT =
-  "answer_skill_optimization_runs_user_create_key_unique";
+  'answer_skill_optimization_runs_user_create_key_unique';
 const NON_CANCELLED_ANSWER_UNIQUE_CONSTRAINT =
-  "uq_answer_skill_optimization_runs_non_cancelled_answer";
+  'uq_answer_skill_optimization_runs_non_cancelled_answer';
 const TEST_REPLAY_POLL_INTERVAL_MS = 50;
 export const ANSWER_SKILL_OPTIMIZATION_PROCESSING_STALE_AFTER_MS =
   15 * 60 * 1000;
 const INTERRUPTED_OPERATION_MESSAGE =
-  "The previous operation was interrupted and can be retried.";
+  'The previous operation was interrupted and can be retried.';
 
 const CREATE_INPUT_FIELDS = new Set([
-  "userId",
-  "packageId",
-  "threadId",
-  "questionMessageId",
-  "enhancedAnswerMessageId",
-  "baselineAnswerMessageId",
-  "answerSide",
-  "answerMessageId",
-  "feedback",
-  "idempotencyKey",
+  'userId',
+  'packageId',
+  'threadId',
+  'questionMessageId',
+  'enhancedAnswerMessageId',
+  'baselineAnswerMessageId',
+  'answerSide',
+  'answerMessageId',
+  'feedback',
+  'idempotencyKey',
 ]);
 
 function assertKnownCreateFields(
@@ -519,22 +511,22 @@ function toNullablePositiveSafeInteger(
 }
 
 function normalizeUserId(userId: unknown): string {
-  if (typeof userId !== "string" || !userId.trim()) {
-    throw new AnswerSkillOptimizationValidationError("userId is required");
+  if (typeof userId !== 'string' || !userId.trim()) {
+    throw new AnswerSkillOptimizationValidationError('userId is required');
   }
   return userId;
 }
 
 function normalizeFeedback(feedback: unknown): string {
-  if (typeof feedback !== "string") {
+  if (typeof feedback !== 'string') {
     throw new AnswerSkillOptimizationValidationError(
-      "feedback must be a string",
+      'feedback must be a string',
     );
   }
   const normalized = feedback.trim();
   if (normalized.length < 1 || normalized.length > 2000) {
     throw new AnswerSkillOptimizationValidationError(
-      "feedback must contain 1 to 2000 characters after trimming",
+      'feedback must contain 1 to 2000 characters after trimming',
     );
   }
   return normalized;
@@ -545,32 +537,32 @@ function normalizeAdditionalFeedback(
   required: boolean,
 ): string | null {
   if (feedback === undefined && !required) return null;
-  if (typeof feedback !== "string") {
+  if (typeof feedback !== 'string') {
     throw new AnswerSkillOptimizationValidationError(
-      "additionalFeedback must be a string",
+      'additionalFeedback must be a string',
     );
   }
   const normalized = feedback.trim();
   if ((!normalized && required) || normalized.length > 1500) {
     throw new AnswerSkillOptimizationValidationError(
       required
-        ? "additionalFeedback must contain 1 to 1500 characters after trimming"
-        : "additionalFeedback must contain at most 1500 characters after trimming",
+        ? 'additionalFeedback must contain 1 to 1500 characters after trimming'
+        : 'additionalFeedback must contain at most 1500 characters after trimming',
     );
   }
   return normalized || null;
 }
 
 function normalizeIdempotencyKey(value: unknown): string {
-  if (typeof value !== "string") {
+  if (typeof value !== 'string') {
     throw new AnswerSkillOptimizationValidationError(
-      "idempotencyKey must be a UUID",
+      'idempotencyKey must be a UUID',
     );
   }
   const normalized = value.trim().toLowerCase();
   if (!UUID_PATTERN.test(normalized)) {
     throw new AnswerSkillOptimizationValidationError(
-      "idempotencyKey must be a UUID",
+      'idempotencyKey must be a UUID',
     );
   }
   return normalized;
@@ -580,7 +572,7 @@ function isOptimizationStatus(
   value: unknown,
 ): value is AnswerSkillOptimizationStatus {
   return (
-    typeof value === "string" &&
+    typeof value === 'string' &&
     ANSWER_SKILL_OPTIMIZATION_STATUSES.some((status) => status === value)
   );
 }
@@ -598,9 +590,9 @@ function parseResultObject(value: unknown): AnswerSkillOptimizationResult {
 
 function normalizeNullableTargetSkillId(value: unknown): string | null {
   if (value === null) return null;
-  if (typeof value !== "string" || !value.trim()) {
+  if (typeof value !== 'string' || !value.trim()) {
     throw new AnswerSkillOptimizationValidationError(
-      "target_skill_id must be null or a non-empty string",
+      'target_skill_id must be null or a non-empty string',
     );
   }
   return value;
@@ -610,7 +602,7 @@ function normalizeTimestamp(value: unknown, field: string): string {
   const timestamp =
     value instanceof Date
       ? value
-      : typeof value === "string" && value.trim()
+      : typeof value === 'string' && value.trim()
         ? new Date(value)
         : null;
   if (!timestamp || Number.isNaN(timestamp.getTime())) {
@@ -624,48 +616,47 @@ function toAnswerSkillOptimizationRun(
 ): AnswerSkillOptimizationRun {
   if (!isOptimizationStatus(row.status)) {
     throw new AnswerSkillOptimizationValidationError(
-      "Stored optimization status is invalid",
+      'Stored optimization status is invalid',
     );
   }
-  const revision = toPositiveSafeInteger(row.revision, "revision");
+  const revision = toPositiveSafeInteger(row.revision, 'revision');
   return {
-    id: toPositiveSafeInteger(row.id, "id"),
+    id: toPositiveSafeInteger(row.id, 'id'),
     userId: normalizeUserId(row.user_id),
-    packageId: toPositiveSafeInteger(row.package_id, "package_id"),
-    threadId: toPositiveSafeInteger(row.thread_id, "thread_id"),
+    packageId: toPositiveSafeInteger(row.package_id, 'package_id'),
+    threadId: toPositiveSafeInteger(row.thread_id, 'thread_id'),
     baseVersionId: toPositiveSafeInteger(
       row.base_version_id,
-      "base_version_id",
+      'base_version_id',
     ),
     questionMessageId: toPositiveSafeInteger(
       row.question_message_id,
-      "question_message_id",
+      'question_message_id',
     ),
     enhancedAnswerMessageId: toPositiveSafeInteger(
       row.enhanced_answer_message_id,
-      "enhanced_answer_message_id",
+      'enhanced_answer_message_id',
     ),
     baselineAnswerMessageId: toNullablePositiveSafeInteger(
       row.baseline_answer_message_id,
-      "baseline_answer_message_id",
+      'baseline_answer_message_id',
     ),
-    answerSide:
-      row.answer_side === "baseline" ? "baseline" : "enhanced",
+    answerSide: row.answer_side === 'baseline' ? 'baseline' : 'enhanced',
     answerMessageId: toPositiveSafeInteger(
       row.answer_message_id ?? row.enhanced_answer_message_id,
-      "answer_message_id",
+      'answer_message_id',
     ),
     evidenceVersionId: toPositiveSafeInteger(
       row.evidence_version_id ?? row.base_version_id,
-      "evidence_version_id",
+      'evidence_version_id',
     ),
     answerSkillVersionId: toNullablePositiveSafeInteger(
       row.answer_skill_version_id ?? null,
-      "answer_skill_version_id",
+      'answer_skill_version_id',
     ),
     workingSkillVersionId: toNullablePositiveSafeInteger(
       row.working_skill_version_id ?? null,
-      "working_skill_version_id",
+      'working_skill_version_id',
     ),
     userFeedback: normalizeFeedback(row.user_feedback),
     targetSkillId: normalizeNullableTargetSkillId(row.target_skill_id),
@@ -674,18 +665,18 @@ function toAnswerSkillOptimizationRun(
     revision,
     finalVersionId: toNullablePositiveSafeInteger(
       row.final_version_id,
-      "final_version_id",
+      'final_version_id',
     ),
-    createdAt: normalizeTimestamp(row.created_at, "created_at"),
-    updatedAt: normalizeTimestamp(row.updated_at, "updated_at"),
+    createdAt: normalizeTimestamp(row.created_at, 'created_at'),
+    updatedAt: normalizeTimestamp(row.updated_at, 'updated_at'),
   };
 }
 
 function answerRunSideProvenance(
   answerRun: ArenaAnswerRun,
-  side: "baseline" | "enhanced",
+  side: 'baseline' | 'enhanced',
 ) {
-  return side === "baseline"
+  return side === 'baseline'
     ? {
         answerMessageId: answerRun.baselineAnswerMessageId,
         usedSkillIds: answerRun.baselineUsedSkillIds ?? [],
@@ -708,7 +699,7 @@ export interface ResolveAnswerSkillOptimizationInput {
   threadId: number;
   questionMessageId: number;
   answerMessageId: number;
-  answerSide: "baseline" | "enhanced";
+  answerSide: 'baseline' | 'enhanced';
 }
 
 export interface AnswerSkillOptimizationReference {
@@ -725,7 +716,7 @@ export interface RebaseAnswerSkillOptimizationInput {
 
 function assertAnswerOptimizationReplayAvailable(
   answerRun: ArenaAnswerRun,
-  side: "baseline" | "enhanced" = "enhanced",
+  side: 'baseline' | 'enhanced' = 'enhanced',
 ): void {
   const provenance = answerRunSideProvenance(answerRun, side);
   const availability = getAnswerOptimizationAvailability({
@@ -733,26 +724,26 @@ function assertAnswerOptimizationReplayAvailable(
     enhancedModel: provenance.model,
   });
   if (availability.available) return;
-  if (availability.reason === "missing_answer_run" || availability.reason === null) {
+  if (
+    availability.reason === 'missing_answer_run' ||
+    availability.reason === null
+  ) {
     throw new AnswerSkillOptimizationNotFoundError(
-      "Arena answer run not found",
+      'Arena answer run not found',
     );
   }
-  throw new AnswerSkillOptimizationReplayUnavailableError(
-    availability.reason,
-  );
+  throw new AnswerSkillOptimizationReplayUnavailableError(availability.reason);
 }
 
 export function isAnswerSkillOptimizationProcessingStale(
-  run: Pick<AnswerSkillOptimizationRun, "status" | "updatedAt">,
+  run: Pick<AnswerSkillOptimizationRun, 'status' | 'updatedAt'>,
   nowMs = Date.now(),
 ): boolean {
-  if (run.status !== "processing") return false;
+  if (run.status !== 'processing') return false;
   const updatedAtMs = Date.parse(run.updatedAt);
   return (
     Number.isFinite(updatedAtMs) &&
-    updatedAtMs <=
-      nowMs - ANSWER_SKILL_OPTIMIZATION_PROCESSING_STALE_AFTER_MS
+    updatedAtMs <= nowMs - ANSWER_SKILL_OPTIMIZATION_PROCESSING_STALE_AFTER_MS
   );
 }
 
@@ -761,14 +752,14 @@ function withoutPendingIdempotencyRecords(
 ): AnswerSkillOptimizationResult {
   const entries = Object.entries(result.idempotencyResults ?? {}).filter(
     ([, record]) =>
-      record.responseSummary.status !== "processing" &&
-      record.responseSummary.testOutcome !== "pending",
+      record.responseSummary.status !== 'processing' &&
+      record.responseSummary.testOutcome !== 'pending',
   );
   return {
     ...result,
     idempotencyResults: Object.fromEntries(entries),
     failure: {
-      code: "operation_interrupted",
+      code: 'operation_interrupted',
       message: INTERRUPTED_OPERATION_MESSAGE,
     },
   };
@@ -814,7 +805,7 @@ async function recoverStaleAnswerSkillOptimizationsForThread(
     now.getTime() - ANSWER_SKILL_OPTIMIZATION_PROCESSING_STALE_AFTER_MS,
   ).toISOString();
   const failure = JSON.stringify({
-    code: "operation_interrupted",
+    code: 'operation_interrupted',
     message: INTERRUPTED_OPERATION_MESSAGE,
   });
   await query(
@@ -854,7 +845,7 @@ function buildCreateRequestHash(input: {
   packageId: number;
   threadId: number;
   questionMessageId: number;
-  answerSide: "baseline" | "enhanced";
+  answerSide: 'baseline' | 'enhanced';
   answerMessageId: number;
   baselineAnswerMessageId: number | null;
   feedback: string;
@@ -868,21 +859,21 @@ function buildCreateRequestHash(input: {
     baselineAnswerMessageId: input.baselineAnswerMessageId,
     feedback: input.feedback,
   });
-  return createHash("sha256").update(stableRequest, "utf8").digest("hex");
+  return createHash('sha256').update(stableRequest, 'utf8').digest('hex');
 }
 
 function isCreateRequestKeyUniqueViolation(error: unknown): boolean {
   if (
     error === null ||
-    typeof error !== "object" ||
-    !("code" in error) ||
-    !("constraint" in error)
+    typeof error !== 'object' ||
+    !('code' in error) ||
+    !('constraint' in error)
   ) {
     return false;
   }
   const databaseError = error as { code?: unknown; constraint?: unknown };
   return (
-    databaseError.code === "23505" &&
+    databaseError.code === '23505' &&
     databaseError.constraint === CREATE_REQUEST_KEY_UNIQUE_CONSTRAINT
   );
 }
@@ -890,15 +881,15 @@ function isCreateRequestKeyUniqueViolation(error: unknown): boolean {
 function isNonCancelledAnswerUniqueViolation(error: unknown): boolean {
   if (
     error === null ||
-    typeof error !== "object" ||
-    !("code" in error) ||
-    !("constraint" in error)
+    typeof error !== 'object' ||
+    !('code' in error) ||
+    !('constraint' in error)
   ) {
     return false;
   }
   const databaseError = error as { code?: unknown; constraint?: unknown };
   return (
-    databaseError.code === "23505" &&
+    databaseError.code === '23505' &&
     databaseError.constraint === NON_CANCELLED_ANSWER_UNIQUE_CONSTRAINT
   );
 }
@@ -947,7 +938,7 @@ function existingOptimizationError(
     toAnswerSkillOptimizationRun(row),
     toNullablePositiveSafeInteger(
       row.final_version_number,
-      "final_version_number",
+      'final_version_number',
     ),
   );
 }
@@ -975,99 +966,102 @@ export async function createAnswerSkillOptimizationRunWithOutcome(
 ): Promise<CreateAnswerSkillOptimizationOutcome> {
   assertKnownCreateFields(input);
   const userId = normalizeUserId(input.userId);
-  const packageId = toPositiveSafeInteger(input.packageId, "packageId");
-  const threadId = toPositiveSafeInteger(input.threadId, "threadId");
+  const packageId = toPositiveSafeInteger(input.packageId, 'packageId');
+  const threadId = toPositiveSafeInteger(input.threadId, 'threadId');
   const questionMessageId = toPositiveSafeInteger(
     input.questionMessageId,
-    "questionMessageId",
+    'questionMessageId',
   );
   const enhancedAnswerMessageId = toPositiveSafeInteger(
     input.enhancedAnswerMessageId,
-    "enhancedAnswerMessageId",
+    'enhancedAnswerMessageId',
   );
   const requestedBaselineAnswerMessageId =
     input.baselineAnswerMessageId === undefined
       ? undefined
       : toNullablePositiveSafeInteger(
           input.baselineAnswerMessageId,
-          "baselineAnswerMessageId",
+          'baselineAnswerMessageId',
         );
-  const answerSide = input.answerSide ?? "enhanced";
-  if (answerSide !== "baseline" && answerSide !== "enhanced") {
+  const answerSide = input.answerSide ?? 'enhanced';
+  if (answerSide !== 'baseline' && answerSide !== 'enhanced') {
     throw new AnswerSkillOptimizationValidationError(
-      "answerSide must be baseline or enhanced",
+      'answerSide must be baseline or enhanced',
     );
   }
   const answerMessageId = toPositiveSafeInteger(
-    input.answerMessageId
-      ?? (answerSide === "baseline"
+    input.answerMessageId ??
+      (answerSide === 'baseline'
         ? requestedBaselineAnswerMessageId
         : enhancedAnswerMessageId),
-    "answerMessageId",
+    'answerMessageId',
   );
   const feedback = normalizeFeedback(input.feedback);
   const idempotencyKey = normalizeIdempotencyKey(input.idempotencyKey);
 
   let answerRun: ArenaAnswerRun;
   try {
-    answerRun = answerSide === "enhanced"
-      ? await getArenaAnswerRunByEnhancedMessage(userId, answerMessageId)
-      : await getArenaAnswerRunByMessage(userId, answerMessageId);
+    answerRun =
+      answerSide === 'enhanced'
+        ? await getArenaAnswerRunByEnhancedMessage(userId, answerMessageId)
+        : await getArenaAnswerRunByMessage(userId, answerMessageId);
   } catch (error) {
     if (error instanceof ArenaAnswerRunNotFoundError) {
       throw new AnswerSkillOptimizationNotFoundError(
-        "Arena answer run not found",
+        'Arena answer run not found',
       );
     }
     throw error;
   }
 
   if (answerRun.userId !== userId) {
-    throw new AnswerSkillOptimizationNotFoundError("Arena answer run not found");
+    throw new AnswerSkillOptimizationNotFoundError(
+      'Arena answer run not found',
+    );
   }
   const recordedPackageId = toPositiveSafeInteger(
     answerRun.packageId,
-    "arenaAnswerRun.packageId",
+    'arenaAnswerRun.packageId',
   );
   const recordedThreadId = toPositiveSafeInteger(
     answerRun.threadId,
-    "arenaAnswerRun.threadId",
+    'arenaAnswerRun.threadId',
   );
   const recordedQuestionMessageId = toPositiveSafeInteger(
     answerRun.questionMessageId,
-    "arenaAnswerRun.questionMessageId",
+    'arenaAnswerRun.questionMessageId',
   );
   const recordedEnhancedAnswerMessageId = toPositiveSafeInteger(
     answerRun.enhancedAnswerMessageId,
-    "arenaAnswerRun.enhancedAnswerMessageId",
+    'arenaAnswerRun.enhancedAnswerMessageId',
   );
   const recordedBaselineAnswerMessageId = toNullablePositiveSafeInteger(
     answerRun.baselineAnswerMessageId,
-    "arenaAnswerRun.baselineAnswerMessageId",
+    'arenaAnswerRun.baselineAnswerMessageId',
   );
   const baseVersionId = toPositiveSafeInteger(
     answerRun.packageVersionId,
-    "arenaAnswerRun.packageVersionId",
+    'arenaAnswerRun.packageVersionId',
   );
   const sideProvenance = answerRunSideProvenance(answerRun, answerSide);
 
-  assertMatchingId("packageId", packageId, recordedPackageId);
-  assertMatchingId("threadId", threadId, recordedThreadId);
+  assertMatchingId('packageId', packageId, recordedPackageId);
+  assertMatchingId('threadId', threadId, recordedThreadId);
   assertMatchingId(
-    "questionMessageId",
+    'questionMessageId',
     questionMessageId,
     recordedQuestionMessageId,
   );
   assertMatchingId(
-    "answerMessageId",
+    'answerMessageId',
     answerMessageId,
     toPositiveSafeInteger(
       sideProvenance.answerMessageId,
-      "arenaAnswerRun.answerMessageId",
+      'arenaAnswerRun.answerMessageId',
     ),
   );
   assertMatchingId(
-    "enhancedAnswerMessageId",
+    'enhancedAnswerMessageId',
     enhancedAnswerMessageId,
     recordedEnhancedAnswerMessageId,
   );
@@ -1076,7 +1070,7 @@ export async function createAnswerSkillOptimizationRunWithOutcome(
     requestedBaselineAnswerMessageId !== recordedBaselineAnswerMessageId
   ) {
     throw new AnswerSkillOptimizationValidationError(
-      "baselineAnswerMessageId does not match the recorded Arena answer run",
+      'baselineAnswerMessageId does not match the recorded Arena answer run',
     );
   }
 
@@ -1096,11 +1090,11 @@ export async function createAnswerSkillOptimizationRunWithOutcome(
   );
   if (existingForAnswer) {
     const existingRun = toAnswerSkillOptimizationRun(existingForAnswer);
-    if (existingRun.status === "completed") {
+    if (existingRun.status === 'completed') {
       if (existingForAnswer.create_request_key === idempotencyKey) {
         if (existingForAnswer.create_request_hash !== requestHash) {
           throw new AnswerSkillOptimizationConflictError(
-            "Idempotency key was already used for a different create request",
+            'Idempotency key was already used for a different create request',
           );
         }
         return { run: existingRun, created: false };
@@ -1116,15 +1110,13 @@ export async function createAnswerSkillOptimizationRunWithOutcome(
     if (isAnswerSkillOptimizationProcessingStale(existingRun)) {
       await recoverStaleAnswerSkillOptimizationRun(existingRun);
       existingForAnswer =
-        (await findNonCancelledByAnswer(
-          userId,
-          answerMessageId,
-        )) ?? existingForAnswer;
+        (await findNonCancelledByAnswer(userId, answerMessageId)) ??
+        existingForAnswer;
     }
     if (existingForAnswer.create_request_key === idempotencyKey) {
       if (existingForAnswer.create_request_hash !== requestHash) {
         throw new AnswerSkillOptimizationConflictError(
-          "Idempotency key was already used for a different create request",
+          'Idempotency key was already used for a different create request',
         );
       }
       return {
@@ -1160,7 +1152,7 @@ export async function createAnswerSkillOptimizationRunWithOutcome(
         feedback,
         null,
         JSON.stringify({}),
-        "processing",
+        'processing',
         1,
         idempotencyKey,
         requestHash,
@@ -1175,7 +1167,7 @@ export async function createAnswerSkillOptimizationRunWithOutcome(
       ],
     );
     const row = result.rows[0];
-    if (!row) throw new Error("Optimization insert returned no row");
+    if (!row) throw new Error('Optimization insert returned no row');
     return { run: toAnswerSkillOptimizationRun(row), created: true };
   } catch (error) {
     if (isCreateRequestKeyUniqueViolation(error)) {
@@ -1183,22 +1175,19 @@ export async function createAnswerSkillOptimizationRunWithOutcome(
       if (!existing) throw error;
       if (existing.create_request_hash !== requestHash) {
         throw new AnswerSkillOptimizationConflictError(
-          "Idempotency key was already used for a different create request",
+          'Idempotency key was already used for a different create request',
         );
       }
       return { run: toAnswerSkillOptimizationRun(existing), created: false };
     }
     if (!isNonCancelledAnswerUniqueViolation(error)) throw error;
 
-    const concurrent = await findNonCancelledByAnswer(
-      userId,
-      answerMessageId,
-    );
+    const concurrent = await findNonCancelledByAnswer(userId, answerMessageId);
     if (!concurrent) throw error;
     if (concurrent.create_request_key === idempotencyKey) {
       if (concurrent.create_request_hash !== requestHash) {
         throw new AnswerSkillOptimizationConflictError(
-          "Idempotency key was already used for a different create request",
+          'Idempotency key was already used for a different create request',
         );
       }
       return {
@@ -1217,7 +1206,7 @@ export async function getAnswerSkillOptimizationRun(
   const userId = normalizeUserId(userIdInput);
   const optimizationId = toPositiveSafeInteger(
     optimizationIdInput,
-    "optimizationId",
+    'optimizationId',
   );
   const result = await query<DbRowAnswerSkillOptimizationRun>(
     `select * from answer_skill_optimization_runs
@@ -1234,7 +1223,7 @@ export async function listAnswerOptimizationSummariesForThread(
   threadIdInput: number,
 ): Promise<ArenaAnswerOptimizationSummary[]> {
   const userId = normalizeUserId(userIdInput);
-  const threadId = toPositiveSafeInteger(threadIdInput, "threadId");
+  const threadId = toPositiveSafeInteger(threadIdInput, 'threadId');
   await recoverStaleAnswerSkillOptimizationsForThread(userId, threadId);
   const result = await query<DbRowAnswerOptimizationSummary>(
     `select
@@ -1271,7 +1260,7 @@ export async function listAnswerOptimizationSummariesForThread(
   return result.rows.map((row) => {
     const enhancedAnswerMessageId = toPositiveSafeInteger(
       row.enhanced_answer_message_id,
-      "enhanced_answer_message_id",
+      'enhanced_answer_message_id',
     );
     const availability =
       row.answer_run_id === null
@@ -1289,23 +1278,23 @@ export async function listAnswerOptimizationSummariesForThread(
           ? row.status
           : (() => {
               throw new AnswerSkillOptimizationValidationError(
-                "Stored optimization summary status is invalid",
+                'Stored optimization summary status is invalid',
               );
             })();
     const optimizationId =
       row.optimization_id === null
         ? null
-        : toPositiveSafeInteger(row.optimization_id, "optimization_id");
+        : toPositiveSafeInteger(row.optimization_id, 'optimization_id');
     const finalVersionId = toNullablePositiveSafeInteger(
       row.final_version_id,
-      "final_version_id",
+      'final_version_id',
     );
     const versionNumber = toNullablePositiveSafeInteger(
       row.version_number,
-      "version_number",
+      'version_number',
     );
 
-    if (status === "completed") {
+    if (status === 'completed') {
       return {
         enhancedAnswerMessageId,
         optimizationId,
@@ -1313,7 +1302,7 @@ export async function listAnswerOptimizationSummariesForThread(
         finalVersionId,
         versionNumber,
         canOptimize: false,
-        action: "completed",
+        action: 'completed',
         unavailableReason: null,
       };
     }
@@ -1325,7 +1314,7 @@ export async function listAnswerOptimizationSummariesForThread(
         finalVersionId,
         versionNumber,
         canOptimize: false,
-        action: "unavailable",
+        action: 'unavailable',
         unavailableReason: availability.reason,
       };
     }
@@ -1337,11 +1326,11 @@ export async function listAnswerOptimizationSummariesForThread(
         finalVersionId: null,
         versionNumber: null,
         canOptimize: true,
-        action: "create",
+        action: 'create',
         unavailableReason: null,
       };
     }
-    const cancelled = status === "cancelled";
+    const cancelled = status === 'cancelled';
     return {
       enhancedAnswerMessageId,
       optimizationId,
@@ -1349,28 +1338,28 @@ export async function listAnswerOptimizationSummariesForThread(
       finalVersionId,
       versionNumber,
       canOptimize: true,
-      action: cancelled ? "restart" : "resume",
+      action: cancelled ? 'restart' : 'resume',
       unavailableReason: null,
     };
   });
 }
 
 const REVISE_ALLOWED_STATUSES: readonly AnswerSkillOptimizationStatus[] = [
-  "target_selection_required",
-  "draft_ready",
-  "test_ready",
-  "failed",
+  'target_selection_required',
+  'draft_ready',
+  'test_ready',
+  'failed',
 ];
 
 const CANCEL_ALLOWED_STATUSES: readonly AnswerSkillOptimizationStatus[] = [
-  "processing",
-  "target_selection_required",
-  "draft_ready",
-  "test_ready",
-  "failed",
+  'processing',
+  'target_selection_required',
+  'draft_ready',
+  'test_ready',
+  'failed',
 ];
 
-const TEST_ALLOWED_STATUSES = ["draft_ready", "test_ready"] as const;
+const TEST_ALLOWED_STATUSES = ['draft_ready', 'test_ready'] as const;
 
 function assertKnownFields(
   input: object,
@@ -1388,15 +1377,15 @@ function assertKnownFields(
 
 function normalizeOptionalSkillId(value: unknown): string | undefined {
   if (value === undefined) return undefined;
-  if (typeof value !== "string") {
+  if (typeof value !== 'string') {
     throw new AnswerSkillOptimizationValidationError(
-      "targetSkillId must be a string",
+      'targetSkillId must be a string',
     );
   }
   const normalized = value.trim();
   if (!normalized || normalized.length > 128) {
     throw new AnswerSkillOptimizationValidationError(
-      "targetSkillId must contain 1 to 128 characters",
+      'targetSkillId must contain 1 to 128 characters',
     );
   }
   return normalized;
@@ -1406,7 +1395,7 @@ function normalizeTargetSkillIds(value: unknown): string[] | undefined {
   if (value === undefined) return undefined;
   if (!Array.isArray(value)) {
     throw new AnswerSkillOptimizationValidationError(
-      "targetSkillIds must be an array of strings",
+      'targetSkillIds must be an array of strings',
     );
   }
   if (value.length === 0 || value.length > MAX_PLANNED_TARGETS) {
@@ -1415,7 +1404,7 @@ function normalizeTargetSkillIds(value: unknown): string[] | undefined {
     );
   }
   const normalized = value.map((item, index) => {
-    if (typeof item !== "string") {
+    if (typeof item !== 'string') {
       throw new AnswerSkillOptimizationValidationError(
         `targetSkillIds[${index}] must be a string`,
       );
@@ -1432,7 +1421,7 @@ function normalizeTargetSkillIds(value: unknown): string[] | undefined {
   for (const id of normalized) {
     if (seen.has(id)) {
       throw new AnswerSkillOptimizationValidationError(
-        "targetSkillIds contains duplicate skillId",
+        'targetSkillIds contains duplicate skillId',
       );
     }
     seen.add(id);
@@ -1442,40 +1431,40 @@ function normalizeTargetSkillIds(value: unknown): string[] | undefined {
 
 function normalizeCancelReason(value: unknown): AnswerOptimizationCancelReason {
   if (
-    typeof value !== "string" ||
+    typeof value !== 'string' ||
     !ANSWER_OPTIMIZATION_CANCEL_REASONS.some((reason) => reason === value)
   ) {
     throw new AnswerSkillOptimizationValidationError(
-      "reason must be user_cancelled, no_longer_needed, or restart_required",
+      'reason must be user_cancelled, no_longer_needed, or restart_required',
     );
   }
   return value as AnswerOptimizationCancelReason;
 }
 
 function createMutationHash(value: Record<string, unknown>): string {
-  return createHash("sha256")
-    .update(JSON.stringify(value), "utf8")
-    .digest("hex");
+  return createHash('sha256')
+    .update(JSON.stringify(value), 'utf8')
+    .digest('hex');
 }
 
 function toArenaMessage(row: DbRowMessage): ArenaMessage {
-  const id = toPositiveSafeInteger(row.id, "message.id");
-  const threadId = toPositiveSafeInteger(row.thread_id, "message.thread_id");
+  const id = toPositiveSafeInteger(row.id, 'message.id');
+  const threadId = toPositiveSafeInteger(row.thread_id, 'message.thread_id');
   if (
-    (row.side !== "shared" &&
-      row.side !== "baseline" &&
-      row.side !== "enhanced") ||
-    (row.role !== "user" && row.role !== "assistant")
+    (row.side !== 'shared' &&
+      row.side !== 'baseline' &&
+      row.side !== 'enhanced') ||
+    (row.role !== 'user' && row.role !== 'assistant')
   ) {
     throw new AnswerSkillOptimizationDraftError(
-      "Stored Arena message has an invalid role or side",
-      "context_invalid",
+      'Stored Arena message has an invalid role or side',
+      'context_invalid',
     );
   }
-  if (typeof row.content !== "string" || !row.content.trim()) {
+  if (typeof row.content !== 'string' || !row.content.trim()) {
     throw new AnswerSkillOptimizationDraftError(
-      "Stored Arena message content is empty",
-      "context_invalid",
+      'Stored Arena message content is empty',
+      'context_invalid',
     );
   }
   return {
@@ -1492,8 +1481,8 @@ async function getOwnedArenaMessage(
   userId: string,
   threadId: number,
   messageId: number,
-  expectedSide: ArenaMessage["side"],
-  expectedRole: ArenaMessage["role"],
+  expectedSide: ArenaMessage['side'],
+  expectedRole: ArenaMessage['role'],
 ): Promise<ArenaMessage> {
   const result = await query<DbRowMessage>(
     `select * from arena_messages
@@ -1502,13 +1491,13 @@ async function getOwnedArenaMessage(
   );
   const row = result.rows[0];
   if (!row) {
-    throw new AnswerSkillOptimizationNotFoundError("Arena message not found");
+    throw new AnswerSkillOptimizationNotFoundError('Arena message not found');
   }
   const message = toArenaMessage(row);
   if (message.side !== expectedSide || message.role !== expectedRole) {
     throw new AnswerSkillOptimizationDraftError(
-      "Arena message does not match the recorded answer role",
-      "context_invalid",
+      'Arena message does not match the recorded answer role',
+      'context_invalid',
     );
   }
   return message;
@@ -1517,33 +1506,33 @@ async function getOwnedArenaMessage(
 function validateBaseSkills(skills: PackageSkill[]): PackageSkill[] {
   if (!Array.isArray(skills) || skills.length === 0) {
     throw new AnswerSkillOptimizationDraftError(
-      "Base version does not contain any Skills",
-      "context_invalid",
+      'Base version does not contain any Skills',
+      'context_invalid',
     );
   }
   const ids = new Set<string>();
   for (const skill of skills) {
     if (
-      typeof skill.id !== "string" ||
+      typeof skill.id !== 'string' ||
       !skill.id.trim() ||
-      typeof skill.dirName !== "string" ||
+      typeof skill.dirName !== 'string' ||
       !skill.dirName.trim() ||
-      typeof skill.name !== "string" ||
+      typeof skill.name !== 'string' ||
       !skill.name.trim() ||
-      typeof skill.description !== "string" ||
+      typeof skill.description !== 'string' ||
       !skill.description.trim() ||
-      typeof skill.skillMd !== "string" ||
+      typeof skill.skillMd !== 'string' ||
       !skill.skillMd.trim()
     ) {
       throw new AnswerSkillOptimizationDraftError(
-        "Base version contains an invalid Skill",
-        "context_invalid",
+        'Base version contains an invalid Skill',
+        'context_invalid',
       );
     }
     if (ids.has(skill.id)) {
       throw new AnswerSkillOptimizationDraftError(
-        "Base version contains duplicate Skill IDs",
-        "context_invalid",
+        'Base version contains duplicate Skill IDs',
+        'context_invalid',
       );
     }
     ids.add(skill.id);
@@ -1565,8 +1554,8 @@ function assertRunMatchesProvenance(
     answerRun.baselineAnswerMessageId === run.baselineAnswerMessageId;
   if (!matches) {
     throw new AnswerSkillOptimizationDraftError(
-      "Optimization task no longer matches its Arena answer provenance",
-      "context_invalid",
+      'Optimization task no longer matches its Arena answer provenance',
+      'context_invalid',
     );
   }
 }
@@ -1576,13 +1565,17 @@ async function getVerifiedArenaAnswerRun(
 ): Promise<ArenaAnswerRun> {
   let answerRun: ArenaAnswerRun;
   try {
-    answerRun = run.answerSide === "enhanced"
-      ? await getArenaAnswerRunByEnhancedMessage(run.userId, run.answerMessageId)
-      : await getArenaAnswerRunByMessage(run.userId, run.answerMessageId);
+    answerRun =
+      run.answerSide === 'enhanced'
+        ? await getArenaAnswerRunByEnhancedMessage(
+            run.userId,
+            run.answerMessageId,
+          )
+        : await getArenaAnswerRunByMessage(run.userId, run.answerMessageId);
   } catch (error) {
     if (error instanceof ArenaAnswerRunNotFoundError) {
       throw new AnswerSkillOptimizationNotFoundError(
-        "Arena answer run not found",
+        'Arena answer run not found',
       );
     }
     throw error;
@@ -1602,7 +1595,7 @@ async function loadAnswerSkillOptimizationContext(
   );
   const thread = threadResult.rows[0];
   if (!thread) {
-    throw new AnswerSkillOptimizationNotFoundError("Arena thread not found");
+    throw new AnswerSkillOptimizationNotFoundError('Arena thread not found');
   }
   let version: PackageVersion;
   try {
@@ -1613,17 +1606,17 @@ async function loadAnswerSkillOptimizationContext(
     );
   } catch {
     throw new AnswerSkillOptimizationNotFoundError(
-      "Base Package version not found",
+      'Base Package version not found',
     );
   }
   version = {
     ...version,
-    id: toPositiveSafeInteger(version.id, "version.id"),
-    packageId: toPositiveSafeInteger(version.packageId, "version.package_id"),
+    id: toPositiveSafeInteger(version.id, 'version.id'),
+    packageId: toPositiveSafeInteger(version.packageId, 'version.package_id'),
   };
   if (
-    run.answerSkillVersionId !== null
-    && run.baseVersionId === run.evidenceVersionId
+    run.answerSkillVersionId !== null &&
+    run.baseVersionId === run.evidenceVersionId
   ) {
     const skillVersion = await getSkillVersionDetail({
       authUserId: run.userId,
@@ -1643,20 +1636,17 @@ async function loadAnswerSkillOptimizationContext(
   }
   if (version.id !== run.baseVersionId || version.packageId !== run.packageId) {
     throw new AnswerSkillOptimizationDraftError(
-      "Loaded Package version does not match the optimization base version",
-      "context_invalid",
+      'Loaded Package version does not match the optimization base version',
+      'context_invalid',
     );
   }
   const skills = validateBaseSkills(version.snapshot.skills);
   const skillIds = new Set(skills.map((skill) => skill.id));
-  const sideProvenance = answerRunSideProvenance(
-    answerRun,
-    run.answerSide,
-  );
+  const sideProvenance = answerRunSideProvenance(answerRun, run.answerSide);
   if (sideProvenance.usedSkillIds.some((skillId) => !skillIds.has(skillId))) {
     throw new AnswerSkillOptimizationDraftError(
-      "Recorded Skill is missing from the base Package version",
-      "context_invalid",
+      'Recorded Skill is missing from the base Package version',
+      'context_invalid',
     );
   }
 
@@ -1664,19 +1654,20 @@ async function loadAnswerSkillOptimizationContext(
     run.userId,
     run.threadId,
     run.questionMessageId,
-    "shared",
-    "user",
+    'shared',
+    'user',
   );
   const originalAnswer = await getOwnedArenaMessage(
     run.userId,
     run.threadId,
     run.answerMessageId,
     run.answerSide,
-    "assistant",
+    'assistant',
   );
-  const comparisonMessageId = run.answerSide === "baseline"
-    ? run.enhancedAnswerMessageId
-    : run.baselineAnswerMessageId;
+  const comparisonMessageId =
+    run.answerSide === 'baseline'
+      ? run.enhancedAnswerMessageId
+      : run.baselineAnswerMessageId;
   const baselineAnswer =
     comparisonMessageId === null
       ? null
@@ -1684,8 +1675,8 @@ async function loadAnswerSkillOptimizationContext(
           run.userId,
           run.threadId,
           comparisonMessageId,
-          run.answerSide === "baseline" ? "enhanced" : "baseline",
-          "assistant",
+          run.answerSide === 'baseline' ? 'enhanced' : 'baseline',
+          'assistant',
         );
 
   return {
@@ -1700,8 +1691,10 @@ async function loadAnswerSkillOptimizationContext(
   };
 }
 
-interface PublicAnswerOptimizationDraft
-  extends Pick<AnswerOptimizationDraft, "skillId" | "validation"> {
+interface PublicAnswerOptimizationDraft extends Pick<
+  AnswerOptimizationDraft,
+  'skillId' | 'validation'
+> {
   previewContent: string;
 }
 
@@ -1718,7 +1711,7 @@ export function publicDraft(
 }
 
 function publicTestResult(
-  run: Pick<AnswerSkillOptimizationRun, "answerSkillVersionId">,
+  run: Pick<AnswerSkillOptimizationRun, 'answerSkillVersionId'>,
   result: AnswerOptimizationTestResult | null | undefined,
 ): PublicAnswerOptimizationTestResult | null {
   if (!result) return null;
@@ -1763,7 +1756,7 @@ function syncPlannedTargetsForView(
   const topTarget = run.result.targetSkill ?? null;
   if (!topPatch || !topTarget) return planned;
   return planned.map((target) =>
-    target.status === "active" && target.skillId === topTarget.skillId
+    target.status === 'active' && target.skillId === topTarget.skillId
       ? { ...target, patch: topPatch }
       : target,
   );
@@ -1794,7 +1787,10 @@ function toDetailDto(
     status: run.status,
     revision: run.revision,
     feedback: run.userFeedback,
-    question: { messageId: context.question.id, content: context.question.content },
+    question: {
+      messageId: context.question.id,
+      content: context.question.content,
+    },
     originalAnswer: {
       messageId: context.originalAnswer.id,
       content: context.originalAnswer.content,
@@ -1844,31 +1840,31 @@ function toReviseDto(
 }
 
 function parseRepairProposedContent(value: unknown): string {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
     throw new AnswerSkillOptimizationDraftError(
-      "Skill repair output must be an object",
-      "skill_validation_failed",
+      'Skill repair output must be an object',
+      'skill_validation_failed',
     );
   }
   const object = value as Record<string, unknown>;
   const keys = Object.keys(object);
-  if (keys.length !== 1 || keys[0] !== "proposedContent") {
+  if (keys.length !== 1 || keys[0] !== 'proposedContent') {
     throw new AnswerSkillOptimizationDraftError(
-      "Skill repair output contains unsupported fields",
-      "skill_validation_failed",
+      'Skill repair output contains unsupported fields',
+      'skill_validation_failed',
     );
   }
-  if (typeof object.proposedContent !== "string") {
+  if (typeof object.proposedContent !== 'string') {
     throw new AnswerSkillOptimizationDraftError(
-      "Skill repair proposedContent must be a string",
-      "skill_validation_failed",
+      'Skill repair proposedContent must be a string',
+      'skill_validation_failed',
     );
   }
   const proposedContent = object.proposedContent.trim();
   if (!proposedContent || proposedContent.length > 12000) {
     throw new AnswerSkillOptimizationDraftError(
-      "Skill repair proposedContent is invalid",
-      "skill_validation_failed",
+      'Skill repair proposedContent is invalid',
+      'skill_validation_failed',
     );
   }
   return proposedContent;
@@ -1904,9 +1900,7 @@ function optimizationUserFacingTexts(
     ...(output.patch
       ? [
           output.patch.reason,
-          ...(translateProposedContent
-            ? [output.patch.proposedContent]
-            : []),
+          ...(translateProposedContent ? [output.patch.proposedContent] : []),
         ]
       : []),
   ];
@@ -1916,10 +1910,9 @@ function optimizationOutputNeedsChineseLocalization(
   output: AnswerOptimizationModelOutput,
   translateProposedContent: boolean,
 ): boolean {
-  return optimizationUserFacingTexts(
-    output,
-    translateProposedContent,
-  ).some(userFacingTextNeedsChinese);
+  return optimizationUserFacingTexts(output, translateProposedContent).some(
+    userFacingTextNeedsChinese,
+  );
 }
 
 function assertOptimizationLocalizationPreservesStructure(
@@ -1943,11 +1936,10 @@ function assertOptimizationLocalizationPreservesStructure(
       (localized.patch.section !== original.patch.section ||
         localized.patch.operation !== original.patch.operation ||
         (!translateProposedContent &&
-          localized.patch.proposedContent !==
-            original.patch.proposedContent)));
+          localized.patch.proposedContent !== original.patch.proposedContent)));
   if (invalid) {
     throw new AnswerSkillOptimizationContractError(
-      "Localization changed protected optimization fields",
+      'Localization changed protected optimization fields',
     );
   }
 }
@@ -1959,8 +1951,8 @@ async function localizeOptimizationModelOutput(
   const targetSkill =
     output.targetSkillId === null
       ? null
-      : options.skills.find((skill) => skill.id === output.targetSkillId) ??
-        null;
+      : (options.skills.find((skill) => skill.id === output.targetSkillId) ??
+        null);
   const translateProposedContent =
     targetSkill !== null && isPrimarilyChineseSkill(targetSkill);
   if (
@@ -2000,13 +1992,13 @@ async function localizeOptimizationModelOutput(
       error instanceof AnswerSkillOptimizationContractError
     ) {
       throw new AnswerSkillOptimizationDraftError(
-        "模型返回的用户可见文本无法安全转换为简体中文",
-        "model_output_invalid",
+        '模型返回的用户可见文本无法安全转换为简体中文',
+        'model_output_invalid',
       );
     }
     throw new AnswerSkillOptimizationUpstreamError(
       `Optimization localization model is temporarily unavailable: ${
-        error instanceof Error ? error.message : "unknown upstream error"
+        error instanceof Error ? error.message : 'unknown upstream error'
       }`,
     );
   }
@@ -2017,8 +2009,8 @@ async function localizeOptimizationModelOutput(
     )
   ) {
     throw new AnswerSkillOptimizationDraftError(
-      "模型返回的用户可见文本未使用简体中文",
-      "model_output_invalid",
+      '模型返回的用户可见文本未使用简体中文',
+      'model_output_invalid',
     );
   }
   return localized;
@@ -2052,13 +2044,13 @@ async function callOptimizationModel(
   } catch (error) {
     if (error instanceof LlmInvalidJsonError) {
       throw new AnswerSkillOptimizationDraftError(
-        "Optimization model returned invalid JSON",
-        "model_output_invalid",
+        'Optimization model returned invalid JSON',
+        'model_output_invalid',
       );
     }
     throw new AnswerSkillOptimizationUpstreamError(
       `Optimization model is temporarily unavailable: ${
-        error instanceof Error ? error.message : "unknown upstream error"
+        error instanceof Error ? error.message : 'unknown upstream error'
       }`,
     );
   }
@@ -2084,7 +2076,7 @@ async function repairRejectedPatch(
   } catch (error) {
     throw new AnswerSkillOptimizationUpstreamError(
       `Skill repair model is temporarily unavailable: ${
-        error instanceof Error ? error.message : "unknown upstream error"
+        error instanceof Error ? error.message : 'unknown upstream error'
       }`,
     );
   }
@@ -2093,8 +2085,8 @@ async function repairRejectedPatch(
     raw = parseJsonObject<unknown>(text);
   } catch {
     throw new AnswerSkillOptimizationDraftError(
-      "Skill repair model returned invalid JSON",
-      "skill_validation_failed",
+      'Skill repair model returned invalid JSON',
+      'skill_validation_failed',
     );
   }
   return { ...patch, proposedContent: parseRepairProposedContent(raw) };
@@ -2109,7 +2101,7 @@ function createCandidateSkills(
     const skill = byId.get(candidate.skillId);
     if (!skill) {
       throw new AnswerSkillOptimizationDraftError(
-        "Candidate Skill does not exist in the base version",
+        'Candidate Skill does not exist in the base version',
       );
     }
     return {
@@ -2124,9 +2116,9 @@ function createCandidateSkills(
 function businessFailure(
   diagnosis: AnswerOptimizationDiagnosis,
 ): AnalysisResult | null {
-  if (diagnosis.reusability === "single_turn") {
+  if (diagnosis.reusability === 'single_turn') {
     return {
-      status: "failed",
+      status: 'failed',
       targetSkillId: null,
       result: {
         diagnosis,
@@ -2137,15 +2129,16 @@ function businessFailure(
         diff: null,
         testResult: null,
         failure: {
-          code: "feedback_not_reusable",
-          message: "The feedback only applies to this turn and was not written into a Skill.",
+          code: 'feedback_not_reusable',
+          message:
+            'The feedback only applies to this turn and was not written into a Skill.',
         },
       },
     };
   }
-  if (diagnosis.reusability === "unclear") {
+  if (diagnosis.reusability === 'unclear') {
     return {
-      status: "failed",
+      status: 'failed',
       targetSkillId: null,
       result: {
         diagnosis,
@@ -2156,8 +2149,9 @@ function businessFailure(
         diff: null,
         testResult: null,
         failure: {
-          code: "feedback_unclear",
-          message: "The feedback is not clear enough to create a reusable Skill change.",
+          code: 'feedback_unclear',
+          message:
+            'The feedback is not clear enough to create a reusable Skill change.',
         },
       },
     };
@@ -2199,7 +2193,7 @@ async function analyzeAnswerSkillOptimization(
 
   if (modelOutput.targetSkillId === null) {
     return {
-      status: "target_selection_required",
+      status: 'target_selection_required',
       targetSkillId: null,
       result: {
         diagnosis: modelOutput.diagnosis,
@@ -2222,7 +2216,7 @@ async function analyzeAnswerSkillOptimization(
   );
   if (!skill || !modelOutput.patch) {
     throw new AnswerSkillOptimizationDraftError(
-      "Optimization model did not return a valid target Skill and patch",
+      'Optimization model did not return a valid target Skill and patch',
     );
   }
 
@@ -2233,7 +2227,7 @@ async function analyzeAnswerSkillOptimization(
     if (error instanceof AnswerSkillPatchApplicationError) {
       throw new AnswerSkillOptimizationDraftError(
         error.message,
-        "skill_validation_failed",
+        'skill_validation_failed',
       );
     }
     throw error;
@@ -2251,8 +2245,8 @@ async function analyzeAnswerSkillOptimization(
       userFacingTextNeedsChinese(finalPatch.proposedContent)
     ) {
       throw new AnswerSkillOptimizationDraftError(
-        "模型修复后的 Skill 内容未保持简体中文",
-        "skill_validation_failed",
+        '模型修复后的 Skill 内容未保持简体中文',
+        'skill_validation_failed',
       );
     }
     try {
@@ -2261,7 +2255,7 @@ async function analyzeAnswerSkillOptimization(
       if (error instanceof AnswerSkillPatchApplicationError) {
         throw new AnswerSkillOptimizationDraftError(
           error.message,
-          "skill_validation_failed",
+          'skill_validation_failed',
         );
       }
       throw error;
@@ -2271,13 +2265,13 @@ async function analyzeAnswerSkillOptimization(
     throw new AnswerSkillOptimizationDraftError(
       `Skill draft validation failed: ${applied.draft.validation.errors
         .slice(0, 5)
-        .join("; ")}`,
-      "skill_validation_failed",
+        .join('; ')}`,
+      'skill_validation_failed',
     );
   }
 
   return {
-    status: "draft_ready",
+    status: 'draft_ready',
     targetSkillId: skill.id,
     result: {
       diagnosis: modelOutput.diagnosis,
@@ -2285,7 +2279,7 @@ async function analyzeAnswerSkillOptimization(
       targetSkill: {
         skillId: skill.id,
         name: skill.name,
-        selectionSource: selectedTargetSkillId ? "user_selected" : "recorded",
+        selectionSource: selectedTargetSkillId ? 'user_selected' : 'recorded',
       },
       patch: finalPatch,
       draft: applied.draft,
@@ -2319,7 +2313,7 @@ async function analyzeAnswerSkillOptimizationMultiTarget(
       skillId,
     );
     if (
-      analysis.status !== "draft_ready" ||
+      analysis.status !== 'draft_ready' ||
       !analysis.result.targetSkill ||
       !analysis.result.patch ||
       !analysis.result.draft
@@ -2335,13 +2329,13 @@ async function analyzeAnswerSkillOptimizationMultiTarget(
       name: analysis.result.targetSkill.name,
       patch: analysis.result.patch,
       draft: analysis.result.draft,
-      diff: analysis.result.diff ?? { before: "", after: "" },
+      diff: analysis.result.diff ?? { before: '', after: '' },
     });
   }
 
   if (entries.length === 0) {
     throw new AnswerSkillOptimizationDraftError(
-      "Multi-target analysis produced no viable Skill patches",
+      'Multi-target analysis produced no viable Skill patches',
     );
   }
 
@@ -2349,14 +2343,14 @@ async function analyzeAnswerSkillOptimizationMultiTarget(
     (entry, index) => ({
       skillId: entry.skillId,
       name: entry.name,
-      status: index === 0 ? "active" : "pending",
+      status: index === 0 ? 'active' : 'pending',
       patch: entry.patch,
     }),
   );
 
   const first = entries[0]!;
   return {
-    status: "draft_ready",
+    status: 'draft_ready',
     targetSkillId: first.skillId,
     result: {
       diagnosis: firstDiagnosis ?? undefined,
@@ -2364,7 +2358,7 @@ async function analyzeAnswerSkillOptimizationMultiTarget(
       targetSkill: {
         skillId: first.skillId,
         name: first.name,
-        selectionSource: "user_selected",
+        selectionSource: 'user_selected',
       },
       patch: first.patch,
       draft: first.draft,
@@ -2379,8 +2373,8 @@ async function analyzeAnswerSkillOptimizationMultiTarget(
 function failureFromError(error: unknown): AnswerOptimizationFailure {
   if (error instanceof AnswerSkillOptimizationUpstreamError) {
     return {
-      code: "model_unavailable",
-      message: "The optimization model is temporarily unavailable.",
+      code: 'model_unavailable',
+      message: 'The optimization model is temporarily unavailable.',
     };
   }
   if (error instanceof AnswerSkillOptimizationDraftError) {
@@ -2388,13 +2382,13 @@ function failureFromError(error: unknown): AnswerOptimizationFailure {
   }
   if (error instanceof AnswerSkillOptimizationNotFoundError) {
     return {
-      code: "context_invalid",
-      message: "The saved answer context is no longer available.",
+      code: 'context_invalid',
+      message: 'The saved answer context is no longer available.',
     };
   }
   return {
-    code: "context_invalid",
-    message: "The optimization could not be completed.",
+    code: 'context_invalid',
+    message: 'The optimization could not be completed.',
   };
 }
 
@@ -2426,9 +2420,9 @@ async function finishCreateProcessing(
   if (row) return toAnswerSkillOptimizationRun(row);
 
   const current = await getAnswerSkillOptimizationRun(run.userId, run.id);
-  if (current.status === "cancelled") return current;
+  if (current.status === 'cancelled') return current;
   throw new AnswerSkillOptimizationConflictError(
-    "Optimization task changed while the draft was being generated",
+    'Optimization task changed while the draft was being generated',
   );
 }
 
@@ -2466,7 +2460,8 @@ export async function createAnswerSkillOptimization(
   const outcome = await createAnswerSkillOptimizationRunWithOutcome(input);
   const initialRun = outcome.run;
   if (!outcome.created) {
-    const existingContext = await loadAnswerSkillOptimizationContext(initialRun);
+    const existingContext =
+      await loadAnswerSkillOptimizationContext(initialRun);
     return toDetailDto(initialRun, existingContext);
   }
 
@@ -2503,19 +2498,19 @@ export async function resolveAnswerSkillOptimizationReference(
   input: ResolveAnswerSkillOptimizationInput,
 ): Promise<AnswerSkillOptimizationReference | null> {
   const userId = normalizeUserId(input.userId);
-  const packageId = toPositiveSafeInteger(input.packageId, "packageId");
-  const threadId = toPositiveSafeInteger(input.threadId, "threadId");
+  const packageId = toPositiveSafeInteger(input.packageId, 'packageId');
+  const threadId = toPositiveSafeInteger(input.threadId, 'threadId');
   const questionMessageId = toPositiveSafeInteger(
     input.questionMessageId,
-    "questionMessageId",
+    'questionMessageId',
   );
   const answerMessageId = toPositiveSafeInteger(
     input.answerMessageId,
-    "answerMessageId",
+    'answerMessageId',
   );
-  if (input.answerSide !== "baseline" && input.answerSide !== "enhanced") {
+  if (input.answerSide !== 'baseline' && input.answerSide !== 'enhanced') {
     throw new AnswerSkillOptimizationValidationError(
-      "answerSide must be baseline or enhanced",
+      'answerSide must be baseline or enhanced',
     );
   }
 
@@ -2524,20 +2519,23 @@ export async function resolveAnswerSkillOptimizationReference(
     answerRun = await getArenaAnswerRunByMessage(userId, answerMessageId);
   } catch (error) {
     if (error instanceof ArenaAnswerRunNotFoundError) {
-      throw new AnswerSkillOptimizationNotFoundError("Answer context not found");
+      throw new AnswerSkillOptimizationNotFoundError(
+        'Answer context not found',
+      );
     }
     throw error;
   }
-  const recordedAnswerId = input.answerSide === "baseline"
-    ? answerRun.baselineAnswerMessageId
-    : answerRun.enhancedAnswerMessageId;
+  const recordedAnswerId =
+    input.answerSide === 'baseline'
+      ? answerRun.baselineAnswerMessageId
+      : answerRun.enhancedAnswerMessageId;
   if (
     answerRun.packageId !== packageId ||
     answerRun.threadId !== threadId ||
     answerRun.questionMessageId !== questionMessageId ||
     recordedAnswerId !== answerMessageId
   ) {
-    throw new AnswerSkillOptimizationNotFoundError("Answer context not found");
+    throw new AnswerSkillOptimizationNotFoundError('Answer context not found');
   }
 
   const row = await findNonCancelledByAnswer(userId, answerMessageId);
@@ -2552,14 +2550,14 @@ export async function resolveAnswerSkillOptimizationReference(
     run.answerMessageId !== answerMessageId ||
     run.answerSide !== input.answerSide
   ) {
-    throw new AnswerSkillOptimizationNotFoundError("Answer context not found");
+    throw new AnswerSkillOptimizationNotFoundError('Answer context not found');
   }
   return {
     optimizationId: run.id,
     status: run.status,
     versionNumber: toNullablePositiveSafeInteger(
       row.final_version_number,
-      "final_version_number",
+      'final_version_number',
     ),
   };
 }
@@ -2570,15 +2568,15 @@ export async function rebaseAnswerSkillOptimization(
   const userId = normalizeUserId(input.userId);
   const optimizationId = toPositiveSafeInteger(
     input.optimizationId,
-    "optimizationId",
+    'optimizationId',
   );
   const expectedRevision = toPositiveSafeInteger(
     input.expectedRevision,
-    "expectedRevision",
+    'expectedRevision',
   );
   const run = await getAnswerSkillOptimizationRun(userId, optimizationId);
   assertRevision(run, expectedRevision);
-  if (run.status !== "draft_ready" && run.status !== "test_ready") {
+  if (run.status !== 'draft_ready' && run.status !== 'test_ready') {
     throw new AnswerSkillOptimizationDraftError(
       `Cannot apply an optimization in ${run.status} status to the current version`,
     );
@@ -2587,7 +2585,7 @@ export async function rebaseAnswerSkillOptimization(
   const targetSkill = run.result.targetSkill;
   if (!patch || !targetSkill) {
     throw new AnswerSkillOptimizationDraftError(
-      "Optimization draft is unavailable for applying to the current version",
+      'Optimization draft is unavailable for applying to the current version',
     );
   }
 
@@ -2598,7 +2596,7 @@ export async function rebaseAnswerSkillOptimization(
   );
   const currentVersionId = toPositiveSafeInteger(
     packageResult.rows[0]?.current_version_id,
-    "Package current version ID",
+    'Package current version ID',
   );
   if (currentVersionId === run.baseVersionId) {
     return getAnswerSkillOptimizationDetail(userId, optimizationId);
@@ -2614,7 +2612,7 @@ export async function rebaseAnswerSkillOptimization(
   );
   if (!currentSkill) {
     throw new AnswerSkillOptimizationConflictError(
-      "The Skill used by this answer is not available in the current version",
+      'The Skill used by this answer is not available in the current version',
     );
   }
   let applied: AppliedAnswerSkillPatch;
@@ -2623,15 +2621,15 @@ export async function rebaseAnswerSkillOptimization(
   } catch (error) {
     if (error instanceof AnswerSkillPatchApplicationError) {
       throw new AnswerSkillOptimizationConflictError(
-        "The current version has conflicting changes. Review the improvement again before saving.",
+        'The current version has conflicting changes. Review the improvement again before saving.',
       );
     }
     throw error;
   }
   if (!applied.draft.validation.valid) {
     throw new AnswerSkillOptimizationDraftError(
-      "The improvement is not valid when applied to the current Skill version",
-      "skill_validation_failed",
+      'The improvement is not valid when applied to the current Skill version',
+      'skill_validation_failed',
     );
   }
   const workingSkillVersionResult = await query<{
@@ -2648,7 +2646,7 @@ export async function rebaseAnswerSkillOptimization(
   const workingSkillVersionId = workingSkillVersionResult.rows[0]
     ? toPositiveSafeInteger(
         workingSkillVersionResult.rows[0].skill_version_id,
-        "working Skill version ID",
+        'working Skill version ID',
       )
     : null;
   const nextRevision = run.revision + 1;
@@ -2682,7 +2680,7 @@ export async function rebaseAnswerSkillOptimization(
   const row = updated.rows[0];
   if (!row) {
     throw new AnswerSkillOptimizationConflictError(
-      "Optimization changed while it was being applied to the current version",
+      'Optimization changed while it was being applied to the current version',
     );
   }
   const rebasedRun = toAnswerSkillOptimizationRun(row);
@@ -2691,10 +2689,10 @@ export async function rebaseAnswerSkillOptimization(
 }
 
 type AnswerOptimizationMutationAction =
-  | "revise"
-  | "test"
-  | "confirm"
-  | "cancel";
+  | 'revise'
+  | 'test'
+  | 'confirm'
+  | 'cancel';
 
 function mutationSlot(
   action: AnswerOptimizationMutationAction,
@@ -2717,7 +2715,7 @@ function assertMatchingMutationRecord(
 ): void {
   if (record.requestHash !== requestHash) {
     throw new AnswerSkillOptimizationConflictError(
-      "Idempotency key was already used for a different request",
+      'Idempotency key was already used for a different request',
     );
   }
 }
@@ -2742,11 +2740,11 @@ function createIdempotencyRecord(input: {
   resultingRevision: number;
   status: AnswerSkillOptimizationStatus;
   reason?: AnswerOptimizationCancelReason;
-  testOutcome?: "pending" | "succeeded" | "failed";
+  testOutcome?: 'pending' | 'succeeded' | 'failed';
   testResult?: AnswerOptimizationTestResult;
-  testFailureCode?: AnswerOptimizationTestFailure["code"];
+  testFailureCode?: AnswerOptimizationTestFailure['code'];
   confirmResult?: AnswerOptimizationConfirmResult;
-  refinementOutcome?: "pending" | "succeeded" | "failed";
+  refinementOutcome?: 'pending' | 'succeeded' | 'failed';
   refinementTurnId?: string;
   refinementFailureCode?: AnswerSkillRefinementFailureCode;
 }): AnswerOptimizationIdempotencyRecord {
@@ -2777,7 +2775,10 @@ function createIdempotencyRecord(input: {
   };
 }
 
-function assertRevision(run: AnswerSkillOptimizationRun, expected: number): void {
+function assertRevision(
+  run: AnswerSkillOptimizationRun,
+  expected: number,
+): void {
   if (run.revision !== expected) {
     throw new AnswerSkillOptimizationConflictError(
       `Optimization revision changed from ${expected} to ${run.revision}`,
@@ -2793,7 +2794,7 @@ function validateSelectedTarget(
   if (!targetSkillId) return;
   if (!context.skills.some((skill) => skill.id === targetSkillId)) {
     throw new AnswerSkillOptimizationNotFoundError(
-      "Target Skill not found in the base Package version",
+      'Target Skill not found in the base Package version',
     );
   }
   const candidates = run.result.candidateSkills ?? [];
@@ -2802,7 +2803,7 @@ function validateSelectedTarget(
     !candidates.some((candidate) => candidate.skillId === targetSkillId)
   ) {
     throw new AnswerSkillOptimizationValidationError(
-      "targetSkillId is not one of the proposed candidate Skills",
+      'targetSkillId is not one of the proposed candidate Skills',
     );
   }
 }
@@ -2817,7 +2818,7 @@ function validateSelectedTargets(
   for (const skillId of targetSkillIds) {
     if (!context.skills.some((skill) => skill.id === skillId)) {
       throw new AnswerSkillOptimizationNotFoundError(
-        "Target Skill not found in the base Package version",
+        'Target Skill not found in the base Package version',
       );
     }
     if (
@@ -2825,7 +2826,7 @@ function validateSelectedTargets(
       !candidates.some((candidate) => candidate.skillId === skillId)
     ) {
       throw new AnswerSkillOptimizationValidationError(
-        "targetSkillIds contains a Skill that is not one of the proposed candidate Skills",
+        'targetSkillIds contains a Skill that is not one of the proposed candidate Skills',
       );
     }
   }
@@ -2839,11 +2840,11 @@ async function claimRevisionForAnalysis(input: {
   requestHash: string;
 }): Promise<{ run: AnswerSkillOptimizationRun; claimed: boolean }> {
   const pendingRecord = createIdempotencyRecord({
-    action: "revise",
+    action: 'revise',
     key: input.idempotencyKey,
     requestHash: input.requestHash,
     resultingRevision: input.run.revision,
-    status: "processing",
+    status: 'processing',
   });
   const pendingResult = withMutationRecord(
     {
@@ -2884,13 +2885,13 @@ async function claimRevisionForAnalysis(input: {
     input.run.userId,
     input.run.id,
   );
-  const replay = getMutationRecord(current, "revise", input.idempotencyKey);
+  const replay = getMutationRecord(current, 'revise', input.idempotencyKey);
   if (replay) {
     assertMatchingMutationRecord(replay, input.requestHash);
     return { run: current, claimed: false };
   }
   throw new AnswerSkillOptimizationConflictError(
-    "Optimization changed before revise could start",
+    'Optimization changed before revise could start',
   );
 }
 
@@ -2903,7 +2904,7 @@ async function finishRevisionAnalysis(input: {
 }): Promise<AnswerSkillOptimizationRun> {
   const nextRevision = input.claimed.revision + 1;
   const record = createIdempotencyRecord({
-    action: "revise",
+    action: 'revise',
     key: input.idempotencyKey,
     requestHash: input.requestHash,
     resultingRevision: nextRevision,
@@ -2947,13 +2948,13 @@ async function finishRevisionAnalysis(input: {
     input.claimed.userId,
     input.claimed.id,
   );
-  const replay = getMutationRecord(current, "revise", input.idempotencyKey);
+  const replay = getMutationRecord(current, 'revise', input.idempotencyKey);
   if (replay && replay.resultingRevision === current.revision) {
     assertMatchingMutationRecord(replay, input.requestHash);
     return current;
   }
   throw new AnswerSkillOptimizationConflictError(
-    "Optimization changed while revise was being generated",
+    'Optimization changed while revise was being generated',
   );
 }
 
@@ -2966,11 +2967,11 @@ async function finishRevisionFailure(input: {
 }): Promise<void> {
   const nextRevision = input.claimed.revision + 1;
   const record = createIdempotencyRecord({
-    action: "revise",
+    action: 'revise',
     key: input.idempotencyKey,
     requestHash: input.requestHash,
     resultingRevision: nextRevision,
-    status: "failed",
+    status: 'failed',
   });
   const resultJson = withMutationRecord(
     {
@@ -3009,18 +3010,16 @@ async function finishRevisionFailure(input: {
 
 type AnswerSkillRefinementAnalysis =
   | {
-      kind: "applied";
+      kind: 'applied';
       analysis: AnalysisResult;
-      outcome: Extract<AnswerSkillRefinementOutcome, { kind: "applied" }>;
+      outcome: Extract<AnswerSkillRefinementOutcome, { kind: 'applied' }>;
     }
   | {
-      kind: "not_applied";
+      kind: 'not_applied';
       outcome: Extract<
         AnswerSkillRefinementOutcome,
         {
-          kind:
-            | "needs_clarification"
-            | "not_suitable_for_shared_rule";
+          kind: 'needs_clarification' | 'not_suitable_for_shared_rule';
         }
       >;
     };
@@ -3033,14 +3032,16 @@ interface AnswerSkillRefinementClaim {
   idempotencySlot: string;
 }
 
-function normalizeRefinementSource(value: unknown): AnswerSkillRefinementSource {
+function normalizeRefinementSource(
+  value: unknown,
+): AnswerSkillRefinementSource {
   if (
-    value !== "draft_review" &&
-    value !== "test_failure" &&
-    value !== "alternative_regeneration"
+    value !== 'draft_review' &&
+    value !== 'test_failure' &&
+    value !== 'alternative_regeneration'
   ) {
     throw new AnswerSkillOptimizationValidationError(
-      "revisionSource must be draft_review, test_failure, or alternative_regeneration",
+      'revisionSource must be draft_review, test_failure, or alternative_regeneration',
     );
   }
   return value;
@@ -3056,21 +3057,21 @@ function requireRefinementPreviewEvidence(
   run: AnswerSkillOptimizationRun,
   source: AnswerSkillRefinementSource,
 ): AnswerSkillRefinementQualityEvidence | null {
-  if (source !== "test_failure") return null;
+  if (source !== 'test_failure') return null;
   const preview = getAnswerSkillPreviewIssueEvidence({
     status: run.status,
     revision: run.revision,
     result: run.result,
   });
-  if (!preview.ok && preview.reason === "missing_current_preview") {
+  if (!preview.ok && preview.reason === 'missing_current_preview') {
     throw new AnswerSkillOptimizationDraftError(
-      "当前草稿没有可用于定向修订的最新效果预览",
-      "context_invalid",
+      '当前草稿没有可用于定向修订的最新效果预览',
+      'context_invalid',
     );
   }
   if (!preview.ok) {
     throw new AnswerSkillOptimizationValidationError(
-      "没有预览问题的草稿应使用 draft_review 提交补充意见",
+      '没有预览问题的草稿应使用 draft_review 提交补充意见',
     );
   }
   return preview.evidence;
@@ -3098,14 +3099,14 @@ function refinementUserFacingTexts(
   output: AnswerSkillRefinementModelOutput,
   translateProposedContent: boolean,
 ): string[] {
-  if (output.kind === "applied") {
+  if (output.kind === 'applied') {
     return [
       output.assistantSummary,
       output.patch.reason,
       ...(translateProposedContent ? [output.patch.proposedContent] : []),
     ];
   }
-  if (output.kind === "needs_clarification") {
+  if (output.kind === 'needs_clarification') {
     return [
       output.message,
       output.clarificationQuestion,
@@ -3124,10 +3125,9 @@ function refinementOutputNeedsChineseLocalization(
   output: AnswerSkillRefinementModelOutput,
   translateProposedContent: boolean,
 ): boolean {
-  return refinementUserFacingTexts(
-    output,
-    translateProposedContent,
-  ).some(userFacingTextNeedsChinese);
+  return refinementUserFacingTexts(output, translateProposedContent).some(
+    userFacingTextNeedsChinese,
+  );
 }
 
 function assertRefinementLocalizationPreservesStructure(
@@ -3136,7 +3136,7 @@ function assertRefinementLocalizationPreservesStructure(
   translateProposedContent: boolean,
 ): void {
   let invalid = localized.kind !== original.kind;
-  if (!invalid && original.kind === "applied" && localized.kind === "applied") {
+  if (!invalid && original.kind === 'applied' && localized.kind === 'applied') {
     invalid =
       localized.patch.section !== original.patch.section ||
       localized.patch.operation !== original.patch.operation ||
@@ -3144,16 +3144,15 @@ function assertRefinementLocalizationPreservesStructure(
         localized.patch.proposedContent !== original.patch.proposedContent);
   } else if (
     !invalid &&
-    original.kind === "needs_clarification" &&
-    localized.kind === "needs_clarification"
+    original.kind === 'needs_clarification' &&
+    localized.kind === 'needs_clarification'
   ) {
     invalid =
-      localized.suggestedFeedback.length !==
-      original.suggestedFeedback.length;
+      localized.suggestedFeedback.length !== original.suggestedFeedback.length;
   } else if (
     !invalid &&
-    original.kind === "not_suitable_for_shared_rule" &&
-    localized.kind === "not_suitable_for_shared_rule"
+    original.kind === 'not_suitable_for_shared_rule' &&
+    localized.kind === 'not_suitable_for_shared_rule'
   ) {
     invalid =
       (localized.suggestedReusableFeedback === null) !==
@@ -3161,7 +3160,7 @@ function assertRefinementLocalizationPreservesStructure(
   }
   if (invalid) {
     throw new AnswerSkillOptimizationContractError(
-      "Localization changed protected refinement fields",
+      'Localization changed protected refinement fields',
     );
   }
 }
@@ -3172,10 +3171,7 @@ async function localizeRefinementModelOutput(
 ): Promise<AnswerSkillRefinementModelOutput> {
   const translateProposedContent = isPrimarilyChineseSkill(targetSkill);
   if (
-    !refinementOutputNeedsChineseLocalization(
-      output,
-      translateProposedContent,
-    )
+    !refinementOutputNeedsChineseLocalization(output, translateProposedContent)
   ) {
     return output;
   }
@@ -3207,13 +3203,13 @@ async function localizeRefinementModelOutput(
       error instanceof AnswerSkillOptimizationContractError
     ) {
       throw new AnswerSkillRefinementTechnicalError(
-        "invalid_model_output",
-        "模型返回的草稿修订说明无法安全转换为简体中文",
+        'invalid_model_output',
+        '模型返回的草稿修订说明无法安全转换为简体中文',
       );
     }
     throw new AnswerSkillRefinementTechnicalError(
-      "model_unavailable",
-      "草稿修订说明暂时无法完成本地化，请稍后重试。",
+      'model_unavailable',
+      '草稿修订说明暂时无法完成本地化，请稍后重试。',
     );
   }
   if (
@@ -3223,8 +3219,8 @@ async function localizeRefinementModelOutput(
     )
   ) {
     throw new AnswerSkillRefinementTechnicalError(
-      "invalid_model_output",
-      "模型返回的草稿修订说明未使用简体中文",
+      'invalid_model_output',
+      '模型返回的草稿修订说明未使用简体中文',
     );
   }
   return localized;
@@ -3234,7 +3230,7 @@ async function callRefinementModel(input: {
   run: AnswerSkillOptimizationRun;
   context: AnswerSkillOptimizationContext;
   additionalFeedback: string | null;
-  source: Exclude<AnswerSkillRefinementSource, "alternative_regeneration">;
+  source: Exclude<AnswerSkillRefinementSource, 'alternative_regeneration'>;
   qualityEvidence: AnswerSkillRefinementQualityEvidence | null;
 }): Promise<AnswerSkillRefinementModelOutput> {
   const diagnosis = input.run.result.diagnosis;
@@ -3244,8 +3240,8 @@ async function callRefinementModel(input: {
   const currentDraft = validateStoredTestDraft(input.run, input.context);
   if (!diagnosis || !targetSkill || !currentPatch || !currentDiff) {
     throw new AnswerSkillOptimizationDraftError(
-      "当前任务没有可继续修改的完整草稿",
-      "context_invalid",
+      '当前任务没有可继续修改的完整草稿',
+      'context_invalid',
     );
   }
   const baseSkill = input.context.skills.find(
@@ -3253,7 +3249,7 @@ async function callRefinementModel(input: {
   );
   if (!baseSkill) {
     throw new AnswerSkillOptimizationNotFoundError(
-      "Target Skill not found in the base Package version",
+      'Target Skill not found in the base Package version',
     );
   }
   const prompt = buildAnswerSkillRefinementPrompt({
@@ -3262,7 +3258,7 @@ async function callRefinementModel(input: {
     enhancedAnswer: input.context.originalAnswer.content,
     initialFeedback: input.run.userFeedback,
     previousSuccessfulTurns: getRefinementHistory(input.run.result).filter(
-      (turn) => turn.outcome?.kind === "applied",
+      (turn) => turn.outcome?.kind === 'applied',
     ),
     additionalFeedback: input.additionalFeedback,
     diagnosis,
@@ -3292,13 +3288,13 @@ async function callRefinementModel(input: {
   } catch (error) {
     if (error instanceof LlmInvalidJsonError) {
       throw new AnswerSkillRefinementTechnicalError(
-        "invalid_model_output",
-        "模型返回的草稿修订结果不是有效 JSON",
+        'invalid_model_output',
+        '模型返回的草稿修订结果不是有效 JSON',
       );
     }
     throw new AnswerSkillRefinementTechnicalError(
-      "model_unavailable",
-      "模型服务暂时不可用，请稍后使用相同意见重试。",
+      'model_unavailable',
+      '模型服务暂时不可用，请稍后使用相同意见重试。',
     );
   }
   let output: AnswerSkillRefinementModelOutput;
@@ -3307,8 +3303,8 @@ async function callRefinementModel(input: {
   } catch (error) {
     if (error instanceof AnswerSkillOptimizationContractError) {
       throw new AnswerSkillRefinementTechnicalError(
-        "invalid_model_output",
-        "模型生成的规则格式不符合要求，请使用相同意见重试。",
+        'invalid_model_output',
+        '模型生成的规则格式不符合要求，请使用相同意见重试。',
       );
     }
     throw error;
@@ -3320,8 +3316,8 @@ function confirmedRefinementFeedback(
   run: AnswerSkillOptimizationRun,
 ): string[] {
   return getRefinementHistory(run.result).flatMap((turn) =>
-    turn.outcome?.kind === "applied" &&
-    turn.source !== "alternative_regeneration"
+    turn.outcome?.kind === 'applied' &&
+    turn.source !== 'alternative_regeneration'
       ? [turn.userMessage]
       : [],
   );
@@ -3335,8 +3331,8 @@ async function callAlternativeRegenerationModel(input: {
   const targetSkill = input.run.result.targetSkill;
   if (!diagnosis || !targetSkill) {
     throw new AnswerSkillOptimizationDraftError(
-      "当前任务没有可重新生成的目标规则",
-      "context_invalid",
+      '当前任务没有可重新生成的目标规则',
+      'context_invalid',
     );
   }
   const baseSkill = input.context.skills.find(
@@ -3344,7 +3340,7 @@ async function callAlternativeRegenerationModel(input: {
   );
   if (!baseSkill) {
     throw new AnswerSkillOptimizationNotFoundError(
-      "Target Skill not found in the base Package version",
+      'Target Skill not found in the base Package version',
     );
   }
   const prompt = buildAnswerSkillAlternativeRegenerationPrompt({
@@ -3371,13 +3367,13 @@ async function callAlternativeRegenerationModel(input: {
   } catch (error) {
     if (error instanceof LlmInvalidJsonError) {
       throw new AnswerSkillRefinementTechnicalError(
-        "invalid_model_output",
-        "模型返回的另一版草稿不是有效 JSON。",
+        'invalid_model_output',
+        '模型返回的另一版草稿不是有效 JSON。',
       );
     }
     throw new AnswerSkillRefinementTechnicalError(
-      "model_unavailable",
-      "模型服务暂时不可用，请稍后重新生成另一版草稿。",
+      'model_unavailable',
+      '模型服务暂时不可用，请稍后重新生成另一版草稿。',
     );
   }
   let output: AnswerSkillRefinementModelOutput;
@@ -3386,16 +3382,16 @@ async function callAlternativeRegenerationModel(input: {
   } catch (error) {
     if (error instanceof AnswerSkillOptimizationContractError) {
       throw new AnswerSkillRefinementTechnicalError(
-        "invalid_model_output",
-        "模型生成的另一版规则格式不符合要求，请重试。",
+        'invalid_model_output',
+        '模型生成的另一版规则格式不符合要求，请重试。',
       );
     }
     throw error;
   }
-  if (output.kind !== "applied") {
+  if (output.kind !== 'applied') {
     throw new AnswerSkillRefinementTechnicalError(
-      "invalid_model_output",
-      "模型没有返回可应用的另一版规则草稿。",
+      'invalid_model_output',
+      '模型没有返回可应用的另一版规则草稿。',
     );
   }
   return localizeRefinementModelOutput(output, baseSkill);
@@ -3412,8 +3408,8 @@ async function analyzeAnswerSkillRefinement(input: {
   const diagnosis = input.run.result.diagnosis;
   if (!targetSkill || !diagnosis) {
     throw new AnswerSkillOptimizationDraftError(
-      "当前任务没有可继续修改的目标规则",
-      "context_invalid",
+      '当前任务没有可继续修改的目标规则',
+      'context_invalid',
     );
   }
   const baseSkill = input.context.skills.find(
@@ -3421,32 +3417,32 @@ async function analyzeAnswerSkillRefinement(input: {
   );
   if (!baseSkill) {
     throw new AnswerSkillOptimizationNotFoundError(
-      "Target Skill not found in the base Package version",
+      'Target Skill not found in the base Package version',
     );
   }
   const output =
-    input.source === "alternative_regeneration"
+    input.source === 'alternative_regeneration'
       ? await callAlternativeRegenerationModel(input)
       : await callRefinementModel({
           ...input,
           source: input.source,
         });
-  if (output.kind === "needs_clarification") {
+  if (output.kind === 'needs_clarification') {
     return {
-      kind: "not_applied",
+      kind: 'not_applied',
       outcome: {
-        kind: "needs_clarification",
+        kind: 'needs_clarification',
         message: output.message,
         clarificationQuestion: output.clarificationQuestion,
         suggestedFeedback: output.suggestedFeedback,
       },
     };
   }
-  if (output.kind === "not_suitable_for_shared_rule") {
+  if (output.kind === 'not_suitable_for_shared_rule') {
     return {
-      kind: "not_applied",
+      kind: 'not_applied',
       outcome: {
-        kind: "not_suitable_for_shared_rule",
+        kind: 'not_suitable_for_shared_rule',
         message: output.message,
         suggestedReusableFeedback: output.suggestedReusableFeedback,
       },
@@ -3460,8 +3456,8 @@ async function analyzeAnswerSkillRefinement(input: {
   } catch (error) {
     if (error instanceof AnswerSkillPatchApplicationError) {
       throw new AnswerSkillRefinementTechnicalError(
-        "patch_application_failed",
-        "模型生成的修改无法安全应用到当前规则，请使用相同意见重试。",
+        'patch_application_failed',
+        '模型生成的修改无法安全应用到当前规则，请使用相同意见重试。',
       );
     }
     throw error;
@@ -3476,13 +3472,13 @@ async function analyzeAnswerSkillRefinement(input: {
     } catch (error) {
       if (error instanceof AnswerSkillOptimizationUpstreamError) {
         throw new AnswerSkillRefinementTechnicalError(
-          "model_unavailable",
-          "模型服务暂时无法修复草稿格式，请稍后重试。",
+          'model_unavailable',
+          '模型服务暂时无法修复草稿格式，请稍后重试。',
         );
       }
       throw new AnswerSkillRefinementTechnicalError(
-        "skill_validation_failed",
-        "修改后的规则未通过格式校验，当前成功草稿保持不变。",
+        'skill_validation_failed',
+        '修改后的规则未通过格式校验，当前成功草稿保持不变。',
       );
     }
     try {
@@ -3490,8 +3486,8 @@ async function analyzeAnswerSkillRefinement(input: {
     } catch (error) {
       if (error instanceof AnswerSkillPatchApplicationError) {
         throw new AnswerSkillRefinementTechnicalError(
-          "patch_application_failed",
-          "修复后的修改仍无法安全应用到当前规则。",
+          'patch_application_failed',
+          '修复后的修改仍无法安全应用到当前规则。',
         );
       }
       throw error;
@@ -3502,19 +3498,19 @@ async function analyzeAnswerSkillRefinement(input: {
     validateSkillMdStandard(applied.draft.skillMd, baseSkill.dirName).length > 0
   ) {
     throw new AnswerSkillRefinementTechnicalError(
-      "skill_validation_failed",
-      "修订后的 Skill 草稿未通过格式校验",
+      'skill_validation_failed',
+      '修订后的 Skill 草稿未通过格式校验',
     );
   }
 
   return {
-    kind: "applied",
+    kind: 'applied',
     outcome: {
-      kind: "applied",
+      kind: 'applied',
       assistantSummary: output.assistantSummary,
     },
     analysis: {
-      status: "draft_ready",
+      status: 'draft_ready',
       targetSkillId: targetSkill.skillId,
       result: {
         diagnosis,
@@ -3535,19 +3531,15 @@ function updateRefinementTurn(
   turnId: string,
   update: Pick<
     AnswerSkillRefinementTurn,
-    | "status"
-    | "toRevision"
-    | "completedAt"
-    | "assistantSummary"
-    | "outcome"
+    'status' | 'toRevision' | 'completedAt' | 'assistantSummary' | 'outcome'
   >,
 ): AnswerSkillRefinementTurn[] {
   let matched = false;
   const updated = history.map((turn) => {
     if (turn.id !== turnId) return turn;
-    if (turn.status !== "pending") {
+    if (turn.status !== 'pending') {
       throw new AnswerSkillOptimizationConflictError(
-        "Refinement turn is no longer pending",
+        'Refinement turn is no longer pending',
       );
     }
     matched = true;
@@ -3555,7 +3547,7 @@ function updateRefinementTurn(
   });
   if (!matched) {
     throw new AnswerSkillOptimizationConflictError(
-      "Pending refinement turn was not found",
+      'Pending refinement turn was not found',
     );
   }
   return updated;
@@ -3563,46 +3555,46 @@ function updateRefinementTurn(
 
 function refinementTechnicalOutcome(
   error: unknown,
-): Extract<AnswerSkillRefinementOutcome, { kind: "technical_failure" }> {
+): Extract<AnswerSkillRefinementOutcome, { kind: 'technical_failure' }> {
   if (error instanceof AnswerSkillRefinementTechnicalError) {
     return {
-      kind: "technical_failure",
+      kind: 'technical_failure',
       code: error.code,
       userMessage: error.message,
     };
   }
   if (error instanceof AnswerSkillOptimizationUpstreamError) {
     return {
-      kind: "technical_failure",
-      code: "model_unavailable",
-      userMessage: "模型服务暂时不可用，请稍后使用相同意见重试。",
+      kind: 'technical_failure',
+      code: 'model_unavailable',
+      userMessage: '模型服务暂时不可用，请稍后使用相同意见重试。',
     };
   }
   if (error instanceof AnswerSkillOptimizationConflictError) {
     return {
-      kind: "technical_failure",
-      code: "revision_conflict",
-      userMessage: "草稿已被其他操作更新，请刷新后基于最新草稿重试。",
+      kind: 'technical_failure',
+      code: 'revision_conflict',
+      userMessage: '草稿已被其他操作更新，请刷新后基于最新草稿重试。',
     };
   }
   if (error instanceof AnswerSkillOptimizationDraftError) {
     const code: AnswerSkillRefinementTechnicalFailureCode =
-      error.failureCode === "skill_validation_failed"
-        ? "skill_validation_failed"
-        : "invalid_model_output";
+      error.failureCode === 'skill_validation_failed'
+        ? 'skill_validation_failed'
+        : 'invalid_model_output';
     return {
-      kind: "technical_failure",
+      kind: 'technical_failure',
       code,
       userMessage:
-        code === "skill_validation_failed"
-          ? "修改后的规则未通过格式校验，当前成功草稿保持不变。"
-          : "模型生成的规则格式不符合要求，当前成功草稿保持不变。",
+        code === 'skill_validation_failed'
+          ? '修改后的规则未通过格式校验，当前成功草稿保持不变。'
+          : '模型生成的规则格式不符合要求，当前成功草稿保持不变。',
     };
   }
   return {
-    kind: "technical_failure",
-    code: "unknown",
-    userMessage: "这次没有生成新草稿，当前成功草稿和重测结果保持不变。",
+    kind: 'technical_failure',
+    code: 'unknown',
+    userMessage: '这次没有生成新草稿，当前成功草稿和重测结果保持不变。',
   };
 }
 
@@ -3621,24 +3613,24 @@ function throwStoredRefinementFailure(
   failureCode: AnswerSkillRefinementFailureCode | undefined,
 ): never {
   const code: AnswerSkillRefinementTechnicalFailureCode =
-    failureCode === "model_unavailable"
-      ? "model_unavailable"
-      : failureCode === "skill_validation_failed"
-        ? "skill_validation_failed"
-        : failureCode === "patch_application_failed"
-          ? "patch_application_failed"
-          : failureCode === "revision_conflict"
-            ? "revision_conflict"
-            : failureCode === "invalid_model_output" ||
-                failureCode === "model_output_invalid"
-              ? "invalid_model_output"
-              : "unknown";
+    failureCode === 'model_unavailable'
+      ? 'model_unavailable'
+      : failureCode === 'skill_validation_failed'
+        ? 'skill_validation_failed'
+        : failureCode === 'patch_application_failed'
+          ? 'patch_application_failed'
+          : failureCode === 'revision_conflict'
+            ? 'revision_conflict'
+            : failureCode === 'invalid_model_output' ||
+                failureCode === 'model_output_invalid'
+              ? 'invalid_model_output'
+              : 'unknown';
   throw new AnswerSkillRefinementTechnicalError(
     code,
     refinementTechnicalOutcome(
       new AnswerSkillRefinementTechnicalError(
         code,
-        "这次没有生成新草稿，当前成功草稿保持不变。",
+        '这次没有生成新草稿，当前成功草稿保持不变。',
       ),
     ).userMessage,
   );
@@ -3649,13 +3641,11 @@ function replayRefinementMutation(
   idempotencyKey: string,
   requestHash: string,
 ): ReviseAnswerSkillOptimizationDto | null {
-  const record = getMutationRecord(run, "revise", idempotencyKey);
+  const record = getMutationRecord(run, 'revise', idempotencyKey);
   if (!record) return null;
   assertMatchingMutationRecord(record, requestHash);
-  if (record.responseSummary.refinementOutcome === "failed") {
-    throwStoredRefinementFailure(
-      record.responseSummary.refinementFailureCode,
-    );
+  if (record.responseSummary.refinementOutcome === 'failed') {
+    throwStoredRefinementFailure(record.responseSummary.refinementFailureCode);
   }
   return toReviseDto(run);
 }
@@ -3672,7 +3662,7 @@ async function claimAnswerSkillRefinement(input: {
   if (history.length >= MAX_ANSWER_SKILL_REFINEMENT_TURNS) {
     throw new AnswerSkillOptimizationDraftError(
       `草稿补充意见最多保留 ${MAX_ANSWER_SKILL_REFINEMENT_TURNS} 轮`,
-      "context_invalid",
+      'context_invalid',
     );
   }
   const turnId = randomUUID();
@@ -3683,7 +3673,7 @@ async function claimAnswerSkillRefinement(input: {
     fromRevision: input.run.revision,
     toRevision: null,
     userMessage: input.userMessage,
-    status: "pending",
+    status: 'pending',
     createdAt,
     completedAt: null,
     assistantSummary: null,
@@ -3691,12 +3681,12 @@ async function claimAnswerSkillRefinement(input: {
     outcome: null,
   };
   const pendingRecord = createIdempotencyRecord({
-    action: "revise",
+    action: 'revise',
     key: input.idempotencyKey,
     requestHash: input.requestHash,
     resultingRevision: input.run.revision,
-    status: "processing",
-    refinementOutcome: "pending",
+    status: 'processing',
+    refinementOutcome: 'pending',
     refinementTurnId: turnId,
   });
   const pendingResult = withMutationRecord(
@@ -3706,7 +3696,7 @@ async function claimAnswerSkillRefinement(input: {
     },
     pendingRecord,
   );
-  const idempotencySlot = mutationSlot("revise", input.idempotencyKey);
+  const idempotencySlot = mutationSlot('revise', input.idempotencyKey);
   const result = await query<DbRowAnswerSkillOptimizationRun>(
     `update answer_skill_optimization_runs
        set result_json = $1,
@@ -3745,11 +3735,7 @@ async function claimAnswerSkillRefinement(input: {
     input.requestHash,
   );
   if (replay) {
-    const record = getMutationRecord(
-      current,
-      "revise",
-      input.idempotencyKey,
-    );
+    const record = getMutationRecord(current, 'revise', input.idempotencyKey);
     return {
       run: current,
       claimed: false,
@@ -3759,7 +3745,7 @@ async function claimAnswerSkillRefinement(input: {
     };
   }
   throw new AnswerSkillOptimizationConflictError(
-    "Optimization changed before refinement could start",
+    'Optimization changed before refinement could start',
   );
 }
 
@@ -3770,7 +3756,7 @@ async function finishAnswerSkillRefinement(input: {
   refinement: AnswerSkillRefinementAnalysis;
 }): Promise<AnswerSkillOptimizationRun> {
   const appliedRefinement =
-    input.refinement.kind === "applied" ? input.refinement : null;
+    input.refinement.kind === 'applied' ? input.refinement : null;
   const completedAt = new Date().toISOString();
   const expectedNextRevision = appliedRefinement
     ? input.claim.run.revision + 1
@@ -3779,11 +3765,10 @@ async function finishAnswerSkillRefinement(input: {
     getRefinementHistory(input.claim.run.result),
     input.claim.turnId,
     {
-      status: "succeeded",
+      status: 'succeeded',
       toRevision: appliedRefinement ? expectedNextRevision : null,
       completedAt,
-      assistantSummary:
-        appliedRefinement?.outcome.assistantSummary ?? null,
+      assistantSummary: appliedRefinement?.outcome.assistantSummary ?? null,
       outcome: input.refinement.outcome,
     },
   );
@@ -3795,18 +3780,15 @@ async function finishAnswerSkillRefinement(input: {
     refinementHistory,
   });
   const record = createIdempotencyRecord({
-    action: "revise",
+    action: 'revise',
     key: input.idempotencyKey,
     requestHash: input.requestHash,
     resultingRevision: transition.revision,
     status: transition.status,
-    refinementOutcome: "succeeded",
+    refinementOutcome: 'succeeded',
     refinementTurnId: input.claim.turnId,
   });
-  const resultJson = withMutationRecord(
-    transition.result,
-    record,
-  );
+  const resultJson = withMutationRecord(transition.result, record);
   const result = await query<DbRowAnswerSkillOptimizationRun>(
     `update answer_skill_optimization_runs
        set target_skill_id = $1,
@@ -3846,7 +3828,7 @@ async function finishAnswerSkillRefinement(input: {
   );
   if (replay) return current;
   throw new AnswerSkillOptimizationConflictError(
-    "Optimization changed while refinement was being generated",
+    'Optimization changed while refinement was being generated',
   );
 }
 
@@ -3863,7 +3845,7 @@ async function finishAnswerSkillRefinementFailure(input: {
     getRefinementHistory(input.claim.run.result),
     input.claim.turnId,
     {
-      status: "failed",
+      status: 'failed',
       toRevision: null,
       completedAt,
       assistantSummary: null,
@@ -3871,12 +3853,12 @@ async function finishAnswerSkillRefinementFailure(input: {
     },
   );
   const record = createIdempotencyRecord({
-    action: "revise",
+    action: 'revise',
     key: input.idempotencyKey,
     requestHash: input.requestHash,
     resultingRevision: input.claim.run.revision,
     status: input.claim.stableStatus,
-    refinementOutcome: "failed",
+    refinementOutcome: 'failed',
     refinementTurnId: input.claim.turnId,
     refinementFailureCode: failureCode,
   });
@@ -3913,17 +3895,13 @@ async function finishAnswerSkillRefinementFailure(input: {
     input.claim.run.userId,
     input.claim.run.id,
   );
-  const replay = getMutationRecord(
-    current,
-    "revise",
-    input.idempotencyKey,
-  );
+  const replay = getMutationRecord(current, 'revise', input.idempotencyKey);
   if (replay) {
     assertMatchingMutationRecord(replay, input.requestHash);
     return current;
   }
   throw new AnswerSkillOptimizationConflictError(
-    "Optimization changed while refinement failure was being saved",
+    'Optimization changed while refinement failure was being saved',
   );
 }
 
@@ -3933,48 +3911,45 @@ async function refineAnswerSkillOptimization(
   assertKnownFields(
     input,
     [
-      "userId",
-      "optimizationId",
-      "expectedRevision",
-      "additionalFeedback",
-      "revisionSource",
-      "idempotencyKey",
+      'userId',
+      'optimizationId',
+      'expectedRevision',
+      'additionalFeedback',
+      'revisionSource',
+      'idempotencyKey',
     ],
-    "refine",
+    'refine',
   );
   const userId = normalizeUserId(input.userId);
   const optimizationId = toPositiveSafeInteger(
     input.optimizationId,
-    "optimizationId",
+    'optimizationId',
   );
   const expectedRevision = toPositiveSafeInteger(
     input.expectedRevision,
-    "expectedRevision",
+    'expectedRevision',
   );
   const requestedSource = normalizeRefinementSource(input.revisionSource);
-  const hasAdditionalFeedback = "additionalFeedback" in input;
-  if (
-    requestedSource === "alternative_regeneration" &&
-    hasAdditionalFeedback
-  ) {
+  const hasAdditionalFeedback = 'additionalFeedback' in input;
+  if (requestedSource === 'alternative_regeneration' && hasAdditionalFeedback) {
     throw new AnswerSkillOptimizationValidationError(
-      "alternative_regeneration cannot include additionalFeedback",
+      'alternative_regeneration cannot include additionalFeedback',
     );
   }
   const additionalFeedback =
-    requestedSource === "alternative_regeneration"
+    requestedSource === 'alternative_regeneration'
       ? null
       : normalizeAdditionalFeedback(
           hasAdditionalFeedback ? input.additionalFeedback : undefined,
-          requestedSource === "draft_review",
+          requestedSource === 'draft_review',
         );
   const userMessage =
-    requestedSource === "alternative_regeneration"
-      ? "根据目前所有要求重新生成另一版草稿"
-      : additionalFeedback ?? "按预览问题修改当前草稿";
+    requestedSource === 'alternative_regeneration'
+      ? '根据目前所有要求重新生成另一版草稿'
+      : (additionalFeedback ?? '按预览问题修改当前草稿');
   const idempotencyKey = normalizeIdempotencyKey(input.idempotencyKey);
   const requestHash = createMutationHash({
-    action: "refine",
+    action: 'refine',
     optimizationId,
     expectedRevision,
     source: requestedSource,
@@ -3985,31 +3960,31 @@ async function refineAnswerSkillOptimization(
   const replay = replayRefinementMutation(run, idempotencyKey, requestHash);
   if (replay) return replay;
   assertRevision(run, expectedRevision);
-  if (!["draft_ready", "test_ready", "failed"].includes(run.status)) {
+  if (!['draft_ready', 'test_ready', 'failed'].includes(run.status)) {
     throw new AnswerSkillOptimizationDraftError(
       `Cannot refine an optimization in ${run.status} status`,
     );
   }
   if (
-    requestedSource === "alternative_regeneration" &&
-    run.status !== "draft_ready"
+    requestedSource === 'alternative_regeneration' &&
+    run.status !== 'draft_ready'
   ) {
     throw new AnswerSkillOptimizationDraftError(
-      "只有尚未重测的成功草稿可以重新生成另一套方案",
-      "context_invalid",
+      '只有尚未重测的成功草稿可以重新生成另一套方案',
+      'context_invalid',
     );
   }
-  if (
-    requestedSource === "test_failure" &&
-    run.status !== "test_ready"
-  ) {
+  if (requestedSource === 'test_failure' && run.status !== 'test_ready') {
     throw new AnswerSkillOptimizationDraftError(
-      "只有当前效果预览发现问题时才能按预览问题修改草稿",
-      "context_invalid",
+      '只有当前效果预览发现问题时才能按预览问题修改草稿',
+      'context_invalid',
     );
   }
   const context = await loadAnswerSkillOptimizationContext(run);
-  assertAnswerOptimizationReplayAvailable(context.answerRun, context.run.answerSide);
+  assertAnswerOptimizationReplayAvailable(
+    context.answerRun,
+    context.run.answerSide,
+  );
   validateStoredTestDraft(run, context);
   const source = requestedSource;
   const qualityEvidence = requireRefinementPreviewEvidence(run, source);
@@ -4060,31 +4035,31 @@ async function regenerateAnswerSkillOptimization(
   assertKnownFields(
     input,
     [
-      "userId",
-      "optimizationId",
-      "expectedRevision",
-      "feedback",
-      "targetSkillId",
-      "targetSkillIds",
-      "idempotencyKey",
+      'userId',
+      'optimizationId',
+      'expectedRevision',
+      'feedback',
+      'targetSkillId',
+      'targetSkillIds',
+      'idempotencyKey',
     ],
-    "revise",
+    'revise',
   );
   const userId = normalizeUserId(input.userId);
   const optimizationId = toPositiveSafeInteger(
     input.optimizationId,
-    "optimizationId",
+    'optimizationId',
   );
   const expectedRevision = toPositiveSafeInteger(
     input.expectedRevision,
-    "expectedRevision",
+    'expectedRevision',
   );
   const feedback = normalizeFeedback(input.feedback);
   const targetSkillId = normalizeOptionalSkillId(input.targetSkillId);
   const targetSkillIds = normalizeTargetSkillIds(input.targetSkillIds);
   if (targetSkillIds && targetSkillId) {
     throw new AnswerSkillOptimizationValidationError(
-      "targetSkillId and targetSkillIds cannot be provided at the same time",
+      'targetSkillId and targetSkillIds cannot be provided at the same time',
     );
   }
   const idempotencyKey = normalizeIdempotencyKey(input.idempotencyKey);
@@ -4097,7 +4072,7 @@ async function regenerateAnswerSkillOptimization(
   });
 
   const run = await getAnswerSkillOptimizationRun(userId, optimizationId);
-  const replay = getMutationRecord(run, "revise", idempotencyKey);
+  const replay = getMutationRecord(run, 'revise', idempotencyKey);
   if (replay) {
     assertMatchingMutationRecord(replay, requestHash);
     return toReviseDto(run);
@@ -4110,7 +4085,10 @@ async function regenerateAnswerSkillOptimization(
   }
 
   const context = await loadAnswerSkillOptimizationContext(run);
-  assertAnswerOptimizationReplayAvailable(context.answerRun, context.run.answerSide);
+  assertAnswerOptimizationReplayAvailable(
+    context.answerRun,
+    context.run.answerSide,
+  );
   const isMultiTarget = Boolean(targetSkillIds && targetSkillIds.length > 0);
   if (isMultiTarget) {
     validateSelectedTargets(run, context, targetSkillIds);
@@ -4137,11 +4115,7 @@ async function regenerateAnswerSkillOptimization(
           feedback,
           targetSkillIds!,
         )
-      : await analyzeAnswerSkillOptimization(
-          context,
-          feedback,
-          targetSkillId,
-        );
+      : await analyzeAnswerSkillOptimization(context, feedback, targetSkillId);
     const updated = await finishRevisionAnalysis({
       claimed,
       feedback,
@@ -4169,7 +4143,7 @@ async function regenerateAnswerSkillOptimization(
 export async function reviseAnswerSkillOptimization(
   input: ReviseAnswerSkillOptimizationInput,
 ): Promise<AnswerSkillOptimizationDetailDto> {
-  const revised = await ("revisionSource" in input
+  const revised = await ('revisionSource' in input
     ? refineAnswerSkillOptimization(input)
     : regenerateAnswerSkillOptimization(input));
   return getAnswerSkillOptimizationDetail(input.userId, revised.optimizationId);
@@ -4184,7 +4158,7 @@ function validateStoredTestDraft(
   const draft = run.result.draft;
   if (!targetSkill || !patch || !draft) {
     throw new AnswerSkillOptimizationDraftError(
-      "Optimization does not contain a complete Skill draft",
+      'Optimization does not contain a complete Skill draft',
     );
   }
   if (
@@ -4192,13 +4166,13 @@ function validateStoredTestDraft(
     draft.skillId !== targetSkill.skillId
   ) {
     throw new AnswerSkillOptimizationDraftError(
-      "Stored target Skill and draft do not match",
+      'Stored target Skill and draft do not match',
     );
   }
   if (!draft.validation.valid || draft.validation.errors.length > 0) {
     throw new AnswerSkillOptimizationDraftError(
-      "Stored Skill draft has not passed validation",
-      "skill_validation_failed",
+      'Stored Skill draft has not passed validation',
+      'skill_validation_failed',
     );
   }
 
@@ -4207,7 +4181,7 @@ function validateStoredTestDraft(
   );
   if (!baseSkill) {
     throw new AnswerSkillOptimizationNotFoundError(
-      "Target Skill not found in the base Package version",
+      'Target Skill not found in the base Package version',
     );
   }
 
@@ -4218,7 +4192,7 @@ function validateStoredTestDraft(
     if (error instanceof AnswerSkillPatchApplicationError) {
       throw new AnswerSkillOptimizationDraftError(
         error.message,
-        "skill_validation_failed",
+        'skill_validation_failed',
       );
     }
     throw error;
@@ -4228,8 +4202,8 @@ function validateStoredTestDraft(
     reapplied.draft.skillMd !== draft.skillMd
   ) {
     throw new AnswerSkillOptimizationDraftError(
-      "Stored Skill draft does not match its validated patch",
-      "skill_validation_failed",
+      'Stored Skill draft does not match its validated patch',
+      'skill_validation_failed',
     );
   }
 
@@ -4241,8 +4215,8 @@ function validateStoredTestDraft(
     throw new AnswerSkillOptimizationDraftError(
       `Stored Skill draft validation failed: ${validationErrors
         .slice(0, 5)
-        .join("; ")}`,
-      "skill_validation_failed",
+        .join('; ')}`,
+      'skill_validation_failed',
     );
   }
   return draft;
@@ -4256,8 +4230,8 @@ function compareArenaMessageOrder(
   const rightTime = Date.parse(right.createdAt);
   if (!Number.isFinite(leftTime) || !Number.isFinite(rightTime)) {
     throw new AnswerSkillOptimizationDraftError(
-      "Recorded Arena message timestamp is invalid",
-      "replay_context_unavailable",
+      'Recorded Arena message timestamp is invalid',
+      'replay_context_unavailable',
     );
   }
   return leftTime === rightTime ? left.id - right.id : leftTime - rightTime;
@@ -4265,11 +4239,11 @@ function compareArenaMessageOrder(
 
 function isReplayHistoryMessage(
   message: ArenaMessage,
-  side: "baseline" | "enhanced",
+  side: 'baseline' | 'enhanced',
 ): boolean {
   return (
-    (message.side === "shared" && message.role === "user") ||
-    (message.side === side && message.role === "assistant")
+    (message.side === 'shared' && message.role === 'user') ||
+    (message.side === side && message.role === 'assistant')
   );
 }
 
@@ -4283,15 +4257,15 @@ async function loadRecordedAnswerReplayContext(
   const contextMessageIds = sideProvenance.contextMessageIds;
   if (contextMessageIds === null) {
     throw new AnswerSkillOptimizationDraftError(
-      "The original enhanced answer does not have recorded replay context",
-      "replay_context_unavailable",
+      'The original enhanced answer does not have recorded replay context',
+      'replay_context_unavailable',
     );
   }
   const enhancedModel = sideProvenance.model;
   if (!enhancedModel?.trim()) {
     throw new AnswerSkillOptimizationDraftError(
-      "The original enhanced answer does not have a recorded model",
-      "replay_model_unavailable",
+      'The original enhanced answer does not have a recorded model',
+      'replay_model_unavailable',
     );
   }
 
@@ -4308,11 +4282,13 @@ async function loadRecordedAnswerReplayContext(
     const loadedIds = historyMessages.map((message) => message.id);
     if (
       loadedIds.length !== contextMessageIds.length ||
-      loadedIds.some((messageId, index) => messageId !== contextMessageIds[index])
+      loadedIds.some(
+        (messageId, index) => messageId !== contextMessageIds[index],
+      )
     ) {
       throw new AnswerSkillOptimizationDraftError(
-        "Recorded Arena replay messages are missing or out of order",
-        "replay_context_unavailable",
+        'Recorded Arena replay messages are missing or out of order',
+        'replay_context_unavailable',
       );
     }
   }
@@ -4321,8 +4297,8 @@ async function loadRecordedAnswerReplayContext(
     const message = historyMessages[index];
     if (!message || !isReplayHistoryMessage(message, context.run.answerSide)) {
       throw new AnswerSkillOptimizationDraftError(
-        "Recorded Arena replay context contains an invalid message",
-        "replay_context_unavailable",
+        'Recorded Arena replay context contains an invalid message',
+        'replay_context_unavailable',
       );
     }
     if (
@@ -4331,15 +4307,15 @@ async function loadRecordedAnswerReplayContext(
       compareArenaMessageOrder(message, context.question) >= 0
     ) {
       throw new AnswerSkillOptimizationDraftError(
-        "Recorded Arena replay context contains a message outside the original history",
-        "replay_context_unavailable",
+        'Recorded Arena replay context contains a message outside the original history',
+        'replay_context_unavailable',
       );
     }
     const previous = historyMessages[index - 1];
     if (previous && compareArenaMessageOrder(previous, message) >= 0) {
       throw new AnswerSkillOptimizationDraftError(
-        "Recorded Arena replay context order is invalid",
-        "replay_context_unavailable",
+        'Recorded Arena replay context order is invalid',
+        'replay_context_unavailable',
       );
     }
   }
@@ -4356,8 +4332,8 @@ async function loadRecordedAnswerReplayContext(
     )
   ) {
     throw new AnswerSkillOptimizationDraftError(
-      "Recorded Arena replay context does not match the enhanced prompt",
-      "replay_context_unavailable",
+      'Recorded Arena replay context does not match the enhanced prompt',
+      'replay_context_unavailable',
     );
   }
   return { promptContext, enhancedModel };
@@ -4370,15 +4346,13 @@ function buildAnswerOptimizationTestContext(
   const targetSkill = context.run.result.targetSkill;
   if (!targetSkill || targetSkill.skillId !== draft.skillId) {
     throw new AnswerSkillOptimizationDraftError(
-      "Target Skill is unavailable for draft testing",
+      'Target Skill is unavailable for draft testing',
     );
   }
-  if (
-    new Set(context.usedSkillIds).size !== context.usedSkillIds.length
-  ) {
+  if (new Set(context.usedSkillIds).size !== context.usedSkillIds.length) {
     throw new AnswerSkillOptimizationDraftError(
-      "Recorded used Skill IDs contain duplicates",
-      "context_invalid",
+      'Recorded used Skill IDs contain duplicates',
+      'context_invalid',
     );
   }
   if (
@@ -4386,16 +4360,16 @@ function buildAnswerOptimizationTestContext(
     !context.usedSkillIds.includes(targetSkill.skillId)
   ) {
     throw new AnswerSkillOptimizationDraftError(
-      "Target Skill was not part of the recorded enhanced answer context",
-      "context_invalid",
+      'Target Skill was not part of the recorded enhanced answer context',
+      'context_invalid',
     );
   }
   if (
     context.usedSkillIds.length === 0 &&
-    targetSkill.selectionSource !== "user_selected"
+    targetSkill.selectionSource !== 'user_selected'
   ) {
     throw new AnswerSkillOptimizationDraftError(
-      "A target Skill must be selected before testing an answer with no recorded Skill",
+      'A target Skill must be selected before testing an answer with no recorded Skill',
     );
   }
 
@@ -4415,8 +4389,8 @@ function buildAnswerOptimizationTestContext(
     const skill = byId.get(skillId);
     if (!skill) {
       throw new AnswerSkillOptimizationDraftError(
-        "A recorded Skill is missing from the test snapshot",
-        "context_invalid",
+        'A recorded Skill is missing from the test snapshot',
+        'context_invalid',
       );
     }
     return skill;
@@ -4456,20 +4430,19 @@ async function generateAnswerOptimizationTestSamples(
   prompt: ReturnType<typeof buildAnswerOptimizationTestPrompt>,
 ): Promise<[string, string, string]> {
   const settled = await Promise.allSettled(
-    Array.from(
-      { length: ANSWER_OPTIMIZATION_TEST_SAMPLE_COUNT },
-      () => generateText(prompt),
+    Array.from({ length: ANSWER_OPTIMIZATION_TEST_SAMPLE_COUNT }, () =>
+      generateText(prompt),
     ),
   );
   const rejected = settled.find(
-    (result): result is PromiseRejectedResult => result.status === "rejected",
+    (result): result is PromiseRejectedResult => result.status === 'rejected',
   );
   if (rejected) throw rejected.reason;
   const samples = settled.map((result) =>
-    result.status === "fulfilled" ? result.value.trim() : "",
+    result.status === 'fulfilled' ? result.value.trim() : '',
   );
   if (samples.some((sample) => !sample)) {
-    throw new Error("Model returned an empty answer sample");
+    throw new Error('Model returned an empty answer sample');
   }
   return samples as [string, string, string];
 }
@@ -4483,17 +4456,16 @@ function buildRuntimeSelectionCheck(
   selectedSkillIds: string[];
   targetSkillSelected: boolean;
 } {
-  const selectedSkillIds = fixedSkillVersionId !== null
-    ? [...testContext.usedSkillIds]
-    : selectRelevantSkills(testContext.snapshot, question).map(
-        (skill) => skill.id,
-      );
+  const selectedSkillIds =
+    fixedSkillVersionId !== null
+      ? [...testContext.usedSkillIds]
+      : selectRelevantSkills(testContext.snapshot, question).map(
+          (skill) => skill.id,
+        );
   return {
     targetSkillId: testContext.targetSkillId,
     selectedSkillIds,
-    targetSkillSelected: selectedSkillIds.includes(
-      testContext.targetSkillId,
-    ),
+    targetSkillSelected: selectedSkillIds.includes(testContext.targetSkillId),
   };
 }
 
@@ -4513,9 +4485,7 @@ function evaluationUserFacingTexts(
 function evaluationNeedsChineseLocalization(
   output: AnswerSkillTestEvaluationOutput,
 ): boolean {
-  return evaluationUserFacingTexts(output).some(
-    userFacingTextNeedsChinese,
-  );
+  return evaluationUserFacingTexts(output).some(userFacingTextNeedsChinese);
 }
 
 function assertEvaluationLocalizationPreservesStructure(
@@ -4541,7 +4511,7 @@ function assertEvaluationLocalizationPreservesStructure(
     });
   if (invalid) {
     throw new AnswerSkillTestEvaluationContractError(
-      "Evaluation localization changed protected fields",
+      'Evaluation localization changed protected fields',
     );
   }
 }
@@ -4567,7 +4537,7 @@ async function localizeAnswerSkillTestEvaluation(
   assertEvaluationLocalizationPreservesStructure(output, localized);
   if (evaluationNeedsChineseLocalization(localized)) {
     throw new AnswerSkillTestEvaluationContractError(
-      "评估模型返回的用户可见文本未使用简体中文",
+      '评估模型返回的用户可见文本未使用简体中文',
     );
   }
   return localized;
@@ -4581,16 +4551,14 @@ async function evaluateAnswerOptimizationTestSamples(input: {
   const diagnosis = input.context.run.result.diagnosis;
   if (!diagnosis) {
     throw new AnswerSkillOptimizationDraftError(
-      "Optimization diagnosis is unavailable for draft testing",
+      'Optimization diagnosis is unavailable for draft testing',
     );
   }
-  const refinementFeedback = (
-    input.context.run.result.refinementHistory ?? []
-  )
+  const refinementFeedback = (input.context.run.result.refinementHistory ?? [])
     .filter(
       (turn) =>
-        turn.outcome?.kind === "applied" &&
-        turn.source !== "alternative_regeneration" &&
+        turn.outcome?.kind === 'applied' &&
+        turn.source !== 'alternative_regeneration' &&
         turn.toRevision !== null &&
         turn.toRevision <= input.context.run.revision,
     )
@@ -4641,7 +4609,7 @@ function buildQualityGatedTestResult(input: {
     unmetRequirements: evaluation.unmetRequirements,
     riskNotes: evaluation.riskNotes,
     criticalRisk: evaluation.criticalRisk,
-  })) as AnswerOptimizationTestResult["samples"];
+  })) as AnswerOptimizationTestResult['samples'];
   const passedCount = samples.filter((sample) => sample.passed).length;
   const hasCriticalRisk = samples.some((sample) => sample.criticalRisk);
   const passed =
@@ -4651,7 +4619,7 @@ function buildQualityGatedTestResult(input: {
   const bestSample = samples[input.evaluation.bestSampleIndex];
   if (!bestSample) {
     throw new AnswerSkillOptimizationDraftError(
-      "Draft test evaluation selected an invalid sample",
+      'Draft test evaluation selected an invalid sample',
     );
   }
   return {
@@ -4669,10 +4637,9 @@ function buildQualityGatedTestResult(input: {
     },
     runtimeSelectionCheck: input.runtimeSelectionCheck,
     usedSkillIds: input.testContext.usedSkillIds,
-    contextMessageIds:
-      input.replayContext.promptContext.contextMessageIds,
+    contextMessageIds: input.replayContext.promptContext.contextMessageIds,
     model: input.replayContext.enhancedModel,
-    replayMode: "recorded_context",
+    replayMode: 'recorded_context',
     createdAt: new Date().toISOString(),
   };
 }
@@ -4680,19 +4647,19 @@ function buildQualityGatedTestResult(input: {
 function toTestDtoFromResult(
   run: Pick<
     AnswerSkillOptimizationRun,
-    "id" | "revision" | "updatedAt" | "answerSkillVersionId"
+    'id' | 'revision' | 'updatedAt' | 'answerSkillVersionId'
   >,
   testResult: AnswerOptimizationTestResult,
 ): TestAnswerSkillOptimizationDto {
   const publicResult = publicTestResult(run, testResult);
   if (!publicResult) {
     throw new AnswerSkillOptimizationConflictError(
-      "Draft test result is unavailable",
+      'Draft test result is unavailable',
     );
   }
   return {
     optimizationId: run.id,
-    status: "test_ready",
+    status: 'test_ready',
     revision: run.revision,
     testResult: publicResult,
     updatedAt: run.updatedAt,
@@ -4704,12 +4671,12 @@ function toTestDto(
 ): TestAnswerSkillOptimizationDto {
   const testResult = run.result.testResult;
   if (
-    run.status !== "test_ready" ||
+    run.status !== 'test_ready' ||
     !testResult ||
     testResult.testedRevision !== run.revision
   ) {
     throw new AnswerSkillOptimizationConflictError(
-      "Draft test result is unavailable",
+      'Draft test result is unavailable',
     );
   }
   return toTestDtoFromResult(run, testResult);
@@ -4721,12 +4688,12 @@ function testReplayDto(
 ): TestAnswerSkillOptimizationDto {
   const testResult = record.responseSummary.testResult;
   if (
-    record.action !== "test" ||
-    record.responseSummary.testOutcome !== "succeeded" ||
+    record.action !== 'test' ||
+    record.responseSummary.testOutcome !== 'succeeded' ||
     !testResult
   ) {
     throw new AnswerSkillOptimizationConflictError(
-      "Completed draft test result is unavailable",
+      'Completed draft test result is unavailable',
     );
   }
   return toTestDtoFromResult(
@@ -4741,16 +4708,16 @@ function testReplayDto(
 }
 
 function testFailureError(
-  failureCode: AnswerOptimizationTestFailure["code"] = "model_unavailable",
+  failureCode: AnswerOptimizationTestFailure['code'] = 'model_unavailable',
 ): AnswerSkillOptimizationUpstreamError | AnswerSkillOptimizationDraftError {
-  if (failureCode === "evaluation_invalid") {
+  if (failureCode === 'evaluation_invalid') {
     return new AnswerSkillOptimizationDraftError(
-      "重测评估结果无效，请重新重测",
-      "model_output_invalid",
+      '重测评估结果无效，请重新重测',
+      'model_output_invalid',
     );
   }
   return new AnswerSkillOptimizationUpstreamError(
-    "Draft answer generation was temporarily unavailable",
+    'Draft answer generation was temporarily unavailable',
     503,
   );
 }
@@ -4765,33 +4732,33 @@ async function replayTestMutation(
   const deadline = Date.now() + config.llmTimeoutMs + 1_000;
 
   while (true) {
-    const record = getMutationRecord(run, "test", idempotencyKey);
+    const record = getMutationRecord(run, 'test', idempotencyKey);
     if (!record) return null;
     assertMatchingMutationRecord(record, requestHash);
-    if (record.responseSummary.testOutcome === "succeeded") {
+    if (record.responseSummary.testOutcome === 'succeeded') {
       return testReplayDto(run, record);
     }
-    if (record.responseSummary.testOutcome === "failed") {
+    if (record.responseSummary.testOutcome === 'failed') {
       throw testFailureError(record.responseSummary.testFailureCode);
     }
-    if (record.responseSummary.testOutcome !== "pending") {
+    if (record.responseSummary.testOutcome !== 'pending') {
       throw new AnswerSkillOptimizationConflictError(
-        "Stored test idempotency result is invalid",
+        'Stored test idempotency result is invalid',
       );
     }
-    if (run.status !== "processing") {
+    if (run.status !== 'processing') {
       throw new AnswerSkillOptimizationDraftError(
         `Cannot continue a draft test in ${run.status} status`,
       );
     }
     if (!waitForPending) {
       throw new AnswerSkillOptimizationConflictError(
-        "Draft test completion could not be persisted",
+        'Draft test completion could not be persisted',
       );
     }
     if (Date.now() >= deadline) {
       throw new AnswerSkillOptimizationConflictError(
-        "Draft test is still processing",
+        'Draft test is still processing',
       );
     }
     await new Promise((resolve) =>
@@ -4806,23 +4773,20 @@ async function claimAnswerSkillOptimizationTest(input: {
   idempotencyKey: string;
   requestHash: string;
 }): Promise<TestClaim | TestAnswerSkillOptimizationDto> {
-  if (
-    input.run.status !== "draft_ready" &&
-    input.run.status !== "test_ready"
-  ) {
+  if (input.run.status !== 'draft_ready' && input.run.status !== 'test_ready') {
     throw new AnswerSkillOptimizationDraftError(
       `Cannot test an optimization in ${input.run.status} status`,
     );
   }
   const previousStatus = input.run.status;
-  const idempotencySlot = mutationSlot("test", input.idempotencyKey);
+  const idempotencySlot = mutationSlot('test', input.idempotencyKey);
   const record = createIdempotencyRecord({
-    action: "test",
+    action: 'test',
     key: input.idempotencyKey,
     requestHash: input.requestHash,
     resultingRevision: input.run.revision,
-    status: "processing",
-    testOutcome: "pending",
+    status: 'processing',
+    testOutcome: 'pending',
   });
   const pendingResult = withMutationRecord(
     {
@@ -4867,7 +4831,7 @@ async function claimAnswerSkillOptimizationTest(input: {
   );
   if (replay) return replay;
   throw new AnswerSkillOptimizationConflictError(
-    "Optimization changed before draft testing could start",
+    'Optimization changed before draft testing could start',
   );
 }
 
@@ -4878,12 +4842,12 @@ async function finishAnswerSkillOptimizationTest(input: {
   testResult: AnswerOptimizationTestResult;
 }): Promise<TestAnswerSkillOptimizationDto> {
   const record = createIdempotencyRecord({
-    action: "test",
+    action: 'test',
     key: input.idempotencyKey,
     requestHash: input.requestHash,
     resultingRevision: input.claim.claimed.revision,
-    status: "test_ready",
-    testOutcome: "succeeded",
+    status: 'test_ready',
+    testOutcome: 'succeeded',
     testResult: input.testResult,
   });
   const resultJson = withMutationRecord(
@@ -4927,7 +4891,7 @@ async function finishAnswerSkillOptimizationTest(input: {
   );
   if (replay) return replay;
   throw new AnswerSkillOptimizationConflictError(
-    "Optimization changed while the draft answer was being generated",
+    'Optimization changed while the draft answer was being generated',
   );
 }
 
@@ -4935,16 +4899,16 @@ async function restoreAnswerSkillOptimizationTestFailure(input: {
   claim: TestClaim;
   idempotencyKey: string;
   requestHash: string;
-  failure: Pick<AnswerOptimizationTestFailure, "code" | "message">;
+  failure: Pick<AnswerOptimizationTestFailure, 'code' | 'message'>;
 }): Promise<void> {
   const failedAt = new Date().toISOString();
   const record = createIdempotencyRecord({
-    action: "test",
+    action: 'test',
     key: input.idempotencyKey,
     requestHash: input.requestHash,
     resultingRevision: input.claim.claimed.revision,
     status: input.claim.previousStatus,
-    testOutcome: "failed",
+    testOutcome: 'failed',
     testFailureCode: input.failure.code,
   });
   const resultJson = withMutationRecord(
@@ -4982,41 +4946,37 @@ export async function testAnswerSkillOptimization(
 ): Promise<TestAnswerSkillOptimizationDto> {
   assertKnownFields(
     input,
-    ["userId", "optimizationId", "expectedRevision", "idempotencyKey"],
-    "test",
+    ['userId', 'optimizationId', 'expectedRevision', 'idempotencyKey'],
+    'test',
   );
   const userId = normalizeUserId(input.userId);
   const optimizationId = toPositiveSafeInteger(
     input.optimizationId,
-    "optimizationId",
+    'optimizationId',
   );
   const expectedRevision = toPositiveSafeInteger(
     input.expectedRevision,
-    "expectedRevision",
+    'expectedRevision',
   );
   const idempotencyKey = normalizeIdempotencyKey(input.idempotencyKey);
   const requestHash = createMutationHash({
-    action: "test",
+    action: 'test',
     optimizationId,
     expectedRevision,
   });
 
   const run = await getAnswerSkillOptimizationRun(userId, optimizationId);
-  if (run.status === "cancelled" || run.status === "completed") {
+  if (run.status === 'cancelled' || run.status === 'completed') {
     throw new AnswerSkillOptimizationDraftError(
       `Cannot test an optimization in ${run.status} status`,
     );
   }
-  const replay = await replayTestMutation(
-    run,
-    idempotencyKey,
-    requestHash,
-  );
+  const replay = await replayTestMutation(run, idempotencyKey, requestHash);
   if (replay) return replay;
   assertRevision(run, expectedRevision);
-  if (run.status === "processing") {
+  if (run.status === 'processing') {
     throw new AnswerSkillOptimizationConflictError(
-      "Optimization is already processing another operation",
+      'Optimization is already processing another operation',
     );
   }
   if (!TEST_ALLOWED_STATUSES.some((status) => status === run.status)) {
@@ -5026,17 +4986,17 @@ export async function testAnswerSkillOptimization(
   }
 
   const context = await loadAnswerSkillOptimizationContext(run);
-  assertAnswerOptimizationReplayAvailable(context.answerRun, context.run.answerSide);
+  assertAnswerOptimizationReplayAvailable(
+    context.answerRun,
+    context.run.answerSide,
+  );
   const replayContext = await loadRecordedAnswerReplayContext(context);
   const draft = validateStoredTestDraft(run, context);
   const testContext = buildAnswerOptimizationTestContext(context, draft);
-  const prompt = buildAnswerOptimizationTestPrompt(
-    testContext,
-    replayContext,
-  );
+  const prompt = buildAnswerOptimizationTestPrompt(testContext, replayContext);
   if (!run.result.diagnosis) {
     throw new AnswerSkillOptimizationDraftError(
-      "Optimization diagnosis is unavailable for draft testing",
+      'Optimization diagnosis is unavailable for draft testing',
     );
   }
   const runtimeSelectionCheck = buildRuntimeSelectionCheck(
@@ -5050,7 +5010,7 @@ export async function testAnswerSkillOptimization(
     idempotencyKey,
     requestHash,
   });
-  if (!("claimed" in claimResult)) return claimResult;
+  if (!('claimed' in claimResult)) return claimResult;
   const claim = claimResult;
 
   let testResult: AnswerOptimizationTestResult;
@@ -5074,18 +5034,16 @@ export async function testAnswerSkillOptimization(
     const evaluationInvalid =
       error instanceof AnswerSkillTestEvaluationContractError ||
       error instanceof LlmInvalidJsonError;
-    const failure: Pick<
-      AnswerOptimizationTestFailure,
-      "code" | "message"
-    > = evaluationInvalid
-      ? {
-          code: "evaluation_invalid",
-          message: "重测评估结果无效，请重新重测。",
-        }
-      : {
-          code: "model_unavailable",
-          message: "Draft answer generation was temporarily unavailable.",
-        };
+    const failure: Pick<AnswerOptimizationTestFailure, 'code' | 'message'> =
+      evaluationInvalid
+        ? {
+            code: 'evaluation_invalid',
+            message: '重测评估结果无效，请重新重测。',
+          }
+        : {
+            code: 'model_unavailable',
+            message: 'Draft answer generation was temporarily unavailable.',
+          };
     try {
       await restoreAnswerSkillOptimizationTestFailure({
         claim,
@@ -5108,16 +5066,16 @@ export async function testAnswerSkillOptimization(
 }
 
 function normalizeVersionNote(value: string | undefined): string {
-  if (value === undefined) return "";
-  if (typeof value !== "string") {
+  if (value === undefined) return '';
+  if (typeof value !== 'string') {
     throw new AnswerSkillOptimizationValidationError(
-      "versionNote must be a string",
+      'versionNote must be a string',
     );
   }
   const normalized = value.trim();
   if (normalized.length > 500) {
     throw new AnswerSkillOptimizationValidationError(
-      "versionNote must contain at most 500 characters",
+      'versionNote must contain at most 500 characters',
     );
   }
   return normalized;
@@ -5125,62 +5083,62 @@ function normalizeVersionNote(value: string | undefined): string {
 
 function parsePackageSnapshot(value: unknown): AgentPackageSnapshot {
   let parsed = value;
-  if (typeof parsed === "string") {
+  if (typeof parsed === 'string') {
     try {
       parsed = JSON.parse(parsed) as unknown;
     } catch {
       throw new AnswerSkillOptimizationDraftError(
-        "Base Package snapshot contains invalid JSON",
-        "context_invalid",
+        'Base Package snapshot contains invalid JSON',
+        'context_invalid',
       );
     }
   }
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
     throw new AnswerSkillOptimizationDraftError(
-      "Base Package snapshot is invalid",
-      "context_invalid",
+      'Base Package snapshot is invalid',
+      'context_invalid',
     );
   }
   const object = parsed as Record<string, unknown>;
   for (const field of [
-    "name",
-    "description",
-    "versionLabel",
-    "agentMd",
-    "rubricMd",
+    'name',
+    'description',
+    'versionLabel',
+    'agentMd',
+    'rubricMd',
   ] as const) {
-    if (typeof object[field] !== "string") {
+    if (typeof object[field] !== 'string') {
       throw new AnswerSkillOptimizationDraftError(
         `Base Package snapshot ${field} is invalid`,
-        "context_invalid",
+        'context_invalid',
       );
     }
   }
   if (!Array.isArray(object.skills)) {
     throw new AnswerSkillOptimizationDraftError(
-      "Base Package snapshot skills are invalid",
-      "context_invalid",
+      'Base Package snapshot skills are invalid',
+      'context_invalid',
     );
   }
   const skills = object.skills.map((value, index): PackageSkill => {
-    if (!value || typeof value !== "object" || Array.isArray(value)) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
       throw new AnswerSkillOptimizationDraftError(
         `Base Package Skill ${index} is invalid`,
-        "context_invalid",
+        'context_invalid',
       );
     }
     const skill = value as Record<string, unknown>;
     for (const field of [
-      "id",
-      "dirName",
-      "name",
-      "description",
-      "skillMd",
+      'id',
+      'dirName',
+      'name',
+      'description',
+      'skillMd',
     ] as const) {
-      if (typeof skill[field] !== "string") {
+      if (typeof skill[field] !== 'string') {
         throw new AnswerSkillOptimizationDraftError(
           `Base Package Skill ${index} ${field} is invalid`,
-          "context_invalid",
+          'context_invalid',
         );
       }
     }
@@ -5209,8 +5167,8 @@ function validateFinalPackageSnapshot(snapshot: AgentPackageSnapshot): void {
     snapshot.skills.length === 0
   ) {
     throw new AnswerSkillOptimizationDraftError(
-      "Final Package snapshot is incomplete",
-      "skill_validation_failed",
+      'Final Package snapshot is incomplete',
+      'skill_validation_failed',
     );
   }
   const skillIds = new Set<string>();
@@ -5223,14 +5181,14 @@ function validateFinalPackageSnapshot(snapshot: AgentPackageSnapshot): void {
       !skill.description.trim()
     ) {
       throw new AnswerSkillOptimizationDraftError(
-        "Final Package contains incomplete Skill metadata",
-        "skill_validation_failed",
+        'Final Package contains incomplete Skill metadata',
+        'skill_validation_failed',
       );
     }
     if (skillIds.has(skill.id) || dirNames.has(skill.dirName)) {
       throw new AnswerSkillOptimizationDraftError(
-        "Final Package contains duplicate Skill identifiers",
-        "skill_validation_failed",
+        'Final Package contains duplicate Skill identifiers',
+        'skill_validation_failed',
       );
     }
     skillIds.add(skill.id);
@@ -5238,8 +5196,8 @@ function validateFinalPackageSnapshot(snapshot: AgentPackageSnapshot): void {
     const errors = validateSkillMdStandard(skill.skillMd, skill.dirName);
     if (errors.length > 0) {
       throw new AnswerSkillOptimizationDraftError(
-        `Final Skill validation failed: ${errors.slice(0, 5).join("; ")}`,
-        "skill_validation_failed",
+        `Final Skill validation failed: ${errors.slice(0, 5).join('; ')}`,
+        'skill_validation_failed',
       );
     }
   }
@@ -5255,7 +5213,7 @@ function rebuildConfirmedSnapshot(input: {
   const storedDraft = input.run.result.draft;
   if (!targetSkill || !patch || !storedDraft) {
     throw new AnswerSkillOptimizationDraftError(
-      "Optimization does not contain a complete confirmed Skill draft",
+      'Optimization does not contain a complete confirmed Skill draft',
     );
   }
   if (
@@ -5265,8 +5223,8 @@ function rebuildConfirmedSnapshot(input: {
     storedDraft.validation.errors.length > 0
   ) {
     throw new AnswerSkillOptimizationDraftError(
-      "Confirmed target Skill and draft are inconsistent",
-      "skill_validation_failed",
+      'Confirmed target Skill and draft are inconsistent',
+      'skill_validation_failed',
     );
   }
   const baseSkill = input.baseSnapshot.skills.find(
@@ -5274,7 +5232,7 @@ function rebuildConfirmedSnapshot(input: {
   );
   if (!baseSkill) {
     throw new AnswerSkillOptimizationNotFoundError(
-      "Target Skill not found in the base Package version",
+      'Target Skill not found in the base Package version',
     );
   }
   let reapplied;
@@ -5284,7 +5242,7 @@ function rebuildConfirmedSnapshot(input: {
     if (error instanceof AnswerSkillPatchApplicationError) {
       throw new AnswerSkillOptimizationDraftError(
         error.message,
-        "skill_validation_failed",
+        'skill_validation_failed',
       );
     }
     throw error;
@@ -5295,8 +5253,8 @@ function rebuildConfirmedSnapshot(input: {
     reapplied.draft.skillMd !== storedDraft.skillMd
   ) {
     throw new AnswerSkillOptimizationDraftError(
-      "Stored Skill draft no longer matches its validated Patch",
-      "skill_validation_failed",
+      'Stored Skill draft no longer matches its validated Patch',
+      'skill_validation_failed',
     );
   }
   const finalSnapshot: AgentPackageSnapshot = {
@@ -5324,7 +5282,7 @@ function applyNextTargetPatch(
   if (!nextTarget.patch) {
     throw new AnswerSkillOptimizationDraftError(
       `Planned target ${nextTarget.name} does not have a patch`,
-      "context_invalid",
+      'context_invalid',
     );
   }
   const baseSkill = baseSnapshot.skills.find(
@@ -5332,7 +5290,7 @@ function applyNextTargetPatch(
   );
   if (!baseSkill) {
     throw new AnswerSkillOptimizationNotFoundError(
-      "Next target Skill not found in the confirmed Package version",
+      'Next target Skill not found in the confirmed Package version',
     );
   }
   let applied: AppliedAnswerSkillPatch;
@@ -5342,7 +5300,7 @@ function applyNextTargetPatch(
     if (error instanceof AnswerSkillPatchApplicationError) {
       throw new AnswerSkillOptimizationDraftError(
         error.message,
-        "skill_validation_failed",
+        'skill_validation_failed',
       );
     }
     throw error;
@@ -5354,8 +5312,8 @@ function applyNextTargetPatch(
     throw new AnswerSkillOptimizationDraftError(
       `Next target Skill draft validation failed: ${applied.draft.validation.errors
         .slice(0, 5)
-        .join("; ")}`,
-      "skill_validation_failed",
+        .join('; ')}`,
+      'skill_validation_failed',
     );
   }
   if (
@@ -5363,8 +5321,8 @@ function applyNextTargetPatch(
     userFacingTextNeedsChinese(nextTarget.patch.proposedContent)
   ) {
     throw new AnswerSkillOptimizationDraftError(
-      "下一个目标 Skill 的修改内容未保持简体中文",
-      "skill_validation_failed",
+      '下一个目标 Skill 的修改内容未保持简体中文',
+      'skill_validation_failed',
     );
   }
   return { draft: applied.draft, diff: applied.diff };
@@ -5377,7 +5335,7 @@ function toConfirmDto(
   const advanced = result.advancedToNextTarget === true;
   return {
     optimizationId,
-    status: advanced ? "draft_ready" : "completed",
+    status: advanced ? 'draft_ready' : 'completed',
     baseVersionId: result.baseVersionId,
     finalVersionId: result.finalVersionId,
     versionNumber: result.versionNumber,
@@ -5393,20 +5351,20 @@ function replayConfirmMutation(
   idempotencyKey: string,
   requestHash: string,
 ): ConfirmAnswerSkillOptimizationDto | null {
-  const record = getMutationRecord(run, "confirm", idempotencyKey);
+  const record = getMutationRecord(run, 'confirm', idempotencyKey);
   if (!record) return null;
   assertMatchingMutationRecord(record, requestHash);
   const confirmResult = record.responseSummary.confirmResult;
   if (!confirmResult) {
     throw new AnswerSkillOptimizationConflictError(
-      "Stored confirm result is unavailable",
+      'Stored confirm result is unavailable',
     );
   }
   const advanced = confirmResult.advancedToNextTarget === true;
-  const expectedStatus = advanced ? "draft_ready" : "completed";
+  const expectedStatus = advanced ? 'draft_ready' : 'completed';
   if (run.status !== expectedStatus) {
     throw new AnswerSkillOptimizationConflictError(
-      "Stored confirm result is unavailable",
+      'Stored confirm result is unavailable',
     );
   }
   return toConfirmDto(run.id, confirmResult);
@@ -5415,7 +5373,7 @@ function replayConfirmMutation(
 function assertConfirmPreconditions(run: AnswerSkillOptimizationRun): void {
   const issue = getAnswerSkillConfirmIssue(run);
   if (!issue) return;
-  if (issue.kind === "conflict") {
+  if (issue.kind === 'conflict') {
     throw new AnswerSkillOptimizationConflictError(issue.message);
   }
   if (issue.failureCode) {
@@ -5438,12 +5396,13 @@ async function confirmAnswerSkillOptimizationTransaction(
     versionNote: string;
   },
 ): Promise<ConfirmAnswerSkillOptimizationDto> {
-  const lockedOptimization = await client.query<DbRowAnswerSkillOptimizationRun>(
-    `select * from answer_skill_optimization_runs
+  const lockedOptimization =
+    await client.query<DbRowAnswerSkillOptimizationRun>(
+      `select * from answer_skill_optimization_runs
      where id = $1 and user_id = $2
      for update`,
-    [input.optimizationId, input.userId],
-  );
+      [input.optimizationId, input.userId],
+    );
   const optimizationRow = lockedOptimization.rows[0];
   if (!optimizationRow) throw new AnswerSkillOptimizationNotFoundError();
   const run = toAnswerSkillOptimizationRun(optimizationRow);
@@ -5464,15 +5423,15 @@ async function confirmAnswerSkillOptimizationTransaction(
   );
   const packageRow = lockedPackage.rows[0];
   if (!packageRow) {
-    throw new AnswerSkillOptimizationNotFoundError("Package not found");
+    throw new AnswerSkillOptimizationNotFoundError('Package not found');
   }
   const currentVersionId = toPositiveSafeInteger(
     packageRow.current_version_id,
-    "Package current version ID",
+    'Package current version ID',
   );
   if (currentVersionId !== run.baseVersionId) {
     throw new AnswerSkillOptimizationConflictError(
-      "Package current version has changed since optimization started",
+      'Package current version has changed since optimization started',
     );
   }
 
@@ -5484,7 +5443,7 @@ async function confirmAnswerSkillOptimizationTransaction(
   const baseVersionRow = baseVersionResult.rows[0];
   if (!baseVersionRow) {
     throw new AnswerSkillOptimizationNotFoundError(
-      "Base Package version not found",
+      'Base Package version not found',
     );
   }
   const nextVersionResult = await client.query<{
@@ -5497,7 +5456,7 @@ async function confirmAnswerSkillOptimizationTransaction(
   );
   const versionNumber = toPositiveSafeInteger(
     nextVersionResult.rows[0]?.next_version_number,
-    "next Package version number",
+    'next Package version number',
   );
   const finalSnapshot = rebuildConfirmedSnapshot({
     baseSnapshot: parsePackageSnapshot(baseVersionRow.snapshot_json),
@@ -5520,33 +5479,37 @@ async function confirmAnswerSkillOptimizationTransaction(
   );
   const finalVersionId = toPositiveSafeInteger(
     insertedVersion.rows[0]?.id,
-    "final Package version ID",
+    'final Package version ID',
   );
   const confirmedTargetSkillId = run.result.targetSkill?.skillId;
-  const syncedSkillVersions = await syncPackageVersionSkillsFromSnapshot(client, {
-    packageId: run.packageId,
-    packageVersionId: finalVersionId,
-    packageVersionNumber: versionNumber,
-    source: "interactive",
-    snapshot: finalSnapshot,
-    note: input.versionNote,
-    forcedSkillVersions: confirmedTargetSkillId
-      ? new Map([
-          [
-            confirmedTargetSkillId,
-            {
-              source: "interactive" as const,
-              ...(run.workingSkillVersionId === null
-                ? {}
-                : { basedOnVersionId: run.workingSkillVersionId }),
-              note: input.versionNote,
-            },
-          ],
-        ])
-      : undefined,
-  });
+  const syncedSkillVersions = await syncPackageVersionSkillsFromSnapshot(
+    client,
+    {
+      packageId: run.packageId,
+      packageVersionId: finalVersionId,
+      packageVersionNumber: versionNumber,
+      source: 'interactive',
+      snapshot: finalSnapshot,
+      note: input.versionNote,
+      forcedSkillVersions: confirmedTargetSkillId
+        ? new Map([
+            [
+              confirmedTargetSkillId,
+              {
+                source: 'interactive' as const,
+                ...(run.workingSkillVersionId === null
+                  ? {}
+                  : { basedOnVersionId: run.workingSkillVersionId }),
+                note: input.versionNote,
+              },
+            ],
+          ])
+        : undefined,
+    },
+  );
   const skillVersionNumber = confirmedTargetSkillId
-    ? syncedSkillVersions?.get(confirmedTargetSkillId)?.versionNumber ?? versionNumber
+    ? (syncedSkillVersions?.get(confirmedTargetSkillId)?.versionNumber ??
+      versionNumber)
     : versionNumber;
   const packageUpdate = await client.query(
     `update agent_packages
@@ -5562,20 +5525,20 @@ async function confirmAnswerSkillOptimizationTransaction(
   );
   if (packageUpdate.rowCount !== 1) {
     throw new AnswerSkillOptimizationConflictError(
-      "Package current version changed during confirmation",
+      'Package current version changed during confirmation',
     );
   }
 
   const plannedTargets = run.result.plannedTargets ?? [];
   const nextPendingIndex = plannedTargets.findIndex(
-    (target) => target.status === "pending",
+    (target) => target.status === 'pending',
   );
   const advanced = nextPendingIndex !== -1;
   const completedPlannedTargets = plannedTargets.map((target) =>
-    target.status === "active"
+    target.status === 'active'
       ? {
           ...target,
-          status: "completed" as const,
+          status: 'completed' as const,
           confirmedVersionId: finalVersionId,
           confirmedVersionNumber: versionNumber,
         }
@@ -5585,17 +5548,18 @@ async function confirmAnswerSkillOptimizationTransaction(
   if (advanced) {
     const nextTarget = plannedTargets[nextPendingIndex]!;
     const nextApplication = applyNextTargetPatch(finalSnapshot, nextTarget);
-    const advancedPlannedTargets = completedPlannedTargets.map((target, index) =>
-      index === nextPendingIndex
-        ? { ...target, status: "active" as const }
-        : target,
+    const advancedPlannedTargets = completedPlannedTargets.map(
+      (target, index) =>
+        index === nextPendingIndex
+          ? { ...target, status: 'active' as const }
+          : target,
     );
     const advancedResult: AnswerSkillOptimizationResult = {
       ...run.result,
       targetSkill: {
         skillId: nextTarget.skillId,
         name: nextTarget.name,
-        selectionSource: "user_selected",
+        selectionSource: 'user_selected',
       },
       patch: nextTarget.patch,
       draft: nextApplication.draft,
@@ -5611,19 +5575,22 @@ async function confirmAnswerSkillOptimizationTransaction(
       finalVersionId,
       versionNumber,
       skillVersionNumber,
-      source: "interactive",
+      source: 'interactive',
       completedAt,
       advancedToNextTarget: true,
     };
     const advancedRecord = createIdempotencyRecord({
-      action: "confirm",
+      action: 'confirm',
       key: input.idempotencyKey,
       requestHash: input.requestHash,
       resultingRevision: nextRevision,
-      status: "draft_ready",
+      status: 'draft_ready',
       confirmResult: advancedConfirmResult,
     });
-    const advancedResultJson = withMutationRecord(advancedResult, advancedRecord);
+    const advancedResultJson = withMutationRecord(
+      advancedResult,
+      advancedRecord,
+    );
     const advancedOptimizationUpdate =
       await client.query<DbRowAnswerSkillOptimizationRun>(
         `update answer_skill_optimization_runs
@@ -5646,7 +5613,7 @@ async function confirmAnswerSkillOptimizationTransaction(
       );
     if (advancedOptimizationUpdate.rowCount !== 1) {
       throw new AnswerSkillOptimizationConflictError(
-        "Optimization changed during confirmation",
+        'Optimization changed during confirmation',
       );
     }
     return toConfirmDto(run.id, advancedConfirmResult);
@@ -5657,15 +5624,15 @@ async function confirmAnswerSkillOptimizationTransaction(
     finalVersionId,
     versionNumber,
     skillVersionNumber,
-    source: "interactive",
+    source: 'interactive',
     completedAt,
   };
   const record = createIdempotencyRecord({
-    action: "confirm",
+    action: 'confirm',
     key: input.idempotencyKey,
     requestHash: input.requestHash,
     resultingRevision: run.revision,
-    status: "completed",
+    status: 'completed',
     confirmResult,
   });
   const resultJson = withMutationRecord(
@@ -5694,7 +5661,7 @@ async function confirmAnswerSkillOptimizationTransaction(
     );
   if (optimizationUpdate.rowCount !== 1) {
     throw new AnswerSkillOptimizationConflictError(
-      "Optimization changed during confirmation",
+      'Optimization changed during confirmation',
     );
   }
   return toConfirmDto(run.id, confirmResult);
@@ -5706,33 +5673,33 @@ export async function confirmAnswerSkillOptimization(
   assertKnownFields(
     input,
     [
-      "userId",
-      "optimizationId",
-      "expectedRevision",
-      "versionNote",
-      "idempotencyKey",
+      'userId',
+      'optimizationId',
+      'expectedRevision',
+      'versionNote',
+      'idempotencyKey',
     ],
-    "confirm",
+    'confirm',
   );
   const userId = normalizeUserId(input.userId);
   const optimizationId = toPositiveSafeInteger(
     input.optimizationId,
-    "optimizationId",
+    'optimizationId',
   );
   const expectedRevision = toPositiveSafeInteger(
     input.expectedRevision,
-    "expectedRevision",
+    'expectedRevision',
   );
   const idempotencyKey = normalizeIdempotencyKey(input.idempotencyKey);
   const versionNote = normalizeVersionNote(input.versionNote);
   const requestHash = createMutationHash({
-    action: "confirm",
+    action: 'confirm',
     optimizationId,
     expectedRevision,
     versionNote,
   });
   const current = await getAnswerSkillOptimizationRun(userId, optimizationId);
-  if (current.status !== "completed") {
+  if (current.status !== 'completed') {
     const answerRun = await getVerifiedArenaAnswerRun(current);
     assertAnswerOptimizationReplayAvailable(answerRun, current.answerSide);
   }
@@ -5752,14 +5719,14 @@ function toCancelDto(
   run: AnswerSkillOptimizationRun,
 ): CancelAnswerSkillOptimizationDto {
   const cancel = run.result.cancel;
-  if (run.status !== "cancelled" || !cancel) {
+  if (run.status !== 'cancelled' || !cancel) {
     throw new AnswerSkillOptimizationConflictError(
-      "Cancelled optimization result is unavailable",
+      'Cancelled optimization result is unavailable',
     );
   }
   return {
     optimizationId: run.id,
-    status: "cancelled",
+    status: 'cancelled',
     revision: run.revision,
     reason: cancel.reason,
     cancelledAt: cancel.cancelledAt,
@@ -5771,17 +5738,23 @@ export async function cancelAnswerSkillOptimization(
 ): Promise<CancelAnswerSkillOptimizationDto> {
   assertKnownFields(
     input,
-    ["userId", "optimizationId", "expectedRevision", "reason", "idempotencyKey"],
-    "cancel",
+    [
+      'userId',
+      'optimizationId',
+      'expectedRevision',
+      'reason',
+      'idempotencyKey',
+    ],
+    'cancel',
   );
   const userId = normalizeUserId(input.userId);
   const optimizationId = toPositiveSafeInteger(
     input.optimizationId,
-    "optimizationId",
+    'optimizationId',
   );
   const expectedRevision = toPositiveSafeInteger(
     input.expectedRevision,
-    "expectedRevision",
+    'expectedRevision',
   );
   const reason = normalizeCancelReason(input.reason);
   const idempotencyKey = normalizeIdempotencyKey(input.idempotencyKey);
@@ -5792,12 +5765,12 @@ export async function cancelAnswerSkillOptimization(
   });
 
   const run = await getAnswerSkillOptimizationRun(userId, optimizationId);
-  const replay = getMutationRecord(run, "cancel", idempotencyKey);
+  const replay = getMutationRecord(run, 'cancel', idempotencyKey);
   if (replay) {
     assertMatchingMutationRecord(replay, requestHash);
     return toCancelDto(run);
   }
-  if (run.status === "cancelled") return toCancelDto(run);
+  if (run.status === 'cancelled') return toCancelDto(run);
   assertRevision(run, expectedRevision);
   if (!CANCEL_ALLOWED_STATUSES.includes(run.status)) {
     throw new AnswerSkillOptimizationDraftError(
@@ -5807,11 +5780,11 @@ export async function cancelAnswerSkillOptimization(
 
   const cancelledAt = new Date().toISOString();
   const record = createIdempotencyRecord({
-    action: "cancel",
+    action: 'cancel',
     key: idempotencyKey,
     requestHash,
     resultingRevision: run.revision,
-    status: "cancelled",
+    status: 'cancelled',
     reason,
   });
   const resultJson = withMutationRecord(
@@ -5833,13 +5806,13 @@ export async function cancelAnswerSkillOptimization(
   if (row) return toCancelDto(toAnswerSkillOptimizationRun(row));
 
   const current = await getAnswerSkillOptimizationRun(userId, optimizationId);
-  const currentReplay = getMutationRecord(current, "cancel", idempotencyKey);
+  const currentReplay = getMutationRecord(current, 'cancel', idempotencyKey);
   if (currentReplay) {
     assertMatchingMutationRecord(currentReplay, requestHash);
     return toCancelDto(current);
   }
-  if (current.status === "cancelled") return toCancelDto(current);
+  if (current.status === 'cancelled') return toCancelDto(current);
   throw new AnswerSkillOptimizationConflictError(
-    "Optimization changed before it could be cancelled",
+    'Optimization changed before it could be cancelled',
   );
 }

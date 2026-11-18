@@ -4,8 +4,7 @@ export const DOCUMENT_CONTENT_QUALITY_ERROR =
 const CJK_RUN_PATTERN =
   /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]+/gu;
 const LATIN_WORD_PATTERN = /[A-Za-zÀ-ÖØ-öø-ÿ]{2,}/g;
-const KEYBOARD_SEQUENCE_PATTERN =
-  /qwert|asdf|zxcv|hjkl|poiuy|lkjh|mnbv/i;
+const KEYBOARD_SEQUENCE_PATTERN = /qwert|asdf|zxcv|hjkl|poiuy|lkjh|mnbv/i;
 const CODE_KEYWORD_PATTERN =
   /\b(?:class|const|def|enum|export|for|from|function|if|import|interface|let|private|public|return|select|type|update|var|while)\b/i;
 
@@ -35,10 +34,7 @@ function hasMeaningfulStructuredContent(content: string): boolean {
       const serializedWords = JSON.stringify(parsed)
         .replace(/[{}\[\]":,]/g, ' ')
         .trim();
-      if (
-        serializedWords &&
-        hasMeaningfulDocumentContent(serializedWords)
-      ) {
+      if (serializedWords && hasMeaningfulDocumentContent(serializedWords)) {
         return true;
       }
     }
@@ -86,9 +82,7 @@ export function hasMeaningfulDocumentContent(content: string): boolean {
   );
   if (
     (wordLikeLatinTokens.length >= 2 && latinLetterCount >= 8) ||
-    (wordLikeLatinTokens.length >= 1 &&
-      latinLetterCount >= 8 &&
-      cjkCount >= 2)
+    (wordLikeLatinTokens.length >= 1 && latinLetterCount >= 8 && cjkCount >= 2)
   ) {
     return true;
   }

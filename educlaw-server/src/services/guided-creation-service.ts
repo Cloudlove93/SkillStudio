@@ -1132,10 +1132,7 @@ export async function getGuidedCreationDetail(input: {
          join agent_package_version_skills link
            on link.skill_id = s.id and link.package_id = s.package_id
         where s.package_id = $1 and link.package_version_id = $2`,
-      [
-        detail.generatedAgent.agentId,
-        detail.generatedAgent.packageVersionId,
-      ],
+      [detail.generatedAgent.agentId, detail.generatedAgent.packageVersionId],
     );
     const skillIdByUid = new Map(
       skillResult.rows.map((skill) => [

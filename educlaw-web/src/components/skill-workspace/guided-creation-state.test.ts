@@ -62,7 +62,11 @@ describe('guided creation UI state', () => {
   it('keeps retryable errors inline', () => {
     const state = applyGuidedStreamEvent(createGuidedStreamState(), {
       event: 'error',
-      data: { code: 'MODEL_UNAVAILABLE', message: '模型暂时不可用', retryable: true },
+      data: {
+        code: 'MODEL_UNAVAILABLE',
+        message: '模型暂时不可用',
+        retryable: true,
+      },
     });
 
     expect(state.error).toEqual({
@@ -75,7 +79,11 @@ describe('guided creation UI state', () => {
 
   it('marks a finalization lease stale after ten minutes', () => {
     const now = Date.parse('2026-08-03T10:20:00.000Z');
-    expect(isGuidedFinalizationStale('2026-08-03T10:09:59.000Z', now)).toBe(true);
-    expect(isGuidedFinalizationStale('2026-08-03T10:15:00.000Z', now)).toBe(false);
+    expect(isGuidedFinalizationStale('2026-08-03T10:09:59.000Z', now)).toBe(
+      true,
+    );
+    expect(isGuidedFinalizationStale('2026-08-03T10:15:00.000Z', now)).toBe(
+      false,
+    );
   });
 });

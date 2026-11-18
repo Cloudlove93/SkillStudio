@@ -22,7 +22,10 @@ test('LiteArenaPanel should guard skill history mutations with action-scoped pen
     source,
     /const actionId = getSkillActionId\('undiscard', currentSkillId, version\.id\);/,
   );
-  assert.match(source, /if \(skillActionPendingIdRef\.current === actionId\) return;/);
+  assert.match(
+    source,
+    /if \(skillActionPendingIdRef\.current === actionId\) return;/,
+  );
   assert.match(source, /skillActionPendingIdRef\.current = actionId;/);
   assert.match(source, /disabled=\{isPending\}/);
 });

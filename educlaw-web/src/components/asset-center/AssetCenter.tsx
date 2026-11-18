@@ -36,10 +36,8 @@ export function AssetCenter({ token }: { token: string }) {
 function AssetCenterSession({ token }: { token: string }) {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
-  const tab: AssetTab =
-    params.get('tab') === 'skills' ? 'skills' : 'agents';
-  const agentOpen =
-    params.has('agentId') || params.get('create') === 'agent';
+  const tab: AssetTab = params.get('tab') === 'skills' ? 'skills' : 'agents';
+  const agentOpen = params.has('agentId') || params.get('create') === 'agent';
   const previewId = params.get('previewSkill');
   const previewPackage = params.get('previewPackage');
   const [agents, setAgents] = useState<AgentSummary[]>([]);
@@ -339,7 +337,11 @@ function AssetCenterSession({ token }: { token: string }) {
             </div>
             <div>
               <span>ATTENTION</span>
-              <strong>{agentsLoading || skillsLoading ? '—' : agentAttention + skillAttention}</strong>
+              <strong>
+                {agentsLoading || skillsLoading
+                  ? '—'
+                  : agentAttention + skillAttention}
+              </strong>
               <small>待配置</small>
             </div>
           </section>
@@ -475,9 +477,7 @@ function AssetCenterSession({ token }: { token: string }) {
                       agent={agent}
                       index={index}
                       onOpen={() => open({ agentId: agent.id })}
-                      onChat={() =>
-                        navigateSafely(routes.chat(agent.id))
-                      }
+                      onChat={() => navigateSafely(routes.chat(agent.id))}
                     />
                   )}
                 />

@@ -59,13 +59,23 @@ export default function AgentDetailSections({
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col gap-3 px-3 py-3">
-      <div ref={containerRef} className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <DetailSurface className="min-h-0 min-w-0 overflow-hidden" style={{ height: `${splitRatio * 100}%` }}>
+      <div
+        ref={containerRef}
+        className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+      >
+        <DetailSurface
+          className="min-h-0 min-w-0 overflow-hidden"
+          style={{ height: `${splitRatio * 100}%` }}
+        >
           {canLoadData ? (
             <SessionList
               sessions={tabSessions}
               activeSessionId={sessionId}
-              onSelect={(id) => { setSessionId(agentId, id); setOpenFilePath(null); useUIStore.getState().setMainView(null); }}
+              onSelect={(id) => {
+                setSessionId(agentId, id);
+                setOpenFilePath(null);
+                useUIStore.getState().setMainView(null);
+              }}
               onCreate={sessions.handleCreateSession}
               onDelete={sessions.handleDeleteSession}
               onArchive={sessions.handleArchiveSession}
@@ -83,13 +93,21 @@ export default function AgentDetailSections({
           )}
         </DetailSurface>
 
-        <div onMouseDown={onDragStart} className="group my-2 flex h-4 shrink-0 cursor-row-resize items-center justify-center">
+        <div
+          onMouseDown={onDragStart}
+          className="group my-2 flex h-4 shrink-0 cursor-row-resize items-center justify-center"
+        >
           <div className="pointer-events-none h-1 w-20 rounded-full bg-border transition-colors duration-200 group-hover:bg-primary/40" />
         </div>
 
         <DetailSurface className="min-h-0 min-w-0 flex-1 overflow-hidden">
           {canLoadData ? (
-            <FileExplorer agentId={agentId} onFileSelect={(path) => setOpenFilePath(path)} onDeselect={() => setOpenFilePath(null)} readonly={readonly} />
+            <FileExplorer
+              agentId={agentId}
+              onFileSelect={(path) => setOpenFilePath(path)}
+              onDeselect={() => setOpenFilePath(null)}
+              readonly={readonly}
+            />
           ) : (
             <div className="flex h-full flex-1 flex-col items-center justify-center px-6 text-center text-muted-foreground/70">
               <div className="mb-3 flex size-11 items-center justify-center rounded-[12px] bg-muted text-muted-foreground">
@@ -112,8 +130,12 @@ export default function AgentDetailSections({
               <Sparkles className="size-4" />
             </div>
             <div className="min-w-0 flex-1">
-              <div className="font-medium text-foreground">{t('optimize.action')}</div>
-              <div className="text-xs break-words text-muted-foreground">{t('optimize.agentHint')}</div>
+              <div className="font-medium text-foreground">
+                {t('optimize.action')}
+              </div>
+              <div className="text-xs break-words text-muted-foreground">
+                {t('optimize.agentHint')}
+              </div>
             </div>
           </button>
         </DetailSurface>
@@ -128,13 +150,20 @@ export default function AgentDetailSections({
             <Settings className="size-4" />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="font-medium text-foreground">{t('sidebar.settings')}</div>
-            <div className="text-xs break-words text-muted-foreground">{t('sidebar.settingsHint')}</div>
+            <div className="font-medium text-foreground">
+              {t('sidebar.settings')}
+            </div>
+            <div className="text-xs break-words text-muted-foreground">
+              {t('sidebar.settingsHint')}
+            </div>
           </div>
         </button>
       </DetailSurface>
 
-      <SettingsDialog open={showSettingsDialog} onOpenChange={setShowSettingsDialog} />
+      <SettingsDialog
+        open={showSettingsDialog}
+        onOpenChange={setShowSettingsDialog}
+      />
     </div>
   );
 }

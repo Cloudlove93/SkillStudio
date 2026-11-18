@@ -1,4 +1,7 @@
-import type { AdoptedChange, InteractiveOptimizationMessage } from '../../api/lite-api';
+import type {
+  AdoptedChange,
+  InteractiveOptimizationMessage,
+} from '../../api/lite-api';
 
 export type SkillOptimizeState = {
   draft: string;

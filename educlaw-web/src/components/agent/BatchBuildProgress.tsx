@@ -6,7 +6,11 @@ import { useChatStore } from '../../stores/chat';
 import { useUIStore } from '../../stores/ui';
 import { useLibraryStore } from '../../stores/library';
 import { useT } from '../../i18n';
-import { LogItem, ProfilePreviewCard, SkillPreviewCard } from './build-components';
+import {
+  LogItem,
+  ProfilePreviewCard,
+  SkillPreviewCard,
+} from './build-components';
 
 export default function BatchBuildProgress() {
   const t = useT();
@@ -23,7 +27,12 @@ export default function BatchBuildProgress() {
 
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [item?.logs, item?.streamingText, item?.profilePreview, item?.skillPreview]);
+  }, [
+    item?.logs,
+    item?.streamingText,
+    item?.profilePreview,
+    item?.skillPreview,
+  ]);
 
   if (!item) {
     return (
@@ -45,13 +54,20 @@ export default function BatchBuildProgress() {
     resultSkill,
     projectCreated,
   } = item;
-  const hasContent = logs.length > 0 || isStreaming || isWaitingLLM || profilePreview !== null || skillPreview !== null;
+  const hasContent =
+    logs.length > 0 ||
+    isStreaming ||
+    isWaitingLLM ||
+    profilePreview !== null ||
+    skillPreview !== null;
 
   if (!hasContent) {
     return (
       <div className="flex items-center justify-center h-full">
         {status === 'pending' ? (
-          <span className="text-sm text-muted-foreground">{t('build.batchPending')}</span>
+          <span className="text-sm text-muted-foreground">
+            {t('build.batchPending')}
+          </span>
         ) : (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="size-3.5 animate-spin" />
@@ -68,7 +84,9 @@ export default function BatchBuildProgress() {
         {logs.map((log, i) => (
           <LogItem key={i} entry={log} t={t} />
         ))}
-        {profilePreview && <ProfilePreviewCard preview={profilePreview} t={t} />}
+        {profilePreview && (
+          <ProfilePreviewCard preview={profilePreview} t={t} />
+        )}
         {skillPreview && <SkillPreviewCard preview={skillPreview} />}
         {isWaitingLLM && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -81,7 +99,9 @@ export default function BatchBuildProgress() {
             <div className="flex items-center gap-2 mb-2">
               <Loader2 className="size-3.5 animate-spin text-blue-500" />
               <span className="text-xs font-medium text-muted-foreground">
-                {profilePreview ? t('build.selectingSkills') : t('build.generatingProfile')}
+                {profilePreview
+                  ? t('build.selectingSkills')
+                  : t('build.generatingProfile')}
               </span>
             </div>
             <pre className="text-sm text-foreground/80 whitespace-pre-wrap break-words font-mono leading-relaxed max-h-48 overflow-y-auto">
@@ -138,4 +158,3 @@ export default function BatchBuildProgress() {
     </div>
   );
 }
-

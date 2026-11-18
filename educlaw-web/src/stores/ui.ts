@@ -1,7 +1,20 @@
 ﻿import { create } from 'zustand';
 
-export type MainView = 'gallery' | 'build' | 'skills' | 'tools' | 'diary' | 'deep-study' | null;
-export type DeepStudyTab = 'gallery' | 'build' | 'skills' | 'tools' | 'arena' | 'optimize';
+export type MainView =
+  | 'gallery'
+  | 'build'
+  | 'skills'
+  | 'tools'
+  | 'diary'
+  | 'deep-study'
+  | null;
+export type DeepStudyTab =
+  | 'gallery'
+  | 'build'
+  | 'skills'
+  | 'tools'
+  | 'arena'
+  | 'optimize';
 
 export interface PendingArenaTarget {
   kind: 'profile' | 'skill' | 'agent';

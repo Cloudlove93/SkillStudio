@@ -8,7 +8,11 @@ import {
 } from '@/components/ui/dialog';
 import { useSettingsStore } from '../../stores/settings';
 import { useT, type Locale } from '../../i18n';
-import { DetailSurface, PremiumHeader, PremiumPill } from '@/components/ui/premium';
+import {
+  DetailSurface,
+  PremiumHeader,
+  PremiumPill,
+} from '@/components/ui/premium';
 
 interface Props {
   open: boolean;
@@ -36,7 +40,11 @@ export default function SettingsDialog({ open, onOpenChange }: Props) {
             eyebrow={t('settings.preferencesEyebrow')}
             title={t('settings.title')}
             description={t('settings.description')}
-            actions={<PremiumPill accent="slate">{language === 'zh' ? zhLabel : 'English'}</PremiumPill>}
+            actions={
+              <PremiumPill accent="slate">
+                {language === 'zh' ? zhLabel : 'English'}
+              </PremiumPill>
+            }
           />
 
           <DetailSurface className="p-4 sm:p-5">
@@ -48,7 +56,9 @@ export default function SettingsDialog({ open, onOpenChange }: Props) {
                   </div>
                   {t('settings.language')}
                 </div>
-                <div className="pl-10 text-xs text-muted-foreground">{t('settings.languageDesc')}</div>
+                <div className="pl-10 text-xs text-muted-foreground">
+                  {t('settings.languageDesc')}
+                </div>
               </div>
               <select
                 value={language}

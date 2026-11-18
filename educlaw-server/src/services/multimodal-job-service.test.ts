@@ -99,15 +99,23 @@ function makeDeps() {
 
 function makeObjectStorageGrants() {
   return {
-    createSignedGetGrant: vi.fn(async ({ objectKey }: { objectKey: string }) => ({
-      method: 'GET',
-      objectKey,
-      url: 'https://signed.example/read',
-      expiresAt: '2026-08-22T10:01:00.000Z',
-      requiredHeaders: {},
-    })),
+    createSignedGetGrant: vi.fn(
+      async ({ objectKey }: { objectKey: string }) => ({
+        method: 'GET',
+        objectKey,
+        url: 'https://signed.example/read',
+        expiresAt: '2026-08-22T10:01:00.000Z',
+        requiredHeaders: {},
+      }),
+    ),
     createSignedPutGrant: vi.fn(
-      async ({ objectKey, contentType }: { objectKey: string; contentType: string }) => ({
+      async ({
+        objectKey,
+        contentType,
+      }: {
+        objectKey: string;
+        contentType: string;
+      }) => ({
         method: 'PUT',
         objectKey,
         url: 'https://signed.example/write',
@@ -393,9 +401,7 @@ async function runRealPythonQualityCheckFixture(options: {
     const stderr = Buffer.concat(stderrChunks).toString('utf-8');
 
     if (exitCode !== 0) {
-      throw new Error(
-        `Python quality check failed: ${stderr || stdout}`,
-      );
+      throw new Error(`Python quality check failed: ${stderr || stdout}`);
     }
 
     return {
@@ -781,12 +787,14 @@ describe('multimodal job service', () => {
   it('adds runtime grants only for media_quality_check claims after the claim transaction completes', async () => {
     const deps = makeDeps();
     const events: string[] = [];
-    deps.withTransaction = vi.fn(async (work: (client: typeof deps.db) => unknown) => {
-      events.push('tx:start');
-      const result = await work(deps.db);
-      events.push('tx:commit');
-      return result;
-    });
+    deps.withTransaction = vi.fn(
+      async (work: (client: typeof deps.db) => unknown) => {
+        events.push('tx:start');
+        const result = await work(deps.db);
+        events.push('tx:commit');
+        return result;
+      },
+    );
     deps.store.claimNextJob.mockResolvedValue(
       makeJob({
         id: '777',
@@ -807,29 +815,33 @@ describe('multimodal job service', () => {
       }),
     );
     const objectStorageService = {
-      createSignedGetGrant: vi.fn(async ({ objectKey }: { objectKey: string }) => {
-        events.push('grant:get');
-        return {
-          method: 'GET',
-          objectKey,
-          url: 'https://signed.example/source',
-          expiresAt: '2026-08-22T10:01:00.000Z',
-          requiredHeaders: {},
-        };
-      }),
-      createSignedPutGrant: vi.fn(async ({ objectKey }: { objectKey: string }) => {
-        events.push('grant:put');
-        return {
-          method: 'PUT',
-          objectKey,
-          url: 'https://signed.example/manifest',
-          expiresAt: '2026-08-22T10:01:00.000Z',
-          requiredHeaders: {
-            'content-type': 'application/json',
-            'if-none-match': '*',
-          },
-        };
-      }),
+      createSignedGetGrant: vi.fn(
+        async ({ objectKey }: { objectKey: string }) => {
+          events.push('grant:get');
+          return {
+            method: 'GET',
+            objectKey,
+            url: 'https://signed.example/source',
+            expiresAt: '2026-08-22T10:01:00.000Z',
+            requiredHeaders: {},
+          };
+        },
+      ),
+      createSignedPutGrant: vi.fn(
+        async ({ objectKey }: { objectKey: string }) => {
+          events.push('grant:put');
+          return {
+            method: 'PUT',
+            objectKey,
+            url: 'https://signed.example/manifest',
+            expiresAt: '2026-08-22T10:01:00.000Z',
+            requiredHeaders: {
+              'content-type': 'application/json',
+              'if-none-match': '*',
+            },
+          };
+        },
+      ),
     };
     const service = createMultimodalJobService({
       ...deps,
@@ -943,24 +955,38 @@ describe('multimodal job service', () => {
       }),
     );
     const objectStorageService = {
-      createSignedGetGrant: vi.fn(async ({ objectKey }: { objectKey: string }) => ({
-        method: 'GET',
-        objectKey,
-        url: 'https://signed.example/read',
-        expiresAt: '2026-08-22T10:01:00.000Z',
-        requiredHeaders: {},
-      })),
+      createSignedGetGrant: vi.fn(
+        async ({ objectKey }: { objectKey: string }) => ({
+          method: 'GET',
+          objectKey,
+          url: 'https://signed.example/read',
+          expiresAt: '2026-08-22T10:01:00.000Z',
+          requiredHeaders: {},
+        }),
+      ),
       createSignedPutGrant: vi.fn(
-        async ({ objectKey, contentType }: { objectKey: string; contentType: string }) => ({
+        async ({
+          objectKey,
+          contentType,
+        }: {
+          objectKey: string;
+          contentType: string;
+        }) => ({
           method: 'PUT',
           objectKey,
           url: 'https://signed.example/write',
           expiresAt: '2026-08-22T10:01:00.000Z',
-          requiredHeaders: { 'content-type': contentType, 'if-none-match': '*' },
+          requiredHeaders: {
+            'content-type': contentType,
+            'if-none-match': '*',
+          },
         }),
       ),
     };
-    const service = createMultimodalJobService({ ...deps, objectStorageService });
+    const service = createMultimodalJobService({
+      ...deps,
+      objectStorageService,
+    });
 
     const result = await service.claimMediaJob({
       workerIdentity: 'worker-a',
@@ -1152,7 +1178,9 @@ describe('multimodal job service', () => {
     );
     expect(deps.db.query.mock.calls[1]?.[0]).toContain('revision_no = $8');
     expect(deps.db.query.mock.calls[1]?.[0]).toContain('media_stage = $9');
-    const persistedState = JSON.parse(String(deps.db.query.mock.calls[1]?.[1]?.[2]));
+    const persistedState = JSON.parse(
+      String(deps.db.query.mock.calls[1]?.[1]?.[2]),
+    );
     expect(persistedState.pendingUpload).toBeNull();
     expect(persistedState.primarySource).toEqual({
       sourceId: 'source-upload-1',
@@ -1502,8 +1530,7 @@ describe('multimodal job service', () => {
       hasAudio: true,
       hasVideo: true,
       normalizedAudioAssetRef: {
-        objectKey:
-          'skill-sessions/91/jobs/801/attempt-2/normalized-audio.wav',
+        objectKey: 'skill-sessions/91/jobs/801/attempt-2/normalized-audio.wav',
         mimeType: 'audio/wav',
         sizeBytes: 64_000,
         sha256: 'b'.repeat(64),
@@ -1794,8 +1821,7 @@ describe('multimodal job service', () => {
           message: 'download failed',
           retryable: true,
           details: {
-            reason:
-              'https://signed.example/source?token=worker-secret-token',
+            reason: 'https://signed.example/source?token=worker-secret-token',
           },
         },
       }),
@@ -1881,9 +1907,9 @@ describe('multimodal job service', () => {
         }),
       }),
     );
-    expect(String(terminalDeps.db.query.mock.calls[0]?.[0]).toLowerCase()).toContain(
-      "media_stage = 'failed'",
-    );
+    expect(
+      String(terminalDeps.db.query.mock.calls[0]?.[0]).toLowerCase(),
+    ).toContain("media_stage = 'failed'");
   });
 
   it('wraps cancel and recycle in transactions', async () => {
@@ -2113,11 +2139,10 @@ describe('multimodal job service', () => {
         leaseExpiresAt: '2026-08-21T00:01:00.000Z',
       }),
     );
-    deps.db.query
-      .mockResolvedValueOnce({
-        rowCount: 1,
-        rows: [makeSessionRow()],
-      });
+    deps.db.query.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [makeSessionRow()],
+    });
     const service = createMultimodalJobService(deps);
 
     await expect(
@@ -2131,49 +2156,309 @@ describe('multimodal job service', () => {
       code: 'DATA_INTEGRITY_ERROR',
     });
 
-    expect(
-      buildMediaQualityCheckResultHash(outputManifest),
-    ).not.toBe('f'.repeat(64));
+    expect(buildMediaQualityCheckResultHash(outputManifest)).not.toBe(
+      'f'.repeat(64),
+    );
     expect(deps.db.query).toHaveBeenCalledTimes(0);
     expect(deps.store.completeJob).not.toHaveBeenCalled();
   });
 
-  it('accepts real python audio output and advances the session to ready_to_process', async () => {
-    const fixture = await runRealPythonQualityCheckFixture({
-      fixtureName: 'audio-short.wav',
-      sessionId: '91',
-      jobId: '301',
-      sourceId: 'source-upload-1',
-      mediaKind: 'audio',
-      objectKey:
-        'skill-sessions/91/source/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.wav',
-      fileName: 'lesson.wav',
-      expectedContentType: 'audio/wav',
-      manifestObjectKey:
-        'skill-sessions/91/manifest/media-quality-check/job-301-attempt-1.json',
-    });
-    const deps = makeDeps();
-    const outputManifest = fixture.outputManifest;
-    const parsedOutputManifest = parseMediaQualityCheckOutputManifest(outputManifest);
-    deps.store.loadJobForLeaseMutation.mockResolvedValue(
-      makeJob({
-        id: '301',
-        jobType: 'media_quality_check',
-        status: 'leased',
-        attemptNo: 1,
-        inputManifest: makeQualityCheckInputManifest({
-          objectKey:
-            'skill-sessions/91/source/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.wav',
-          fileName: 'lesson.wav',
-          expectedSizeBytes: fixture.observedSizeBytes,
-          expectedContentType: 'audio/wav',
+  it(
+    'accepts real python audio output and advances the session to ready_to_process',
+    async () => {
+      const fixture = await runRealPythonQualityCheckFixture({
+        fixtureName: 'audio-short.wav',
+        sessionId: '91',
+        jobId: '301',
+        sourceId: 'source-upload-1',
+        mediaKind: 'audio',
+        objectKey:
+          'skill-sessions/91/source/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.wav',
+        fileName: 'lesson.wav',
+        expectedContentType: 'audio/wav',
+        manifestObjectKey:
+          'skill-sessions/91/manifest/media-quality-check/job-301-attempt-1.json',
+      });
+      const deps = makeDeps();
+      const outputManifest = fixture.outputManifest;
+      const parsedOutputManifest =
+        parseMediaQualityCheckOutputManifest(outputManifest);
+      deps.store.loadJobForLeaseMutation.mockResolvedValue(
+        makeJob({
+          id: '301',
+          jobType: 'media_quality_check',
+          status: 'leased',
+          attemptNo: 1,
+          inputManifest: makeQualityCheckInputManifest({
+            objectKey:
+              'skill-sessions/91/source/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.wav',
+            fileName: 'lesson.wav',
+            expectedSizeBytes: fixture.observedSizeBytes,
+            expectedContentType: 'audio/wav',
+          }),
+          leaseTokenHash: 'b'.repeat(64),
+          leaseExpiresAt: '2026-08-21T00:01:00.000Z',
         }),
-        leaseTokenHash: 'b'.repeat(64),
-        leaseExpiresAt: '2026-08-21T00:01:00.000Z',
-      }),
-    );
-    deps.db.query
-      .mockResolvedValueOnce({
+      );
+      deps.db.query
+        .mockResolvedValueOnce({
+          rowCount: 1,
+          rows: [
+            makeSessionRow({
+              media_state_json: makeMediaState({
+                pendingUpload: makePendingUpload(
+                  {
+                    fileName: 'lesson.wav',
+                    declaredMimeType: 'audio/wav',
+                    sizeBytes: fixture.observedSizeBytes,
+                    objectKey:
+                      'skill-sessions/91/source/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.wav',
+                  },
+                  {
+                    observedSizeBytes: fixture.observedSizeBytes,
+                    observedContentType: 'audio/wav',
+                  },
+                ),
+              }),
+            }),
+          ],
+        })
+        .mockResolvedValueOnce({
+          rowCount: 1,
+          rows: [
+            (() => {
+              const sourceAsset = (
+                outputManifest as {
+                  sourceAsset: Record<string, unknown>;
+                }
+              ).sourceAsset;
+              return makeSessionRow({
+                media_stage: 'ready_to_process',
+                media_state_json: makeMediaState({
+                  primarySource: {
+                    sourceId: 'source-upload-1',
+                    kind: 'audio',
+                    assetRef: sourceAsset,
+                  },
+                  pendingUpload: null,
+                }),
+                revision_no: 3,
+              });
+            })(),
+          ],
+        });
+      deps.store.completeJob.mockResolvedValue({
+        jobId: '301',
+        status: 'succeeded',
+        resultHash: fixture.resultHash,
+        outputManifest,
+        finishedAt: '2026-08-21T00:00:00.000Z',
+        replayed: false,
+      });
+      const service = createMultimodalJobService(deps);
+
+      const result = await service.completeMediaJob({
+        jobId: '301',
+        leaseToken: 'opaque-lease-token',
+        resultHash: fixture.resultHash,
+        outputManifest,
+      });
+
+      expect(result.status).toBe('succeeded');
+      const persistedState = JSON.parse(
+        String(deps.db.query.mock.calls[1]?.[1]?.[2]),
+      );
+      expect(persistedState.mediaStage).toBeUndefined();
+      expect(persistedState.pendingUpload).toBeNull();
+      expect(persistedState.primarySource.kind).toBe('audio');
+      expect(persistedState.primarySource.assetRef.mimeType).toBe('audio/wav');
+      expect(persistedState.primarySource.assetRef.sizeBytes).toBe(
+        fixture.observedSizeBytes,
+      );
+      expect(buildMediaQualityCheckResultHash(parsedOutputManifest)).toBe(
+        fixture.resultHash,
+      );
+      expect(fixture.uploadedFullManifest?.processorVersion).toBe('0.1.0');
+    },
+    REAL_MEDIA_INTEGRATION_TIMEOUT_MS,
+  );
+
+  it(
+    'accepts real python video output and advances the session to ready_to_process',
+    async () => {
+      const fixture = await runRealPythonQualityCheckFixture({
+        fixtureName: 'video-with-audio.mp4',
+        sessionId: '92',
+        jobId: '302',
+        sourceId: 'source-upload-2',
+        mediaKind: 'video',
+        objectKey:
+          'skill-sessions/92/source/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb.mp4',
+        fileName: 'lesson.mp4',
+        expectedContentType: 'video/mp4',
+        manifestObjectKey:
+          'skill-sessions/92/manifest/media-quality-check/job-302-attempt-1.json',
+      });
+      const deps = makeDeps();
+      const outputManifest = fixture.outputManifest;
+      const parsedOutputManifest =
+        parseMediaQualityCheckOutputManifest(outputManifest);
+      deps.store.loadJobForLeaseMutation.mockResolvedValue(
+        makeJob({
+          id: '302',
+          sessionId: '92',
+          jobType: 'media_quality_check',
+          status: 'leased',
+          attemptNo: 1,
+          inputManifest: makeQualityCheckInputManifest({
+            sourceId: 'source-upload-2',
+            mediaKind: 'video',
+            objectKey:
+              'skill-sessions/92/source/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb.mp4',
+            fileName: 'lesson.mp4',
+            expectedSizeBytes: fixture.observedSizeBytes,
+            expectedContentType: 'video/mp4',
+          }),
+          leaseTokenHash: 'b'.repeat(64),
+          leaseExpiresAt: '2026-08-21T00:01:00.000Z',
+        }),
+      );
+      deps.db.query
+        .mockResolvedValueOnce({
+          rowCount: 1,
+          rows: [
+            makeSessionRow({
+              id: '92',
+              revision_no: 2,
+              media_state_json: makeMediaState({
+                pendingUpload: makePendingUpload(
+                  {
+                    sourceId: 'source-upload-2',
+                    mediaKind: 'video',
+                    fileName: 'lesson.mp4',
+                    declaredMimeType: 'video/mp4',
+                    sizeBytes: fixture.observedSizeBytes,
+                    objectKey:
+                      'skill-sessions/92/source/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb.mp4',
+                  },
+                  {
+                    jobId: '302',
+                    observedSizeBytes: fixture.observedSizeBytes,
+                    observedContentType: 'video/mp4',
+                  },
+                ),
+              }),
+            }),
+          ],
+        })
+        .mockResolvedValueOnce({
+          rowCount: 1,
+          rows: [
+            (() => {
+              const sourceAsset = (
+                outputManifest as {
+                  sourceAsset: Record<string, unknown>;
+                }
+              ).sourceAsset;
+              return makeSessionRow({
+                id: '92',
+                media_stage: 'ready_to_process',
+                media_state_json: makeMediaState({
+                  primarySource: {
+                    sourceId: 'source-upload-2',
+                    kind: 'video',
+                    assetRef: sourceAsset,
+                  },
+                  pendingUpload: null,
+                }),
+                revision_no: 3,
+              });
+            })(),
+          ],
+        });
+      deps.store.completeJob.mockResolvedValue({
+        jobId: '302',
+        status: 'succeeded',
+        resultHash: fixture.resultHash,
+        outputManifest,
+        finishedAt: '2026-08-21T00:00:00.000Z',
+        replayed: false,
+      });
+      const service = createMultimodalJobService(deps);
+
+      const result = await service.completeMediaJob({
+        jobId: '302',
+        leaseToken: 'opaque-lease-token',
+        resultHash: fixture.resultHash,
+        outputManifest,
+      });
+
+      expect(result.status).toBe('succeeded');
+      const persistedState = JSON.parse(
+        String(deps.db.query.mock.calls[1]?.[1]?.[2]),
+      );
+      expect(persistedState.pendingUpload).toBeNull();
+      expect(persistedState.primarySource.kind).toBe('video');
+      expect(persistedState.primarySource.assetRef.mimeType).toBe('video/mp4');
+      expect(persistedState.primarySource.assetRef.sizeBytes).toBe(
+        fixture.observedSizeBytes,
+      );
+      expect(buildMediaQualityCheckResultHash(parsedOutputManifest)).toBe(
+        fixture.resultHash,
+      );
+      expect(fixture.uploadedFullManifest?.processorVersion).toBe('0.1.0');
+    },
+    REAL_MEDIA_INTEGRATION_TIMEOUT_MS,
+  );
+
+  it(
+    'rejects tampered real python output without advancing the transaction state',
+    async () => {
+      const fixture = await runRealPythonQualityCheckFixture({
+        fixtureName: 'audio-short.wav',
+        sessionId: '91',
+        jobId: '301',
+        sourceId: 'source-upload-1',
+        mediaKind: 'audio',
+        objectKey:
+          'skill-sessions/91/source/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.wav',
+        fileName: 'lesson.wav',
+        expectedContentType: 'audio/wav',
+        manifestObjectKey:
+          'skill-sessions/91/manifest/media-quality-check/job-301-attempt-1.json',
+      });
+      const deps = makeDeps();
+      const tamperedManifest = {
+        ...(fixture.outputManifest as Record<string, unknown>),
+        sourceAsset: {
+          ...(
+            fixture.outputManifest as { sourceAsset: Record<string, unknown> }
+          ).sourceAsset,
+          objectKey:
+            'skill-sessions/91/source/ffffffff-ffff-4fff-8fff-ffffffffffff.wav',
+        },
+      };
+      const tamperedHash = buildMediaQualityCheckResultHash(
+        parseMediaQualityCheckOutputManifest(tamperedManifest),
+      );
+      deps.store.loadJobForLeaseMutation.mockResolvedValue(
+        makeJob({
+          id: '301',
+          jobType: 'media_quality_check',
+          status: 'leased',
+          attemptNo: 1,
+          inputManifest: makeQualityCheckInputManifest({
+            objectKey:
+              'skill-sessions/91/source/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.wav',
+            fileName: 'lesson.wav',
+            expectedSizeBytes: fixture.observedSizeBytes,
+            expectedContentType: 'audio/wav',
+          }),
+          leaseTokenHash: 'b'.repeat(64),
+          leaseExpiresAt: '2026-08-21T00:01:00.000Z',
+        }),
+      );
+      deps.db.query.mockResolvedValueOnce({
         rowCount: 1,
         rows: [
           makeSessionRow({
@@ -2194,261 +2479,25 @@ describe('multimodal job service', () => {
             }),
           }),
         ],
-      })
-      .mockResolvedValueOnce({
-        rowCount: 1,
-        rows: [
-          (() => {
-            const sourceAsset = (outputManifest as {
-              sourceAsset: Record<string, unknown>;
-            }).sourceAsset;
-            return makeSessionRow({
-              media_stage: 'ready_to_process',
-              media_state_json: makeMediaState({
-                primarySource: {
-                  sourceId: 'source-upload-1',
-                  kind: 'audio',
-                  assetRef: sourceAsset,
-                },
-                pendingUpload: null,
-              }),
-              revision_no: 3,
-            });
-          })(),
-        ],
       });
-    deps.store.completeJob.mockResolvedValue({
-      jobId: '301',
-      status: 'succeeded',
-      resultHash: fixture.resultHash,
-      outputManifest,
-      finishedAt: '2026-08-21T00:00:00.000Z',
-      replayed: false,
-    });
-    const service = createMultimodalJobService(deps);
+      const service = createMultimodalJobService(deps);
 
-    const result = await service.completeMediaJob({
-      jobId: '301',
-      leaseToken: 'opaque-lease-token',
-      resultHash: fixture.resultHash,
-      outputManifest,
-    });
-
-    expect(result.status).toBe('succeeded');
-    const persistedState = JSON.parse(String(deps.db.query.mock.calls[1]?.[1]?.[2]));
-    expect(persistedState.mediaStage).toBeUndefined();
-    expect(persistedState.pendingUpload).toBeNull();
-    expect(persistedState.primarySource.kind).toBe('audio');
-    expect(persistedState.primarySource.assetRef.mimeType).toBe('audio/wav');
-    expect(persistedState.primarySource.assetRef.sizeBytes).toBe(
-      fixture.observedSizeBytes,
-    );
-    expect(buildMediaQualityCheckResultHash(parsedOutputManifest)).toBe(
-      fixture.resultHash,
-    );
-    expect(fixture.uploadedFullManifest?.processorVersion).toBe('0.1.0');
-  }, REAL_MEDIA_INTEGRATION_TIMEOUT_MS);
-
-  it('accepts real python video output and advances the session to ready_to_process', async () => {
-    const fixture = await runRealPythonQualityCheckFixture({
-      fixtureName: 'video-with-audio.mp4',
-      sessionId: '92',
-      jobId: '302',
-      sourceId: 'source-upload-2',
-      mediaKind: 'video',
-      objectKey:
-        'skill-sessions/92/source/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb.mp4',
-      fileName: 'lesson.mp4',
-      expectedContentType: 'video/mp4',
-      manifestObjectKey:
-        'skill-sessions/92/manifest/media-quality-check/job-302-attempt-1.json',
-    });
-    const deps = makeDeps();
-    const outputManifest = fixture.outputManifest;
-    const parsedOutputManifest = parseMediaQualityCheckOutputManifest(outputManifest);
-    deps.store.loadJobForLeaseMutation.mockResolvedValue(
-      makeJob({
-        id: '302',
-        sessionId: '92',
-        jobType: 'media_quality_check',
-        status: 'leased',
-        attemptNo: 1,
-        inputManifest: makeQualityCheckInputManifest({
-          sourceId: 'source-upload-2',
-          mediaKind: 'video',
-          objectKey:
-            'skill-sessions/92/source/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb.mp4',
-          fileName: 'lesson.mp4',
-          expectedSizeBytes: fixture.observedSizeBytes,
-          expectedContentType: 'video/mp4',
+      await expect(
+        service.completeMediaJob({
+          jobId: '301',
+          leaseToken: 'opaque-lease-token',
+          resultHash: tamperedHash,
+          outputManifest: tamperedManifest,
         }),
-        leaseTokenHash: 'b'.repeat(64),
-        leaseExpiresAt: '2026-08-21T00:01:00.000Z',
-      }),
-    );
-    deps.db.query
-      .mockResolvedValueOnce({
-        rowCount: 1,
-        rows: [
-          makeSessionRow({
-            id: '92',
-            revision_no: 2,
-            media_state_json: makeMediaState({
-              pendingUpload: makePendingUpload(
-                {
-                  sourceId: 'source-upload-2',
-                  mediaKind: 'video',
-                  fileName: 'lesson.mp4',
-                  declaredMimeType: 'video/mp4',
-                  sizeBytes: fixture.observedSizeBytes,
-                  objectKey:
-                    'skill-sessions/92/source/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb.mp4',
-                },
-                {
-                  jobId: '302',
-                  observedSizeBytes: fixture.observedSizeBytes,
-                  observedContentType: 'video/mp4',
-                },
-              ),
-            }),
-          }),
-        ],
-      })
-      .mockResolvedValueOnce({
-        rowCount: 1,
-        rows: [
-          (() => {
-            const sourceAsset = (outputManifest as {
-              sourceAsset: Record<string, unknown>;
-            }).sourceAsset;
-            return makeSessionRow({
-              id: '92',
-              media_stage: 'ready_to_process',
-              media_state_json: makeMediaState({
-                primarySource: {
-                  sourceId: 'source-upload-2',
-                  kind: 'video',
-                  assetRef: sourceAsset,
-                },
-                pendingUpload: null,
-              }),
-              revision_no: 3,
-            });
-          })(),
-        ],
+      ).rejects.toMatchObject({
+        code: 'DATA_INTEGRITY_ERROR',
       });
-    deps.store.completeJob.mockResolvedValue({
-      jobId: '302',
-      status: 'succeeded',
-      resultHash: fixture.resultHash,
-      outputManifest,
-      finishedAt: '2026-08-21T00:00:00.000Z',
-      replayed: false,
-    });
-    const service = createMultimodalJobService(deps);
 
-    const result = await service.completeMediaJob({
-      jobId: '302',
-      leaseToken: 'opaque-lease-token',
-      resultHash: fixture.resultHash,
-      outputManifest,
-    });
-
-    expect(result.status).toBe('succeeded');
-    const persistedState = JSON.parse(String(deps.db.query.mock.calls[1]?.[1]?.[2]));
-    expect(persistedState.pendingUpload).toBeNull();
-    expect(persistedState.primarySource.kind).toBe('video');
-    expect(persistedState.primarySource.assetRef.mimeType).toBe('video/mp4');
-    expect(persistedState.primarySource.assetRef.sizeBytes).toBe(
-      fixture.observedSizeBytes,
-    );
-    expect(buildMediaQualityCheckResultHash(parsedOutputManifest)).toBe(
-      fixture.resultHash,
-    );
-    expect(fixture.uploadedFullManifest?.processorVersion).toBe('0.1.0');
-  }, REAL_MEDIA_INTEGRATION_TIMEOUT_MS);
-
-  it('rejects tampered real python output without advancing the transaction state', async () => {
-    const fixture = await runRealPythonQualityCheckFixture({
-      fixtureName: 'audio-short.wav',
-      sessionId: '91',
-      jobId: '301',
-      sourceId: 'source-upload-1',
-      mediaKind: 'audio',
-      objectKey:
-        'skill-sessions/91/source/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.wav',
-      fileName: 'lesson.wav',
-      expectedContentType: 'audio/wav',
-      manifestObjectKey:
-        'skill-sessions/91/manifest/media-quality-check/job-301-attempt-1.json',
-    });
-    const deps = makeDeps();
-    const tamperedManifest = {
-      ...(fixture.outputManifest as Record<string, unknown>),
-      sourceAsset: {
-        ...((fixture.outputManifest as { sourceAsset: Record<string, unknown> }).sourceAsset),
-        objectKey:
-          'skill-sessions/91/source/ffffffff-ffff-4fff-8fff-ffffffffffff.wav',
-      },
-    };
-    const tamperedHash = buildMediaQualityCheckResultHash(
-      parseMediaQualityCheckOutputManifest(tamperedManifest),
-    );
-    deps.store.loadJobForLeaseMutation.mockResolvedValue(
-      makeJob({
-        id: '301',
-        jobType: 'media_quality_check',
-        status: 'leased',
-        attemptNo: 1,
-        inputManifest: makeQualityCheckInputManifest({
-          objectKey:
-            'skill-sessions/91/source/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.wav',
-          fileName: 'lesson.wav',
-          expectedSizeBytes: fixture.observedSizeBytes,
-          expectedContentType: 'audio/wav',
-        }),
-        leaseTokenHash: 'b'.repeat(64),
-        leaseExpiresAt: '2026-08-21T00:01:00.000Z',
-      }),
-    );
-    deps.db.query.mockResolvedValueOnce({
-      rowCount: 1,
-      rows: [
-        makeSessionRow({
-          media_state_json: makeMediaState({
-            pendingUpload: makePendingUpload(
-              {
-                fileName: 'lesson.wav',
-                declaredMimeType: 'audio/wav',
-                sizeBytes: fixture.observedSizeBytes,
-                objectKey:
-                  'skill-sessions/91/source/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.wav',
-              },
-              {
-                observedSizeBytes: fixture.observedSizeBytes,
-                observedContentType: 'audio/wav',
-              },
-            ),
-          }),
-        }),
-      ],
-    });
-    const service = createMultimodalJobService(deps);
-
-    await expect(
-      service.completeMediaJob({
-        jobId: '301',
-        leaseToken: 'opaque-lease-token',
-        resultHash: tamperedHash,
-        outputManifest: tamperedManifest,
-      }),
-    ).rejects.toMatchObject({
-      code: 'DATA_INTEGRITY_ERROR',
-    });
-
-    expect(deps.store.completeJob).not.toHaveBeenCalled();
-    expect(deps.db.query).toHaveBeenCalledTimes(1);
-  }, REAL_MEDIA_INTEGRATION_TIMEOUT_MS);
+      expect(deps.store.completeJob).not.toHaveBeenCalled();
+      expect(deps.db.query).toHaveBeenCalledTimes(1);
+    },
+    REAL_MEDIA_INTEGRATION_TIMEOUT_MS,
+  );
 
   it('rejects media_quality_check completion when output bindings drift from the original upload intent', async () => {
     const deps = makeDeps();
@@ -2567,20 +2616,24 @@ describe('multimodal job service', () => {
     const service = createMultimodalJobService({
       ...deps,
       objectStorageService: {
-        createSignedGetGrant: vi.fn(async ({ objectKey }: { objectKey: string }) => ({
-          method: 'GET',
-          objectKey,
-          url: 'https://signed.example/source',
-          expiresAt: '2026-08-22T10:01:00.000Z',
-          requiredHeaders: {},
-        })),
-        createSignedPutGrant: vi.fn(async ({ objectKey }: { objectKey: string }) => ({
-          method: 'PUT',
-          objectKey,
-          url: 'https://signed.example/manifest',
-          expiresAt: '2026-08-22T10:01:00.000Z',
-          requiredHeaders: {},
-        })),
+        createSignedGetGrant: vi.fn(
+          async ({ objectKey }: { objectKey: string }) => ({
+            method: 'GET',
+            objectKey,
+            url: 'https://signed.example/source',
+            expiresAt: '2026-08-22T10:01:00.000Z',
+            requiredHeaders: {},
+          }),
+        ),
+        createSignedPutGrant: vi.fn(
+          async ({ objectKey }: { objectKey: string }) => ({
+            method: 'PUT',
+            objectKey,
+            url: 'https://signed.example/manifest',
+            expiresAt: '2026-08-22T10:01:00.000Z',
+            requiredHeaders: {},
+          }),
+        ),
       },
     });
 
@@ -2633,8 +2686,7 @@ describe('multimodal job service', () => {
       artifactWrites: {
         transcript: {
           method: 'PUT',
-          objectKey:
-            'skill-sessions/21/jobs/17/attempt-2/transcript.json',
+          objectKey: 'skill-sessions/21/jobs/17/attempt-2/transcript.json',
         },
         transcriptChunks: [
           {
@@ -2645,8 +2697,7 @@ describe('multimodal job service', () => {
         ],
       },
       resultManifestWrite: {
-        objectKey:
-          'skill-sessions/21/jobs/17/attempt-2/result.json',
+        objectKey: 'skill-sessions/21/jobs/17/attempt-2/result.json',
       },
     });
     expect(deps.hashLeaseToken).toHaveBeenCalledWith('opaque-lease-token');

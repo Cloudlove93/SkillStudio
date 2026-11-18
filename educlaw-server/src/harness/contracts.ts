@@ -1,28 +1,28 @@
-export type HarnessRunStatus = "completed" | "failed" | "cancelled";
+export type HarnessRunStatus = 'completed' | 'failed' | 'cancelled';
 
 export type HarnessThinkingLevel =
-  | "off"
-  | "minimal"
-  | "low"
-  | "medium"
-  | "high"
-  | "xhigh"
-  | "max";
+  | 'off'
+  | 'minimal'
+  | 'low'
+  | 'medium'
+  | 'high'
+  | 'xhigh'
+  | 'max';
 
 export type HarnessErrorCode =
-  | "INVALID_REQUEST"
-  | "SKILL_INVALID"
-  | "MODEL_UNAVAILABLE"
-  | "OUTPUT_TRUNCATED"
-  | "EMPTY_RESPONSE"
-  | "TOOL_DENIED"
-  | "RUN_LIMIT_EXCEEDED"
-  | "RUN_TIMEOUT"
-  | "RUN_CANCELLED"
-  | "RUN_FAILED";
+  | 'INVALID_REQUEST'
+  | 'SKILL_INVALID'
+  | 'MODEL_UNAVAILABLE'
+  | 'OUTPUT_TRUNCATED'
+  | 'EMPTY_RESPONSE'
+  | 'TOOL_DENIED'
+  | 'RUN_LIMIT_EXCEEDED'
+  | 'RUN_TIMEOUT'
+  | 'RUN_CANCELLED'
+  | 'RUN_FAILED';
 
 export interface HarnessHistoryMessage {
-  role: "user" | "assistant";
+  role: 'user' | 'assistant';
   content: string;
   createdAt?: string;
 }
@@ -91,45 +91,43 @@ export interface HarnessResult {
 
 export type HarnessEvent =
   | {
-      type: "run_started";
+      type: 'run_started';
       runId: string;
       requestedModelId: string;
       selectedSkillVersionId: number;
     }
   | {
-      type: "model_request_started";
+      type: 'model_request_started';
       runId: string;
       requestNumber: number;
     }
   | {
-      type: "tool_started";
+      type: 'tool_started';
       runId: string;
       toolName: string;
     }
   | {
-      type: "tool_finished";
+      type: 'tool_finished';
       runId: string;
       toolName: string;
       ok: boolean;
     }
   | {
-      type: "text_delta";
+      type: 'text_delta';
       runId: string;
       delta: string;
     }
   | {
-      type: "reasoning_delta";
+      type: 'reasoning_delta';
       runId: string;
       delta: string;
     }
   | {
-      type: "run_finished";
+      type: 'run_finished';
       runId: string;
       status: HarnessRunStatus;
       errorCode: HarnessErrorCode | null;
       outputChars: number;
     };
 
-export type HarnessEventEmitter = (
-  event: HarnessEvent,
-) => void | Promise<void>;
+export type HarnessEventEmitter = (event: HarnessEvent) => void | Promise<void>;

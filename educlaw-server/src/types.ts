@@ -1,4 +1,4 @@
-import type { Request } from "express";
+import type { Request } from 'express';
 
 export interface AuthedRequest extends Request {
   userId?: string;
@@ -95,7 +95,7 @@ export interface DbRowAnswerSkillOptimizationRun {
   question_message_id: number;
   enhanced_answer_message_id: number;
   baseline_answer_message_id: number | null;
-  answer_side?: "baseline" | "enhanced" | null;
+  answer_side?: 'baseline' | 'enhanced' | null;
   answer_message_id?: number | null;
   evidence_version_id?: number | null;
   answer_skill_version_id?: number | null;

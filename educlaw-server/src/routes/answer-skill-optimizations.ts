@@ -1,9 +1,9 @@
 import { createTrackedRouter } from '../services/http-drain.js';
-import { Router, type Request, type Response } from "express";
-import { ANSWER_SKILL_OPTIMIZATION_ROUTES } from "@educlaw/shared";
-import { getLogger, getRequestId } from "../lib/request-context.js";
-import { safeError } from "../lib/logger.js";
-import { requireAuth } from "../middleware/auth.js";
+import { Router, type Request, type Response } from 'express';
+import { ANSWER_SKILL_OPTIMIZATION_ROUTES } from '@educlaw/shared';
+import { getLogger, getRequestId } from '../lib/request-context.js';
+import { safeError } from '../lib/logger.js';
+import { requireAuth } from '../middleware/auth.js';
 import {
   AnswerSkillOptimizationAlreadyExistsError,
   AnswerSkillOptimizationConflictError,
@@ -27,21 +27,21 @@ import {
   type CreateAnswerSkillOptimizationRunInput,
   type ReviseAnswerSkillOptimizationInput,
   type TestAnswerSkillOptimizationInput,
-} from "../services/answer-skill-optimization-service.js";
-import type { AuthedRequest } from "../types.js";
+} from '../services/answer-skill-optimization-service.js';
+import type { AuthedRequest } from '../types.js';
 import {
   AnswerOptimizationSuggestionNotFoundError,
   suggestAnswerOptimizationFeedback,
-} from "../services/answer-optimization-suggestion-service.js";
+} from '../services/answer-optimization-suggestion-service.js';
 
-const router: import("express").Router = createTrackedRouter(Router());
+const router: import('express').Router = createTrackedRouter(Router());
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function asObject(value: unknown): Record<string, unknown> {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
     throw new AnswerSkillOptimizationValidationError(
-      "Request body must be a JSON object",
+      'Request body must be a JSON object',
     );
   }
   return value as Record<string, unknown>;
@@ -61,7 +61,7 @@ function assertOnlyKeys(
 }
 
 function positiveInteger(value: unknown, field: string): number {
-  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 1) {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 1) {
     throw new AnswerSkillOptimizationValidationError(
       `${field} must be a positive integer`,
     );
@@ -70,15 +70,17 @@ function positiveInteger(value: unknown, field: string): number {
 }
 
 function requiredString(value: unknown, field: string): string {
-  if (typeof value !== "string") {
-    throw new AnswerSkillOptimizationValidationError(`${field} must be a string`);
+  if (typeof value !== 'string') {
+    throw new AnswerSkillOptimizationValidationError(
+      `${field} must be a string`,
+    );
   }
   return value;
 }
 
 function optionalBaselineMessageId(value: unknown): number | null | undefined {
   if (value === undefined || value === null) return value;
-  return positiveInteger(value, "baselineAnswerMessageId");
+  return positiveInteger(value, 'baselineAnswerMessageId');
 }
 
 function parseCreateBody(
@@ -88,26 +90,26 @@ function parseCreateBody(
 ): CreateAnswerSkillOptimizationRunInput {
   const body = asObject(value);
   assertOnlyKeys(body, [
-    "packageId",
-    "threadId",
-    "questionMessageId",
-    "enhancedAnswerMessageId",
-    "baselineAnswerMessageId",
-    "answerSide",
-    "answerMessageId",
-    "feedback",
+    'packageId',
+    'threadId',
+    'questionMessageId',
+    'enhancedAnswerMessageId',
+    'baselineAnswerMessageId',
+    'answerSide',
+    'answerMessageId',
+    'feedback',
   ]);
   return {
     userId,
-    packageId: positiveInteger(body.packageId, "packageId"),
-    threadId: positiveInteger(body.threadId, "threadId"),
+    packageId: positiveInteger(body.packageId, 'packageId'),
+    threadId: positiveInteger(body.threadId, 'threadId'),
     questionMessageId: positiveInteger(
       body.questionMessageId,
-      "questionMessageId",
+      'questionMessageId',
     ),
     enhancedAnswerMessageId: positiveInteger(
       body.enhancedAnswerMessageId,
-      "enhancedAnswerMessageId",
+      'enhancedAnswerMessageId',
     ),
     baselineAnswerMessageId: optionalBaselineMessageId(
       body.baselineAnswerMessageId,
@@ -115,18 +117,18 @@ function parseCreateBody(
     answerSide:
       body.answerSide === undefined
         ? undefined
-        : body.answerSide === "baseline" || body.answerSide === "enhanced"
+        : body.answerSide === 'baseline' || body.answerSide === 'enhanced'
           ? body.answerSide
           : (() => {
               throw new AnswerSkillOptimizationValidationError(
-                "answerSide must be baseline or enhanced",
+                'answerSide must be baseline or enhanced',
               );
             })(),
     answerMessageId:
       body.answerMessageId === undefined
         ? undefined
-        : positiveInteger(body.answerMessageId, "answerMessageId"),
-    feedback: requiredString(body.feedback, "feedback"),
+        : positiveInteger(body.answerMessageId, 'answerMessageId'),
+    feedback: requiredString(body.feedback, 'feedback'),
     idempotencyKey,
   };
 }
@@ -134,51 +136,60 @@ function parseCreateBody(
 function parseSuggestionsBody(value: unknown, userId: string) {
   const body = asObject(value);
   assertOnlyKeys(body, [
-    "packageId",
-    "threadId",
-    "questionMessageId",
-    "answerMessageId",
-    "answerSide",
-    "answerVersionNumber",
+    'packageId',
+    'threadId',
+    'questionMessageId',
+    'answerMessageId',
+    'answerSide',
+    'answerVersionNumber',
   ]);
-  if (body.answerSide !== "baseline" && body.answerSide !== "enhanced") {
+  if (body.answerSide !== 'baseline' && body.answerSide !== 'enhanced') {
     throw new AnswerSkillOptimizationValidationError(
-      "answerSide must be baseline or enhanced",
+      'answerSide must be baseline or enhanced',
     );
   }
-  const answerSide: "baseline" | "enhanced" = body.answerSide;
+  const answerSide: 'baseline' | 'enhanced' = body.answerSide;
   return {
     userId,
-    packageId: positiveInteger(body.packageId, "packageId"),
-    threadId: positiveInteger(body.threadId, "threadId"),
-    questionMessageId: positiveInteger(body.questionMessageId, "questionMessageId"),
-    answerMessageId: positiveInteger(body.answerMessageId, "answerMessageId"),
+    packageId: positiveInteger(body.packageId, 'packageId'),
+    threadId: positiveInteger(body.threadId, 'threadId'),
+    questionMessageId: positiveInteger(
+      body.questionMessageId,
+      'questionMessageId',
+    ),
+    answerMessageId: positiveInteger(body.answerMessageId, 'answerMessageId'),
     answerSide,
-    answerVersionNumber: positiveInteger(body.answerVersionNumber, "answerVersionNumber"),
+    answerVersionNumber: positiveInteger(
+      body.answerVersionNumber,
+      'answerVersionNumber',
+    ),
   };
 }
 
 function parseResolveBody(value: unknown, userId: string) {
   const body = asObject(value);
   assertOnlyKeys(body, [
-    "packageId",
-    "threadId",
-    "questionMessageId",
-    "answerMessageId",
-    "answerSide",
+    'packageId',
+    'threadId',
+    'questionMessageId',
+    'answerMessageId',
+    'answerSide',
   ]);
-  if (body.answerSide !== "baseline" && body.answerSide !== "enhanced") {
+  if (body.answerSide !== 'baseline' && body.answerSide !== 'enhanced') {
     throw new AnswerSkillOptimizationValidationError(
-      "answerSide must be baseline or enhanced",
+      'answerSide must be baseline or enhanced',
     );
   }
-  const answerSide: "baseline" | "enhanced" = body.answerSide;
+  const answerSide: 'baseline' | 'enhanced' = body.answerSide;
   return {
     userId,
-    packageId: positiveInteger(body.packageId, "packageId"),
-    threadId: positiveInteger(body.threadId, "threadId"),
-    questionMessageId: positiveInteger(body.questionMessageId, "questionMessageId"),
-    answerMessageId: positiveInteger(body.answerMessageId, "answerMessageId"),
+    packageId: positiveInteger(body.packageId, 'packageId'),
+    threadId: positiveInteger(body.threadId, 'threadId'),
+    questionMessageId: positiveInteger(
+      body.questionMessageId,
+      'questionMessageId',
+    ),
+    answerMessageId: positiveInteger(body.answerMessageId, 'answerMessageId'),
     answerSide,
   };
 }
@@ -191,16 +202,16 @@ function parseReviseBody(
 ): ReviseAnswerSkillOptimizationInput {
   const body = asObject(value);
   assertOnlyKeys(body, [
-    "expectedRevision",
-    "feedback",
-    "targetSkillId",
-    "targetSkillIds",
-    "additionalFeedback",
-    "revisionSource",
+    'expectedRevision',
+    'feedback',
+    'targetSkillId',
+    'targetSkillIds',
+    'additionalFeedback',
+    'revisionSource',
   ]);
   const expectedRevision = positiveInteger(
     body.expectedRevision,
-    "expectedRevision",
+    'expectedRevision',
   );
   const usesRefinementMode =
     body.additionalFeedback !== undefined || body.revisionSource !== undefined;
@@ -211,65 +222,65 @@ function parseReviseBody(
       body.targetSkillIds !== undefined
     ) {
       throw new AnswerSkillOptimizationValidationError(
-        "Refinement input cannot include feedback, targetSkillId, or targetSkillIds",
+        'Refinement input cannot include feedback, targetSkillId, or targetSkillIds',
       );
     }
     if (
-      body.revisionSource !== "draft_review" &&
-      body.revisionSource !== "test_failure" &&
-      body.revisionSource !== "alternative_regeneration"
+      body.revisionSource !== 'draft_review' &&
+      body.revisionSource !== 'test_failure' &&
+      body.revisionSource !== 'alternative_regeneration'
     ) {
       throw new AnswerSkillOptimizationValidationError(
-        "revisionSource must be draft_review, test_failure, or alternative_regeneration",
+        'revisionSource must be draft_review, test_failure, or alternative_regeneration',
       );
     }
-    if (body.revisionSource === "alternative_regeneration") {
+    if (body.revisionSource === 'alternative_regeneration') {
       if (body.additionalFeedback !== undefined) {
         throw new AnswerSkillOptimizationValidationError(
-          "alternative_regeneration cannot include additionalFeedback",
+          'alternative_regeneration cannot include additionalFeedback',
         );
       }
       return {
         userId,
         optimizationId,
         expectedRevision,
-        revisionSource: "alternative_regeneration",
+        revisionSource: 'alternative_regeneration',
         idempotencyKey,
       };
     }
     if (
-      body.revisionSource === "test_failure" &&
+      body.revisionSource === 'test_failure' &&
       body.additionalFeedback === undefined
     ) {
       return {
         userId,
         optimizationId,
         expectedRevision,
-        revisionSource: "test_failure",
+        revisionSource: 'test_failure',
         idempotencyKey,
       };
     }
     const additionalFeedback = requiredString(
       body.additionalFeedback,
-      "additionalFeedback",
+      'additionalFeedback',
     ).trim();
     if (additionalFeedback.length > 1500) {
       throw new AnswerSkillOptimizationValidationError(
-        "additionalFeedback must contain at most 1500 characters after trimming",
+        'additionalFeedback must contain at most 1500 characters after trimming',
       );
     }
     if (!additionalFeedback) {
-      if (body.revisionSource === "test_failure") {
+      if (body.revisionSource === 'test_failure') {
         return {
           userId,
           optimizationId,
           expectedRevision,
-          revisionSource: "test_failure",
+          revisionSource: 'test_failure',
           idempotencyKey,
         };
       }
       throw new AnswerSkillOptimizationValidationError(
-        "additionalFeedback must contain 1 to 1500 characters after trimming",
+        'additionalFeedback must contain 1 to 1500 characters after trimming',
       );
     }
     return {
@@ -281,27 +292,27 @@ function parseReviseBody(
       idempotencyKey,
     };
   }
-  if (
-    body.targetSkillId !== undefined &&
-    body.targetSkillIds !== undefined
-  ) {
+  if (body.targetSkillId !== undefined && body.targetSkillIds !== undefined) {
     throw new AnswerSkillOptimizationValidationError(
-      "targetSkillId and targetSkillIds cannot be provided at the same time",
+      'targetSkillId and targetSkillIds cannot be provided at the same time',
     );
   }
   const targetSkillId =
     body.targetSkillId === undefined
       ? undefined
-      : requiredString(body.targetSkillId, "targetSkillId");
+      : requiredString(body.targetSkillId, 'targetSkillId');
   let targetSkillIds: string[] | undefined;
   if (body.targetSkillIds !== undefined) {
-    if (!Array.isArray(body.targetSkillIds) || body.targetSkillIds.length === 0) {
+    if (
+      !Array.isArray(body.targetSkillIds) ||
+      body.targetSkillIds.length === 0
+    ) {
       throw new AnswerSkillOptimizationValidationError(
-        "targetSkillIds must be a non-empty array of strings",
+        'targetSkillIds must be a non-empty array of strings',
       );
     }
     targetSkillIds = body.targetSkillIds.map((item, index) => {
-      if (typeof item !== "string" || !item.trim()) {
+      if (typeof item !== 'string' || !item.trim()) {
         throw new AnswerSkillOptimizationValidationError(
           `targetSkillIds[${index}] must be a non-empty string`,
         );
@@ -312,7 +323,7 @@ function parseReviseBody(
     for (const id of targetSkillIds) {
       if (seen.has(id)) {
         throw new AnswerSkillOptimizationValidationError(
-          "targetSkillIds contains duplicate skillId",
+          'targetSkillIds contains duplicate skillId',
         );
       }
       seen.add(id);
@@ -322,7 +333,7 @@ function parseReviseBody(
     userId,
     optimizationId,
     expectedRevision,
-    feedback: requiredString(body.feedback, "feedback"),
+    feedback: requiredString(body.feedback, 'feedback'),
     ...(targetSkillId === undefined ? {} : { targetSkillId }),
     ...(targetSkillIds === undefined ? {} : { targetSkillIds }),
     idempotencyKey,
@@ -336,18 +347,18 @@ function parseCancelBody(
   idempotencyKey: string,
 ): CancelAnswerSkillOptimizationInput {
   const body = asObject(value);
-  assertOnlyKeys(body, ["expectedRevision", "reason"]);
+  assertOnlyKeys(body, ['expectedRevision', 'reason']);
   return {
     userId,
     optimizationId,
     expectedRevision: positiveInteger(
       body.expectedRevision,
-      "expectedRevision",
+      'expectedRevision',
     ),
     reason: requiredString(
       body.reason,
-      "reason",
-    ) as CancelAnswerSkillOptimizationInput["reason"],
+      'reason',
+    ) as CancelAnswerSkillOptimizationInput['reason'],
     idempotencyKey,
   };
 }
@@ -359,13 +370,13 @@ function parseTestBody(
   idempotencyKey: string,
 ): TestAnswerSkillOptimizationInput {
   const body = asObject(value);
-  assertOnlyKeys(body, ["expectedRevision"]);
+  assertOnlyKeys(body, ['expectedRevision']);
   return {
     userId,
     optimizationId,
     expectedRevision: positiveInteger(
       body.expectedRevision,
-      "expectedRevision",
+      'expectedRevision',
     ),
     idempotencyKey,
   };
@@ -378,17 +389,17 @@ function parseConfirmBody(
   idempotencyKey: string,
 ): ConfirmAnswerSkillOptimizationInput {
   const body = asObject(value);
-  assertOnlyKeys(body, ["expectedRevision", "versionNote"]);
+  assertOnlyKeys(body, ['expectedRevision', 'versionNote']);
   const versionNote =
     body.versionNote === undefined
       ? undefined
-      : requiredString(body.versionNote, "versionNote");
+      : requiredString(body.versionNote, 'versionNote');
   return {
     userId,
     optimizationId,
     expectedRevision: positiveInteger(
       body.expectedRevision,
-      "expectedRevision",
+      'expectedRevision',
     ),
     ...(versionNote === undefined ? {} : { versionNote }),
     idempotencyKey,
@@ -396,33 +407,33 @@ function parseConfirmBody(
 }
 
 function requestId(): string {
-  return getRequestId() ?? "";
+  return getRequestId() ?? '';
 }
 
 function authenticatedUserId(req: Request): string {
   const userId = (req as AuthedRequest).userId;
   if (!userId) {
     throw new AnswerSkillOptimizationValidationError(
-      "Authenticated user is unavailable",
+      'Authenticated user is unavailable',
     );
   }
   return userId;
 }
 
 function idempotencyKey(req: Request): string {
-  const value = req.header("Idempotency-Key");
+  const value = req.header('Idempotency-Key');
   if (!value || !UUID_PATTERN.test(value.trim())) {
     throw new AnswerSkillOptimizationValidationError(
-      "Idempotency-Key header must be a UUID",
+      'Idempotency-Key header must be a UUID',
     );
   }
   return value;
 }
 
 function assertJsonRequest(req: Request): void {
-  if (!req.is("application/json")) {
+  if (!req.is('application/json')) {
     throw new AnswerSkillOptimizationValidationError(
-      "Content-Type must be application/json",
+      'Content-Type must be application/json',
     );
   }
 }
@@ -433,7 +444,7 @@ function sendError(res: Response, error: unknown): void {
       error: error.code,
       existingOptimizationId: error.existingOptimizationId,
       status: error.status,
-      ...(error.code === "answer_already_optimized"
+      ...(error.code === 'answer_already_optimized'
         ? {
             finalVersionId: error.finalVersionId,
             versionNumber: error.versionNumber,
@@ -445,7 +456,7 @@ function sendError(res: Response, error: unknown): void {
   }
   if (error instanceof AnswerSkillOptimizationReplayUnavailableError) {
     res.status(422).json({
-      error: "replay_provenance_unavailable",
+      error: 'replay_provenance_unavailable',
       reason: error.reason,
       requestId: requestId(),
     });
@@ -460,22 +471,22 @@ function sendError(res: Response, error: unknown): void {
   }
   if (error instanceof AnswerSkillRefinementTechnicalError) {
     const status =
-      error.code === "model_unavailable"
+      error.code === 'model_unavailable'
         ? 503
-        : error.code === "revision_conflict"
+        : error.code === 'revision_conflict'
           ? 409
-          : error.code === "unknown"
+          : error.code === 'unknown'
             ? 500
             : 422;
     res.status(status).json({
-      error: "refinement_technical_failure",
+      error: 'refinement_technical_failure',
       code: error.code,
       requestId: requestId(),
     });
     return;
   }
   let status = 500;
-  let message = "Internal server error";
+  let message = 'Internal server error';
   if (error instanceof AnswerSkillOptimizationValidationError) {
     status = 400;
     message = error.message;
@@ -490,13 +501,13 @@ function sendError(res: Response, error: unknown): void {
     message = error.message;
   } else if (error instanceof AnswerSkillOptimizationDraftError) {
     status = 422;
-    message = "optimization_not_ready";
+    message = 'optimization_not_ready';
   } else if (error instanceof AnswerSkillOptimizationUpstreamError) {
     status = error.statusCode;
-    message = "Optimization model is temporarily unavailable";
+    message = 'Optimization model is temporarily unavailable';
   } else {
-    getLogger({ component: "answer-skill-optimization-route" }).error({
-      event: "answer_optimization.request_failed",
+    getLogger({ component: 'answer-skill-optimization-route' }).error({
+      event: 'answer_optimization.request_failed',
       error: safeError(error),
     });
   }
@@ -574,7 +585,7 @@ router.get(
     try {
       const data = await getAnswerSkillOptimizationDetail(
         authenticatedUserId(req),
-        positiveInteger(Number(req.params.optimizationId), "optimizationId"),
+        positiveInteger(Number(req.params.optimizationId), 'optimizationId'),
       );
       res.json({ data, requestId: requestId() });
     } catch (error) {
@@ -593,7 +604,7 @@ router.post(
         parseReviseBody(
           req.body as unknown,
           authenticatedUserId(req),
-          positiveInteger(Number(req.params.optimizationId), "optimizationId"),
+          positiveInteger(Number(req.params.optimizationId), 'optimizationId'),
           idempotencyKey(req),
         ),
       );
@@ -614,7 +625,7 @@ router.post(
         parseTestBody(
           req.body as unknown,
           authenticatedUserId(req),
-          positiveInteger(Number(req.params.optimizationId), "optimizationId"),
+          positiveInteger(Number(req.params.optimizationId), 'optimizationId'),
           idempotencyKey(req),
         ),
       );
@@ -632,16 +643,16 @@ router.post(
     try {
       assertJsonRequest(req);
       const body = asObject(req.body);
-      assertOnlyKeys(body, ["expectedRevision"]);
+      assertOnlyKeys(body, ['expectedRevision']);
       const data = await rebaseAnswerSkillOptimization({
         userId: authenticatedUserId(req),
         optimizationId: positiveInteger(
           Number(req.params.optimizationId),
-          "optimizationId",
+          'optimizationId',
         ),
         expectedRevision: positiveInteger(
           body.expectedRevision,
-          "expectedRevision",
+          'expectedRevision',
         ),
       });
       res.json({ data, requestId: requestId() });
@@ -661,7 +672,7 @@ router.post(
         parseCancelBody(
           req.body as unknown,
           authenticatedUserId(req),
-          positiveInteger(Number(req.params.optimizationId), "optimizationId"),
+          positiveInteger(Number(req.params.optimizationId), 'optimizationId'),
           idempotencyKey(req),
         ),
       );
@@ -682,7 +693,7 @@ router.post(
         parseConfirmBody(
           req.body as unknown,
           authenticatedUserId(req),
-          positiveInteger(Number(req.params.optimizationId), "optimizationId"),
+          positiveInteger(Number(req.params.optimizationId), 'optimizationId'),
           idempotencyKey(req),
         ),
       );

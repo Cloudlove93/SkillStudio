@@ -17,8 +17,14 @@ interface SearchResult {
 }
 
 const typeConfig: Record<ResultType, { icon: typeof Bot; color: string }> = {
-  profile: { icon: Bot, color: 'bg-[rgba(55,130,255,0.10)] text-[color:var(--info)]' },
-  skill: { icon: BookOpen, color: 'bg-[rgba(30,180,120,0.10)] text-[color:var(--success)]' },
+  profile: {
+    icon: Bot,
+    color: 'bg-[rgba(55,130,255,0.10)] text-[color:var(--info)]',
+  },
+  skill: {
+    icon: BookOpen,
+    color: 'bg-[rgba(30,180,120,0.10)] text-[color:var(--success)]',
+  },
   tool: { icon: Wrench, color: 'bg-primary-soft text-primary' },
 };
 
@@ -44,7 +50,9 @@ export default function GlobalSearch() {
 
   const setMainView = useUIStore((s) => s.setMainView);
   const setDeepStudyTab = useUIStore((s) => s.setDeepStudyTab);
-  const setPendingProfileFileName = useUIStore((s) => s.setPendingProfileFileName);
+  const setPendingProfileFileName = useUIStore(
+    (s) => s.setPendingProfileFileName,
+  );
   const setPendingSkillDirName = useUIStore((s) => s.setPendingSkillDirName);
   const setPendingToolDirName = useUIStore((s) => s.setPendingToolDirName);
 
@@ -77,41 +85,73 @@ export default function GlobalSearch() {
 
     for (const p of profiles) {
       const text = `${p.name} ${p.description}`.toLowerCase();
-      if (keywords.every((kw) => text.includes(kw))) items.push({ type: 'profile', id: p.fileName, name: p.name, description: p.description, source: p.source });
+      if (keywords.every((kw) => text.includes(kw)))
+        items.push({
+          type: 'profile',
+          id: p.fileName,
+          name: p.name,
+          description: p.description,
+          source: p.source,
+        });
     }
     for (const s of skills) {
       const text = `${s.name} ${s.description}`.toLowerCase();
-      if (keywords.every((kw) => text.includes(kw))) items.push({ type: 'skill', id: s.dirName, name: s.name, description: s.description, source: s.source });
+      if (keywords.every((kw) => text.includes(kw)))
+        items.push({
+          type: 'skill',
+          id: s.dirName,
+          name: s.name,
+          description: s.description,
+          source: s.source,
+        });
     }
     for (const tl of tools) {
       const text = `${tl.name} ${tl.description}`.toLowerCase();
-      if (keywords.every((kw) => text.includes(kw))) items.push({ type: 'tool', id: tl.dirName, name: tl.name, description: tl.description, source: tl.source });
+      if (keywords.every((kw) => text.includes(kw)))
+        items.push({
+          type: 'tool',
+          id: tl.dirName,
+          name: tl.name,
+          description: tl.description,
+          source: tl.source,
+        });
     }
     return items.slice(0, 20);
   }, [query, profiles, skills, tools]);
 
-  useEffect(() => { setActiveIndex(0); }, [results.length]);
+  useEffect(() => {
+    setActiveIndex(0);
+  }, [results.length]);
 
-  const navigate = useCallback((item: SearchResult) => {
-    switch (item.type) {
-      case 'profile':
-        setPendingProfileFileName(item.id);
-        setDeepStudyTab('gallery');
-        setMainView('deep-study');
-        break;
-      case 'skill':
-        setPendingSkillDirName(item.id);
-        setDeepStudyTab('skills');
-        setMainView('deep-study');
-        break;
-      case 'tool':
-        setPendingToolDirName(item.id);
-        setDeepStudyTab('tools');
-        setMainView('deep-study');
-        break;
-    }
-    setOpen(false);
-  }, [setMainView, setDeepStudyTab, setPendingProfileFileName, setPendingSkillDirName, setPendingToolDirName]);
+  const navigate = useCallback(
+    (item: SearchResult) => {
+      switch (item.type) {
+        case 'profile':
+          setPendingProfileFileName(item.id);
+          setDeepStudyTab('gallery');
+          setMainView('deep-study');
+          break;
+        case 'skill':
+          setPendingSkillDirName(item.id);
+          setDeepStudyTab('skills');
+          setMainView('deep-study');
+          break;
+        case 'tool':
+          setPendingToolDirName(item.id);
+          setDeepStudyTab('tools');
+          setMainView('deep-study');
+          break;
+      }
+      setOpen(false);
+    },
+    [
+      setMainView,
+      setDeepStudyTab,
+      setPendingProfileFileName,
+      setPendingSkillDirName,
+      setPendingToolDirName,
+    ],
+  );
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'ArrowDown') {
@@ -154,8 +194,16 @@ export default function GlobalSearch() {
         </div>
 
         <div ref={listRef} className="max-h-80 overflow-y-auto p-2">
-          {query.trim() && results.length === 0 && <div className="px-4 py-10 text-center text-sm text-muted-foreground">{t('search.noResults')}</div>}
-          {!query.trim() && <div className="px-4 py-10 text-center text-sm text-muted-foreground">{t('search.hint')}</div>}
+          {query.trim() && results.length === 0 && (
+            <div className="px-4 py-10 text-center text-sm text-muted-foreground">
+              {t('search.noResults')}
+            </div>
+          )}
+          {!query.trim() && (
+            <div className="px-4 py-10 text-center text-sm text-muted-foreground">
+              {t('search.hint')}
+            </div>
+          )}
           {results.map((item, idx) => {
             const cfg = typeConfig[item.type];
             const Icon = cfg.icon;
@@ -167,17 +215,27 @@ export default function GlobalSearch() {
                 onMouseEnter={() => setActiveIndex(idx)}
                 className={`flex w-full items-center gap-3 rounded-[12px] px-3 py-3 text-left transition-colors ${isActive ? 'bg-muted' : 'hover:bg-muted/70'}`}
               >
-                <div className={`flex size-9 shrink-0 items-center justify-center rounded-[10px] ${cfg.color}`}>
+                <div
+                  className={`flex size-9 shrink-0 items-center justify-center rounded-[10px] ${cfg.color}`}
+                >
                   <Icon className="size-4" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium text-foreground">{item.name}</div>
-                  {item.description && <div className="truncate text-xs text-muted-foreground">{item.description}</div>}
+                  <div className="truncate text-sm font-medium text-foreground">
+                    {item.name}
+                  </div>
+                  {item.description && (
+                    <div className="truncate text-xs text-muted-foreground">
+                      {item.description}
+                    </div>
+                  )}
                 </div>
                 <span className="shrink-0 rounded-full border border-border bg-card px-2.5 py-1 text-[10px] font-medium text-muted-foreground">
                   {t(typeLabelKeys[item.type])}
                 </span>
-                {isActive && <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" />}
+                {isActive && (
+                  <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" />
+                )}
               </button>
             );
           })}

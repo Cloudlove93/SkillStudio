@@ -324,11 +324,7 @@ function parsePipelineError(value: unknown): PersistedPipelineError | null {
     return null;
   }
   const record = parseStoredJson(value, 'error');
-  if (
-    typeof record !== 'object' ||
-    record === null ||
-    Array.isArray(record)
-  ) {
+  if (typeof record !== 'object' || record === null || Array.isArray(record)) {
     fail('MULTIMODAL_PIPELINE_FAILED', 'errorJson 损坏', 500);
   }
   const errorRecord = record as Record<string, unknown>;
@@ -417,7 +413,9 @@ function normalizeScanLimit(value: unknown): number {
   return value;
 }
 
-function countCandidatePasses(candidatePasses: MultimodalCandidatePasses): number {
+function countCandidatePasses(
+  candidatePasses: MultimodalCandidatePasses,
+): number {
   return (
     candidatePasses.frameworks.length +
     candidatePasses.principles.length +
@@ -456,11 +454,7 @@ function normalizeFailureInput(
   value: unknown,
   expectedStage: PipelineStage,
 ): PersistedPipelineError {
-  if (
-    typeof value !== 'object' ||
-    value === null ||
-    Array.isArray(value)
-  ) {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     fail('INVALID_ARGUMENT', 'pipeline error 格式不正确', 422);
   }
   const record = value as Record<string, unknown>;
@@ -673,7 +667,11 @@ export function createMultimodalPipelineStore(
           sessionId,
         });
         if (snapshot.revisionNo !== expectedRevisionNo) {
-          fail('SESSION_REVISION_CONFLICT', '会话版本已变化，请刷新后重试', 409);
+          fail(
+            'SESSION_REVISION_CONFLICT',
+            '会话版本已变化，请刷新后重试',
+            409,
+          );
         }
         if (
           snapshot.mediaStage !== 'failed' ||
@@ -728,7 +726,11 @@ export function createMultimodalPipelineStore(
         );
         const updatedRow = result.rows[0];
         if (!result.rowCount || !updatedRow) {
-          fail('SESSION_REVISION_CONFLICT', '会话版本已变化，请刷新后重试', 409);
+          fail(
+            'SESSION_REVISION_CONFLICT',
+            '会话版本已变化，请刷新后重试',
+            409,
+          );
         }
         return mapSessionRow(updatedRow);
       });
@@ -754,13 +756,13 @@ export function createMultimodalPipelineStore(
           ...input,
           sessionId,
         });
-        assertExpectedSnapshot(
-          snapshot,
-          expectedRevisionNo,
-          expectedStage,
-        );
+        assertExpectedSnapshot(snapshot, expectedRevisionNo, expectedStage);
         if (snapshot.mediaState.selectedCandidateIds.length > 0) {
-          fail('MULTIMODAL_SESSION_FAILED', '候选选择残留，不能覆盖候选提取结果', 500);
+          fail(
+            'MULTIMODAL_SESSION_FAILED',
+            '候选选择残留，不能覆盖候选提取结果',
+            500,
+          );
         }
         const nextStage: MediaStage = 'validating_candidates';
         const nextState = parseMultimodalSessionState({
@@ -818,7 +820,11 @@ export function createMultimodalPipelineStore(
         );
         const updatedRow = result.rows[0];
         if (!result.rowCount || !updatedRow) {
-          fail('SESSION_REVISION_CONFLICT', '会话版本已变化，请刷新后重试', 409);
+          fail(
+            'SESSION_REVISION_CONFLICT',
+            '会话版本已变化，请刷新后重试',
+            409,
+          );
         }
         return mapSessionRow(updatedRow);
       });
@@ -838,11 +844,7 @@ export function createMultimodalPipelineStore(
           ...input,
           sessionId,
         });
-        assertExpectedSnapshot(
-          snapshot,
-          expectedRevisionNo,
-          expectedStage,
-        );
+        assertExpectedSnapshot(snapshot, expectedRevisionNo, expectedStage);
         assertCandidateValidationCoverage(
           snapshot.mediaState.candidatePasses,
           input.candidateValidations,
@@ -918,7 +920,11 @@ export function createMultimodalPipelineStore(
         );
         const updatedRow = result.rows[0];
         if (!result.rowCount || !updatedRow) {
-          fail('SESSION_REVISION_CONFLICT', '会话版本已变化，请刷新后重试', 409);
+          fail(
+            'SESSION_REVISION_CONFLICT',
+            '会话版本已变化，请刷新后重试',
+            409,
+          );
         }
         return mapSessionRow(updatedRow);
       });
@@ -941,11 +947,7 @@ export function createMultimodalPipelineStore(
           ...input,
           sessionId,
         });
-        assertExpectedSnapshot(
-          snapshot,
-          expectedRevisionNo,
-          expectedStage,
-        );
+        assertExpectedSnapshot(snapshot, expectedRevisionNo, expectedStage);
         if (snapshot.mediaState.selectedCandidateIds.length === 0) {
           fail(
             'MULTIMODAL_PIPELINE_FAILED',
@@ -1007,7 +1009,11 @@ export function createMultimodalPipelineStore(
         );
         const updatedRow = result.rows[0];
         if (!result.rowCount || !updatedRow) {
-          fail('SESSION_REVISION_CONFLICT', '会话版本已变化，请刷新后重试', 409);
+          fail(
+            'SESSION_REVISION_CONFLICT',
+            '会话版本已变化，请刷新后重试',
+            409,
+          );
         }
         return mapSessionRow(updatedRow);
       });
@@ -1025,11 +1031,7 @@ export function createMultimodalPipelineStore(
           ...input,
           sessionId,
         });
-        assertExpectedSnapshot(
-          snapshot,
-          expectedRevisionNo,
-          expectedStage,
-        );
+        assertExpectedSnapshot(snapshot, expectedRevisionNo, expectedStage);
         const nextStage: MediaStage = 'failed';
         assertMediaStageTransition(snapshot.mediaStage, nextStage);
         assertMediaStageGate({
@@ -1078,7 +1080,11 @@ export function createMultimodalPipelineStore(
         );
         const updatedRow = result.rows[0];
         if (!result.rowCount || !updatedRow) {
-          fail('SESSION_REVISION_CONFLICT', '会话版本已变化，请刷新后重试', 409);
+          fail(
+            'SESSION_REVISION_CONFLICT',
+            '会话版本已变化，请刷新后重试',
+            409,
+          );
         }
         return mapSessionRow(updatedRow);
       });

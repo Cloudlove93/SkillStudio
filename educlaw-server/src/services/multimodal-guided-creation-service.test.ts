@@ -15,17 +15,17 @@ type QueryResultRow = Record<string, unknown>;
 
 function createServiceHarness() {
   const query = vi.fn<
-    (text: string, values?: unknown[]) => Promise<{
+    (
+      text: string,
+      values?: unknown[],
+    ) => Promise<{
       rows: QueryResultRow[];
       rowCount: number | null;
     }>
   >();
   const withTransaction = vi.fn(
-    async (
-      work: (db: {
-        query: typeof query;
-      }) => Promise<unknown>,
-    ) => work({ query }),
+    async (work: (db: { query: typeof query }) => Promise<unknown>) =>
+      work({ query }),
   );
   const now = new Date('2026-08-21T10:00:00.000Z');
 
@@ -369,9 +369,9 @@ describe('multimodal guided creation service', () => {
     expect(values?.[4]).toMatch(/^[a-f0-9]{64}$/);
     expect(values?.[5]).toBe('draft');
     expect(values?.[6]).toBe('collecting');
-    expect(parseMultimodalSessionState(JSON.parse(String(values?.[7])))).toEqual(
-      session.mediaState,
-    );
+    expect(
+      parseMultimodalSessionState(JSON.parse(String(values?.[7]))),
+    ).toEqual(session.mediaState);
     expect(JSON.parse(String(values?.[7]))).toMatchObject({
       semanticMoments: [],
       degradations: [],
@@ -486,9 +486,7 @@ describe('multimodal guided creation service', () => {
       ],
       nextCursor: null,
     });
-    expect(String(query.mock.calls[0]?.[0])).toContain(
-      'user_id = $1',
-    );
+    expect(String(query.mock.calls[0]?.[0])).toContain('user_id = $1');
     expect(String(query.mock.calls[0]?.[0])).toContain(
       "creation_mode = 'multimodal_distill'",
     );
@@ -534,18 +532,20 @@ describe('multimodal guided creation service', () => {
   it('returns a sanitized persisted pipeline error with failed session detail', async () => {
     const { service, query } = createServiceHarness();
     query.mockResolvedValueOnce({
-      rows: [createSessionRow({
-        status: 'failed',
-        media_stage: 'failed',
-        error_json: {
-          code: 'MULTIMODAL_PIPELINE_FAILED',
-          stage: 'validating_candidates',
-          resumeStage: 'validating_candidates',
-          retryable: true,
-          message: '候选校验失败，请重试',
-          signedUrl: 'https://storage.example/secret',
-        },
-      })],
+      rows: [
+        createSessionRow({
+          status: 'failed',
+          media_stage: 'failed',
+          error_json: {
+            code: 'MULTIMODAL_PIPELINE_FAILED',
+            stage: 'validating_candidates',
+            resumeStage: 'validating_candidates',
+            retryable: true,
+            message: '候选校验失败，请重试',
+            signedUrl: 'https://storage.example/secret',
+          },
+        }),
+      ],
       rowCount: 1,
     });
 
@@ -598,35 +598,40 @@ describe('multimodal guided creation service', () => {
       resultHash: computeMultimodalArenaResultHash(evaluationWithoutHash),
     };
     query.mockResolvedValueOnce({
-      rows: [createSessionRow({
-        validation_result_json: {
-          schemaVersion: 1,
-          action: 'skill.media.test.start',
-          idempotencyKey: 'arena-test-001',
-          requestHash: 'c'.repeat(64),
-          baseRevisionNo: 10,
-          resultRevisionNo: 11,
-          recordedAt: '2026-08-23T10:00:00.000Z',
-          evaluation,
-        },
-        confirmation_json: {
-          schemaVersion: 1,
-          action: 'skill.media.publish',
-          idempotencyKey: 'publish-test-001',
-          requestHash: 'd'.repeat(64),
-          baseRevisionNo: 11,
-          resultRevisionNo: 12,
-          packageId: '51',
-          packageVersionId: '61',
-          packageVersionNumber: 2,
-          skillVersionIds: { 'skill-1': '71' },
-          publishedAt: '2026-08-23T10:01:00.000Z',
-        },
-      })],
+      rows: [
+        createSessionRow({
+          validation_result_json: {
+            schemaVersion: 1,
+            action: 'skill.media.test.start',
+            idempotencyKey: 'arena-test-001',
+            requestHash: 'c'.repeat(64),
+            baseRevisionNo: 10,
+            resultRevisionNo: 11,
+            recordedAt: '2026-08-23T10:00:00.000Z',
+            evaluation,
+          },
+          confirmation_json: {
+            schemaVersion: 1,
+            action: 'skill.media.publish',
+            idempotencyKey: 'publish-test-001',
+            requestHash: 'd'.repeat(64),
+            baseRevisionNo: 11,
+            resultRevisionNo: 12,
+            packageId: '51',
+            packageVersionId: '61',
+            packageVersionNumber: 2,
+            skillVersionIds: { 'skill-1': '71' },
+            publishedAt: '2026-08-23T10:01:00.000Z',
+          },
+        }),
+      ],
       rowCount: 1,
     });
 
-    const detail = await service.getSessionDetail({ authUserId: 'user-1', sessionId: '101' });
+    const detail = await service.getSessionDetail({
+      authUserId: 'user-1',
+      sessionId: '101',
+    });
 
     expect(detail.arenaEvaluation).toEqual(evaluation);
     expect(detail.publishedPackage).toEqual({
@@ -636,7 +641,9 @@ describe('multimodal guided creation service', () => {
       skillVersionIds: { 'skill-1': '71' },
       publishedAt: '2026-08-23T10:01:00.000Z',
     });
-    expect(String(query.mock.calls[0]?.[0])).toContain('validation_result_json');
+    expect(String(query.mock.calls[0]?.[0])).toContain(
+      'validation_result_json',
+    );
     expect(String(query.mock.calls[0]?.[0])).toContain('confirmation_json');
   });
 
@@ -667,7 +674,9 @@ describe('multimodal guided creation service', () => {
     ).rejects.toBeInstanceOf(MultimodalGuidedCreationServiceError);
 
     query.mockResolvedValueOnce({
-      rows: [createSessionRow({ media_stage: 'published', status: 'collecting' })],
+      rows: [
+        createSessionRow({ media_stage: 'published', status: 'collecting' }),
+      ],
       rowCount: 1,
     });
     await expect(
@@ -1049,8 +1058,12 @@ describe('multimodal guided creation service', () => {
     expect(persisted.evidenceTimeline.evidenceItems).toEqual([]);
     expect(persisted.adlerOverview).toBeNull();
     expect(persisted.candidatePasses.frameworks).toEqual([]);
-    expect(String(query.mock.calls[0]?.[0]).toLowerCase()).toContain('for update');
-    expect(String(query.mock.calls[1]?.[0]).toLowerCase()).toContain('revision_no = $9');
+    expect(String(query.mock.calls[0]?.[0]).toLowerCase()).toContain(
+      'for update',
+    );
+    expect(String(query.mock.calls[1]?.[0]).toLowerCase()).toContain(
+      'revision_no = $9',
+    );
   });
 
   it('replays the same transcript edit but rejects a stale segment revision for a new edit', async () => {
@@ -1153,20 +1166,24 @@ describe('multimodal guided creation service', () => {
           text: '第二次修订',
         },
       }),
-    ).rejects.toMatchObject({ code: 'SEGMENT_REVISION_CONFLICT', statusCode: 409 });
+    ).rejects.toMatchObject({
+      code: 'SEGMENT_REVISION_CONFLICT',
+      statusCode: 409,
+    });
   });
 
   it('replaces the reviewed evidence set without deleting assets and restarts only Adler downstream work', async () => {
     const { service, query } = createServiceHarness();
     const sessionState = createAwaitingAdlerState();
-    const evidenceItems = sessionState.evidenceTimeline.evidenceItems.map((item) =>
-      item.evidenceId === 'ev-transcript-1'
-        ? {
-            ...item,
-            text: '人工校正后的转写证据',
-            provenance: { ...item.provenance, editedByUser: true },
-          }
-        : item,
+    const evidenceItems = sessionState.evidenceTimeline.evidenceItems.map(
+      (item) =>
+        item.evidenceId === 'ev-transcript-1'
+          ? {
+              ...item,
+              text: '人工校正后的转写证据',
+              provenance: { ...item.provenance, editedByUser: true },
+            }
+          : item,
     );
     const requestHash = createHash('sha256')
       .update(
@@ -1429,13 +1446,27 @@ describe('multimodal guided creation service', () => {
       replayed: false,
     });
     expect(withTransaction).toHaveBeenCalledOnce();
-    expect(String(query.mock.calls[0]?.[0]).toLowerCase()).toContain('for update');
-    expect(String(query.mock.calls[0]?.[0]).toLowerCase()).toContain('user_id = $2');
-    expect(String(query.mock.calls[0]?.[0]).toLowerCase()).toContain("creation_mode = $3");
-    expect(String(query.mock.calls[0]?.[0]).toLowerCase()).toContain('deleted_at is null');
-    expect(String(query.mock.calls[1]?.[0]).toLowerCase()).toContain('confirmed_stages_json = $');
-    expect(String(query.mock.calls[1]?.[0]).toLowerCase()).toContain('revision_no = $');
-    expect(String(query.mock.calls[1]?.[0]).toLowerCase()).toContain('media_stage = $');
+    expect(String(query.mock.calls[0]?.[0]).toLowerCase()).toContain(
+      'for update',
+    );
+    expect(String(query.mock.calls[0]?.[0]).toLowerCase()).toContain(
+      'user_id = $2',
+    );
+    expect(String(query.mock.calls[0]?.[0]).toLowerCase()).toContain(
+      'creation_mode = $3',
+    );
+    expect(String(query.mock.calls[0]?.[0]).toLowerCase()).toContain(
+      'deleted_at is null',
+    );
+    expect(String(query.mock.calls[1]?.[0]).toLowerCase()).toContain(
+      'confirmed_stages_json = $',
+    );
+    expect(String(query.mock.calls[1]?.[0]).toLowerCase()).toContain(
+      'revision_no = $',
+    );
+    expect(String(query.mock.calls[1]?.[0]).toLowerCase()).toContain(
+      'media_stage = $',
+    );
     const updateValues = query.mock.calls[1]?.[1] ?? [];
     expect(updateValues).toContain('extracting_candidates');
     expect(updateValues).toContain('collecting');
@@ -1459,10 +1490,7 @@ describe('multimodal guided creation service', () => {
   });
 
   it('replays the original overview confirmation for the same action, key and hash, but rejects a different hash', async () => {
-    const {
-      service: seedService,
-      query: seedQuery,
-    } = createServiceHarness();
+    const { service: seedService, query: seedQuery } = createServiceHarness();
     const seedState = createAwaitingAdlerState();
     seedQuery
       .mockResolvedValueOnce({
@@ -1533,7 +1561,10 @@ describe('multimodal guided creation service', () => {
             status: 'collecting',
             media_stage: 'building_skills',
             revision_no: 2,
-            confirmed_stages_json: ['adler_overview', 'evidence_and_candidates'],
+            confirmed_stages_json: [
+              'adler_overview',
+              'evidence_and_candidates',
+            ],
             media_state_json: {
               ...createAwaitingCandidatesState(),
               selectedCandidateIds: ['candidate-framework-1'],
@@ -1702,7 +1733,10 @@ describe('multimodal guided creation service', () => {
                 },
               ],
             },
-            confirmed_stages_json: ['adler_overview', 'evidence_and_candidates'],
+            confirmed_stages_json: [
+              'adler_overview',
+              'evidence_and_candidates',
+            ],
             revision_no: 2,
             updated_at: '2026-08-21T10:00:00.000Z',
           }),
@@ -1815,7 +1849,10 @@ describe('multimodal guided creation service', () => {
                 },
               ],
             },
-            confirmed_stages_json: ['adler_overview', 'evidence_and_candidates'],
+            confirmed_stages_json: [
+              'adler_overview',
+              'evidence_and_candidates',
+            ],
             revision_no: 2,
             updated_at: '2026-08-21T10:00:00.000Z',
           }),
@@ -1885,7 +1922,8 @@ describe('multimodal guided creation service', () => {
                 overallPassed: false,
                 disposition: 'case',
                 validation: {
-                  ...createAwaitingCandidatesState().candidateValidations[0].validation,
+                  ...createAwaitingCandidatesState().candidateValidations[0]
+                    .validation,
                   v1: {
                     ...createAwaitingCandidatesState().candidateValidations[0]
                       .validation.v1,
@@ -2271,7 +2309,9 @@ describe('multimodal guided creation service', () => {
   });
 
   describe('upload intent', () => {
-    function createUploadConfirmReceipt(overrides: Record<string, unknown> = {}) {
+    function createUploadConfirmReceipt(
+      overrides: Record<string, unknown> = {},
+    ) {
       return {
         action: 'skill.media.upload.confirm',
         idempotencyKey: 'upload-confirm-001',
@@ -2395,7 +2435,9 @@ describe('multimodal guided creation service', () => {
       expect(queryMock.mock.calls[1]?.[0]).toContain('and revision_no = $9');
       expect(queryMock.mock.calls[1]?.[0]).toContain('and media_stage = $10');
 
-      const persistedState = JSON.parse(queryMock.mock.calls[1]?.[1]?.[2] as string);
+      const persistedState = JSON.parse(
+        queryMock.mock.calls[1]?.[1]?.[2] as string,
+      );
       expect(persistedState.pendingUpload.objectKey).toBe(
         'skill-sessions/101/source/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.mp4',
       );
@@ -2521,7 +2563,9 @@ describe('multimodal guided creation service', () => {
           'skill-sessions/101/source/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.mp4',
         contentType: 'video/mp4',
       });
-      expect(objectStorageService.abortIncompleteMultipartUpload).not.toHaveBeenCalled();
+      expect(
+        objectStorageService.abortIncompleteMultipartUpload,
+      ).not.toHaveBeenCalled();
 
       const detail = await service.getSessionDetail({
         authUserId: 'user-1',
@@ -2543,27 +2587,25 @@ describe('multimodal guided creation service', () => {
     });
 
     it('replays the same upload intent key/hash but rejects same key with different normalized arguments', async () => {
-      const requestHash =
-        __testing.buildUploadIntentRequestHash({
-          sessionId: '101',
-          fileName: 'lesson.mp4',
-          declaredMimeType: 'video/mp4',
-          sizeBytes: 1024,
-          mediaKind: 'video',
-          uploadMode: 'single_put',
-        });
-      const intentClaimsHash =
-        __testing.buildUploadIntentClaimsHash({
-          sessionId: '101',
-          authUserId: 'user-1',
-          sourceId: 'source-upload-1',
-          objectKey:
-            'skill-sessions/101/source/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.mp4',
-          declaredMimeType: 'video/mp4',
-          sizeBytes: 1024,
-          uploadMode: 'single_put',
-          intentRevisionNo: 1,
-        });
+      const requestHash = __testing.buildUploadIntentRequestHash({
+        sessionId: '101',
+        fileName: 'lesson.mp4',
+        declaredMimeType: 'video/mp4',
+        sizeBytes: 1024,
+        mediaKind: 'video',
+        uploadMode: 'single_put',
+      });
+      const intentClaimsHash = __testing.buildUploadIntentClaimsHash({
+        sessionId: '101',
+        authUserId: 'user-1',
+        sourceId: 'source-upload-1',
+        objectKey:
+          'skill-sessions/101/source/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.mp4',
+        declaredMimeType: 'video/mp4',
+        sizeBytes: 1024,
+        uploadMode: 'single_put',
+        intentRevisionNo: 1,
+      });
       const queryMock = vi.fn().mockResolvedValue({
         rows: [
           createSessionRow({
@@ -2625,7 +2667,9 @@ describe('multimodal guided creation service', () => {
         mediaStage: 'uploading',
         replayed: true,
       });
-      expect(objectStorageService.createSessionObjectKey).not.toHaveBeenCalled();
+      expect(
+        objectStorageService.createSessionObjectKey,
+      ).not.toHaveBeenCalled();
       expect(objectStorageService.createSignedPutGrant).toHaveBeenCalledWith({
         objectKey:
           'skill-sessions/101/source/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.mp4',
@@ -2649,29 +2693,27 @@ describe('multimodal guided creation service', () => {
     });
 
     it('replays multipart intents with the original object key and multipart upload id', async () => {
-      const requestHash =
-        __testing.buildUploadIntentRequestHash({
-          sessionId: '101',
-          fileName: 'lesson.mp4',
-          declaredMimeType: 'video/mp4',
-          sizeBytes: 20 * 1024 * 1024,
-          mediaKind: 'video',
-        });
-      const intentClaimsHash =
-        __testing.buildUploadIntentClaimsHash({
-          sessionId: '101',
-          authUserId: 'user-1',
-          sourceId: 'source-upload-1',
-          objectKey:
-            'skill-sessions/101/source/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.mp4',
-          declaredMimeType: 'video/mp4',
-          sizeBytes: 20 * 1024 * 1024,
-          uploadMode: 'multipart',
-          multipartUploadId: 'multipart-upload-123',
-          partSizeBytes: 8 * 1024 * 1024,
-          partCount: 3,
-          intentRevisionNo: 1,
-        });
+      const requestHash = __testing.buildUploadIntentRequestHash({
+        sessionId: '101',
+        fileName: 'lesson.mp4',
+        declaredMimeType: 'video/mp4',
+        sizeBytes: 20 * 1024 * 1024,
+        mediaKind: 'video',
+      });
+      const intentClaimsHash = __testing.buildUploadIntentClaimsHash({
+        sessionId: '101',
+        authUserId: 'user-1',
+        sourceId: 'source-upload-1',
+        objectKey:
+          'skill-sessions/101/source/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.mp4',
+        declaredMimeType: 'video/mp4',
+        sizeBytes: 20 * 1024 * 1024,
+        uploadMode: 'multipart',
+        multipartUploadId: 'multipart-upload-123',
+        partSizeBytes: 8 * 1024 * 1024,
+        partCount: 3,
+        intentRevisionNo: 1,
+      });
       const queryMock = vi.fn().mockResolvedValue({
         rows: [
           createSessionRow({
@@ -2752,20 +2794,21 @@ describe('multimodal guided creation service', () => {
           ],
         },
       });
-      expect(objectStorageService.createSessionObjectKey).not.toHaveBeenCalled();
+      expect(
+        objectStorageService.createSessionObjectKey,
+      ).not.toHaveBeenCalled();
       expect(objectStorageService.createMultipartUpload).not.toHaveBeenCalled();
       expect(
         objectStorageService.abortIncompleteMultipartUpload,
       ).not.toHaveBeenCalled();
-      expect(objectStorageService.createSignedUploadPartGrant).toHaveBeenNthCalledWith(
-        1,
-        {
-          objectKey:
-            'skill-sessions/101/source/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.mp4',
-          multipartUploadId: 'multipart-upload-123',
-          partNumber: 1,
-        },
-      );
+      expect(
+        objectStorageService.createSignedUploadPartGrant,
+      ).toHaveBeenNthCalledWith(1, {
+        objectKey:
+          'skill-sessions/101/source/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.mp4',
+        multipartUploadId: 'multipart-upload-123',
+        partNumber: 1,
+      });
 
       await expect(
         service.createUploadIntent({
@@ -2832,7 +2875,8 @@ describe('multimodal guided creation service', () => {
       };
       const service = createMultimodalGuidedCreationService({
         query: queryPrimarySource,
-        withTransaction: async (callback) => callback({ query: queryPrimarySource }),
+        withTransaction: async (callback) =>
+          callback({ query: queryPrimarySource }),
         now: () => new Date('2026-08-22T10:00:00.000Z'),
         objectStorageService,
         uploadSecurityService,
@@ -2900,18 +2944,17 @@ describe('multimodal guided creation service', () => {
     });
 
     it('rejects replay when the stored pending intent is no longer in uploading stage', async () => {
-      const intentClaimsHash =
-        __testing.buildUploadIntentClaimsHash({
-          sessionId: '101',
-          authUserId: 'user-1',
-          sourceId: 'source-upload-1',
-          objectKey:
-            'skill-sessions/101/source/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.mp4',
-          declaredMimeType: 'video/mp4',
-          sizeBytes: 1024,
-          uploadMode: 'single_put',
-          intentRevisionNo: 1,
-        });
+      const intentClaimsHash = __testing.buildUploadIntentClaimsHash({
+        sessionId: '101',
+        authUserId: 'user-1',
+        sourceId: 'source-upload-1',
+        objectKey:
+          'skill-sessions/101/source/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.mp4',
+        declaredMimeType: 'video/mp4',
+        sizeBytes: 1024,
+        uploadMode: 'single_put',
+        intentRevisionNo: 1,
+      });
       const queryMock = vi.fn().mockResolvedValue({
         rows: [
           createSessionRow({
@@ -2921,15 +2964,14 @@ describe('multimodal guided creation service', () => {
             media_state_json: {
               ...createSessionRow().media_state_json,
               pendingUpload: createPendingUpload({
-                requestHash:
-                  __testing.buildUploadIntentRequestHash({
-                    sessionId: '101',
-                    fileName: 'lesson.mp4',
-                    declaredMimeType: 'video/mp4',
-                    sizeBytes: 1024,
-                    mediaKind: 'video',
-                    uploadMode: 'single_put',
-                  }),
+                requestHash: __testing.buildUploadIntentRequestHash({
+                  sessionId: '101',
+                  fileName: 'lesson.mp4',
+                  declaredMimeType: 'video/mp4',
+                  sizeBytes: 1024,
+                  mediaKind: 'video',
+                  uploadMode: 'single_put',
+                }),
                 intentClaimsHash,
               }),
             },
@@ -2969,7 +3011,8 @@ describe('multimodal guided creation service', () => {
     });
 
     it('maps verifying pending uploads to public whitelists only', async () => {
-      const queryMock = vi.fn()
+      const queryMock = vi
+        .fn()
         .mockResolvedValueOnce({
           rows: [
             createSessionRow({
@@ -3078,7 +3121,9 @@ describe('multimodal guided creation service', () => {
       expect(singleSerialized).not.toHaveProperty('expiresAt');
       expect(singleSerialized).not.toHaveProperty('requestHash');
       expect(singleSerialized).not.toHaveProperty('intentClaimsHash');
-      expect(singleSerialized.verification).not.toHaveProperty('idempotencyKey');
+      expect(singleSerialized.verification).not.toHaveProperty(
+        'idempotencyKey',
+      );
       expect(singleSerialized.verification).not.toHaveProperty('requestHash');
 
       const multipartDetail = await service.getSessionDetail({
@@ -3102,7 +3147,9 @@ describe('multimodal guided creation service', () => {
           confirmedAt: '2026-08-22T10:04:00.000Z',
         },
       });
-      expect(Object.keys(multipartDetail.mediaState.pendingUpload ?? {})).toEqual([
+      expect(
+        Object.keys(multipartDetail.mediaState.pendingUpload ?? {}),
+      ).toEqual([
         'sourceId',
         'mediaKind',
         'fileName',
@@ -3122,8 +3169,12 @@ describe('multimodal guided creation service', () => {
       expect(multipartSerialized).not.toHaveProperty('multipartUploadId');
       expect(multipartSerialized).not.toHaveProperty('requestHash');
       expect(multipartSerialized).not.toHaveProperty('intentClaimsHash');
-      expect(multipartSerialized.verification).not.toHaveProperty('idempotencyKey');
-      expect(multipartSerialized.verification).not.toHaveProperty('requestHash');
+      expect(multipartSerialized.verification).not.toHaveProperty(
+        'idempotencyKey',
+      );
+      expect(multipartSerialized.verification).not.toHaveProperty(
+        'requestHash',
+      );
     });
 
     it('rejects replay when pending upload is already verifying without side effects', async () => {
@@ -3202,9 +3253,13 @@ describe('multimodal guided creation service', () => {
         statusCode: 409,
       });
       expect(objectStorageService.createSignedPutGrant).not.toHaveBeenCalled();
-      expect(objectStorageService.createSessionObjectKey).not.toHaveBeenCalled();
+      expect(
+        objectStorageService.createSessionObjectKey,
+      ).not.toHaveBeenCalled();
       expect(objectStorageService.createMultipartUpload).not.toHaveBeenCalled();
-      expect(objectStorageService.abortIncompleteMultipartUpload).not.toHaveBeenCalled();
+      expect(
+        objectStorageService.abortIncompleteMultipartUpload,
+      ).not.toHaveBeenCalled();
       expect(queryMock).toHaveBeenCalledTimes(1);
     });
 
@@ -3217,15 +3272,14 @@ describe('multimodal guided creation service', () => {
             media_state_json: {
               ...createSessionRow().media_state_json,
               pendingUpload: createPendingUpload({
-                requestHash:
-                  __testing.buildUploadIntentRequestHash({
-                    sessionId: '101',
-                    fileName: 'lesson.mp4',
-                    declaredMimeType: 'video/mp4',
-                    sizeBytes: 1024,
-                    mediaKind: 'video',
-                    uploadMode: 'single_put',
-                  }),
+                requestHash: __testing.buildUploadIntentRequestHash({
+                  sessionId: '101',
+                  fileName: 'lesson.mp4',
+                  declaredMimeType: 'video/mp4',
+                  sizeBytes: 1024,
+                  mediaKind: 'video',
+                  uploadMode: 'single_put',
+                }),
                 intentClaimsHash: 'f'.repeat(64),
               }),
             },
@@ -3325,7 +3379,9 @@ describe('multimodal guided creation service', () => {
                   requiredHeaders: {},
                 }),
               ),
-            abortIncompleteMultipartUpload: vi.fn().mockResolvedValue(undefined),
+            abortIncompleteMultipartUpload: vi
+              .fn()
+              .mockResolvedValue(undefined),
           },
           uploadSecurityService: createUploadSecurityService({
             maxUploadBytes: 1024 * 1024 * 1024,
@@ -3378,7 +3434,10 @@ describe('multimodal guided creation service', () => {
           declaredMimeType: 'video/mp4',
           sizeBytes: 1024,
         }),
-      ).rejects.toMatchObject({ code: 'UNSUPPORTED_MEDIA_TYPE', statusCode: 415 });
+      ).rejects.toMatchObject({
+        code: 'UNSUPPORTED_MEDIA_TYPE',
+        statusCode: 415,
+      });
 
       await expect(
         makeService().createUploadIntent({
@@ -4385,7 +4444,9 @@ describe('multimodal guided creation service', () => {
       };
     }
 
-    function createUploadConfirmReceipt(overrides: Record<string, unknown> = {}) {
+    function createUploadConfirmReceipt(
+      overrides: Record<string, unknown> = {},
+    ) {
       return {
         action: 'skill.media.upload.confirm',
         idempotencyKey: 'upload-confirm-001',
@@ -4413,29 +4474,34 @@ describe('multimodal guided creation service', () => {
     }): string {
       return __testing.issueUploadIntentToken({
         secret: 'x'.repeat(32),
-        binding: binding as Parameters<typeof __testing.issueUploadIntentToken>[0]['binding'],
+        binding: binding as Parameters<
+          typeof __testing.issueUploadIntentToken
+        >[0]['binding'],
         expiresAt: '2026-08-22T10:05:00.000Z',
       });
     }
 
-    function createDefaultConfirmToken(overrides: Partial<{
-      sessionId: string;
-      authUserId: string;
-      sourceId: string;
-      objectKey: string;
-      declaredMimeType: string;
-      sizeBytes: number;
-      uploadMode: 'single_put' | 'multipart';
-      multipartUploadId?: string;
-      partSizeBytes?: number;
-      partCount?: number;
-      intentRevisionNo: number;
-    }> = {}): string {
+    function createDefaultConfirmToken(
+      overrides: Partial<{
+        sessionId: string;
+        authUserId: string;
+        sourceId: string;
+        objectKey: string;
+        declaredMimeType: string;
+        sizeBytes: number;
+        uploadMode: 'single_put' | 'multipart';
+        multipartUploadId?: string;
+        partSizeBytes?: number;
+        partCount?: number;
+        intentRevisionNo: number;
+      }> = {},
+    ): string {
       return createUploadConfirmToken({
         sessionId: '101',
         authUserId: 'user-1',
         sourceId: 'source-upload-1',
-        objectKey: 'skill-sessions/101/source/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.mp4',
+        objectKey:
+          'skill-sessions/101/source/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.mp4',
         declaredMimeType: 'video/mp4',
         sizeBytes: 1024,
         uploadMode: 'single_put',
@@ -4679,7 +4745,11 @@ describe('multimodal guided creation service', () => {
           },
         },
         { revision_no: 2, updated_at: '2026-08-22T10:00:00.000Z' },
-        { operationReceipts: [createUploadConfirmReceipt({ requestHash: expectedHash })] },
+        {
+          operationReceipts: [
+            createUploadConfirmReceipt({ requestHash: expectedHash }),
+          ],
+        },
       );
       queryMock
         .mockResolvedValueOnce({ rows: [uploadingRow], rowCount: 1 })
@@ -5146,9 +5216,9 @@ describe('multimodal guided creation service', () => {
           etag: '"final-etag"',
           lastModified: new Date('2026-08-22T09:00:00.000Z'),
         }),
-        completeMultipartUpload: vi.fn().mockRejectedValue(
-          new Error('network error'),
-        ),
+        completeMultipartUpload: vi
+          .fn()
+          .mockRejectedValue(new Error('network error')),
       };
       const createMediaJobInTransaction = vi.fn().mockResolvedValue({
         jobId: 'job-quality-1',
@@ -5226,7 +5296,11 @@ describe('multimodal guided creation service', () => {
           },
         },
         { revision_no: 2, updated_at: '2026-08-22T10:00:00.000Z' },
-        { operationReceipts: [createUploadConfirmReceipt({ requestHash: expectedHash })] },
+        {
+          operationReceipts: [
+            createUploadConfirmReceipt({ requestHash: expectedHash }),
+          ],
+        },
       );
       queryMock.mockResolvedValueOnce({ rows: [verifyingRow], rowCount: 1 });
 
@@ -5279,7 +5353,11 @@ describe('multimodal guided creation service', () => {
           },
         },
         { revision_no: 2, updated_at: '2026-08-22T10:00:00.000Z' },
-        { operationReceipts: [createUploadConfirmReceipt({ requestHash: differentHash })] },
+        {
+          operationReceipts: [
+            createUploadConfirmReceipt({ requestHash: differentHash }),
+          ],
+        },
       );
       queryMock.mockResolvedValueOnce({ rows: [verifyingRow], rowCount: 1 });
 
@@ -5351,7 +5429,11 @@ describe('multimodal guided creation service', () => {
           },
         },
         { revision_no: 2, updated_at: '2026-08-22T10:00:00.000Z' },
-        { operationReceipts: [createUploadConfirmReceipt({ requestHash: expectedHash })] },
+        {
+          operationReceipts: [
+            createUploadConfirmReceipt({ requestHash: expectedHash }),
+          ],
+        },
       );
       queryMock.mockResolvedValueOnce({ rows: [verifyingRow], rowCount: 1 });
 
@@ -5424,12 +5506,16 @@ describe('multimodal guided creation service', () => {
       });
 
       const callOrder: string[] = [];
-      const wrappedHeadObject = vi.fn().mockImplementation(async (...args: unknown[]) => {
-        callOrder.push('headObject');
-        return headObject(...args);
-      });
+      const wrappedHeadObject = vi
+        .fn()
+        .mockImplementation(async (...args: unknown[]) => {
+          callOrder.push('headObject');
+          return headObject(...args);
+        });
       const withTransaction = vi.fn(
-        async (callback: (db: { query: typeof queryMock }) => Promise<unknown>) => {
+        async (
+          callback: (db: { query: typeof queryMock }) => Promise<unknown>,
+        ) => {
           callOrder.push('transaction-start');
           const result = await callback({ query: queryMock });
           callOrder.push('transaction-end');
@@ -5582,7 +5668,7 @@ describe('upload confirm media quality job contract', () => {
 
 function createReadyAudioState() {
   return {
-    ...createSessionRow().media_state_json as Record<string, unknown>,
+    ...(createSessionRow().media_state_json as Record<string, unknown>),
     primarySource: {
       sourceId: 'source-audio-1',
       kind: 'audio',
@@ -5665,7 +5751,10 @@ describe('multimodal processing controls', () => {
     });
     queryMock
       .mockResolvedValueOnce({ rows: [readyRow], rowCount: 1 })
-      .mockResolvedValueOnce({ rows: [createQualityCheckJobRow()], rowCount: 1 })
+      .mockResolvedValueOnce({
+        rows: [createQualityCheckJobRow()],
+        rowCount: 1,
+      })
       .mockResolvedValueOnce({ rows: [preparingRow], rowCount: 1 });
     const createMediaJobInTransaction = vi.fn().mockResolvedValue({
       jobId: '701',
@@ -5714,7 +5803,9 @@ describe('multimodal processing controls', () => {
         }),
       }),
     );
-    expect(String(queryMock.mock.calls[0]?.[0]).toLowerCase()).toContain('for update');
+    expect(String(queryMock.mock.calls[0]?.[0]).toLowerCase()).toContain(
+      'for update',
+    );
   });
 
   it('replays process.start after the original transaction committed without creating another job', async () => {
@@ -5838,7 +5929,10 @@ describe('multimodal processing controls', () => {
             status: 'failed',
             attempt_no: 3,
             max_attempts: 3,
-            input_manifest_json: { schemaVersion: 1, sourceId: 'source-audio-1' },
+            input_manifest_json: {
+              schemaVersion: 1,
+              sourceId: 'source-audio-1',
+            },
             error_json: {
               code: 'ASR_FAILED',
               message: 'Transcription failed',
@@ -6005,80 +6099,80 @@ describe('multimodal processing controls', () => {
   it.each(['WORKER_LEASE_EXPIRED', 'OBJECT_STORAGE_WRITE_FAILED'])(
     'retries a legacy transcription %s failure after the worker upgrade',
     async (errorCode) => {
-    const queryMock = vi.fn();
-    const failedInputManifest = {
-      schemaVersion: 1,
-      sourceId: 'source-video-1',
-      durationMs: 741_077,
-    };
-    queryMock
-      .mockResolvedValueOnce({
-        rows: [
-          createSessionRow({
-            status: 'failed',
-            media_stage: 'failed',
-            revision_no: 8,
-            media_state_json: createReadyAudioState(),
-          }),
-        ],
-        rowCount: 1,
-      })
-      .mockResolvedValueOnce({
-        rows: [
-          createJobRow({
-            id: '704',
-            session_id: '101',
-            job_type: 'transcribe',
-            status: 'failed',
-            attempt_no: 3,
-            max_attempts: 3,
-            input_manifest_json: failedInputManifest,
-            error_json: {
-              code: errorCode,
-              message: 'Legacy worker failed before completion',
-              retryable: false,
-              details: { resumeFromStage: 'transcribing' },
-            },
-          }),
-        ],
-        rowCount: 1,
-      })
-      .mockResolvedValueOnce({
-        rows: [
-          createSessionRow({
-            media_stage: 'transcribing',
-            revision_no: 9,
-            media_state_json: createReadyAudioState(),
-          }),
-        ],
-        rowCount: 1,
+      const queryMock = vi.fn();
+      const failedInputManifest = {
+        schemaVersion: 1,
+        sourceId: 'source-video-1',
+        durationMs: 741_077,
+      };
+      queryMock
+        .mockResolvedValueOnce({
+          rows: [
+            createSessionRow({
+              status: 'failed',
+              media_stage: 'failed',
+              revision_no: 8,
+              media_state_json: createReadyAudioState(),
+            }),
+          ],
+          rowCount: 1,
+        })
+        .mockResolvedValueOnce({
+          rows: [
+            createJobRow({
+              id: '704',
+              session_id: '101',
+              job_type: 'transcribe',
+              status: 'failed',
+              attempt_no: 3,
+              max_attempts: 3,
+              input_manifest_json: failedInputManifest,
+              error_json: {
+                code: errorCode,
+                message: 'Legacy worker failed before completion',
+                retryable: false,
+                details: { resumeFromStage: 'transcribing' },
+              },
+            }),
+          ],
+          rowCount: 1,
+        })
+        .mockResolvedValueOnce({
+          rows: [
+            createSessionRow({
+              media_stage: 'transcribing',
+              revision_no: 9,
+              media_state_json: createReadyAudioState(),
+            }),
+          ],
+          rowCount: 1,
+        });
+      const createMediaJobInTransaction = vi.fn().mockResolvedValue({
+        jobId: '705',
+        jobType: 'transcribe',
+        status: 'queued',
+        attemptNo: 0,
       });
-    const createMediaJobInTransaction = vi.fn().mockResolvedValue({
-      jobId: '705',
-      jobType: 'transcribe',
-      status: 'queued',
-      attemptNo: 0,
-    });
-    const service = createMultimodalGuidedCreationService({
-      query: queryMock,
-      withTransaction: async (callback) => callback({ query: queryMock }),
-      createMediaJobInTransaction,
-    });
+      const service = createMultimodalGuidedCreationService({
+        query: queryMock,
+        withTransaction: async (callback) => callback({ query: queryMock }),
+        createMediaJobInTransaction,
+      });
 
-    const result = await service.retryProcessing({
-      authUserId: 'user-1',
-      sessionId: '101',
-      idempotencyKey: `process-retry-${errorCode.toLowerCase()}-upgrade-001`,
-      expectedRevisionNo: 8,
-      failedJobId: '704',
-    });
+      const result = await service.retryProcessing({
+        authUserId: 'user-1',
+        sessionId: '101',
+        idempotencyKey: `process-retry-${errorCode.toLowerCase()}-upgrade-001`,
+        expectedRevisionNo: 8,
+        failedJobId: '704',
+      });
 
-    expect(result).toMatchObject({
-      revisionNo: 9,
-      mediaStage: 'transcribing',
-      retriedJobId: '704',
-      job: { jobId: '705', jobType: 'transcribe', status: 'queued' },
-    });
+      expect(result).toMatchObject({
+        revisionNo: 9,
+        mediaStage: 'transcribing',
+        retriedJobId: '704',
+        job: { jobId: '705', jobType: 'transcribe', status: 'queued' },
+      });
     },
   );
 
@@ -6088,88 +6182,88 @@ describe('multimodal processing controls', () => {
   ])(
     'retries the legacy frame %s failure after the worker upgrade (%s)',
     async (errorCode) => {
-    const failedInputManifest = {
-      schemaVersion: 1,
-      sourceId: 'source-video-1',
-      frameRequests: [
-        {
-          candidateId: 'frame-001',
-          semanticMomentId: 'moment-001',
-          timestampMs: 1_000,
-          sourceSignal: 'semantic_moment',
-          selectionReason: 'semantic anchor',
-        },
-      ],
-    };
-    const queryMock = vi
-      .fn()
-      .mockResolvedValueOnce({
-        rows: [
-          createSessionRow({
-            status: 'failed',
-            media_stage: 'failed',
-            revision_no: 14,
-            media_state_json: createReadyAudioState(),
-          }),
+      const failedInputManifest = {
+        schemaVersion: 1,
+        sourceId: 'source-video-1',
+        frameRequests: [
+          {
+            candidateId: 'frame-001',
+            semanticMomentId: 'moment-001',
+            timestampMs: 1_000,
+            sourceSignal: 'semantic_moment',
+            selectionReason: 'semantic anchor',
+          },
         ],
-        rowCount: 1,
-      })
-      .mockResolvedValueOnce({
-        rows: [
-          createJobRow({
-            id: '707',
-            session_id: '101',
-            job_type: 'frame_materialize',
-            status: 'failed',
-            attempt_no: 1,
-            max_attempts: 3,
-            input_manifest_json: failedInputManifest,
-            error_json: {
-              code: errorCode,
-              message: 'Media processing failed',
-              retryable: false,
-              details: { resumeFromStage: 'building_evidence' },
-            },
-          }),
-        ],
-        rowCount: 1,
-      })
-      .mockResolvedValueOnce({
-        rows: [
-          createSessionRow({
-            media_stage: 'building_evidence',
-            revision_no: 15,
-            media_state_json: createReadyAudioState(),
-          }),
-        ],
-        rowCount: 1,
+      };
+      const queryMock = vi
+        .fn()
+        .mockResolvedValueOnce({
+          rows: [
+            createSessionRow({
+              status: 'failed',
+              media_stage: 'failed',
+              revision_no: 14,
+              media_state_json: createReadyAudioState(),
+            }),
+          ],
+          rowCount: 1,
+        })
+        .mockResolvedValueOnce({
+          rows: [
+            createJobRow({
+              id: '707',
+              session_id: '101',
+              job_type: 'frame_materialize',
+              status: 'failed',
+              attempt_no: 1,
+              max_attempts: 3,
+              input_manifest_json: failedInputManifest,
+              error_json: {
+                code: errorCode,
+                message: 'Media processing failed',
+                retryable: false,
+                details: { resumeFromStage: 'building_evidence' },
+              },
+            }),
+          ],
+          rowCount: 1,
+        })
+        .mockResolvedValueOnce({
+          rows: [
+            createSessionRow({
+              media_stage: 'building_evidence',
+              revision_no: 15,
+              media_state_json: createReadyAudioState(),
+            }),
+          ],
+          rowCount: 1,
+        });
+      const createMediaJobInTransaction = vi.fn().mockResolvedValue({
+        jobId: '708',
+        jobType: 'frame_materialize',
+        status: 'queued',
+        attemptNo: 0,
       });
-    const createMediaJobInTransaction = vi.fn().mockResolvedValue({
-      jobId: '708',
-      jobType: 'frame_materialize',
-      status: 'queued',
-      attemptNo: 0,
-    });
-    const service = createMultimodalGuidedCreationService({
-      query: queryMock,
-      withTransaction: async (callback) => callback({ query: queryMock }),
-      createMediaJobInTransaction,
-    });
+      const service = createMultimodalGuidedCreationService({
+        query: queryMock,
+        withTransaction: async (callback) => callback({ query: queryMock }),
+        createMediaJobInTransaction,
+      });
 
-    const result = await service.retryProcessing({
-      authUserId: 'user-1',
-      sessionId: '101',
-      idempotencyKey: 'process-retry-frame-token-upgrade-001',
-      expectedRevisionNo: 14,
-      failedJobId: '707',
-    });
+      const result = await service.retryProcessing({
+        authUserId: 'user-1',
+        sessionId: '101',
+        idempotencyKey: 'process-retry-frame-token-upgrade-001',
+        expectedRevisionNo: 14,
+        failedJobId: '707',
+      });
 
-    expect(result).toMatchObject({
-      revisionNo: 15,
-      mediaStage: 'building_evidence',
-      retriedJobId: '707',
-      job: { jobId: '708', jobType: 'frame_materialize', status: 'queued' },
-    });
+      expect(result).toMatchObject({
+        revisionNo: 15,
+        mediaStage: 'building_evidence',
+        retriedJobId: '707',
+        job: { jobId: '708', jobType: 'frame_materialize', status: 'queued' },
+      });
     },
   );
 
@@ -6271,7 +6365,10 @@ describe('multimodal processing controls', () => {
         ],
         rowCount: 1,
       })
-      .mockResolvedValueOnce({ rows: [{ id: '701' }, { id: '702' }], rowCount: 2 })
+      .mockResolvedValueOnce({
+        rows: [{ id: '701' }, { id: '702' }],
+        rowCount: 2,
+      })
       .mockResolvedValueOnce({
         rows: [
           createSessionRow({
@@ -6407,7 +6504,8 @@ describe('multimodal processing controls', () => {
       service.createAssetPreview({
         authUserId: 'user-1',
         sessionId: '101',
-        objectKey: 'skill-sessions/101/source/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb.mp4',
+        objectKey:
+          'skill-sessions/101/source/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb.mp4',
       }),
     ).rejects.toMatchObject({ code: 'MEDIA_ASSET_NOT_FOUND' });
     expect(createSignedGetGrant).toHaveBeenCalledTimes(1);

@@ -17,7 +17,9 @@ describe('multimodal local deployment contract', () => {
     expect(compose).toContain('educlaw-minio:');
     expect(compose).toContain('educlaw-minio-init:');
     expect(compose).toContain('educlaw-db-init:');
-    expect(compose).toContain('node dist/educlaw-server/src/scripts/init-db.js');
+    expect(compose).toContain(
+      'node dist/educlaw-server/src/scripts/init-db.js',
+    );
     expect(compose).toMatch(
       /educlaw-db-init:[\s\S]*?MEDIA_UPLOAD_TOKEN_SECRET=\$\{MEDIA_UPLOAD_TOKEN_SECRET\}[\s\S]*?INTERNAL_WORKER_TOKENS=\$\{INTERNAL_WORKER_TOKENS\}/,
     );
@@ -28,8 +30,12 @@ describe('multimodal local deployment contract', () => {
     expect(
       compose.match(/educlaw-server:\s*\r?\n\s*condition: service_healthy/g),
     ).toHaveLength(3);
-    expect(compose).toContain('-bucket=${OBJECT_STORAGE_BUCKET:-educlaw-media}');
-    expect(compose).toContain('-s3.allowedOrigins=${APP_ORIGIN:-http://app.localhost:8080}');
+    expect(compose).toContain(
+      '-bucket=${OBJECT_STORAGE_BUCKET:-educlaw-media}',
+    );
+    expect(compose).toContain(
+      '-s3.allowedOrigins=${APP_ORIGIN:-http://app.localhost:8080}',
+    );
     expect(compose).not.toContain('mc cors set');
     expect(compose).toContain('educlaw-media-quality-worker:');
     expect(compose).toContain('educlaw-media-distillation-worker:');
@@ -37,7 +43,9 @@ describe('multimodal local deployment contract', () => {
     expect(compose).toContain('MEDIA_WORKER_EXECUTOR_MODE=media_quality_check');
     expect(compose).toContain('MEDIA_WORKER_EXECUTOR_MODE=distillation');
     expect(compose).not.toMatch(/MEDIA_WORKER[\s\S]{0,500}DATABASE_URL/);
-    expect(compose).not.toMatch(/mc\s+ilm\s+rule\s+add|expire-days|noncurrent-expire/);
+    expect(compose).not.toMatch(
+      /mc\s+ilm\s+rule\s+add|expire-days|noncurrent-expire/,
+    );
     expect(workerDockerfile).toContain('ffmpeg');
     expect(workerDockerfile).toContain('asr-local');
     expect(workerProject).toContain('flatbuffers==25.9.23');
@@ -59,7 +67,8 @@ describe('multimodal local deployment contract', () => {
       'MEDIA_WORKER_ASR_MODEL',
       'MINIO_ROOT_USER',
       'MINIO_ROOT_PASSWORD',
-    ]) expect(env).toContain(`${key}=`);
+    ])
+      expect(env).toContain(`${key}=`);
     expect(env).not.toMatch(/(?:sk-|Bearer\s+)[A-Za-z0-9_-]{16,}/);
   });
 

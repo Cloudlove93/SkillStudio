@@ -2,7 +2,10 @@ import type { LessonIndexItem } from './lessons';
 import type { StructuredSkillDraft } from '../components/skill-workspace/structured-skill-creation-state';
 import { LESSON_PACK_COUNTS } from './lesson-pack-counts';
 
-export type StudioPresetKind = 'lesson-pack' | 'analysis-skill' | 'agent-template';
+export type StudioPresetKind =
+  | 'lesson-pack'
+  | 'analysis-skill'
+  | 'agent-template';
 export type StudioSubject = '语文' | '数学' | '英语';
 export type StudioStage = '小学' | '初中' | '高中';
 export type StudioGrade =
@@ -49,12 +52,9 @@ const STAGE_GRADES: Array<{ stage: StudioStage; grades: StudioGrade[] }> = [
 const SUBJECTS: StudioSubject[] = ['语文', '数学', '英语'];
 
 const SUBJECT_METHOD: Record<StudioSubject, string> = {
-  语文:
-    '按“文本解读—语言实践—朗读与表达—单元语文要素”的顺序分析，关注教师如何引导学生从文字走向理解与表达。',
-  数学:
-    '按“问题情境—探究活动—汇报交流—变式练习—思维可视化”的顺序分析，关注关键问题、错误资源与算理表达。',
-  英语:
-    '按“语境导入—听说输入—任务操练—输出表达—反馈评价”的顺序分析，关注语言支架、互动机会与目标语言使用。',
+  语文: '按“文本解读—语言实践—朗读与表达—单元语文要素”的顺序分析，关注教师如何引导学生从文字走向理解与表达。',
+  数学: '按“问题情境—探究活动—汇报交流—变式练习—思维可视化”的顺序分析，关注关键问题、错误资源与算理表达。',
+  英语: '按“语境导入—听说输入—任务操练—输出表达—反馈评价”的顺序分析，关注语言支架、互动机会与目标语言使用。',
 };
 
 const LESSON_PACK_KEYWORDS = [
@@ -111,26 +111,27 @@ function lessonPackStructured(
   };
 }
 
-export const LESSON_PACK_PRESETS: StudioPreset[] = STAGE_GRADES.flatMap(({ stage, grades }) =>
-  SUBJECTS.flatMap((subject) =>
-    grades.map((grade) => {
-      const count = lessonPackCount(subject, grade);
-      return {
-        id: `lesson-pack-${subject}-${grade}`,
-        kind: 'lesson-pack' as const,
-        name: `${stage}${subject}${grade}课例包`,
-        description: `${stage}${grade}${subject} ${count} 节课堂 ASR 课例，按单元与课型整理，可直接用于备课、磨课与教研分析。`,
-        tags: ['课例包', stage, subject, grade],
-        keywords: [...LESSON_PACK_KEYWORDS, stage, subject, grade],
-        prompt: lessonPackPrompt(stage, subject, grade),
-        subject,
-        stage,
-        grade,
-        lessonCount: count,
-        structured: lessonPackStructured(stage, subject, grade),
-      };
-    }),
-  ),
+export const LESSON_PACK_PRESETS: StudioPreset[] = STAGE_GRADES.flatMap(
+  ({ stage, grades }) =>
+    SUBJECTS.flatMap((subject) =>
+      grades.map((grade) => {
+        const count = lessonPackCount(subject, grade);
+        return {
+          id: `lesson-pack-${subject}-${grade}`,
+          kind: 'lesson-pack' as const,
+          name: `${stage}${subject}${grade}课例包`,
+          description: `${stage}${grade}${subject} ${count} 节课堂 ASR 课例，按单元与课型整理，可直接用于备课、磨课与教研分析。`,
+          tags: ['课例包', stage, subject, grade],
+          keywords: [...LESSON_PACK_KEYWORDS, stage, subject, grade],
+          prompt: lessonPackPrompt(stage, subject, grade),
+          subject,
+          stage,
+          grade,
+          lessonCount: count,
+          structured: lessonPackStructured(stage, subject, grade),
+        };
+      }),
+    ),
 );
 
 export const ANALYSIS_SKILL_PRESETS: StudioPreset[] = [
@@ -140,7 +141,16 @@ export const ANALYSIS_SKILL_PRESETS: StudioPreset[] = [
     name: 'ASR 课例清洗',
     description: '修正课堂转写中的错字、断句和说话人混叠，保留原话与时间线索。',
     tags: ['分析 Skill', 'ASR', '清洗'],
-    keywords: ['清洗', '转写', 'asr', '错字', '断句', '说话人', '校对', '文本整理'],
+    keywords: [
+      '清洗',
+      '转写',
+      'asr',
+      '错字',
+      '断句',
+      '说话人',
+      '校对',
+      '文本整理',
+    ],
     prompt: [
       '创建一个「ASR 课例清洗」Skill，用于课堂 ASR 转写文本的教研前处理。',
       '输入：课堂 ASR 原始转写、课例名称、已知的学科与年级。',
@@ -162,9 +172,20 @@ export const ANALYSIS_SKILL_PRESETS: StudioPreset[] = [
     id: 'analysis-lesson-segments',
     kind: 'analysis-skill',
     name: '课例分段与环节还原',
-    description: '把一节课还原为导入、探究、练习、总结等教学环节，并标出时间与证据。',
+    description:
+      '把一节课还原为导入、探究、练习、总结等教学环节，并标出时间与证据。',
     tags: ['分析 Skill', '课例分段', '教学环节'],
-    keywords: ['分段', '环节', '流程', '导入', '探究', '练习', '总结', '课堂结构', '时间'],
+    keywords: [
+      '分段',
+      '环节',
+      '流程',
+      '导入',
+      '探究',
+      '练习',
+      '总结',
+      '课堂结构',
+      '时间',
+    ],
     prompt: [
       '创建一个「课例分段与环节还原」Skill。',
       '输入：一节课堂 ASR 课例文本，可附带教师说明的课时目标。',
@@ -188,7 +209,16 @@ export const ANALYSIS_SKILL_PRESETS: StudioPreset[] = [
     name: '提问链分析',
     description: '提取教师提问，梳理问题链的逻辑层次、等待时间与学生回答质量。',
     tags: ['分析 Skill', '提问', '问题链'],
-    keywords: ['提问', '问题链', '追问', '问题', '候答', '等待时间', '回答', '理答'],
+    keywords: [
+      '提问',
+      '问题链',
+      '追问',
+      '问题',
+      '候答',
+      '等待时间',
+      '回答',
+      '理答',
+    ],
     prompt: [
       '创建一个「提问链分析」Skill，用于课堂提问与理答研究。',
       '输入：课堂 ASR 课例文本、学科与年级、教师关注的问题。',
@@ -212,7 +242,18 @@ export const ANALYSIS_SKILL_PRESETS: StudioPreset[] = [
     name: '师生话语分析',
     description: '统计师生话语比例、互动结构与发言机会，识别课堂中的真实参与。',
     tags: ['分析 Skill', '课堂话语', '师生互动'],
-    keywords: ['话语', '师生', '互动', '发言', '参与', '问答', '小组', '讨论', '理答', '沉默'],
+    keywords: [
+      '话语',
+      '师生',
+      '互动',
+      '发言',
+      '参与',
+      '问答',
+      '小组',
+      '讨论',
+      '理答',
+      '沉默',
+    ],
     prompt: [
       '创建一个「师生话语分析」Skill。',
       '输入：课堂 ASR 课例文本、学科与年级。',
@@ -236,7 +277,16 @@ export const ANALYSIS_SKILL_PRESETS: StudioPreset[] = [
     name: '教学目标对齐',
     description: '检查教学目标、课堂活动与评价证据是否指向同一核心目标。',
     tags: ['分析 Skill', '目标对齐', '课标'],
-    keywords: ['目标', '课标', '对齐', '评价', '一致性', '核心素养', '重难点', '达成'],
+    keywords: [
+      '目标',
+      '课标',
+      '对齐',
+      '评价',
+      '一致性',
+      '核心素养',
+      '重难点',
+      '达成',
+    ],
     prompt: [
       '创建一个「教学目标对齐」Skill。',
       '输入：课时目标、课堂 ASR 课例文本、教材或单元信息（可选）。',
@@ -260,7 +310,16 @@ export const ANALYSIS_SKILL_PRESETS: StudioPreset[] = [
     name: '课例对比分析',
     description: '对比同课异构或跨课例的教学处理，提炼可迁移的做法与差异。',
     tags: ['分析 Skill', '课例对比', '同课异构'],
-    keywords: ['对比', '比较', '同课异构', '差异', '两节课', '多个课例', '共同点', '迁移'],
+    keywords: [
+      '对比',
+      '比较',
+      '同课异构',
+      '差异',
+      '两节课',
+      '多个课例',
+      '共同点',
+      '迁移',
+    ],
     prompt: [
       '创建一个「课例对比分析」Skill。',
       '输入：两节或多节课例的 ASR 文本，说明对比目的（同课异构、不同课型或不同年级）。',
@@ -308,7 +367,16 @@ export const ANALYSIS_SKILL_PRESETS: StudioPreset[] = [
     name: '课例检索与匹配',
     description: '根据学科、年级、课型或教学问题，从课例包中定位可用课例。',
     tags: ['分析 Skill', '课例检索', '匹配'],
-    keywords: ['检索', '找课', '匹配', '推荐课例', '哪节课', '课例包', '目录', '筛选'],
+    keywords: [
+      '检索',
+      '找课',
+      '匹配',
+      '推荐课例',
+      '哪节课',
+      '课例包',
+      '目录',
+      '筛选',
+    ],
     prompt: [
       '创建一个「课例检索与匹配」Skill。',
       '输入：学科、年级、教材单元、课型、想研究的教学问题，以及课例包目录。',
@@ -330,9 +398,19 @@ export const ANALYSIS_SKILL_PRESETS: StudioPreset[] = [
     id: 'analysis-unit-design',
     kind: 'analysis-skill',
     name: '单元整体教学设计',
-    description: '把一个单元拆成目标、课时任务、学习支架与评价证据，形成可执行的单元教学方案。',
+    description:
+      '把一个单元拆成目标、课时任务、学习支架与评价证据，形成可执行的单元教学方案。',
     tags: ['分析 Skill', '单元整体', '教学设计'],
-    keywords: ['单元', '整体设计', '单元目标', '课时', '大概念', '学习支架', '单元规划', '教学评一致'],
+    keywords: [
+      '单元',
+      '整体设计',
+      '单元目标',
+      '课时',
+      '大概念',
+      '学习支架',
+      '单元规划',
+      '教学评一致',
+    ],
     prompt: [
       '创建一个「单元整体教学设计」Skill，用于单元层面的教学设计。',
       '输入：教材版本、年级、单元名称或单元目录、课程标准要求（可选）、课时数量。',
@@ -354,9 +432,20 @@ export const ANALYSIS_SKILL_PRESETS: StudioPreset[] = [
     id: 'analysis-learner-diagnosis',
     kind: 'analysis-skill',
     name: '学情分析与前测',
-    description: '根据前测、作业或课堂表现，分析学生的已知、易错点与学习起点，给出教学起点建议。',
+    description:
+      '根据前测、作业或课堂表现，分析学生的已知、易错点与学习起点，给出教学起点建议。',
     tags: ['分析 Skill', '学情分析', '前测'],
-    keywords: ['学情', '前测', '起点', '已知', '易错', '错误', '诊断', '学生基础', '预习'],
+    keywords: [
+      '学情',
+      '前测',
+      '起点',
+      '已知',
+      '易错',
+      '错误',
+      '诊断',
+      '学生基础',
+      '预习',
+    ],
     prompt: [
       '创建一个「学情分析与前测」Skill。',
       '输入：前测题、学生作答、作业样本、课堂观察记录或教师对学生基础的描述。',
@@ -378,9 +467,19 @@ export const ANALYSIS_SKILL_PRESETS: StudioPreset[] = [
     id: 'analysis-homework-assessment',
     kind: 'analysis-skill',
     name: '作业与评价设计',
-    description: '围绕课时目标设计分层作业、评价任务与评分标准，检查作业与目标的一致性。',
+    description:
+      '围绕课时目标设计分层作业、评价任务与评分标准，检查作业与目标的一致性。',
     tags: ['分析 Skill', '作业设计', '评价'],
-    keywords: ['作业', '评价', '分层', '评分', '检测', '练习', '反馈', '教学评一致'],
+    keywords: [
+      '作业',
+      '评价',
+      '分层',
+      '评分',
+      '检测',
+      '练习',
+      '反馈',
+      '教学评一致',
+    ],
     prompt: [
       '创建一个「作业与评价设计」Skill。',
       '输入：课时目标、教材内容、学生基础、作业时长限制。',
@@ -402,9 +501,18 @@ export const ANALYSIS_SKILL_PRESETS: StudioPreset[] = [
     id: 'analysis-classroom-observation',
     kind: 'analysis-skill',
     name: '课堂观察与量表',
-    description: '把课堂观察关注点转成可记录、可评分的观察量表，并给出记录与复盘方法。',
+    description:
+      '把课堂观察关注点转成可记录、可评分的观察量表，并给出记录与复盘方法。',
     tags: ['分析 Skill', '课堂观察', '量表'],
-    keywords: ['课堂观察', '量表', '观察记录', '观察维度', '评分', '证据', '课堂诊断'],
+    keywords: [
+      '课堂观察',
+      '量表',
+      '观察记录',
+      '观察维度',
+      '评分',
+      '证据',
+      '课堂诊断',
+    ],
     prompt: [
       '创建一个「课堂观察与量表」Skill。',
       '输入：观察目的、学科年级、课堂关注点（提问、互动、目标达成、学生参与等）。',
@@ -426,9 +534,17 @@ export const ANALYSIS_SKILL_PRESETS: StudioPreset[] = [
     id: 'analysis-interdisciplinary-design',
     kind: 'analysis-skill',
     name: '跨学科主题学习设计',
-    description: '围绕真实问题设计跨学科主题任务，明确学科分工、课时安排与评价证据。',
+    description:
+      '围绕真实问题设计跨学科主题任务，明确学科分工、课时安排与评价证据。',
     tags: ['分析 Skill', '跨学科', '主题学习'],
-    keywords: ['跨学科', '主题学习', '项目化', '真实问题', '学科融合', '综合实践'],
+    keywords: [
+      '跨学科',
+      '主题学习',
+      '项目化',
+      '真实问题',
+      '学科融合',
+      '综合实践',
+    ],
     prompt: [
       '创建一个「跨学科主题学习设计」Skill。',
       '输入：主题或真实问题、涉及学科与年级、可用课时、学校资源条件。',
@@ -450,9 +566,18 @@ export const ANALYSIS_SKILL_PRESETS: StudioPreset[] = [
     id: 'analysis-test-blueprint',
     kind: 'analysis-skill',
     name: '命题与双向细目表',
-    description: '依据教学目标与知识分布编制双向细目表，检查试题覆盖、难度与分值结构。',
+    description:
+      '依据教学目标与知识分布编制双向细目表，检查试题覆盖、难度与分值结构。',
     tags: ['分析 Skill', '命题', '双向细目表'],
-    keywords: ['命题', '双向细目表', '试题', '难度', '分值', '覆盖率', '试卷分析'],
+    keywords: [
+      '命题',
+      '双向细目表',
+      '试题',
+      '难度',
+      '分值',
+      '覆盖率',
+      '试卷分析',
+    ],
     prompt: [
       '创建一个「命题与双向细目表」Skill。',
       '输入：考试范围、课时目标、教材内容、题型与总分要求、学生基础（可选）。',
@@ -477,7 +602,8 @@ export const AGENT_TEMPLATE_PRESETS: StudioPreset[] = [
     id: 'agent-lesson-analyst',
     kind: 'agent-template',
     name: '课例拆解师',
-    description: '把一节课拆成目标、环节、问题链与评价证据，给出可执行的改进建议。',
+    description:
+      '把一节课拆成目标、环节、问题链与评价证据，给出可执行的改进建议。',
     tags: ['Agent 模板', '课例拆解', '教研'],
     keywords: ['拆解', '课例分析', '环节', '目标', '评价', '磨课', '诊断'],
     skillPresetIds: [
@@ -508,7 +634,15 @@ export const AGENT_TEMPLATE_PRESETS: StudioPreset[] = [
     name: '文本解读师',
     description: '面向语文课例，从文本、单元要素与课堂语言实践三个层面做解读。',
     tags: ['Agent 模板', '文本解读', '语文'],
-    keywords: ['文本解读', '语文', '阅读', '单元要素', '语言实践', '朗读', '写作'],
+    keywords: [
+      '文本解读',
+      '语文',
+      '阅读',
+      '单元要素',
+      '语言实践',
+      '朗读',
+      '写作',
+    ],
     skillPresetIds: [
       'analysis-lesson-segments',
       'analysis-question-chain',
@@ -564,7 +698,8 @@ export const AGENT_TEMPLATE_PRESETS: StudioPreset[] = [
     id: 'agent-discourse-analyst',
     kind: 'agent-template',
     name: '课堂话语分析师',
-    description: '从师生话语比例、互动结构和参与机会分析课堂，提出增加学生话语的行动方案。',
+    description:
+      '从师生话语比例、互动结构和参与机会分析课堂，提出增加学生话语的行动方案。',
     tags: ['Agent 模板', '课堂话语', '互动'],
     keywords: ['话语', '互动', '发言', '参与', '课堂观察', '小组讨论', '问答'],
     skillPresetIds: [
@@ -595,7 +730,15 @@ export const AGENT_TEMPLATE_PRESETS: StudioPreset[] = [
     name: '单元整体教学设计师',
     description: '把单元目标拆成课时任务与评价证据，形成可执行的单元教学方案。',
     tags: ['Agent 模板', '单元整体', '教学设计'],
-    keywords: ['单元', '整体设计', '单元设计', '课时', '大概念', '教学评一致', '单元规划'],
+    keywords: [
+      '单元',
+      '整体设计',
+      '单元设计',
+      '课时',
+      '大概念',
+      '教学评一致',
+      '单元规划',
+    ],
     skillPresetIds: [
       'analysis-unit-design',
       'analysis-lesson-search',
@@ -652,7 +795,8 @@ export const AGENT_TEMPLATE_PRESETS: StudioPreset[] = [
     id: 'agent-learner-diagnostician',
     kind: 'agent-template',
     name: '学情诊断师',
-    description: '从前后测、作业和课堂表现分析学生起点与易错点，给出教学起点建议。',
+    description:
+      '从前后测、作业和课堂表现分析学生起点与易错点，给出教学起点建议。',
     tags: ['Agent 模板', '学情分析', '课堂诊断'],
     keywords: ['学情', '前测', '诊断', '易错', '学生基础', '课堂观察', '起点'],
     skillPresetIds: [
@@ -755,7 +899,12 @@ function presetReason(
   hits: string[],
 ): string {
   if (preset.kind === 'lesson-pack') {
-    if (subject && grade && preset.subject === subject && preset.grade === grade) {
+    if (
+      subject &&
+      grade &&
+      preset.subject === subject &&
+      preset.grade === grade
+    ) {
       return `匹配${preset.stage ?? ''}${grade}${subject}课例`;
     }
     if (subject && preset.subject === subject) {
@@ -764,23 +913,23 @@ function presetReason(
     return `包含 ${preset.lessonCount ?? 40} 节可分析课例`;
   }
   if (preset.kind === 'analysis-skill') {
-    return hits.length ? `匹配${hits.slice(0, 2).join('、')}` : '可复用的课堂分析方法';
+    return hits.length
+      ? `匹配${hits.slice(0, 2).join('、')}`
+      : '可复用的课堂分析方法';
   }
   return preset.skillPresetIds?.length
     ? `组合 ${preset.skillPresetIds.length} 个相关分析 Skill`
     : '可直接装配的教研 Agent';
 }
 
-export function recommendPresets(
-  text: string,
-  limit = 3,
-): PresetMatch[] {
+export function recommendPresets(text: string, limit = 3): PresetMatch[] {
   const normalized = normalizeText(text);
   if (normalized.trim().length < 2) return [];
   const subject = detectSubject(normalized);
   const stage = detectStage(normalized);
   const grade = detectGrade(normalized);
-  const materialHit = matchedKeywords(normalized, LESSON_PACK_KEYWORDS).length > 0;
+  const materialHit =
+    matchedKeywords(normalized, LESSON_PACK_KEYWORDS).length > 0;
   const analysisScores = new Map<string, number>();
 
   const scored = STUDIO_PRESETS.map((preset) => {
@@ -791,7 +940,12 @@ export function recommendPresets(
       if (stage && preset.stage === stage) score += 2;
       if (stage && preset.stage !== stage) score -= 2;
       if (grade && preset.grade === grade) score += 3;
-      if (subject && grade && preset.subject === subject && preset.grade !== grade) {
+      if (
+        subject &&
+        grade &&
+        preset.subject === subject &&
+        preset.grade !== grade
+      ) {
         score += 1;
       }
       if (materialHit) score += 2;

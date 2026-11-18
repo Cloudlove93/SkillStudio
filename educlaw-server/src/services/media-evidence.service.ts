@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash } from 'node:crypto';
 import { getLogger } from '../lib/request-context.js';
 import {
   classifyGenerationFailure,
@@ -24,10 +24,10 @@ import {
   type MultimodalTranscript,
   type NormalizedSemanticMoment,
   type SemanticMomentDraft,
-} from "@educlaw/shared";
+} from '@educlaw/shared';
 
-const SERVICE_ERROR = "MEDIA_EVIDENCE_FAILED";
-const SERVICE_PROCESSOR_VERSION = "media-evidence-service-v1";
+const SERVICE_ERROR = 'MEDIA_EVIDENCE_FAILED';
+const SERVICE_PROCESSOR_VERSION = 'media-evidence-service-v1';
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const MAX_METADATA_LENGTH = 128;
 const MAX_VISUAL_CONTEXT_FRAMES = 16;
@@ -38,10 +38,10 @@ const MAX_ANALYSIS_DIMENSION = 1024;
 const MAX_TRANSCRIPT_SEGMENTS = 10_000;
 const MAX_TRANSCRIPT_CORRECTION_TEXT_LENGTH = 2000;
 const HARD_REJECTED_REASONS = [
-  "blurry",
-  "black_screen",
-  "white_screen",
-  "low_information",
+  'blurry',
+  'black_screen',
+  'white_screen',
+  'low_information',
 ] as const;
 const VISUAL_SIGNAL_PRIORITY: Record<MultimodalFrameSourceSignal, number> = {
   semantic_moment: 0,
@@ -51,8 +51,8 @@ const VISUAL_SIGNAL_PRIORITY: Record<MultimodalFrameSourceSignal, number> = {
   periodic_fallback: 4,
 };
 const VISUAL_SIGNAL_DEGRADATION_CODES = {
-  slow_visual_change: "VISUAL_SIGNAL_DETECTOR_UNAVAILABLE",
-  scene_change: "VISUAL_SIGNAL_DETECTOR_UNAVAILABLE",
+  slow_visual_change: 'VISUAL_SIGNAL_DETECTOR_UNAVAILABLE',
+  scene_change: 'VISUAL_SIGNAL_DETECTOR_UNAVAILABLE',
 } as const;
 
 export interface MediaEvidenceDegradation {
@@ -91,7 +91,7 @@ export interface RankedVisualFrame {
   assetRef: MultimodalAssetRef;
   score: number;
   rankingReason: string;
-  rankingMethod: "vision_model" | "deterministic_quality_fallback";
+  rankingMethod: 'vision_model' | 'deterministic_quality_fallback';
   rankingModel?: string | null;
   qualitySummary: FrameQualityMetrics;
   visualObservation?: MultimodalEvidence['visualObservation'];
@@ -212,22 +212,22 @@ interface CompatibilityFrameContext {
 
 type SemanticVisualContext =
   | {
-      mode: "native_video";
+      mode: 'native_video';
       sourceAssetRef: MultimodalAssetRef;
     }
   | {
-      mode: "compatibility_frames";
+      mode: 'compatibility_frames';
       frames: CompatibilityFrameContext[];
     };
 
 function stableError(
-  message = "Media evidence processing failed",
+  message = 'Media evidence processing failed',
 ): MediaEvidenceServiceError {
   return new MediaEvidenceServiceError(SERVICE_ERROR, message, false);
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function readRecord(value: unknown, path: string): Record<string, unknown> {
@@ -249,7 +249,11 @@ function assertExactKeys(
 }
 
 function readString(value: unknown, path: string, maximum = 512): string {
-  if (typeof value !== "string" || value.trim().length === 0 || value.length > maximum) {
+  if (
+    typeof value !== 'string' ||
+    value.trim().length === 0 ||
+    value.length > maximum
+  ) {
     throw stableError(`${path} must be a non-empty string`);
   }
   return value;
@@ -263,7 +267,11 @@ function readSafeId(value: unknown, path: string): string {
   return text;
 }
 
-function readOptionalString(value: unknown, path: string, maximum = 512): string | null {
+function readOptionalString(
+  value: unknown,
+  path: string,
+  maximum = 512,
+): string | null {
   if (value === undefined || value === null) {
     return null;
   }
@@ -271,7 +279,7 @@ function readOptionalString(value: unknown, path: string, maximum = 512): string
 }
 
 function readBoolean(value: unknown, path: string): boolean {
-  if (typeof value !== "boolean") {
+  if (typeof value !== 'boolean') {
     throw stableError(`${path} must be a boolean`);
   }
   return value;
@@ -282,7 +290,7 @@ function readFiniteNumber(
   path: string,
   options?: { min?: number; max?: number },
 ): number {
-  if (typeof value !== "number" || !Number.isFinite(value)) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
     throw stableError(`${path} must be a finite number`);
   }
   if (options?.min !== undefined && value < options.min) {
@@ -318,9 +326,16 @@ function readArray(value: unknown, path: string): unknown[] {
   return value;
 }
 
-function readSourceKind(value: unknown, path: string): MultimodalPrimarySourceKind {
+function readSourceKind(
+  value: unknown,
+  path: string,
+): MultimodalPrimarySourceKind {
   const sourceKind = readString(value, path, 16);
-  if (!MULTIMODAL_PRIMARY_SOURCE_KINDS.includes(sourceKind as MultimodalPrimarySourceKind)) {
+  if (
+    !MULTIMODAL_PRIMARY_SOURCE_KINDS.includes(
+      sourceKind as MultimodalPrimarySourceKind,
+    )
+  ) {
     throw stableError(`${path} is invalid`);
   }
   return sourceKind as MultimodalPrimarySourceKind;
@@ -338,14 +353,18 @@ function readFrameSourceSignal(
   path: string,
 ): MultimodalFrameSourceSignal {
   const signal = readString(value, path, 64);
-  if (!MULTIMODAL_FRAME_SOURCE_SIGNALS.includes(signal as MultimodalFrameSourceSignal)) {
+  if (
+    !MULTIMODAL_FRAME_SOURCE_SIGNALS.includes(
+      signal as MultimodalFrameSourceSignal,
+    )
+  ) {
     throw stableError(`${path} is invalid`);
   }
   return signal as MultimodalFrameSourceSignal;
 }
 
 function readDuration(durationMs: number): number {
-  return readInteger(durationMs, "durationMs", {
+  return readInteger(durationMs, 'durationMs', {
     min: 1,
     max: Number.MAX_SAFE_INTEGER,
   });
@@ -384,7 +403,7 @@ function pushDegradation(
   degradations: MediaEvidenceDegradation[],
   degradation: MediaEvidenceDegradation,
 ): void {
-  const key = `${degradation.code}:${degradation.semanticMomentId ?? ""}`;
+  const key = `${degradation.code}:${degradation.semanticMomentId ?? ''}`;
   if (
     !degradations.some(
       (item) => `${item.code}:${item.semanticMomentId ?? ''}` === key,
@@ -408,7 +427,7 @@ function canonicalize(value: unknown): string {
 }
 
 function makeDeterministicId(prefix: string, payload: unknown): string {
-  return `${prefix}-${createHash("sha256").update(canonicalize(payload)).digest("hex").slice(0, 16)}`;
+  return `${prefix}-${createHash('sha256').update(canonicalize(payload)).digest('hex').slice(0, 16)}`;
 }
 
 function compareMoments(
@@ -422,18 +441,26 @@ function compareMoments(
   );
 }
 
-function compareRankedFrames(left: RankedVisualFrame, right: RankedVisualFrame): number {
+function compareRankedFrames(
+  left: RankedVisualFrame,
+  right: RankedVisualFrame,
+): number {
   return (
     right.score - left.score ||
-    right.qualitySummary.sharpness.value - left.qualitySummary.sharpness.value ||
-    right.qualitySummary.entropyNormalized - left.qualitySummary.entropyNormalized ||
+    right.qualitySummary.sharpness.value -
+      left.qualitySummary.sharpness.value ||
+    right.qualitySummary.entropyNormalized -
+      left.qualitySummary.entropyNormalized ||
     left.timestampMs - right.timestampMs ||
     left.candidateId.localeCompare(right.candidateId)
   );
 }
 
-function compareEvidence(left: MultimodalEvidence, right: MultimodalEvidence): number {
-  const kindOrder: Record<MultimodalEvidence["kind"], number> = {
+function compareEvidence(
+  left: MultimodalEvidence,
+  right: MultimodalEvidence,
+): number {
+  const kindOrder: Record<MultimodalEvidence['kind'], number> = {
     transcript: 0,
     audio_segment: 1,
     frame: 2,
@@ -522,14 +549,19 @@ export class MediaEvidenceService {
     try {
       const durationMs = readDuration(args.durationMs);
       const primarySource =
-        parseMultimodalPrimarySource(args.primarySource, "primarySource") ?? null;
+        parseMultimodalPrimarySource(args.primarySource, 'primarySource') ??
+        null;
       if (primarySource == null) {
         throw stableError();
       }
-      const transcript = parseMultimodalTranscript(args.transcript, "transcript", {
-        durationMs,
-        maxSegments: MAX_TRANSCRIPT_SEGMENTS,
-      });
+      const transcript = parseMultimodalTranscript(
+        args.transcript,
+        'transcript',
+        {
+          durationMs,
+          maxSegments: MAX_TRANSCRIPT_SEGMENTS,
+        },
+      );
       const visualContext = this.parseSemanticVisualContext(
         args.visualContext,
         primarySource,
@@ -559,7 +591,7 @@ export class MediaEvidenceService {
         throw failure;
       }
 
-      const record = readRecord(adapterResult, "semanticMomentModelResult");
+      const record = readRecord(adapterResult, 'semanticMomentModelResult');
       assertExactKeys(record, 'semanticMomentModelResult', [
         'moments',
         'model',
@@ -570,7 +602,8 @@ export class MediaEvidenceService {
         throw stableError('empty result');
       }
 
-      const normalized = this.normalizeSemanticMoments(drafts).sort(compareMoments);
+      const normalized =
+        this.normalizeSemanticMoments(drafts).sort(compareMoments);
       return {
         moments: normalized,
         provenance: {
@@ -610,13 +643,18 @@ export class MediaEvidenceService {
     transcript: unknown;
   }): Promise<TranscriptCorrectionResult | null> {
     try {
-      const transcript = parseMultimodalTranscript(args.transcript, "transcript", {
-        maxSegments: MAX_TRANSCRIPT_SEGMENTS,
-      });
+      const transcript = parseMultimodalTranscript(
+        args.transcript,
+        'transcript',
+        {
+          maxSegments: MAX_TRANSCRIPT_SEGMENTS,
+        },
+      );
       const correctable = transcript.segments
         .map((segment, index) => ({ segment, index }))
         .filter(
-          (item) => !item.segment.editedByUser && !item.segment.correctedByModel,
+          (item) =>
+            !item.segment.editedByUser && !item.segment.correctedByModel,
         );
       if (
         this.transcriptCorrectionModelAdapter === null ||
@@ -653,20 +691,23 @@ export class MediaEvidenceService {
         };
       }
 
-      const record = readRecord(adapterResult, "transcriptCorrectionModelResult");
+      const record = readRecord(
+        adapterResult,
+        'transcriptCorrectionModelResult',
+      );
       assertExactKeys(record, 'transcriptCorrectionModelResult', [
         'corrections',
       ]);
       const correctionItems = readArray(
         record.corrections,
-        "transcriptCorrectionModelResult.corrections",
+        'transcriptCorrectionModelResult.corrections',
       );
       const segments = transcript.segments.map((segment) => ({ ...segment }));
       let correctedCount = 0;
       for (const item of correctionItems) {
         const correction = readRecord(
           item,
-          "transcriptCorrectionModelResult.corrections[]",
+          'transcriptCorrectionModelResult.corrections[]',
         );
         assertExactKeys(
           correction,
@@ -675,12 +716,12 @@ export class MediaEvidenceService {
         );
         const index = readInteger(
           correction.index,
-          "transcriptCorrectionModelResult.corrections[].index",
+          'transcriptCorrectionModelResult.corrections[].index',
           { min: 0, max: segments.length - 1 },
         );
         const text = readString(
           correction.text,
-          "transcriptCorrectionModelResult.corrections[].text",
+          'transcriptCorrectionModelResult.corrections[].text',
           MAX_TRANSCRIPT_CORRECTION_TEXT_LENGTH,
         );
         const target = segments[index];
@@ -720,11 +761,13 @@ export class MediaEvidenceService {
   }): FrameCandidatePlanResult {
     try {
       const durationMs = readDuration(args.durationMs);
-      const sourceKind = readSourceKind(args.sourceKind, "sourceKind");
+      const sourceKind = readSourceKind(args.sourceKind, 'sourceKind');
       if (args.hasAudio !== undefined) {
         readBoolean(args.hasAudio, 'hasAudio');
       }
-      const moments = parseNormalizedSemanticMoments(args.semanticMoments, { durationMs }).sort(compareMoments);
+      const moments = parseNormalizedSemanticMoments(args.semanticMoments, {
+        durationMs,
+      }).sort(compareMoments);
       const degradations: MediaEvidenceDegradation[] = [];
 
       if (sourceKind === 'audio') {
@@ -773,11 +816,18 @@ export class MediaEvidenceService {
         if (windowDuration < 3) {
           throw stableError();
         }
-        const anchorCandidates = new Map<number, FrameRequestPlanItem & { priority: number }>();
-        const supplementalCandidates = new Map<number, FrameRequestPlanItem & { priority: number }>();
+        const anchorCandidates = new Map<
+          number,
+          FrameRequestPlanItem & { priority: number }
+        >();
+        const supplementalCandidates = new Map<
+          number,
+          FrameRequestPlanItem & { priority: number }
+        >();
         const anchorTimes = this.buildSemanticAnchors(moment);
         for (const [index, timestampMs] of anchorTimes.entries()) {
-          const positionLabel = index === 0 ? "front" : index === 1 ? "middle" : "back";
+          const positionLabel =
+            index === 0 ? 'front' : index === 1 ? 'middle' : 'back';
           anchorCandidates.set(timestampMs, {
             candidateId: this.makeFrameCandidateId(
               moment.semanticMomentId,
@@ -817,7 +867,10 @@ export class MediaEvidenceService {
         );
 
         if (anchorCandidates.size + supplementalCandidates.size < 3) {
-          const fallbackTimestamps = this.buildPeriodicFallbackTimestamps(moment, durationMs);
+          const fallbackTimestamps = this.buildPeriodicFallbackTimestamps(
+            moment,
+            durationMs,
+          );
           for (const timestampMs of fallbackTimestamps) {
             this.insertCandidate(
               supplementalCandidates,
@@ -844,7 +897,8 @@ export class MediaEvidenceService {
 
         const guaranteedAnchors = [...anchorCandidates.values()].sort(
           (left, right) =>
-            left.timestampMs - right.timestampMs || left.candidateId.localeCompare(right.candidateId),
+            left.timestampMs - right.timestampMs ||
+            left.candidateId.localeCompare(right.candidateId),
         );
         const supplemental = [...supplementalCandidates.values()]
           .sort(
@@ -853,7 +907,10 @@ export class MediaEvidenceService {
               left.timestampMs - right.timestampMs ||
               left.candidateId.localeCompare(right.candidateId),
           )
-          .slice(0, Math.max(0, this.maxFramesPerMoment - guaranteedAnchors.length));
+          .slice(
+            0,
+            Math.max(0, this.maxFramesPerMoment - guaranteedAnchors.length),
+          );
         const orderedCandidates = [...guaranteedAnchors, ...supplemental].sort(
           (left, right) =>
             left.timestampMs - right.timestampMs ||
@@ -884,7 +941,7 @@ export class MediaEvidenceService {
   }): Promise<VisualRankingResult> {
     try {
       const degradations: MediaEvidenceDegradation[] = [];
-      const sourceKind = readSourceKind(args.sourceKind, "sourceKind");
+      const sourceKind = readSourceKind(args.sourceKind, 'sourceKind');
       const durationMs = readDuration(args.durationMs);
       if (sourceKind === 'audio') {
         pushDegradation(degradations, {
@@ -893,9 +950,16 @@ export class MediaEvidenceService {
         });
         return { selectedFrames: [], degradations };
       }
-      const moments = parseNormalizedSemanticMoments(args.semanticMoments, { durationMs }).sort(compareMoments);
-      const momentById = new Map(moments.map((moment) => [moment.semanticMomentId, moment]));
-      const parsedCandidates = this.parseFrameCandidateManifest(args.frameCandidateManifest, momentById);
+      const moments = parseNormalizedSemanticMoments(args.semanticMoments, {
+        durationMs,
+      }).sort(compareMoments);
+      const momentById = new Map(
+        moments.map((moment) => [moment.semanticMomentId, moment]),
+      );
+      const parsedCandidates = this.parseFrameCandidateManifest(
+        args.frameCandidateManifest,
+        momentById,
+      );
       const grouped = new Map<string, ParsedFrameCandidate[]>();
       for (const candidate of parsedCandidates) {
         const list = grouped.get(candidate.semanticMomentId);
@@ -908,19 +972,25 @@ export class MediaEvidenceService {
 
       const selectedFrames: SelectedMomentFrame[] = [];
       for (const moment of moments) {
-        const allCandidates = [...(grouped.get(moment.semanticMomentId) ?? [])].sort(
+        const allCandidates = [
+          ...(grouped.get(moment.semanticMomentId) ?? []),
+        ].sort(
           (left, right) =>
-            left.timestampMs - right.timestampMs || left.candidateId.localeCompare(right.candidateId),
+            left.timestampMs - right.timestampMs ||
+            left.candidateId.localeCompare(right.candidateId),
         );
         let usableCandidates = allCandidates.filter(
-          (candidate) => !candidate.suppressed && candidate.hardRejectedReasons.length === 0,
+          (candidate) =>
+            !candidate.suppressed && candidate.hardRejectedReasons.length === 0,
         );
         if (usableCandidates.length === 0) {
           const blurryOnlyCandidates = allCandidates.filter(
             (candidate) =>
               !candidate.suppressed &&
               candidate.hardRejectedReasons.length > 0 &&
-              candidate.hardRejectedReasons.every((reason) => reason === "blurry"),
+              candidate.hardRejectedReasons.every(
+                (reason) => reason === 'blurry',
+              ),
           );
           if (blurryOnlyCandidates.length > 0) {
             usableCandidates = blurryOnlyCandidates;
@@ -940,7 +1010,10 @@ export class MediaEvidenceService {
           }
         }
 
-        const fallbackSelected = this.selectByDeterministicQuality(moment, usableCandidates);
+        const fallbackSelected = this.selectByDeterministicQuality(
+          moment,
+          usableCandidates,
+        );
         if (moment.visualTarget == null) {
           pushDegradation(degradations, {
             code: 'VISION_RANKING_FALLBACK',
@@ -964,17 +1037,22 @@ export class MediaEvidenceService {
         let rankingModel: string | null = null;
         await args.beforeModelCall?.();
         try {
-          const adapterResult = await this.visionRankingAdapter.rankVisualCandidates({
-            semanticMoment: moment,
-            candidates: usableCandidates.map((candidate) => ({
-              candidateId: candidate.candidateId,
-              timestampMs: candidate.timestampMs,
-              assetRef: candidate.assetRef,
-              selectionReason: candidate.selectionReason,
-              qualityMetrics: candidate.metrics,
-            })),
-          });
-          const applied = this.applyVisionRankingOutput(moment, usableCandidates, adapterResult);
+          const adapterResult =
+            await this.visionRankingAdapter.rankVisualCandidates({
+              semanticMoment: moment,
+              candidates: usableCandidates.map((candidate) => ({
+                candidateId: candidate.candidateId,
+                timestampMs: candidate.timestampMs,
+                assetRef: candidate.assetRef,
+                selectionReason: candidate.selectionReason,
+                qualityMetrics: candidate.metrics,
+              })),
+            });
+          const applied = this.applyVisionRankingOutput(
+            moment,
+            usableCandidates,
+            adapterResult,
+          );
           rankedFrames = applied?.selectedFrames ?? null;
           rankingModel = applied?.rankingModel ?? null;
         } catch {
@@ -1026,22 +1104,36 @@ export class MediaEvidenceService {
     try {
       const durationMs = readDuration(args.durationMs);
       const primarySource =
-        parseMultimodalPrimarySource(args.primarySource, "primarySource") ?? null;
+        parseMultimodalPrimarySource(args.primarySource, 'primarySource') ??
+        null;
       if (primarySource == null) {
         throw stableError();
       }
-      const transcript = parseMultimodalTranscript(args.transcript, "transcript", {
-        durationMs,
-        maxSegments: MAX_TRANSCRIPT_SEGMENTS,
-      });
-      const semanticMoments = parseNormalizedSemanticMoments(args.semanticMoments, {
-        durationMs,
-      }).sort(compareMoments);
-      const momentById = new Map(semanticMoments.map((moment) => [moment.semanticMomentId, moment]));
-      const selectedFrames = this.parseSelectedFrames(args.selectedFrames, momentById);
+      const transcript = parseMultimodalTranscript(
+        args.transcript,
+        'transcript',
+        {
+          durationMs,
+          maxSegments: MAX_TRANSCRIPT_SEGMENTS,
+        },
+      );
+      const semanticMoments = parseNormalizedSemanticMoments(
+        args.semanticMoments,
+        {
+          durationMs,
+        },
+      ).sort(compareMoments);
+      const momentById = new Map(
+        semanticMoments.map((moment) => [moment.semanticMomentId, moment]),
+      );
+      const selectedFrames = this.parseSelectedFrames(
+        args.selectedFrames,
+        momentById,
+      );
       const evidenceItems: MultimodalEvidence[] = [];
       const degradations: MediaEvidenceDegradation[] = [];
-      const sourceHasAudio = args.sourceHasAudio ?? primarySource.kind === "audio";
+      const sourceHasAudio =
+        args.sourceHasAudio ?? primarySource.kind === 'audio';
       if (args.sourceHasAudio !== undefined) {
         readBoolean(args.sourceHasAudio, 'sourceHasAudio');
       }
@@ -1051,13 +1143,14 @@ export class MediaEvidenceService {
       const transcriptAssetRef =
         args.transcriptAssetRef == null
           ? null
-          : parseAssetRef(args.transcriptAssetRef, "transcriptAssetRef");
+          : parseAssetRef(args.transcriptAssetRef, 'transcriptAssetRef');
       const audioPlayableAssetRef =
         args.audioPlayableAssetRef == null
-          ? primarySource.kind === "audio" && primarySource.assetRef.mimeType.startsWith("audio/")
+          ? primarySource.kind === 'audio' &&
+            primarySource.assetRef.mimeType.startsWith('audio/')
             ? primarySource.assetRef
             : null
-          : parseAssetRef(args.audioPlayableAssetRef, "audioPlayableAssetRef");
+          : parseAssetRef(args.audioPlayableAssetRef, 'audioPlayableAssetRef');
       if (audioPlayableAssetRef != null) {
         if (
           !audioPlayableAssetRef.mimeType.startsWith('audio/') ||
@@ -1115,7 +1208,10 @@ export class MediaEvidenceService {
       for (const segment of [...transcript.segments].sort(
         (left, right) => left.startMs - right.startMs,
       )) {
-        const claimType = this.claimTypeForTranscriptSegment(transcript.status, segment);
+        const claimType = this.claimTypeForTranscriptSegment(
+          transcript.status,
+          segment,
+        );
         evidenceItems.push(
           this.buildEvidence({
             kind: 'transcript',
@@ -1178,10 +1274,11 @@ export class MediaEvidenceService {
         }
         const observation = frame.visualObservation;
         const visibleBody = observation?.visibleText.length
-          ? `画面可见摘录（机器转写，需核对）：\n${observation.visibleText.map(text=>`- ${text}`).join('\n')}`
+          ? `画面可见摘录（机器转写，需核对）：\n${observation.visibleText.map((text) => `- ${text}`).join('\n')}`
           : '未取得可靠的画面内容摘录，待人工核对。';
         const uncertainBody = observation?.uncertainties.length
-          ? `\n不确定：\n${observation.uncertainties.map(text=>`- ${text}`).join('\n')}` : '';
+          ? `\n不确定：\n${observation.uncertainties.map((text) => `- ${text}`).join('\n')}`
+          : '';
         evidenceItems.push(
           this.buildEvidence({
             kind: 'frame',
@@ -1191,7 +1288,7 @@ export class MediaEvidenceService {
             },
             timeRange: { startMs: frame.timestampMs, endMs: frameEndMs },
             text: `${visibleBody}${uncertainBody}`,
-            ...(observation ? {visualObservation:observation} : {}),
+            ...(observation ? { visualObservation: observation } : {}),
             assetRef: frame.assetRef,
             claimType: 'modelInference',
             selectionReason: `${frame.selectionReason}; ${frame.rankingReason}`,
@@ -1253,7 +1350,10 @@ export class MediaEvidenceService {
         audioEvidence: draft.audioEvidence ?? null,
         selectionReason: draft.selectionReason,
       };
-      const prefix = createHash("sha256").update(JSON.stringify(hashPayload)).digest("hex").slice(0, 16);
+      const prefix = createHash('sha256')
+        .update(JSON.stringify(hashPayload))
+        .digest('hex')
+        .slice(0, 16);
       const occurrence = (seen.get(prefix) ?? 0) + 1;
       seen.set(prefix, occurrence);
       return {
@@ -1282,11 +1382,14 @@ export class MediaEvidenceService {
     if (value === undefined || value === null) {
       return null;
     }
-    const record = readRecord(value, "visualContext");
-    const mode = readString(record.mode, "visualContext.mode", 64);
+    const record = readRecord(value, 'visualContext');
+    const mode = readString(record.mode, 'visualContext.mode', 64);
     if (mode === 'native_video') {
       assertExactKeys(record, 'visualContext', ['mode', 'sourceAssetRef']);
-      const sourceAssetRef = parseAssetRef(record.sourceAssetRef, "visualContext.sourceAssetRef");
+      const sourceAssetRef = parseAssetRef(
+        record.sourceAssetRef,
+        'visualContext.sourceAssetRef',
+      );
       if (
         canonicalize(sourceAssetRef) !== canonicalize(primarySource.assetRef)
       ) {
@@ -1296,7 +1399,7 @@ export class MediaEvidenceService {
     }
     if (mode === 'compatibility_frames') {
       assertExactKeys(record, 'visualContext', ['mode', 'frames']);
-      const frames = readArray(record.frames, "visualContext.frames");
+      const frames = readArray(record.frames, 'visualContext.frames');
       if (frames.length === 0 || frames.length > MAX_VISUAL_CONTEXT_FRAMES) {
         throw stableError();
       }
@@ -1345,7 +1448,7 @@ export class MediaEvidenceService {
     if (timestamps === undefined) {
       return [];
     }
-    const values = readArray(timestamps, "timestamps");
+    const values = readArray(timestamps, 'timestamps');
     if (values.length > MAX_VISUAL_SIGNAL_TIMESTAMPS) {
       throw stableError();
     }
@@ -1374,7 +1477,10 @@ export class MediaEvidenceService {
   }
 
   private insertSignalCandidates(
-    candidatesByTimestamp: Map<number, FrameRequestPlanItem & { priority: number }>,
+    candidatesByTimestamp: Map<
+      number,
+      FrameRequestPlanItem & { priority: number }
+    >,
     anchorCandidates: Map<number, FrameRequestPlanItem & { priority: number }>,
     timestamps: number[],
     moment: NormalizedSemanticMoment,
@@ -1385,27 +1491,43 @@ export class MediaEvidenceService {
       if (timestampMs < moment.startMs || timestampMs >= moment.endMs) {
         continue;
       }
-      this.insertCandidate(candidatesByTimestamp, {
-        candidateId: this.makeFrameCandidateId(moment.semanticMomentId, timestampMs, sourceSignal),
-        semanticMomentId: moment.semanticMomentId,
-        timestampMs,
-        sourceSignal,
-        selectionReason: reason,
-        priority: VISUAL_SIGNAL_PRIORITY[sourceSignal],
-      }, anchorCandidates);
+      this.insertCandidate(
+        candidatesByTimestamp,
+        {
+          candidateId: this.makeFrameCandidateId(
+            moment.semanticMomentId,
+            timestampMs,
+            sourceSignal,
+          ),
+          semanticMomentId: moment.semanticMomentId,
+          timestampMs,
+          sourceSignal,
+          selectionReason: reason,
+          priority: VISUAL_SIGNAL_PRIORITY[sourceSignal],
+        },
+        anchorCandidates,
+      );
     }
   }
 
   private insertCandidate(
-    candidatesByTimestamp: Map<number, FrameRequestPlanItem & { priority: number }>,
+    candidatesByTimestamp: Map<
+      number,
+      FrameRequestPlanItem & { priority: number }
+    >,
     candidate: FrameRequestPlanItem & { priority: number },
-    protectedCandidates?: Map<number, FrameRequestPlanItem & { priority: number }>,
+    protectedCandidates?: Map<
+      number,
+      FrameRequestPlanItem & { priority: number }
+    >,
   ): void {
     const conflicts = [
       ...(protectedCandidates?.values() ?? []),
       ...candidatesByTimestamp.values(),
     ].filter(
-      (item) => Math.abs(item.timestampMs - candidate.timestampMs) < this.minFrameSpacingMs,
+      (item) =>
+        Math.abs(item.timestampMs - candidate.timestampMs) <
+        this.minFrameSpacingMs,
     );
     if (conflicts.length === 0) {
       candidatesByTimestamp.set(candidate.timestampMs, candidate);
@@ -1429,10 +1551,17 @@ export class MediaEvidenceService {
   ): number[] {
     const candidates: number[] = [];
     const windowDuration = moment.endMs - moment.startMs;
-    for (let fraction = 0.2; fraction < 1 && candidates.length < 6; fraction += 0.2) {
+    for (
+      let fraction = 0.2;
+      fraction < 1 && candidates.length < 6;
+      fraction += 0.2
+    ) {
       const timestampMs = Math.min(
         durationMs - 1,
-        Math.max(moment.startMs, Math.floor(moment.startMs + windowDuration * fraction)),
+        Math.max(
+          moment.startMs,
+          Math.floor(moment.startMs + windowDuration * fraction),
+        ),
       );
       if (timestampMs >= moment.startMs && timestampMs < moment.endMs) {
         candidates.push(timestampMs);
@@ -1446,7 +1575,7 @@ export class MediaEvidenceService {
     timestampMs: number,
     sourceSignal: MultimodalFrameSourceSignal,
   ): string {
-    return makeDeterministicId("frame-candidate", {
+    return makeDeterministicId('frame-candidate', {
       semanticMomentId,
       timestampMs,
       sourceSignal,
@@ -1454,7 +1583,7 @@ export class MediaEvidenceService {
   }
 
   private maxSemanticMomentEnd(moments: unknown): number {
-    const items = readArray(moments, "semanticMoments");
+    const items = readArray(moments, 'semanticMoments');
     return Math.max(
       1,
       ...items.map((moment, index) =>
@@ -1471,7 +1600,7 @@ export class MediaEvidenceService {
     value: unknown,
     momentById: Map<string, NormalizedSemanticMoment>,
   ): ParsedFrameCandidate[] {
-    const items = readArray(value, "frameCandidateManifest");
+    const items = readArray(value, 'frameCandidateManifest');
     if (items.length === 0 || items.length > MAX_FRAME_CANDIDATES) {
       throw stableError();
     }
@@ -1591,7 +1720,9 @@ export class MediaEvidenceService {
       };
       return parsed;
     });
-    const candidateById = new Map(parsed.map((candidate) => [candidate.candidateId, candidate]));
+    const candidateById = new Map(
+      parsed.map((candidate) => [candidate.candidateId, candidate]),
+    );
     for (const candidate of parsed) {
       if (candidate.duplicateOf == null) {
         continue;
@@ -1610,94 +1741,109 @@ export class MediaEvidenceService {
   }
 
   private parseFrameQualityMetrics(value: unknown): FrameQualityMetrics {
-    const record = readRecord(value, "frameQualityMetrics");
-    assertExactKeys(record, "frameQualityMetrics", [
-      "analysisWidth",
-      "analysisHeight",
-      "brightnessMeanNormalized",
-      "blackPixelRatio",
-      "whitePixelRatio",
-      "entropyNormalized",
-      "sharpness",
-      "duplicateHash",
+    const record = readRecord(value, 'frameQualityMetrics');
+    assertExactKeys(record, 'frameQualityMetrics', [
+      'analysisWidth',
+      'analysisHeight',
+      'brightnessMeanNormalized',
+      'blackPixelRatio',
+      'whitePixelRatio',
+      'entropyNormalized',
+      'sharpness',
+      'duplicateHash',
     ]);
-    const sharpnessRecord = readRecord(record.sharpness, "frameQualityMetrics.sharpness");
+    const sharpnessRecord = readRecord(
+      record.sharpness,
+      'frameQualityMetrics.sharpness',
+    );
     const duplicateHashRecord = readRecord(
       record.duplicateHash,
-      "frameQualityMetrics.duplicateHash",
+      'frameQualityMetrics.duplicateHash',
     );
-    assertExactKeys(sharpnessRecord, "frameQualityMetrics.sharpness", [
-      "algorithm",
-      "normalized",
-      "value",
+    assertExactKeys(sharpnessRecord, 'frameQualityMetrics.sharpness', [
+      'algorithm',
+      'normalized',
+      'value',
     ]);
-    assertExactKeys(duplicateHashRecord, "frameQualityMetrics.duplicateHash", [
-      "algorithm",
-      "value",
+    assertExactKeys(duplicateHashRecord, 'frameQualityMetrics.duplicateHash', [
+      'algorithm',
+      'value',
     ]);
     if (sharpnessRecord.normalized !== true) {
       throw stableError();
     }
     return {
-      analysisWidth: readInteger(record.analysisWidth, "frameQualityMetrics.analysisWidth", {
-        min: 1,
-        max: MAX_ANALYSIS_DIMENSION,
-      }),
-      analysisHeight: readInteger(record.analysisHeight, "frameQualityMetrics.analysisHeight", {
-        min: 1,
-        max: MAX_ANALYSIS_DIMENSION,
-      }),
+      analysisWidth: readInteger(
+        record.analysisWidth,
+        'frameQualityMetrics.analysisWidth',
+        {
+          min: 1,
+          max: MAX_ANALYSIS_DIMENSION,
+        },
+      ),
+      analysisHeight: readInteger(
+        record.analysisHeight,
+        'frameQualityMetrics.analysisHeight',
+        {
+          min: 1,
+          max: MAX_ANALYSIS_DIMENSION,
+        },
+      ),
       brightnessMeanNormalized: readFiniteNumber(
         record.brightnessMeanNormalized,
-        "frameQualityMetrics.brightnessMeanNormalized",
+        'frameQualityMetrics.brightnessMeanNormalized',
         { min: 0, max: 1 },
       ),
       blackPixelRatio: readFiniteNumber(
         record.blackPixelRatio,
-        "frameQualityMetrics.blackPixelRatio",
+        'frameQualityMetrics.blackPixelRatio',
         { min: 0, max: 1 },
       ),
       whitePixelRatio: readFiniteNumber(
         record.whitePixelRatio,
-        "frameQualityMetrics.whitePixelRatio",
+        'frameQualityMetrics.whitePixelRatio',
         { min: 0, max: 1 },
       ),
       entropyNormalized: readFiniteNumber(
         record.entropyNormalized,
-        "frameQualityMetrics.entropyNormalized",
+        'frameQualityMetrics.entropyNormalized',
         { min: 0, max: 1 },
       ),
       sharpness: {
         algorithm:
           readString(
             sharpnessRecord.algorithm,
-            "frameQualityMetrics.sharpness.algorithm",
+            'frameQualityMetrics.sharpness.algorithm',
             128,
-          ) === "laplacian_variance_4_neighbour_normalized"
-            ? "laplacian_variance_4_neighbour_normalized"
+          ) === 'laplacian_variance_4_neighbour_normalized'
+            ? 'laplacian_variance_4_neighbour_normalized'
             : (() => {
                 throw stableError();
               })(),
         normalized: true,
-        value: readFiniteNumber(sharpnessRecord.value, "frameQualityMetrics.sharpness.value", {
-          min: 0,
-          max: 1,
-        }),
+        value: readFiniteNumber(
+          sharpnessRecord.value,
+          'frameQualityMetrics.sharpness.value',
+          {
+            min: 0,
+            max: 1,
+          },
+        ),
       },
       duplicateHash: {
         algorithm:
           readString(
             duplicateHashRecord.algorithm,
-            "frameQualityMetrics.duplicateHash.algorithm",
+            'frameQualityMetrics.duplicateHash.algorithm',
             128,
-          ) === "dhash_64"
-            ? "dhash_64"
+          ) === 'dhash_64'
+            ? 'dhash_64'
             : (() => {
                 throw stableError();
               })(),
         value: parseFrameDHash64(
           duplicateHashRecord.value,
-          "frameQualityMetrics.duplicateHash.value",
+          'frameQualityMetrics.duplicateHash.value',
         ),
       },
     };
@@ -1726,10 +1872,13 @@ export class MediaEvidenceService {
         selectionReason: candidate.selectionReason,
         assetRef: candidate.assetRef,
         score: Math.max(0, Math.min(1, 1 - index * 0.1)),
-        rankingReason: "deterministic quality fallback",
-        rankingMethod: "deterministic_quality_fallback",
+        rankingReason: 'deterministic quality fallback',
+        rankingMethod: 'deterministic_quality_fallback',
         rankingModel: null,
-        visualObservation: {visibleText:[],uncertainties:['仅按画面质量选取，尚无可靠的可见内容转写。']},
+        visualObservation: {
+          visibleText: [],
+          uncertainties: ['仅按画面质量选取，尚无可靠的可见内容转写。'],
+        },
         qualitySummary: candidate.metrics,
       }));
   }
@@ -1742,7 +1891,7 @@ export class MediaEvidenceService {
     selectedFrames: SelectedMomentFrame[];
     rankingModel: string | null;
   } | null {
-    const record = readRecord(value, "visionRankingOutput");
+    const record = readRecord(value, 'visionRankingOutput');
     assertExactKeys(record, 'visionRankingOutput', ['rankings', 'model']);
     const rankings = readArray(
       record.rankings,
@@ -1773,12 +1922,23 @@ export class MediaEvidenceService {
           `visionRankingOutput.rankings[${index}].reason`,
           512,
         ),
-        ...(rankingRecord.visualObservation !== undefined ? {visualObservation:parseVisualObservation(rankingRecord.visualObservation)} : {}),
+        ...(rankingRecord.visualObservation !== undefined
+          ? {
+              visualObservation: parseVisualObservation(
+                rankingRecord.visualObservation,
+              ),
+            }
+          : {}),
       } satisfies RankingOutputItem;
     });
-    const byId = new Map(usableCandidates.map((candidate) => [candidate.candidateId, candidate]));
+    const byId = new Map(
+      usableCandidates.map((candidate) => [candidate.candidateId, candidate]),
+    );
     const seen = new Set<string>();
-    if (rankings.length > usableCandidates.length || rankings.length > this.maxSelectedFramesPerMoment) {
+    if (
+      rankings.length > usableCandidates.length ||
+      rankings.length > this.maxSelectedFramesPerMoment
+    ) {
       return null;
     }
     for (const ranking of rankings) {
@@ -1795,7 +1955,7 @@ export class MediaEvidenceService {
       ),
       selectedFrames: rankings
         .map((ranking): SelectedMomentFrame | null => {
-        const candidate = byId.get(ranking.candidateId);
+          const candidate = byId.get(ranking.candidateId);
           if (!candidate) {
             return null;
           }
@@ -1810,7 +1970,9 @@ export class MediaEvidenceService {
             rankingReason: ranking.reason,
             rankingMethod: 'vision_model',
             rankingModel: null,
-            ...(ranking.visualObservation ? {visualObservation:ranking.visualObservation} : {}),
+            ...(ranking.visualObservation
+              ? { visualObservation: ranking.visualObservation }
+              : {}),
             qualitySummary: candidate.metrics,
           };
         })
@@ -1826,7 +1988,7 @@ export class MediaEvidenceService {
     value: unknown,
     momentById: Map<string, NormalizedSemanticMoment>,
   ): SelectedMomentFrame[] {
-    const items = readArray(value, "selectedFrames");
+    const items = readArray(value, 'selectedFrames');
     const seenCandidateIds = new Set<string>();
     const selectedCountByMoment = new Map<string, number>();
     return items.map((item, index) => {
@@ -1901,7 +2063,8 @@ export class MediaEvidenceService {
       ) {
         throw stableError();
       }
-      const selectedCount = (selectedCountByMoment.get(semanticMomentId) ?? 0) + 1;
+      const selectedCount =
+        (selectedCountByMoment.get(semanticMomentId) ?? 0) + 1;
       if (selectedCount > this.maxSelectedFramesPerMoment) {
         throw stableError();
       }
@@ -1936,40 +2099,46 @@ export class MediaEvidenceService {
         rankingMethod,
         rankingModel,
         qualitySummary: this.parseFrameQualityMetrics(record.qualitySummary),
-        ...(record.visualObservation !== undefined ? {visualObservation:parseVisualObservation(record.visualObservation)} : {}),
+        ...(record.visualObservation !== undefined
+          ? {
+              visualObservation: parseVisualObservation(
+                record.visualObservation,
+              ),
+            }
+          : {}),
       };
     });
   }
 
   private claimTypeForTranscriptSegment(
-    transcriptStatus: MultimodalTranscript["status"],
-    segment: MultimodalTranscript["segments"][number],
+    transcriptStatus: MultimodalTranscript['status'],
+    segment: MultimodalTranscript['segments'][number],
   ): MultimodalClaimType {
     if (segment.editedByUser === true) {
-      return "userInput";
+      return 'userInput';
     }
-    if (transcriptStatus !== "ready") {
-      return "modelInference";
+    if (transcriptStatus !== 'ready') {
+      return 'modelInference';
     }
     if ((segment.confidence ?? 0) < this.lowConfidenceThreshold) {
-      return "modelInference";
+      return 'modelInference';
     }
-    return "sourceFact";
+    return 'sourceFact';
   }
 
   private buildEvidence(args: {
-    kind: MultimodalEvidence["kind"];
-    source: MultimodalEvidence["source"];
-    timeRange: MultimodalEvidence["timeRange"];
+    kind: MultimodalEvidence['kind'];
+    source: MultimodalEvidence['source'];
+    timeRange: MultimodalEvidence['timeRange'];
     text: string;
-    assetRef: MultimodalEvidence["assetRef"];
+    assetRef: MultimodalEvidence['assetRef'];
     claimType: MultimodalClaimType;
     selectionReason: string;
-    provenance: MultimodalEvidence["provenance"];
+    provenance: MultimodalEvidence['provenance'];
     visualObservation?: MultimodalEvidence['visualObservation'];
   }): MultimodalEvidence {
     return parseEvidenceCard({
-      evidenceId: makeDeterministicId("evidence", {
+      evidenceId: makeDeterministicId('evidence', {
         kind: args.kind,
         source: args.source,
         timeRange: args.timeRange,
@@ -1986,7 +2155,9 @@ export class MediaEvidenceService {
       provenance: args.provenance,
       claimType: args.claimType,
       selectionReason: args.selectionReason,
-      ...(args.visualObservation ? {visualObservation:args.visualObservation} : {}),
+      ...(args.visualObservation
+        ? { visualObservation: args.visualObservation }
+        : {}),
     });
   }
 }

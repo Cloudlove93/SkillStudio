@@ -6,7 +6,9 @@ import { describe, expect, it } from 'vitest';
 describe('diary editor dependency compatibility', () => {
   it('keeps the markdown import, edit, and export path used by DiaryPanel', () => {
     const editor = BlockNoteEditor.create();
-    const blocks = editor.tryParseMarkdownToBlocks('# 课堂反思\n\n今天完成函数教学。');
+    const blocks = editor.tryParseMarkdownToBlocks(
+      '# 课堂反思\n\n今天完成函数教学。',
+    );
 
     editor.replaceBlocks(editor.document, blocks);
 

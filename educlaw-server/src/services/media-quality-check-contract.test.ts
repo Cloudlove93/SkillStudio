@@ -18,7 +18,8 @@ function makeValidInput() {
     schemaVersion: 1,
     sourceId: 'src-test-001',
     mediaKind: 'video' as const,
-    objectKey: 'skill-sessions/42/source/a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d.mp4',
+    objectKey:
+      'skill-sessions/42/source/a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d.mp4',
     fileName: 'recording.mp4',
     expectedSizeBytes: 1024000,
     expectedContentType: 'video/mp4',
@@ -34,10 +35,12 @@ function makeValidOutput(): QualityCheckOutputManifest {
     sourceId: 'src-test-001',
     sourceKind: 'video',
     sourceAsset: {
-      objectKey: 'skill-sessions/42/source/a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d.mp4',
+      objectKey:
+        'skill-sessions/42/source/a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d.mp4',
       mimeType: 'video/mp4',
       sizeBytes: 1024000,
-      sha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+      sha256:
+        'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
     },
     probe: {
       durationMs: 30000,
@@ -50,10 +53,12 @@ function makeValidOutput(): QualityCheckOutputManifest {
       primaryVideoStreamIndex: 1,
     },
     resultManifestRef: {
-      objectKey: 'skill-sessions/42/manifest/00000000-0000-4000-8000-000000000001.json',
+      objectKey:
+        'skill-sessions/42/manifest/00000000-0000-4000-8000-000000000001.json',
       mimeType: 'application/json',
       sizeBytes: 512,
-      sha256: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      sha256:
+        'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     },
     processorVersion: '0.1.0',
     degradations: [],
@@ -79,29 +84,46 @@ function canonicalizeGenericJson(value: unknown): string {
 
 describe('parseQualityCheckInputManifest', () => {
   it('rejects non-object', () => {
-    expect(() => parseQualityCheckInputManifest(null)).toThrow('must be a plain object');
-    expect(() => parseQualityCheckInputManifest('string')).toThrow('must be a plain object');
-    expect(() => parseQualityCheckInputManifest([])).toThrow('must be a plain object');
+    expect(() => parseQualityCheckInputManifest(null)).toThrow(
+      'must be a plain object',
+    );
+    expect(() => parseQualityCheckInputManifest('string')).toThrow(
+      'must be a plain object',
+    );
+    expect(() => parseQualityCheckInputManifest([])).toThrow(
+      'must be a plain object',
+    );
   });
 
   it('rejects unknown keys', () => {
-    const input = { ...makeValidInput(), signedUrl: 'https://evil.example.com' };
-    expect(() => parseQualityCheckInputManifest(input)).toThrow('unknown key "signedUrl"');
+    const input = {
+      ...makeValidInput(),
+      signedUrl: 'https://evil.example.com',
+    };
+    expect(() => parseQualityCheckInputManifest(input)).toThrow(
+      'unknown key "signedUrl"',
+    );
   });
 
   it('rejects url/token/uploadId/ETag/headers if smuggled', () => {
     const input = { ...makeValidInput(), url: 'https://example.com' };
-    expect(() => parseQualityCheckInputManifest(input)).toThrow('unknown key "url"');
+    expect(() => parseQualityCheckInputManifest(input)).toThrow(
+      'unknown key "url"',
+    );
   });
 
   it('rejects wrong schemaVersion', () => {
     const input = { ...makeValidInput(), schemaVersion: 99 };
-    expect(() => parseQualityCheckInputManifest(input)).toThrow('schemaVersion must be 1');
+    expect(() => parseQualityCheckInputManifest(input)).toThrow(
+      'schemaVersion must be 1',
+    );
   });
 
   it('rejects invalid mediaKind', () => {
     const input = { ...makeValidInput(), mediaKind: 'image' };
-    expect(() => parseQualityCheckInputManifest(input)).toThrow('mediaKind must be one of');
+    expect(() => parseQualityCheckInputManifest(input)).toThrow(
+      'mediaKind must be one of',
+    );
   });
 
   it('rejects negative expectedSizeBytes', () => {
@@ -111,32 +133,44 @@ describe('parseQualityCheckInputManifest', () => {
 
   it('rejects non-integer expectedSizeBytes', () => {
     const input = { ...makeValidInput(), expectedSizeBytes: 1.5 };
-    expect(() => parseQualityCheckInputManifest(input)).toThrow('must be an integer');
+    expect(() => parseQualityCheckInputManifest(input)).toThrow(
+      'must be an integer',
+    );
   });
 
   it('rejects empty sourceId', () => {
     const input = { ...makeValidInput(), sourceId: '' };
-    expect(() => parseQualityCheckInputManifest(input)).toThrow('is not a valid id');
+    expect(() => parseQualityCheckInputManifest(input)).toThrow(
+      'is not a valid id',
+    );
   });
 
   it('rejects empty objectKey', () => {
     const input = { ...makeValidInput(), objectKey: '' };
-    expect(() => parseQualityCheckInputManifest(input)).toThrow('must be a non-empty string');
+    expect(() => parseQualityCheckInputManifest(input)).toThrow(
+      'must be a non-empty string',
+    );
   });
 
   it('rejects empty fileName', () => {
     const input = { ...makeValidInput(), fileName: '' };
-    expect(() => parseQualityCheckInputManifest(input)).toThrow('must be a non-empty string');
+    expect(() => parseQualityCheckInputManifest(input)).toThrow(
+      'must be a non-empty string',
+    );
   });
 
   it('rejects empty expectedContentType', () => {
     const input = { ...makeValidInput(), expectedContentType: '' };
-    expect(() => parseQualityCheckInputManifest(input)).toThrow('must be a non-empty string');
+    expect(() => parseQualityCheckInputManifest(input)).toThrow(
+      'must be a non-empty string',
+    );
   });
 
   it('rejects invalid uploadMode', () => {
     const input = { ...makeValidInput(), uploadMode: 'presigned_post' };
-    expect(() => parseQualityCheckInputManifest(input)).toThrow('uploadMode must be one of');
+    expect(() => parseQualityCheckInputManifest(input)).toThrow(
+      'uploadMode must be one of',
+    );
   });
 
   it('accepts valid input manifest', () => {
@@ -144,7 +178,9 @@ describe('parseQualityCheckInputManifest', () => {
     expect(result.schemaVersion).toBe(1);
     expect(result.sourceId).toBe('src-test-001');
     expect(result.mediaKind).toBe('video');
-    expect(result.objectKey).toBe('skill-sessions/42/source/a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d.mp4');
+    expect(result.objectKey).toBe(
+      'skill-sessions/42/source/a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d.mp4',
+    );
     expect(result.fileName).toBe('recording.mp4');
     expect(result.expectedSizeBytes).toBe(1024000);
     expect(result.expectedContentType).toBe('video/mp4');
@@ -175,56 +211,79 @@ describe('parseQualityCheckOutputManifest', () => {
   });
 
   it('rejects non-object', () => {
-    expect(() => parseQualityCheckOutputManifest(null)).toThrow('must be a plain object');
+    expect(() => parseQualityCheckOutputManifest(null)).toThrow(
+      'must be a plain object',
+    );
   });
 
   it('rejects unknown keys', () => {
     const output = { ...makeValidOutput(), s3Path: '/tmp/evil' };
-    expect(() => parseQualityCheckOutputManifest(output)).toThrow('unknown key "s3Path"');
+    expect(() => parseQualityCheckOutputManifest(output)).toThrow(
+      'unknown key "s3Path"',
+    );
   });
 
   it('rejects wrong schemaVersion', () => {
     const output = { ...makeValidOutput(), schemaVersion: 99 };
-    expect(() => parseQualityCheckOutputManifest(output)).toThrow('schemaVersion must be 1');
+    expect(() => parseQualityCheckOutputManifest(output)).toThrow(
+      'schemaVersion must be 1',
+    );
   });
 
   it('rejects wrong jobType', () => {
     const output = { ...makeValidOutput(), jobType: 'transcribe' };
-    expect(() => parseQualityCheckOutputManifest(output)).toThrow('must be one of');
+    expect(() => parseQualityCheckOutputManifest(output)).toThrow(
+      'must be one of',
+    );
   });
 
   it('rejects invalid sourceKind', () => {
     const output = { ...makeValidOutput(), sourceKind: 'image' };
-    expect(() => parseQualityCheckOutputManifest(output)).toThrow('sourceKind must be one of');
+    expect(() => parseQualityCheckOutputManifest(output)).toThrow(
+      'sourceKind must be one of',
+    );
   });
 
   it('rejects empty sessionId', () => {
     const output = { ...makeValidOutput(), sessionId: '' };
-    expect(() => parseQualityCheckOutputManifest(output)).toThrow('is not a valid id');
+    expect(() => parseQualityCheckOutputManifest(output)).toThrow(
+      'is not a valid id',
+    );
   });
 
   it('rejects invalid sha256 in sourceAsset', () => {
     const output = { ...makeValidOutput() };
     (output.sourceAsset as Record<string, unknown>).sha256 = 'bad';
-    expect(() => parseQualityCheckOutputManifest(output)).toThrow('64-char hex SHA-256');
+    expect(() => parseQualityCheckOutputManifest(output)).toThrow(
+      '64-char hex SHA-256',
+    );
   });
 
   it('rejects too-short sha256', () => {
     const output = { ...makeValidOutput() };
     (output.sourceAsset as Record<string, unknown>).sha256 = 'abcdef';
-    expect(() => parseQualityCheckOutputManifest(output)).toThrow('64-char hex SHA-256');
+    expect(() => parseQualityCheckOutputManifest(output)).toThrow(
+      '64-char hex SHA-256',
+    );
   });
 
   it('rejects uppercase sha256', () => {
     const output = { ...makeValidOutput() };
     (output.sourceAsset as Record<string, unknown>).sha256 =
       'E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855';
-    expect(() => parseQualityCheckOutputManifest(output)).toThrow('64-char hex SHA-256');
+    expect(() => parseQualityCheckOutputManifest(output)).toThrow(
+      '64-char hex SHA-256',
+    );
   });
 
   it('rejects negative durationMs', () => {
-    const output = { ...makeValidOutput(), probe: { ...makeValidOutput().probe, durationMs: -1 } };
-    expect(() => parseQualityCheckOutputManifest(output)).toThrow('must be >= 0');
+    const output = {
+      ...makeValidOutput(),
+      probe: { ...makeValidOutput().probe, durationMs: -1 },
+    };
+    expect(() => parseQualityCheckOutputManifest(output)).toThrow(
+      'must be >= 0',
+    );
   });
 
   it('rejects non-integer audioStreamCount', () => {
@@ -232,7 +291,9 @@ describe('parseQualityCheckOutputManifest', () => {
       ...makeValidOutput(),
       probe: { ...makeValidOutput().probe, audioStreamCount: 1.5 },
     };
-    expect(() => parseQualityCheckOutputManifest(output)).toThrow('must be an integer');
+    expect(() => parseQualityCheckOutputManifest(output)).toThrow(
+      'must be an integer',
+    );
   });
 
   it('rejects non-boolean hasAudio', () => {
@@ -240,20 +301,29 @@ describe('parseQualityCheckOutputManifest', () => {
       ...makeValidOutput(),
       probe: { ...makeValidOutput().probe, hasAudio: 'yes' },
     };
-    expect(() => parseQualityCheckOutputManifest(output)).toThrow('must be a boolean');
+    expect(() => parseQualityCheckOutputManifest(output)).toThrow(
+      'must be a boolean',
+    );
   });
 
   it('rejects resultManifestRef with wrong mimeType', () => {
     const output = {
       ...makeValidOutput(),
-      resultManifestRef: { ...makeValidOutput().resultManifestRef, mimeType: 'text/plain' },
+      resultManifestRef: {
+        ...makeValidOutput().resultManifestRef,
+        mimeType: 'text/plain',
+      },
     };
-    expect(() => parseQualityCheckOutputManifest(output)).toThrow('mimeType must be application/json');
+    expect(() => parseQualityCheckOutputManifest(output)).toThrow(
+      'mimeType must be application/json',
+    );
   });
 
   it('rejects invalid processorVersion', () => {
     const output = { ...makeValidOutput(), processorVersion: 'not-semver' };
-    expect(() => parseQualityCheckOutputManifest(output)).toThrow('must be semver');
+    expect(() => parseQualityCheckOutputManifest(output)).toThrow(
+      'must be semver',
+    );
   });
 
   it('rejects negative sizeBytes in sourceAsset', () => {
@@ -261,7 +331,9 @@ describe('parseQualityCheckOutputManifest', () => {
       ...makeValidOutput(),
       sourceAsset: { ...makeValidOutput().sourceAsset, sizeBytes: -1 },
     };
-    expect(() => parseQualityCheckOutputManifest(output)).toThrow('must be >= 0');
+    expect(() => parseQualityCheckOutputManifest(output)).toThrow(
+      'must be >= 0',
+    );
   });
 
   it('rejects missing probe fields', () => {
@@ -280,10 +352,12 @@ describe('parseQualityCheckOutputManifest', () => {
       sourceId: 'src-audio-01',
       sourceKind: 'audio',
       sourceAsset: {
-        objectKey: 'skill-sessions/42/source/aaaaaaaa-bbbb-4ccc-8ddd-eeeeffff0000.mp3',
+        objectKey:
+          'skill-sessions/42/source/aaaaaaaa-bbbb-4ccc-8ddd-eeeeffff0000.mp3',
         mimeType: 'audio/mpeg',
         sizeBytes: 512000,
-        sha256: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        sha256:
+          'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
       },
       probe: {
         durationMs: 12000,
@@ -296,10 +370,12 @@ describe('parseQualityCheckOutputManifest', () => {
         primaryVideoStreamIndex: null,
       },
       resultManifestRef: {
-        objectKey: 'skill-sessions/42/manifest/11111111-1111-4111-8111-111111111111.json',
+        objectKey:
+          'skill-sessions/42/manifest/11111111-1111-4111-8111-111111111111.json',
         mimeType: 'application/json',
         sizeBytes: 300,
-        sha256: 'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
+        sha256:
+          'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
       },
       processorVersion: '0.1.0',
       degradations: [],
@@ -324,7 +400,12 @@ describe('parseQualityCheckOutputManifest', () => {
         primaryAudioStreamIndex: null,
         primaryVideoStreamIndex: 0,
       },
-      degradations: [{ code: 'visual_only/no_audio_track', message: 'No audio stream detected' }],
+      degradations: [
+        {
+          code: 'visual_only/no_audio_track',
+          message: 'No audio stream detected',
+        },
+      ],
     };
     const result = parseQualityCheckOutputManifest(visualOutput);
     expect(result.probe.hasAudio).toBe(false);
@@ -485,10 +566,12 @@ describe('computeQualityCheckResultHash', () => {
       sourceId: 'src-test-001',
       sourceKind: 'video',
       sourceAsset: {
-        objectKey: 'skill-sessions/42/source/a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d.mp4',
+        objectKey:
+          'skill-sessions/42/source/a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d.mp4',
         mimeType: 'video/mp4',
         sizeBytes: 1024000,
-        sha256: 'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',
+        sha256:
+          'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',
       },
       probe: {
         durationMs: 30000,
@@ -501,15 +584,19 @@ describe('computeQualityCheckResultHash', () => {
         primaryVideoStreamIndex: 1,
       },
       resultManifestRef: {
-        objectKey: 'skill-sessions/42/manifest/00000000-0000-4000-8000-000000000001.json',
+        objectKey:
+          'skill-sessions/42/manifest/00000000-0000-4000-8000-000000000001.json',
         mimeType: 'application/json',
         sizeBytes: 512,
-        sha256: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        sha256:
+          'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
       },
       processorVersion: '0.1.0',
       degradations: [],
     };
-    expect(computeQualityCheckResultHash(output1)).not.toBe(computeQualityCheckResultHash(output2));
+    expect(computeQualityCheckResultHash(output1)).not.toBe(
+      computeQualityCheckResultHash(output2),
+    );
   });
 
   it('hash is based on canonical sorted JSON keys', () => {

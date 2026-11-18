@@ -18,7 +18,9 @@ export default function MessageList({
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const viewport = scrollAreaRef.current?.querySelector('[data-slot="scroll-area-viewport"]');
+    const viewport = scrollAreaRef.current?.querySelector(
+      '[data-slot="scroll-area-viewport"]',
+    );
     if (viewport) {
       viewport.scrollTop = viewport.scrollHeight;
     }
@@ -35,8 +37,12 @@ export default function MessageList({
             </div>
           </div>
           <div>
-            <p className="text-lg font-semibold tracking-[-0.03em] text-foreground">{t('message.start')}</p>
-            <p className="mt-2 text-sm leading-7 text-muted-foreground/70">{t('message.startHint')}</p>
+            <p className="text-lg font-semibold tracking-[-0.03em] text-foreground">
+              {t('message.start')}
+            </p>
+            <p className="mt-2 text-sm leading-7 text-muted-foreground/70">
+              {t('message.startHint')}
+            </p>
           </div>
         </div>
       </div>
@@ -50,14 +56,23 @@ export default function MessageList({
   const showThinkingPlaceholder = isStreaming && lastMsg?.role !== 'assistant';
 
   return (
-    <ScrollArea className="flex-1 min-h-0 overflow-hidden [&_[data-slot=scroll-area-viewport]]:!overflow-x-hidden" ref={scrollAreaRef}>
+    <ScrollArea
+      className="flex-1 min-h-0 overflow-hidden [&_[data-slot=scroll-area-viewport]]:!overflow-x-hidden"
+      ref={scrollAreaRef}
+    >
       <div className="mx-auto max-w-5xl space-y-6 overflow-hidden px-5 py-8 sm:px-7 lg:px-8">
         {messages.map((msg, idx) => (
           <MessageItem
             key={idx}
             message={msg}
-            isStreaming={isStreaming && idx === messages.length - 1 && msg.role === 'assistant'}
-            onDelete={onDeleteMessage ? () => onDeleteMessage(msg.id) : undefined}
+            isStreaming={
+              isStreaming &&
+              idx === messages.length - 1 &&
+              msg.role === 'assistant'
+            }
+            onDelete={
+              onDeleteMessage ? () => onDeleteMessage(msg.id) : undefined
+            }
           />
         ))}
 
@@ -65,15 +80,22 @@ export default function MessageList({
         {showThinkingPlaceholder && (
           <div className="animate-fade-in-up flex gap-3 rounded-[24px] border border-white/55 bg-white/45 px-4 py-4 shadow-sm dark:border-white/10 dark:bg-white/6">
             <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-50 to-teal-50 shadow-sm ring-2 ring-white dark:from-emerald-500/20 dark:to-teal-500/20 dark:ring-background">
-              <Bot size={14} className="text-emerald-600 dark:text-emerald-400" />
+              <Bot
+                size={14}
+                className="text-emerald-600 dark:text-emerald-400"
+              />
             </div>
             <div className="flex-1 min-w-0 space-y-2">
-              <span className="text-[11px] font-medium tracking-[0.24em] text-muted-foreground/60 uppercase">Assistant</span>
+              <span className="text-[11px] font-medium tracking-[0.24em] text-muted-foreground/60 uppercase">
+                Assistant
+              </span>
               <div className="flex items-center gap-1.5 py-2">
                 <span className="size-1.5 rounded-full bg-emerald-500/60 animate-bounce [animation-delay:0ms]" />
                 <span className="size-1.5 rounded-full bg-emerald-500/60 animate-bounce [animation-delay:150ms]" />
                 <span className="size-1.5 rounded-full bg-emerald-500/60 animate-bounce [animation-delay:300ms]" />
-                <span className="ml-2 text-xs text-muted-foreground/50">{t('message.thinking')}</span>
+                <span className="ml-2 text-xs text-muted-foreground/50">
+                  {t('message.thinking')}
+                </span>
               </div>
             </div>
           </div>

@@ -14,4 +14,3 @@ export function InspectorPortal({
   if (!outlet || !state.open || state.descriptor?.owner !== owner) return null;
   return createPortal(children, outlet);
 }
-

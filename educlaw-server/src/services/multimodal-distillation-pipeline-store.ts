@@ -56,7 +56,12 @@ interface SessionMutationRow {
 }
 
 function fail(code: string, message: string, statusCode: number): never {
-  throw new GuidedCreationError(code, message, statusCode, code === 'SESSION_REVISION_CONFLICT');
+  throw new GuidedCreationError(
+    code,
+    message,
+    statusCode,
+    code === 'SESSION_REVISION_CONFLICT',
+  );
 }
 
 function record(value: unknown, field: string): Record<string, unknown> {
@@ -90,7 +95,9 @@ function parseJson(value: unknown): unknown {
   }
 }
 
-function parseJobRow(row: Record<string, unknown> | undefined): StoredJobResult | null {
+function parseJobRow(
+  row: Record<string, unknown> | undefined,
+): StoredJobResult | null {
   if (!row) return null;
   const jobType = row.job_type;
   if (
@@ -128,7 +135,8 @@ export function createMultimodalDistillationPipelineStore(
   const transaction = dependencies.withTransaction ?? withTransaction;
   const now = dependencies.now ?? (() => new Date());
   const pipelineStore =
-    dependencies.pipelineStore ?? createMultimodalPipelineStore({ query: queryFn });
+    dependencies.pipelineStore ??
+    createMultimodalPipelineStore({ query: queryFn });
   const createJob =
     dependencies.createMediaJobInTransaction ??
     createMultimodalJobService().createMediaJobInTransaction;
@@ -266,7 +274,8 @@ export function createMultimodalDistillationPipelineStore(
           semanticMoments: input.semanticMoments,
           ...(input.transcript ? { transcript: input.transcript } : {}),
           evidenceTimeline: {
-            evidenceItems: input.evidenceItems ?? state.evidenceTimeline.evidenceItems,
+            evidenceItems:
+              input.evidenceItems ?? state.evidenceTimeline.evidenceItems,
           },
           degradations: input.degradations,
         });
@@ -303,11 +312,7 @@ export function createMultimodalDistillationPipelineStore(
               (item) => item.kind === 'frame',
             ))
         ) {
-          fail(
-            'MULTIMODAL_PIPELINE_FAILED',
-            '当前会话不需要修复视觉证据',
-            409,
-          );
+          fail('MULTIMODAL_PIPELINE_FAILED', '当前会话不需要修复视觉证据', 409);
         }
         const nextState = parseMultimodalSessionState({
           ...state,

@@ -8,7 +8,11 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { useAgentStore } from '../../stores/agent';
 import { useT } from '../../i18n';
-import { DetailSurface, PremiumHeader, PremiumPill } from '@/components/ui/premium';
+import {
+  DetailSurface,
+  PremiumHeader,
+  PremiumPill,
+} from '@/components/ui/premium';
 import { Globe, Lock, SlidersHorizontal } from 'lucide-react';
 
 export default function AgentSettingsDialog({
@@ -21,7 +25,9 @@ export default function AgentSettingsDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const t = useT();
-  const agent = useAgentStore((s) => agentId ? s.agents.find((a) => a.id === agentId) : undefined);
+  const agent = useAgentStore((s) =>
+    agentId ? s.agents.find((a) => a.id === agentId) : undefined,
+  );
   const togglePublic = useAgentStore((s) => s.togglePublic);
 
   if (!agent) return null;
@@ -42,7 +48,10 @@ export default function AgentSettingsDialog({
             title={t('agentSettings.title')}
             description={agent.name}
             actions={
-              <PremiumPill accent={agent.public ? 'emerald' : 'slate'} icon={agent.public ? Globe : Lock}>
+              <PremiumPill
+                accent={agent.public ? 'emerald' : 'slate'}
+                icon={agent.public ? Globe : Lock}
+              >
                 {agent.public ? t('shared.public') : t('shared.private')}
               </PremiumPill>
             }
@@ -52,12 +61,20 @@ export default function AgentSettingsDialog({
             <div className="flex items-center justify-between gap-4">
               <div className="space-y-1">
                 <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-                  <div className={`flex size-8 items-center justify-center rounded-2xl ${agent.public ? 'bg-gradient-to-br from-emerald-500/16 to-teal-500/10 text-emerald-600 dark:text-emerald-300' : 'bg-gradient-to-br from-slate-500/14 to-white/20 text-slate-600 dark:text-slate-300'}`}>
-                    {agent.public ? <Globe className="size-4" /> : <Lock className="size-4" />}
+                  <div
+                    className={`flex size-8 items-center justify-center rounded-2xl ${agent.public ? 'bg-gradient-to-br from-emerald-500/16 to-teal-500/10 text-emerald-600 dark:text-emerald-300' : 'bg-gradient-to-br from-slate-500/14 to-white/20 text-slate-600 dark:text-slate-300'}`}
+                  >
+                    {agent.public ? (
+                      <Globe className="size-4" />
+                    ) : (
+                      <Lock className="size-4" />
+                    )}
                   </div>
                   {t('agentSettings.public')}
                 </div>
-                <p className="pl-10 text-xs leading-5 text-muted-foreground">{t('agentSettings.publicDesc')}</p>
+                <p className="pl-10 text-xs leading-5 text-muted-foreground">
+                  {t('agentSettings.publicDesc')}
+                </p>
               </div>
               <Switch
                 checked={!!agent.public}

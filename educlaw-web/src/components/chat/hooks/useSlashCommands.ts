@@ -17,20 +17,37 @@ export function useSlashCommands(
   // Load available agents and custom commands when running.
   useEffect(() => {
     if (!isRunning) return;
-    api.listAgents().then((data: unknown) => {
-      const arr = Array.isArray(data) ? data : [];
-      setAgents(arr);
-      if (!currentAgent && arr.length > 0) {
-        const sessionAgentName = sessionId
-          ? useChatStore.getState().tabs.get(agentId)?.sessions.find((session) => session.id === sessionId)?.agentName
-          : undefined;
-        const primary = arr.find((a: Record<string, unknown>) => a.mode === 'primary' || a.mode === 'all');
-        setCurrentAgent(sessionAgentName ?? (primary as Record<string, string>)?.name ?? arr[0]?.name);
-      }
-    }).catch(() => {});
-    api.listCommands().then((data: unknown) => {
-      setCustomCommands(Array.isArray(data) ? data : []);
-    }).catch(() => {});
+    api
+      .listAgents()
+      .then((data: unknown) => {
+        const arr = Array.isArray(data) ? data : [];
+        setAgents(arr);
+        if (!currentAgent && arr.length > 0) {
+          const sessionAgentName = sessionId
+            ? useChatStore
+                .getState()
+                .tabs.get(agentId)
+                ?.sessions.find((session) => session.id === sessionId)
+                ?.agentName
+            : undefined;
+          const primary = arr.find(
+            (a: Record<string, unknown>) =>
+              a.mode === 'primary' || a.mode === 'all',
+          );
+          setCurrentAgent(
+            sessionAgentName ??
+              (primary as Record<string, string>)?.name ??
+              arr[0]?.name,
+          );
+        }
+      })
+      .catch(() => {});
+    api
+      .listCommands()
+      .then((data: unknown) => {
+        setCustomCommands(Array.isArray(data) ? data : []);
+      })
+      .catch(() => {});
   }, [isRunning, agentId, sessionId, currentAgent, api]);
 
   return {

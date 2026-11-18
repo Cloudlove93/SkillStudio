@@ -29,6 +29,13 @@ __pycache__/
 # Test coverage
 coverage/
 
+# Playwright
+.env.e2e
+educlaw-web/test-results/
+educlaw-web/playwright-report/
+educlaw-web/blob-report/
+educlaw-web/.auth/
+
 # IDE
 .vscode/
 .idea/

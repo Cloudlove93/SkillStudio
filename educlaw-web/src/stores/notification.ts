@@ -12,7 +12,11 @@ export interface Notification {
 interface NotificationStore {
   notifications: Notification[];
   unreadCount: number;
-  add: (type: Notification['type'], title: string, description?: string) => void;
+  add: (
+    type: Notification['type'],
+    title: string,
+    description?: string,
+  ) => void;
   markAllRead: () => void;
   dismiss: (id: string) => void;
   clear: () => void;
@@ -34,7 +38,10 @@ export const useNotificationStore = create<NotificationStore>((set) => ({
       read: false,
     };
     set((s) => ({
-      notifications: [notification, ...s.notifications].slice(0, MAX_NOTIFICATIONS),
+      notifications: [notification, ...s.notifications].slice(
+        0,
+        MAX_NOTIFICATIONS,
+      ),
       unreadCount: s.unreadCount + 1,
     }));
   },

@@ -21,13 +21,19 @@ export default function HomeChatHeader({
       <div className="flex items-center gap-3">
         <div className="relative">
           <div className="absolute -inset-2 rounded-full bg-primary/10 blur-lg" />
-          <img src={`${BASE}/logo.png`} alt="" className="relative size-9 rounded-2xl drop-shadow-sm" />
+          <img
+            src={`${BASE}/logo.png`}
+            alt=""
+            className="relative size-9 rounded-2xl drop-shadow-sm"
+          />
         </div>
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-muted-foreground/60">
             Guided Conversation
           </div>
-          <span className="text-sm font-semibold tracking-[-0.02em] text-foreground">{t('home.chatTitle')}</span>
+          <span className="text-sm font-semibold tracking-[-0.02em] text-foreground">
+            {t('home.chatTitle')}
+          </span>
         </div>
       </div>
 

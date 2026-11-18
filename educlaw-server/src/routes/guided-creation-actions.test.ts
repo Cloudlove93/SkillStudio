@@ -870,14 +870,62 @@ describe('guided creation POST /api actions', () => {
       { payload: { uploadToken: 'a.b.c', expectedRevisionNo: -1 } },
       { payload: { uploadToken: 'a.b.c', expectedRevisionNo: 1.5 } },
       { payload: { uploadToken: 'a.b.c', expectedRevisionNo: '1' } },
-      { payload: { uploadToken: 'a.b.c', expectedRevisionNo: 1, parts: 'not-array' } },
-      { payload: { uploadToken: 'a.b.c', expectedRevisionNo: 1, parts: [{ partNumber: 1, etag: '"etag"', extra: true }] } },
-      { payload: { uploadToken: 'a.b.c', expectedRevisionNo: 1, parts: [{ partNumber: 0, etag: '"etag"' }] } },
-      { payload: { uploadToken: 'a.b.c', expectedRevisionNo: 1, parts: [{ partNumber: -1, etag: '"etag"' }] } },
-      { payload: { uploadToken: 'a.b.c', expectedRevisionNo: 1, parts: [{ partNumber: '1', etag: '"etag"' }] } },
-      { payload: { uploadToken: 'a.b.c', expectedRevisionNo: 1, parts: [{ partNumber: 1, etag: '' }] } },
-      { payload: { uploadToken: 'a.b.c', expectedRevisionNo: 1, parts: [{ partNumber: 1, etag: '   ' }] } },
-      { payload: { uploadToken: 'a.b.c', expectedRevisionNo: 1, parts: [{ partNumber: 1, etag: 123 }] } },
+      {
+        payload: {
+          uploadToken: 'a.b.c',
+          expectedRevisionNo: 1,
+          parts: 'not-array',
+        },
+      },
+      {
+        payload: {
+          uploadToken: 'a.b.c',
+          expectedRevisionNo: 1,
+          parts: [{ partNumber: 1, etag: '"etag"', extra: true }],
+        },
+      },
+      {
+        payload: {
+          uploadToken: 'a.b.c',
+          expectedRevisionNo: 1,
+          parts: [{ partNumber: 0, etag: '"etag"' }],
+        },
+      },
+      {
+        payload: {
+          uploadToken: 'a.b.c',
+          expectedRevisionNo: 1,
+          parts: [{ partNumber: -1, etag: '"etag"' }],
+        },
+      },
+      {
+        payload: {
+          uploadToken: 'a.b.c',
+          expectedRevisionNo: 1,
+          parts: [{ partNumber: '1', etag: '"etag"' }],
+        },
+      },
+      {
+        payload: {
+          uploadToken: 'a.b.c',
+          expectedRevisionNo: 1,
+          parts: [{ partNumber: 1, etag: '' }],
+        },
+      },
+      {
+        payload: {
+          uploadToken: 'a.b.c',
+          expectedRevisionNo: 1,
+          parts: [{ partNumber: 1, etag: '   ' }],
+        },
+      },
+      {
+        payload: {
+          uploadToken: 'a.b.c',
+          expectedRevisionNo: 1,
+          parts: [{ partNumber: 1, etag: 123 }],
+        },
+      },
       { payload: { uploadToken: 'a.b.c', expectedRevisionNo: 1, extra: true } },
     ];
 

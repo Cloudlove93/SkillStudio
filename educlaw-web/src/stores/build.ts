@@ -45,7 +45,12 @@ interface LogEntry {
   errorType?: string;
   detail?: string;
   decision?: ArtifactDecisionLog;
-  profile?: { name: string; description: string; details: string; skills: string[] };
+  profile?: {
+    name: string;
+    description: string;
+    details: string;
+    skills: string[];
+  };
   skill?: SkillLog;
 }
 
@@ -70,14 +75,19 @@ interface BuildStore {
 function handleSSEEvent(
   evt: GenerateProfileEvent,
   isDetailed: boolean,
-  set: (partial: Partial<BuildStore> | ((s: BuildStore) => Partial<BuildStore>)) => void,
+  set: (
+    partial: Partial<BuildStore> | ((s: BuildStore) => Partial<BuildStore>),
+  ) => void,
 ) {
   switch (evt.event) {
     case 'step':
       set((s) => ({
         isStreaming: false,
         isWaitingLLM: false,
-        logs: [...s.logs, { type: 'step', message: evt.data.message as string }],
+        logs: [
+          ...s.logs,
+          { type: 'step', message: evt.data.message as string },
+        ],
       }));
       break;
     case 'llm_waiting':
@@ -97,15 +107,24 @@ function handleSSEEvent(
       set((s) => ({
         isStreaming: false,
         streamingText: '',
-        logs: [...s.logs, {
-          type: 'decision',
-          decision: {
-            kind: evt.data.kind === 'skill' ? 'skill' : 'agent',
-            reason: String(evt.data.reason || ''),
-            suggestedName: typeof evt.data.suggestedName === 'string' ? evt.data.suggestedName : undefined,
-            suggestedDescription: typeof evt.data.suggestedDescription === 'string' ? evt.data.suggestedDescription : undefined,
+        logs: [
+          ...s.logs,
+          {
+            type: 'decision',
+            decision: {
+              kind: evt.data.kind === 'skill' ? 'skill' : 'agent',
+              reason: String(evt.data.reason || ''),
+              suggestedName:
+                typeof evt.data.suggestedName === 'string'
+                  ? evt.data.suggestedName
+                  : undefined,
+              suggestedDescription:
+                typeof evt.data.suggestedDescription === 'string'
+                  ? evt.data.suggestedDescription
+                  : undefined,
+            },
           },
-        }],
+        ],
       }));
       break;
     case 'profile_preview':
@@ -131,7 +150,10 @@ function handleSSEEvent(
         streamingText: '',
         profilePreview: null,
         skillPreview: null,
-        logs: [...s.logs, { type: 'profile', profile: evt.data as LogEntry['profile'] }],
+        logs: [
+          ...s.logs,
+          { type: 'profile', profile: evt.data as LogEntry['profile'] },
+        ],
       }));
       break;
     case 'skill':
@@ -139,15 +161,22 @@ function handleSSEEvent(
         isStreaming: false,
         isWaitingLLM: false,
         streamingText: '',
-        logs: [...s.logs, {
-          type: 'skill',
-          skill: {
-            dirName: typeof evt.data.dirName === 'string' ? evt.data.dirName : undefined,
-            name: String(evt.data.name || ''),
-            description: String(evt.data.description || ''),
-            metadata: (evt.data.metadata as Record<string, unknown>) || undefined,
+        logs: [
+          ...s.logs,
+          {
+            type: 'skill',
+            skill: {
+              dirName:
+                typeof evt.data.dirName === 'string'
+                  ? evt.data.dirName
+                  : undefined,
+              name: String(evt.data.name || ''),
+              description: String(evt.data.description || ''),
+              metadata:
+                (evt.data.metadata as Record<string, unknown>) || undefined,
+            },
           },
-        }],
+        ],
       }));
       break;
     case 'done': {
@@ -186,12 +215,15 @@ function handleSSEEvent(
         streamingText: '',
         profilePreview: null,
         skillPreview: null,
-        logs: [...s.logs, {
-          type: 'error',
-          message: evt.data.message as string,
-          errorType: (evt.data.errorType as string) || undefined,
-          detail: (evt.data.detail as string) || undefined,
-        }],
+        logs: [
+          ...s.logs,
+          {
+            type: 'error',
+            message: evt.data.message as string,
+            errorType: (evt.data.errorType as string) || undefined,
+            detail: (evt.data.detail as string) || undefined,
+          },
+        ],
         finished: true,
         loading: false,
       }));
@@ -201,18 +233,31 @@ function handleSSEEvent(
 
 function handleCatchError(
   err: unknown,
-  set: (partial: Partial<BuildStore> | ((s: BuildStore) => Partial<BuildStore>)) => void,
+  set: (
+    partial: Partial<BuildStore> | ((s: BuildStore) => Partial<BuildStore>),
+  ) => void,
 ) {
   const msg = err instanceof Error ? err.message : '';
   const msgLower = msg.toLowerCase();
-  const isNetwork = msgLower.includes('fetch') || msgLower.includes('failed') || msgLower.includes('networkerror') || msgLower.includes('network error') || msgLower.includes('err_') || msgLower.includes('econnrefused') || msgLower.includes('etimedout') || msgLower.includes('abort');
+  const isNetwork =
+    msgLower.includes('fetch') ||
+    msgLower.includes('failed') ||
+    msgLower.includes('networkerror') ||
+    msgLower.includes('network error') ||
+    msgLower.includes('err_') ||
+    msgLower.includes('econnrefused') ||
+    msgLower.includes('etimedout') ||
+    msgLower.includes('abort');
   set((s) => ({
-    logs: [...s.logs, {
-      type: 'error',
-      message: isNetwork ? 'network_error' : (msg || 'unknown_error'),
-      errorType: isNetwork ? 'network' : 'unexpected',
-      detail: msg || undefined,
-    }],
+    logs: [
+      ...s.logs,
+      {
+        type: 'error',
+        message: isNetwork ? 'network_error' : msg || 'unknown_error',
+        errorType: isNetwork ? 'network' : 'unexpected',
+        detail: msg || undefined,
+      },
+    ],
     finished: true,
     loading: false,
   }));
@@ -246,14 +291,16 @@ export const useBuildStore = create<BuildStore>((set) => ({
       isDetailed: false,
     });
     const { enabledPublicSkills } = useSettingsStore.getState();
-    api.generateProfile(
-      instruction,
-      model,
-      (evt) => handleSSEEvent(evt, false, set),
-      enabledPublicSkills ?? undefined,
-    ).catch((err) => {
-      handleCatchError(err, set);
-    });
+    api
+      .generateProfile(
+        instruction,
+        model,
+        (evt) => handleSSEEvent(evt, false, set),
+        enabledPublicSkills ?? undefined,
+      )
+      .catch((err) => {
+        handleCatchError(err, set);
+      });
   },
 
   startDetailedBuild(file: File, model: string | undefined) {
@@ -263,14 +310,16 @@ export const useBuildStore = create<BuildStore>((set) => ({
       isDetailed: true,
     });
     const { enabledPublicSkills } = useSettingsStore.getState();
-    api.generateProfileFromFile(
-      file,
-      model,
-      (evt) => handleSSEEvent(evt, true, set),
-      enabledPublicSkills ?? undefined,
-    ).catch((err) => {
-      handleCatchError(err, set);
-    });
+    api
+      .generateProfileFromFile(
+        file,
+        model,
+        (evt) => handleSSEEvent(evt, true, set),
+        enabledPublicSkills ?? undefined,
+      )
+      .catch((err) => {
+        handleCatchError(err, set);
+      });
   },
 }));
 

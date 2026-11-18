@@ -65,7 +65,10 @@ function validateLimits(limits: PackageZipLimits) {
     limits.maxTotalUncompressedBytes,
     'maxTotalUncompressedBytes',
   );
-  if (!Number.isFinite(limits.maxCompressionRatio) || limits.maxCompressionRatio <= 0) {
+  if (
+    !Number.isFinite(limits.maxCompressionRatio) ||
+    limits.maxCompressionRatio <= 0
+  ) {
     throw new TypeError(
       'ZIP limit maxCompressionRatio must be a positive finite number',
     );
@@ -85,7 +88,9 @@ function canonicalizeEntryPath(entryName: string) {
 
   const normalized = entryName.normalize('NFC');
   const segments = normalized.split('/');
-  const pathSegments = normalized.endsWith('/') ? segments.slice(0, -1) : segments;
+  const pathSegments = normalized.endsWith('/')
+    ? segments.slice(0, -1)
+    : segments;
   if (
     pathSegments.length === 0 ||
     pathSegments.some(
@@ -126,10 +131,7 @@ function preflightEntries(
   for (const entry of entries) {
     const canonicalPath = canonicalizeEntryPath(entry.entryName);
     if (paths.has(canonicalPath)) {
-      fail(
-        'DUPLICATE_ENTRY_PATH',
-        `ZIP 中包含重复路径：${entry.entryName}`,
-      );
+      fail('DUPLICATE_ENTRY_PATH', `ZIP 中包含重复路径：${entry.entryName}`);
     }
     paths.add(canonicalPath);
 

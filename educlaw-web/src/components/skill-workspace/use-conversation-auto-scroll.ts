@@ -58,4 +58,3 @@ export function useConversationAutoScroll<T extends HTMLElement>(
     return () => window.cancelAnimationFrame(frame);
   }, [changeKey, containerRef]);
 }
-

@@ -4,9 +4,7 @@ import {
   type MultimodalSessionState,
 } from '@educlaw/shared';
 import { MediaEvidenceService } from './media-evidence.service.js';
-import {
-  createMultimodalDistillationPipelineOrchestrator,
-} from './multimodal-distillation-pipeline-orchestrator.js';
+import { createMultimodalDistillationPipelineOrchestrator } from './multimodal-distillation-pipeline-orchestrator.js';
 import type { MultimodalDistillationPipelineStore } from './multimodal-distillation-pipeline-store.js';
 import type { MultimodalPipelineSnapshot } from './multimodal-pipeline-store.js';
 
@@ -168,7 +166,8 @@ function frameOutput() {
         sourceSignal: 'semantic_moment',
         selectionReason: '核心画面',
         assetRef: {
-          objectKey: 'skill-sessions/101/jobs/703/attempt-1/frames/frame-001.png',
+          objectKey:
+            'skill-sessions/101/jobs/703/attempt-1/frames/frame-001.png',
           mimeType: 'image/png',
           sizeBytes: 512,
           sha256: '1'.repeat(64),

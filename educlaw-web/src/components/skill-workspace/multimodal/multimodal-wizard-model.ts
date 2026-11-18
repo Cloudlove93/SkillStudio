@@ -141,7 +141,8 @@ const DEGRADATION_PRESENTATIONS: Record<string, DegradationPresentation> = {
   },
   ASR_TRANSCRIPT_CORRECTION_FAILED: {
     title: '转录纠错未完成',
-    detail: '模型未能完成自动纠错，已保留原始语音识别文本。建议在「完整转录」中人工修订识别有误的片段。',
+    detail:
+      '模型未能完成自动纠错，已保留原始语音识别文本。建议在「完整转录」中人工修订识别有误的片段。',
   },
   LOW_CONFIDENCE_SEGMENTS: {
     title: '低置信度转录片段',
@@ -150,15 +151,18 @@ const DEGRADATION_PRESENTATIONS: Record<string, DegradationPresentation> = {
   },
   NO_AUDIO_TRACK: {
     title: '视频素材缺少音轨',
-    detail: '上传的视频中未检测到可识别的音轨，无法生成语音转录，相关证据将仅限画面。',
+    detail:
+      '上传的视频中未检测到可识别的音轨，无法生成语音转录，相关证据将仅限画面。',
   },
   AUDIO_TRACK_MISSING: {
     title: '视频素材缺少音轨',
-    detail: '上传的视频中未检测到可识别的音轨，无法生成语音转录，相关证据将仅限画面。',
+    detail:
+      '上传的视频中未检测到可识别的音轨，无法生成语音转录，相关证据将仅限画面。',
   },
   AUDIO_PLAYBACK_UNAVAILABLE: {
     title: '音频定位回放不可用',
-    detail: '缺少可直接播放的音轨文件，无法点击转录跳转到对应时间点回放音频，但不影响转录文本本身。',
+    detail:
+      '缺少可直接播放的音轨文件，无法点击转录跳转到对应时间点回放音频，但不影响转录文本本身。',
   },
   VISUAL_ONLY: {
     title: '仅有画面证据',
@@ -185,7 +189,8 @@ const DEGRADATION_PRESENTATIONS: Record<string, DegradationPresentation> = {
   },
   VISUAL_SIGNAL_DETECTOR_UNAVAILABLE: {
     title: '画面信号检测缺失',
-    detail: '画面变化或场景切换检测未能产出有效数据，已退化为按等时间隔采样关键帧，分布可能不够理想。',
+    detail:
+      '画面变化或场景切换检测未能产出有效数据，已退化为按等时间隔采样关键帧，分布可能不够理想。',
   },
   VISION_RANKING_FALLBACK: {
     title: '画面语义排序已降级',
@@ -200,7 +205,10 @@ const DEGRADATION_PRESENTATIONS: Record<string, DegradationPresentation> = {
 };
 
 // 兼容历史会话中的降级键：旧版把机器码直接写进 message，或 code 直接是英文分组 key
-const LEGACY_DEGRADATION_ALIASES: Record<string, keyof typeof DEGRADATION_PRESENTATIONS> = {
+const LEGACY_DEGRADATION_ALIASES: Record<
+  string,
+  keyof typeof DEGRADATION_PRESENTATIONS
+> = {
   one_or_more_segments_below_confidence_threshold: 'LOW_CONFIDENCE_SEGMENTS',
   TRANSCRIPT_LOW_CONFIDENCE: 'ASR_LOW_CONFIDENCE_UNCONFIRMED',
   LOW_CONFIDENCE: 'LOW_CONFIDENCE_SEGMENTS',
@@ -211,7 +219,10 @@ const LEGACY_DEGRADATION_ALIASES: Record<string, keyof typeof DEGRADATION_PRESEN
   NO_FRAME: 'FRAME_NOT_APPLICABLE',
 };
 
-export function degradationPresentation(code: string, fallbackMessage?: string): {
+export function degradationPresentation(
+  code: string,
+  fallbackMessage?: string,
+): {
   title: string;
   detail: string;
 } {
@@ -314,9 +325,7 @@ export function aggregateMultimodalDegradations<T extends DegradationLike>(
       ...item,
       message: normalizedMessage,
       count: 1,
-      semanticMomentIds: item.semanticMomentId
-        ? [item.semanticMomentId]
-        : [],
+      semanticMomentIds: item.semanticMomentId ? [item.semanticMomentId] : [],
     });
   }
 
@@ -335,16 +344,10 @@ export function paginateMultimodalItems<T>(
 } {
   const safePageSize = Math.max(1, Math.floor(pageSize));
   const pageCount = Math.max(1, Math.ceil(items.length / safePageSize));
-  const page = Math.min(
-    Math.max(1, Math.floor(requestedPage)),
-    pageCount,
-  );
+  const page = Math.min(Math.max(1, Math.floor(requestedPage)), pageCount);
 
   return {
-    items: items.slice(
-      (page - 1) * safePageSize,
-      page * safePageSize,
-    ),
+    items: items.slice((page - 1) * safePageSize, page * safePageSize),
     page,
     pageCount,
     total: items.length,

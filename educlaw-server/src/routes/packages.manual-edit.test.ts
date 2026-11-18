@@ -1,6 +1,6 @@
-import type { Server } from "node:http";
-import express from "express";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import type { Server } from 'node:http';
+import express from 'express';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const applyManualMarkdownEditMock = vi.fn();
 const generatePackageMock = vi.fn();
@@ -41,21 +41,23 @@ async function createApp() {
     getInteractiveSession: vi.fn(),
     listInteractiveSessions: vi.fn(),
   }));
-  const router = (await import("./packages.js")).default;
+  const router = (await import('./packages.js')).default;
   const app = express();
   app.use(express.json());
   app.use(router);
   return app;
 }
 
-async function listen(app: express.Express): Promise<{ server: Server; url: string }> {
+async function listen(
+  app: express.Express,
+): Promise<{ server: Server; url: string }> {
   const server = app.listen(0);
   await new Promise<void>((resolve) => {
-    server.once("listening", resolve);
+    server.once('listening', resolve);
   });
   const address = server.address();
-  if (!address || typeof address === "string") {
-    throw new Error("Expected server to listen on a TCP port");
+  if (!address || typeof address === 'string') {
+    throw new Error('Expected server to listen on a TCP port');
   }
   return { server, url: `http://127.0.0.1:${address.port}` };
 }
@@ -82,7 +84,7 @@ afterEach(() => {
 
 it('passes the document single-Skill requirement to generation', async () => {
   generatePackageMock.mockResolvedValue({ id: 'p1', name: '函数作业设计' });
-    const { server, url } = await listen(await createApp());
+  const { server, url } = await listen(await createApp());
   try {
     const response = await fetch(`${url}/packages/generate/stream`, {
       method: 'POST',
@@ -172,16 +174,35 @@ describe('POST /packages/:packageId/manual-edit', () => {
   });
 });
 
-it.each([['missing',{},422],['conflict',{expectedPackageVersionId:'old'},409]])('preserves the %s precondition error contract',async (_name,extra,status)=>{
-  applyManualMarkdownEditMock.mockRejectedValue(versionConflict());
-  const {server,url}=await listen(await createApp());
-  try{
-    const response=await fetch(`${url}/packages/1/manual-edit`,{method:'POST',headers:{'X-User-Id':'owner','Content-Type':'application/json'},body:JSON.stringify({target:'agent',content:'# Changed',...extra})});
-    expect(response.status).toBe(status);
-    if(status===409)expect(await response.json()).toMatchObject({code:'PACKAGE_VERSION_CONFLICT'});
-    else expect(applyManualMarkdownEditMock).not.toHaveBeenCalled();
-  }finally{await close(server);}
-});
+it.each([
+  ['missing', {}, 422],
+  ['conflict', { expectedPackageVersionId: 'old' }, 409],
+])(
+  'preserves the %s precondition error contract',
+  async (_name, extra, status) => {
+    applyManualMarkdownEditMock.mockRejectedValue(versionConflict());
+    const { server, url } = await listen(await createApp());
+    try {
+      const response = await fetch(`${url}/packages/1/manual-edit`, {
+        method: 'POST',
+        headers: { 'X-User-Id': 'owner', 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          target: 'agent',
+          content: '# Changed',
+          ...extra,
+        }),
+      });
+      expect(response.status).toBe(status);
+      if (status === 409)
+        expect(await response.json()).toMatchObject({
+          code: 'PACKAGE_VERSION_CONFLICT',
+        });
+      else expect(applyManualMarkdownEditMock).not.toHaveBeenCalled();
+    } finally {
+      await close(server);
+    }
+  },
+);
 
 describe('package version conflict contract', () => {
   it.each([
@@ -228,7 +249,10 @@ describe('package version conflict contract', () => {
       });
       expect(response.status).toBe(422);
       const body = await response.json();
-      expect(body).toMatchObject({ code: 'INVALID_SKILL_MD', validationErrors: [message] });
+      expect(body).toMatchObject({
+        code: 'INVALID_SKILL_MD',
+        validationErrors: [message],
+      });
     } finally {
       await close(server);
     }

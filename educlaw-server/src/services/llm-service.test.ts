@@ -1,12 +1,12 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const baseConfig = {
   llmTimeoutMs: 1_000,
-  llmBaseUrl: "https://llm.example.test/v1",
-  llmApiKey: "test-api-key",
-  llmModel: "test-model",
+  llmBaseUrl: 'https://llm.example.test/v1',
+  llmApiKey: 'test-api-key',
+  llmModel: 'test-model',
   llmNetworkRetries: 0,
-  llmBaselineModel: "baseline-model",
+  llmBaselineModel: 'baseline-model',
 };
 
 it('disables Qwen 3.5 reasoning on the verified SII chat template for text and image JSON', async () => {
@@ -28,7 +28,8 @@ it('disables Qwen 3.5 reasoning on the verified SII chat template for text and i
 });
 
 it('streamTextParts combines explicit cancellation with its timeout signal', async () => {
-  const controller = new AbortController(); let requestSignal: AbortSignal | undefined;
+  const controller = new AbortController();
+  let requestSignal: AbortSignal | undefined;
   vi.stubGlobal(
     'fetch',
     vi.fn(async (_url, init) => {
@@ -43,7 +44,11 @@ it('streamTextParts combines explicit cancellation with its timeout signal', asy
     }),
   );
   const { streamTextParts } = await loadService();
-  const pending = streamTextParts({ systemPrompt: "system", userPrompt: "question", signal: controller.signal }).next();
+  const pending = streamTextParts({
+    systemPrompt: 'system',
+    userPrompt: 'question',
+    signal: controller.signal,
+  }).next();
   await Promise.resolve();
   controller.abort();
   await expect(pending).rejects.toThrow();
@@ -52,13 +57,13 @@ it('streamTextParts combines explicit cancellation with its timeout signal', asy
 
 async function loadService(configOverrides: Partial<typeof baseConfig> = {}) {
   vi.resetModules();
-  vi.doMock("../config.js", () => ({
+  vi.doMock('../config.js', () => ({
     config: {
       ...baseConfig,
       ...configOverrides,
     },
   }));
-  return import("./llm-service.js");
+  return import('./llm-service.js');
 }
 
 async function loadServiceWithLogger(
@@ -70,18 +75,18 @@ async function loadServiceWithLogger(
     error: vi.fn(),
   };
   vi.resetModules();
-  vi.doMock("../config.js", () => ({
+  vi.doMock('../config.js', () => ({
     config: {
       ...baseConfig,
       ...configOverrides,
     },
   }));
-  vi.doMock("../lib/request-context.js", () => ({
+  vi.doMock('../lib/request-context.js', () => ({
     getLogger: vi.fn(() => logger),
   }));
   return {
     logger,
-    service: await import("./llm-service.js"),
+    service: await import('./llm-service.js'),
   };
 }
 
@@ -92,7 +97,7 @@ function mockChatResponse(content: string, init: ResponseInit = {}) {
     }),
     {
       status: 200,
-      headers: { "Content-Type": "application/json" },
+      headers: { 'Content-Type': 'application/json' },
       ...init,
     },
   );
@@ -104,16 +109,18 @@ function mockChatResponseWithReasoning(
 ) {
   return new Response(
     JSON.stringify({
-      choices: [{
-        message: {
-          reasoning_content: reasoningContent,
-          content,
+      choices: [
+        {
+          message: {
+            reasoning_content: reasoningContent,
+            content,
+          },
         },
-      }],
+      ],
     }),
     {
       status: 200,
-      headers: { "Content-Type": "application/json" },
+      headers: { 'Content-Type': 'application/json' },
     },
   );
 }
@@ -121,14 +128,16 @@ function mockChatResponseWithReasoning(
 function mockTruncatedThinkingResponse() {
   return new Response(
     JSON.stringify({
-      choices: [{
-        finish_reason: "length",
-        message: { content: null, reasoning_content: "internal reasoning" },
-      }],
+      choices: [
+        {
+          finish_reason: 'length',
+          message: { content: null, reasoning_content: 'internal reasoning' },
+        },
+      ],
     }),
     {
       status: 200,
-      headers: { "Content-Type": "application/json" },
+      headers: { 'Content-Type': 'application/json' },
     },
   );
 }
@@ -146,7 +155,7 @@ function mockStreamResponse(chunks: string[]) {
     }),
     {
       status: 200,
-      headers: { "Content-Type": "text/event-stream" },
+      headers: { 'Content-Type': 'text/event-stream' },
     },
   );
 }
@@ -161,60 +170,150 @@ afterEach(() => {
 });
 
 describe('llm-service', () => {
-  it.each(['{"ok":true', '{"ok":true}'])('rejects structured length responses before repair: %s', async (content) => {
-    const fetchMock = vi.fn().mockImplementation(async () => new Response(JSON.stringify({
-      choices: [{ finish_reason: 'length', message: { content, reasoning_content: 'PRIVATE_REASONING' } }],
-      usage: { prompt_tokens: 30, completion_tokens: 100, total_tokens: 130, completion_tokens_details: { reasoning_tokens: 80 }, secret: 'PRIVATE_USAGE' },
-    })));
-    vi.stubGlobal('fetch', fetchMock);
-    const { service, logger } = await loadServiceWithLogger();
-    await expect(service.generateJson({ systemPrompt: 'PRIVATE_PROMPT', userPrompt: 'PRIVATE_INPUT', hidePromptContentInLogs: true }, 2)).rejects.toBeInstanceOf(service.LlmOutputTruncatedError);
-    expect(fetchMock).toHaveBeenCalledOnce();
-    expect(logger.info).toHaveBeenCalledWith(expect.objectContaining({
-      event: 'llm.response.completion', finishReason: 'length', truncated: true,
-      usage: { promptTokens: 30, completionTokens: 100, totalTokens: 130, reasoningTokens: 80 },
-    }));
-    expect(JSON.stringify(logger.info.mock.calls)).not.toMatch(/PRIVATE_|test-api-key/);
-  });
+  it.each(['{"ok":true', '{"ok":true}'])(
+    'rejects structured length responses before repair: %s',
+    async (content) => {
+      const fetchMock = vi.fn().mockImplementation(
+        async () =>
+          new Response(
+            JSON.stringify({
+              choices: [
+                {
+                  finish_reason: 'length',
+                  message: { content, reasoning_content: 'PRIVATE_REASONING' },
+                },
+              ],
+              usage: {
+                prompt_tokens: 30,
+                completion_tokens: 100,
+                total_tokens: 130,
+                completion_tokens_details: { reasoning_tokens: 80 },
+                secret: 'PRIVATE_USAGE',
+              },
+            }),
+          ),
+      );
+      vi.stubGlobal('fetch', fetchMock);
+      const { service, logger } = await loadServiceWithLogger();
+      await expect(
+        service.generateJson(
+          {
+            systemPrompt: 'PRIVATE_PROMPT',
+            userPrompt: 'PRIVATE_INPUT',
+            hidePromptContentInLogs: true,
+          },
+          2,
+        ),
+      ).rejects.toBeInstanceOf(service.LlmOutputTruncatedError);
+      expect(fetchMock).toHaveBeenCalledOnce();
+      expect(logger.info).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: 'llm.response.completion',
+          finishReason: 'length',
+          truncated: true,
+          usage: {
+            promptTokens: 30,
+            completionTokens: 100,
+            totalTokens: 130,
+            reasoningTokens: 80,
+          },
+        }),
+      );
+      expect(JSON.stringify(logger.info.mock.calls)).not.toMatch(
+        /PRIVATE_|test-api-key/,
+      );
+    },
+  );
 
   it('rejects a truncated image JSON response and a truncated repair response', async () => {
-    const truncated = () => new Response(JSON.stringify({ choices: [{ finish_reason: 'length', message: { content: '{"ok":true' } }] }));
+    const truncated = () =>
+      new Response(
+        JSON.stringify({
+          choices: [
+            { finish_reason: 'length', message: { content: '{"ok":true' } },
+          ],
+        }),
+      );
     const fetchMock = vi.fn().mockImplementation(truncated);
     vi.stubGlobal('fetch', fetchMock);
     const service = await loadService();
-    await expect(service.generateMultimodalJson({ systemPrompt: 'JSON', userPrompt: 'test', images: [{imageUrl:'data:image/png;base64,YQ=='}] })).rejects.toBeInstanceOf(service.LlmOutputTruncatedError);
+    await expect(
+      service.generateMultimodalJson({
+        systemPrompt: 'JSON',
+        userPrompt: 'test',
+        images: [{ imageUrl: 'data:image/png;base64,YQ==' }],
+      }),
+    ).rejects.toBeInstanceOf(service.LlmOutputTruncatedError);
     fetchMock.mockResolvedValueOnce(mockChatResponse('{"a":1,,bad}'));
-    await expect(service.generateJson({ systemPrompt: 'JSON', userPrompt: 'test' })).rejects.toBeInstanceOf(service.LlmOutputTruncatedError);
+    await expect(
+      service.generateJson({ systemPrompt: 'JSON', userPrompt: 'test' }),
+    ).rejects.toBeInstanceOf(service.LlmOutputTruncatedError);
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it('preserves ordinary partial text in nonstream, SSE, and JSON stream fallback responses', async () => {
-    const truncated = () => new Response(JSON.stringify({ choices: [{ finish_reason: 'length', message: { content: 'partial answer' } }] }));
+    const truncated = () =>
+      new Response(
+        JSON.stringify({
+          choices: [
+            { finish_reason: 'length', message: { content: 'partial answer' } },
+          ],
+        }),
+      );
     const fetchMock = vi.fn().mockImplementation(truncated);
     vi.stubGlobal('fetch', fetchMock);
     const service = await loadService();
-    const input = {systemPrompt:'system',userPrompt:'question'};
+    const input = { systemPrompt: 'system', userPrompt: 'question' };
     expect(await service.generateText(input)).toBe('partial answer');
-    for (const stream of [service.streamText(input), service.streamChat([{role:'user',content:'question'}])]) {
-      const parts=[]; for await(const part of stream) parts.push(part);
+    for (const stream of [
+      service.streamText(input),
+      service.streamChat([{ role: 'user', content: 'question' }]),
+    ]) {
+      const parts = [];
+      for await (const part of stream) parts.push(part);
       expect(parts.join('')).toBe('partial answer');
     }
-    fetchMock.mockImplementation(() => mockStreamResponse(['data: {"choices":[{"delta":{"content":"partial answer"}}]}\n\n', 'data: {"choices":[{"delta":{},"finish_reason":"length"}]}\n\n','data: [DONE]\n\n']));
-    for (const stream of [service.streamText(input), service.streamChat([{role:'user',content:'question'}])]) {
-      const parts=[]; for await(const part of stream) parts.push(part);
+    fetchMock.mockImplementation(() =>
+      mockStreamResponse([
+        'data: {"choices":[{"delta":{"content":"partial answer"}}]}\n\n',
+        'data: {"choices":[{"delta":{},"finish_reason":"length"}]}\n\n',
+        'data: [DONE]\n\n',
+      ]),
+    );
+    for (const stream of [
+      service.streamText(input),
+      service.streamChat([{ role: 'user', content: 'question' }]),
+    ]) {
+      const parts = [];
+      for await (const part of stream) parts.push(part);
       expect(parts.join('')).toBe('partial answer');
     }
   });
 
   it('uses the verified SII DeepSeek V4.1 template toggle for text and image JSON only on that model', async () => {
-    const fetchMock = vi.fn().mockImplementation(async () => mockChatResponse('{"ok":true}'));
+    const fetchMock = vi
+      .fn()
+      .mockImplementation(async () => mockChatResponse('{"ok":true}'));
     vi.stubGlobal('fetch', fetchMock);
-    const service = await loadService({llmModel:'DeepSeek-V4.1-Flash-1017'});
-    await service.generateJson({systemPrompt:'JSON',userPrompt:'test'});
-    await service.generateMultimodalJson({systemPrompt:'JSON',userPrompt:'test',images:[{imageUrl:'data:image/png;base64,YQ=='}]});
-    for (const call of fetchMock.mock.calls) expect(JSON.parse(call[1].body).chat_template_kwargs).toEqual({thinking:false});
-    await service.generateText({systemPrompt:'text',userPrompt:'test',model:'other-deepseek'});
-    expect(JSON.parse(fetchMock.mock.calls[2]![1].body).chat_template_kwargs).toBeUndefined();
+    const service = await loadService({ llmModel: 'DeepSeek-V4.1-Flash-1017' });
+    await service.generateJson({ systemPrompt: 'JSON', userPrompt: 'test' });
+    await service.generateMultimodalJson({
+      systemPrompt: 'JSON',
+      userPrompt: 'test',
+      images: [{ imageUrl: 'data:image/png;base64,YQ==' }],
+    });
+    for (const call of fetchMock.mock.calls)
+      expect(JSON.parse(call[1].body).chat_template_kwargs).toEqual({
+        thinking: false,
+      });
+    await service.generateText({
+      systemPrompt: 'text',
+      userPrompt: 'test',
+      model: 'other-deepseek',
+    });
+    expect(
+      JSON.parse(fetchMock.mock.calls[2]![1].body).chat_template_kwargs,
+    ).toBeUndefined();
   });
   it('streamText falls back to a normal JSON response when the response is not SSE', async () => {
     vi.stubGlobal(
@@ -235,14 +334,16 @@ describe('llm-service', () => {
   });
 
   it('generateText posts chat completion request and returns trimmed content', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(mockChatResponse("  Hello EduClaw  "));
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(mockChatResponse('  Hello EduClaw  '));
     vi.stubGlobal('fetch', fetchMock);
     const { generateText } = await loadService();
 
     const result = await generateText({
-      systemPrompt: "System prompt",
-      userPrompt: "User prompt",
-      model: "custom-model",
+      systemPrompt: 'System prompt',
+      userPrompt: 'User prompt',
+      model: 'custom-model',
       temperature: 0.7,
       maxTokens: 123,
     });
@@ -315,7 +416,7 @@ describe('llm-service', () => {
           ]),
         ),
     );
-  const { streamTextParts } = await loadService();
+    const { streamTextParts } = await loadService();
 
     const parts = [];
     for await (const part of streamTextParts({
@@ -367,7 +468,7 @@ describe('llm-service', () => {
           mockChatResponseWithReasoning('回退分析', '回退答案'),
         ),
     );
-  const { streamTextParts } = await loadService();
+    const { streamTextParts } = await loadService();
 
     const parts = [];
     for await (const part of streamTextParts({
@@ -384,7 +485,7 @@ describe('llm-service', () => {
   });
 
   it('does not write streamed reasoning into LLM response logs', async () => {
-    const secret = "PRIVATE_REASONING_SENTINEL";
+    const secret = 'PRIVATE_REASONING_SENTINEL';
     vi.stubGlobal(
       'fetch',
       vi
@@ -410,13 +511,15 @@ describe('llm-service', () => {
   });
 
   it('generateJson parses strict JSON returned by the model', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(mockChatResponse('{"ok":true,"count":2}'));
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(mockChatResponse('{"ok":true,"count":2}'));
     vi.stubGlobal('fetch', fetchMock);
     const { generateJson } = await loadService();
 
     const result = await generateJson<{ ok: boolean; count: number }>({
-      systemPrompt: "Return JSON",
-      userPrompt: "Give me data",
+      systemPrompt: 'Return JSON',
+      userPrompt: 'Give me data',
     });
 
     expect(result).toEqual({ ok: true, count: 2 });
@@ -430,9 +533,10 @@ describe('llm-service', () => {
 
   it('automatically recovers from two transient network resets', async () => {
     vi.useFakeTimers();
-    const resetError = () => new Error("fetch failed", {
-      cause: { code: "ECONNRESET" },
-    });
+    const resetError = () =>
+      new Error('fetch failed', {
+        cause: { code: 'ECONNRESET' },
+      });
     const fetchMock = vi
       .fn()
       .mockRejectedValueOnce(resetError())
@@ -442,8 +546,8 @@ describe('llm-service', () => {
     const { generateJson } = await loadService({ llmNetworkRetries: 2 });
 
     const resultPromise = generateJson<{ ok: boolean }>({
-      systemPrompt: "Return JSON",
-      userPrompt: "Give me data",
+      systemPrompt: 'Return JSON',
+      userPrompt: 'Give me data',
     });
     await vi.runAllTimersAsync();
 
@@ -453,18 +557,20 @@ describe('llm-service', () => {
 
   it('stops automatic network recovery after three total attempts', async () => {
     vi.useFakeTimers();
-    const fetchMock = vi.fn().mockRejectedValue(new Error("fetch failed", {
-      cause: { code: "ECONNRESET" },
-    }));
+    const fetchMock = vi.fn().mockRejectedValue(
+      new Error('fetch failed', {
+        cause: { code: 'ECONNRESET' },
+      }),
+    );
     vi.stubGlobal('fetch', fetchMock);
     const { generateJson } = await loadService({ llmNetworkRetries: 2 });
 
     const resultPromise = generateJson<{ ok: boolean }>({
-      systemPrompt: "Return JSON",
-      userPrompt: "Give me data",
+      systemPrompt: 'Return JSON',
+      userPrompt: 'Give me data',
     });
     const rejection = expect(resultPromise).rejects.toThrow(
-      "LLM network request failed",
+      'LLM network request failed',
     );
     await vi.runAllTimersAsync();
 
@@ -509,7 +615,7 @@ describe('llm-service', () => {
 
   it('sends image URLs as ephemeral multimodal content without logging signed URLs', async () => {
     const signedUrl =
-      "https://storage.example.test/frame.png?X-Amz-Signature=secret-sentinel";
+      'https://storage.example.test/frame.png?X-Amz-Signature=secret-sentinel';
     const fetchMock = vi
       .fn()
       .mockResolvedValue(mockChatResponse('{"rankings":[]}'));
@@ -548,7 +654,7 @@ describe('llm-service', () => {
   });
 
   it('accepts a bounded inline teaching image without logging its contents', async () => {
-    const dataUrl = `data:image/png;base64,${Buffer.from("small-png-fixture").toString("base64")}`;
+    const dataUrl = `data:image/png;base64,${Buffer.from('small-png-fixture').toString('base64')}`;
     const fetchMock = vi
       .fn()
       .mockResolvedValue(mockChatResponse('{"rankings":[]}'));
@@ -574,7 +680,9 @@ describe('llm-service', () => {
   });
 
   it('does not repeat a JSON request that exhausted its output limit', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(mockTruncatedThinkingResponse());
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(mockTruncatedThinkingResponse());
     vi.stubGlobal('fetch', fetchMock);
     const { generateJson } = await loadService();
 
@@ -590,7 +698,7 @@ describe('llm-service', () => {
   it('throws before fetch when LLM_API_KEY is missing', async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
-    const { generateText } = await loadService({ llmApiKey: "" });
+    const { generateText } = await loadService({ llmApiKey: '' });
 
     await expect(
       generateText({
@@ -602,7 +710,7 @@ describe('llm-service', () => {
   });
 
   it('does not expose a provider response body when the request fails', async () => {
-    const secret = "PRIVATE_PROVIDER_BODY_SENTINEL";
+    const secret = 'PRIVATE_PROVIDER_BODY_SENTINEL';
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
@@ -633,12 +741,12 @@ describe('llm-service', () => {
     expect(resolveBaselineModel('chosen-model')).toBe('chosen-model');
     expect(resolveBaselineModel()).toBe('baseline-model');
 
-    const fallbackService = await loadService({ llmBaselineModel: "" });
+    const fallbackService = await loadService({ llmBaselineModel: '' });
     expect(fallbackService.resolveBaselineModel()).toBe('test-model');
   });
 
   it('uses special request body fields for Kimi models', async () => {
-    const fetchMock = vi.fn().mockImplementation(() => mockChatResponse("ok"));
+    const fetchMock = vi.fn().mockImplementation(() => mockChatResponse('ok'));
     vi.stubGlobal('fetch', fetchMock);
     const { generateText } = await loadService();
 
@@ -666,10 +774,14 @@ describe('llm-service', () => {
   it('enables explicit thinking only for supported Kimi models', async () => {
     const fetchMock = vi
       .fn()
-      .mockImplementation(() => Promise.resolve(mockStreamResponse([
-        'data: {"choices":[{"delta":{"content":"完成"}}]}\n\n',
-        "data: [DONE]\n\n",
-      ])));
+      .mockImplementation(() =>
+        Promise.resolve(
+          mockStreamResponse([
+            'data: {"choices":[{"delta":{"content":"完成"}}]}\n\n',
+            'data: [DONE]\n\n',
+          ]),
+        ),
+      );
     vi.stubGlobal('fetch', fetchMock);
     const { streamTextParts, supportsExplicitThinking } = await loadService();
 

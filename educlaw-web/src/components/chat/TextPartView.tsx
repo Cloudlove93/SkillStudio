@@ -39,7 +39,11 @@ function CopyButton({ text }: { text: string }) {
       className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
       title="Copy"
     >
-      {copied ? <Check size={10} className="text-green-500" /> : <Copy size={10} />}
+      {copied ? (
+        <Check size={10} className="text-green-500" />
+      ) : (
+        <Copy size={10} />
+      )}
       {copied ? 'Copied' : 'Copy'}
     </button>
   );
@@ -51,7 +55,10 @@ const rehypePlugins = [rehypeKatex];
 const markdownComponents: Components = {
   pre({ children, ...props }) {
     const codeChild = Array.isArray(children) ? children[0] : children;
-    if (codeChild?.type === 'code' || codeChild?.props?.node?.tagName === 'code') {
+    if (
+      codeChild?.type === 'code' ||
+      codeChild?.props?.node?.tagName === 'code'
+    ) {
       const className = codeChild.props?.className || '';
       const match = /language-(\w+)/.exec(className);
       const code = String(codeChild.props?.children ?? '').replace(/\n$/, '');
@@ -74,7 +81,11 @@ const markdownComponents: Components = {
   code({ className, children, node, ...props }) {
     const isBlock = node?.position && String(children).includes('\n');
     if (isBlock || /language-(\w+)/.test(className || '')) {
-      return <code className={className} {...props}>{children}</code>;
+      return (
+        <code className={className} {...props}>
+          {children}
+        </code>
+      );
     }
     return (
       <code
@@ -115,7 +126,10 @@ const markdownComponents: Components = {
   },
   tr({ children, ...props }) {
     return (
-      <tr className="transition-colors hover:bg-muted/40 even:bg-muted/20" {...props}>
+      <tr
+        className="transition-colors hover:bg-muted/40 even:bg-muted/20"
+        {...props}
+      >
         {children}
       </tr>
     );
@@ -146,16 +160,30 @@ const markdownComponents: Components = {
     return <li className="leading-relaxed pl-0.5">{children}</li>;
   },
   h1({ children }) {
-    return <h1 className="text-xl font-bold mt-5 mb-3 leading-tight">{children}</h1>;
+    return (
+      <h1 className="text-xl font-bold mt-5 mb-3 leading-tight">{children}</h1>
+    );
   },
   h2({ children }) {
-    return <h2 className="text-lg font-semibold mt-4 mb-2 leading-tight">{children}</h2>;
+    return (
+      <h2 className="text-lg font-semibold mt-4 mb-2 leading-tight">
+        {children}
+      </h2>
+    );
   },
   h3({ children }) {
-    return <h3 className="text-base font-semibold mt-3 mb-1.5 leading-snug">{children}</h3>;
+    return (
+      <h3 className="text-base font-semibold mt-3 mb-1.5 leading-snug">
+        {children}
+      </h3>
+    );
   },
   h4({ children }) {
-    return <h4 className="text-sm font-semibold mt-3 mb-1 leading-snug">{children}</h4>;
+    return (
+      <h4 className="text-sm font-semibold mt-3 mb-1 leading-snug">
+        {children}
+      </h4>
+    );
   },
   blockquote({ children }) {
     return (
@@ -242,9 +270,18 @@ function useThrottledText(text: string, isStreaming: boolean): string {
  *             keeping the UI responsive while still showing formatted content.
  * Completed:  text is rendered immediately with full markdown + math support.
  */
-export default function TextPartView({ text, isStreaming }: { text: string; isStreaming?: boolean }) {
+export default function TextPartView({
+  text,
+  isStreaming,
+}: {
+  text: string;
+  isStreaming?: boolean;
+}) {
   const throttled = useThrottledText(text, !!isStreaming);
-  const normalizedText = useMemo(() => normalizeMathDelimiters(throttled), [throttled]);
+  const normalizedText = useMemo(
+    () => normalizeMathDelimiters(throttled),
+    [throttled],
+  );
 
   if (!text && !isStreaming) return null;
 
@@ -258,7 +295,9 @@ export default function TextPartView({ text, isStreaming }: { text: string; isSt
         {normalizedText}
       </ReactMarkdown>
       {isStreaming && (
-        <span className="animate-blink-cursor text-primary font-bold text-lg leading-none">▍</span>
+        <span className="animate-blink-cursor text-primary font-bold text-lg leading-none">
+          ▍
+        </span>
       )}
     </div>
   );

@@ -9,7 +9,9 @@ export default function StepIndicator({ part }: { part: MessagePart }) {
     return (
       <div className="my-4 flex items-center gap-3">
         <div className="h-px flex-1 bg-gradient-to-r from-transparent via-border/80 to-primary/20" />
-        <PremiumPill accent="blue" icon={Sparkles}>{t('shared.stepStarted')}</PremiumPill>
+        <PremiumPill accent="blue" icon={Sparkles}>
+          {t('shared.stepStarted')}
+        </PremiumPill>
       </div>
     );
   }
@@ -19,7 +21,9 @@ export default function StepIndicator({ part }: { part: MessagePart }) {
   return (
     <div className="my-4 flex items-center gap-3">
       <div className="h-px flex-1 bg-gradient-to-r from-transparent via-border/80 to-emerald-500/20" />
-      <PremiumPill accent="emerald" icon={CheckCircle2}>{t('shared.stepFinished')}</PremiumPill>
+      <PremiumPill accent="emerald" icon={CheckCircle2}>
+        {t('shared.stepFinished')}
+      </PremiumPill>
       {tokens && (tokens.input > 0 || tokens.output > 0) && (
         <div className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-background px-2.5 py-1 text-[10px] font-mono text-muted-foreground shadow-sm">
           <ArrowDown size={8} />

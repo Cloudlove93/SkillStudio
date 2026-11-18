@@ -11,7 +11,10 @@ interface TodoStore {
   /** Map of agentId → sessionId → Todo[] */
   todos: Map<string, Map<string, Todo[]>>;
 
-  handleTodoUpdate: (agentId: string, data: { sessionID?: string; todos?: unknown } | Todo[]) => void;
+  handleTodoUpdate: (
+    agentId: string,
+    data: { sessionID?: string; todos?: unknown } | Todo[],
+  ) => void;
   getTodos: (agentId: string, sessionId: string) => Todo[];
   clearSession: (agentId: string, sessionId: string) => void;
 }
@@ -27,12 +30,15 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
 
     const newTodos = new Map(todos);
     const agentMap = new Map(newTodos.get(agentId) ?? []);
-    agentMap.set(sessionId, items.map((t) => ({
-      id: t.id ?? '',
-      content: t.content ?? t.subject ?? '',
-      status: t.status ?? 'pending',
-      priority: t.priority,
-    })));
+    agentMap.set(
+      sessionId,
+      items.map((t) => ({
+        id: t.id ?? '',
+        content: t.content ?? t.subject ?? '',
+        status: t.status ?? 'pending',
+        priority: t.priority,
+      })),
+    );
     newTodos.set(agentId, agentMap);
     set({ todos: newTodos });
   },

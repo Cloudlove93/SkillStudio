@@ -26,8 +26,14 @@ export function SkillContextMenu({ x, y, items, onSelect, onClose }: Props) {
     if (!menu) return;
     const margin = 8;
     setPosition({
-      left: Math.max(margin, Math.min(x, window.innerWidth - menu.offsetWidth - margin)),
-      top: Math.max(margin, Math.min(y, window.innerHeight - menu.offsetHeight - margin)),
+      left: Math.max(
+        margin,
+        Math.min(x, window.innerWidth - menu.offsetWidth - margin),
+      ),
+      top: Math.max(
+        margin,
+        Math.min(y, window.innerHeight - menu.offsetHeight - margin),
+      ),
     });
   }, [x, y]);
 
@@ -54,7 +60,12 @@ export function SkillContextMenu({ x, y, items, onSelect, onClose }: Props) {
       style={{ left: position.left, top: position.top }}
     >
       {items.map(({ id, label, icon: Icon, destructive, separatorBefore }) => (
-        <div key={id} className={separatorBefore ? 'skill-context-menu-separator' : undefined}>
+        <div
+          key={id}
+          className={
+            separatorBefore ? 'skill-context-menu-separator' : undefined
+          }
+        >
           <button
             type="button"
             role="menuitem"

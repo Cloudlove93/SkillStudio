@@ -18,8 +18,10 @@ describe('guided experience library', () => {
     expect(lesson.length).toBeLessThanOrEqual(8);
     expect(differentiation.length).toBeGreaterThanOrEqual(5);
     expect(differentiation.length).toBeLessThanOrEqual(8);
-    expect(new Set(GUIDED_TEACHING_EXPERIENCES.map((item) => item.experience_id)).size)
-      .toBe(GUIDED_TEACHING_EXPERIENCES.length);
+    expect(
+      new Set(GUIDED_TEACHING_EXPERIENCES.map((item) => item.experience_id))
+        .size,
+    ).toBe(GUIDED_TEACHING_EXPERIENCES.length);
   });
 
   it('stores executable observation, adjustment, responsibility and evidence', () => {

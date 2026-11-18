@@ -955,7 +955,9 @@ describe('multimodal session service', () => {
             skillMd: '---\nname: model-chosen-name\n---\n\n# skill',
             sourceEvidenceIds: ['ev-transcript'],
             mechanism: '先定义规则，再给例证',
-            sourceFacts: [{ evidenceId: 'ev-transcript', quote: '原视频中的定义片段' }],
+            sourceFacts: [
+              { evidenceId: 'ev-transcript', quote: '原视频中的定义片段' },
+            ],
             futureApplicability: '适用于错题讲评',
             execution: {
               input: '教师目标与学生困惑',
@@ -993,7 +995,9 @@ describe('multimodal session service', () => {
             skillMd: '---\nname: model-chosen-name\n---\n\n# support',
             sourceEvidenceIds: ['ev-transcript'],
             mechanism: '先对齐术语',
-            sourceFacts: [{ evidenceId: 'ev-transcript', quote: '视频中的术语定义' }],
+            sourceFacts: [
+              { evidenceId: 'ev-transcript', quote: '视频中的术语定义' },
+            ],
             futureApplicability: '适用于新单元导入',
             execution: {
               input: '术语混乱的课堂片段',
@@ -1219,7 +1223,9 @@ describe('multimodal session service', () => {
               skillMd: '# skill',
               sourceEvidenceIds: ['ev-transcript'],
               mechanism: '先定义规则，再给例证',
-              sourceFacts: [{ evidenceId: 'ev-transcript', quote: '原视频中的定义片段' }],
+              sourceFacts: [
+                { evidenceId: 'ev-transcript', quote: '原视频中的定义片段' },
+              ],
               futureApplicability: '适用于错题讲评',
               execution: {
                 input: '教师目标与学生困惑',
@@ -2255,7 +2261,9 @@ describe('multimodal session service', () => {
               skillMd: '# skill',
               sourceEvidenceIds: ['ev-audio'],
               mechanism: 'mechanism',
-              sourceFacts: [{ evidenceId: 'ev-audio', quote: 'source example' }],
+              sourceFacts: [
+                { evidenceId: 'ev-audio', quote: 'source example' },
+              ],
               futureApplicability: 'future',
               execution: {
                 input: 'input',

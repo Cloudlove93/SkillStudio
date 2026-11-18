@@ -24,7 +24,10 @@ export default function AgentList() {
                 {authUser.username.charAt(0)}
               </div>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-[13px] font-semibold text-foreground" title={authUser.username}>
+                <div
+                  className="truncate text-[13px] font-semibold text-foreground"
+                  title={authUser.username}
+                >
                   {authUser.username}
                 </div>
                 <div className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground/50">
@@ -57,7 +60,10 @@ export default function AgentList() {
         )}
       </div>
 
-      <SettingsDialog open={showSettingsDialog} onOpenChange={setShowSettingsDialog} />
+      <SettingsDialog
+        open={showSettingsDialog}
+        onOpenChange={setShowSettingsDialog}
+      />
     </div>
   );
 }

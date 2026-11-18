@@ -13,7 +13,10 @@ export function fetchChatSessions(): Promise<ChatSession[]> {
   return apiFetchJson(`/api/chat/sessions`);
 }
 
-export function createChatSession(title: string, model: string): Promise<ChatSession> {
+export function createChatSession(
+  title: string,
+  model: string,
+): Promise<ChatSession> {
   const input: HomeChatCreateSessionInput = { title, model };
   return apiPost(`/api/chat/sessions`, input);
 }
@@ -22,7 +25,10 @@ export function deleteChatSession(id: string): Promise<{ ok: boolean }> {
   return apiFetchJson(`/api/chat/sessions/${id}`, { method: 'DELETE' });
 }
 
-export function updateChatSession(id: string, updates: HomeChatUpdateSessionInput): Promise<{ ok: boolean }> {
+export function updateChatSession(
+  id: string,
+  updates: HomeChatUpdateSessionInput,
+): Promise<{ ok: boolean }> {
   return apiPatch(`/api/chat/sessions/${id}`, updates);
 }
 
@@ -31,7 +37,13 @@ export function fetchChatMessages(sessionId: string): Promise<ChatMessage[]> {
 }
 
 export interface HomeChatStreamEvent {
-  event: 'accepted' | 'delta' | 'message.completed' | 'done' | 'cancelled' | 'error';
+  event:
+    | 'accepted'
+    | 'delta'
+    | 'message.completed'
+    | 'done'
+    | 'cancelled'
+    | 'error';
   data: Record<string, unknown>;
 }
 
@@ -45,8 +57,13 @@ function parseEventChunk(chunk: string): HomeChatStreamEvent | null {
 
   try {
     return {
-      event: eventLine.slice('event:'.length).trim() as HomeChatStreamEvent['event'],
-      data: JSON.parse(dataLine.slice('data:'.length).trim()) as Record<string, unknown>,
+      event: eventLine
+        .slice('event:'.length)
+        .trim() as HomeChatStreamEvent['event'],
+      data: JSON.parse(dataLine.slice('data:'.length).trim()) as Record<
+        string,
+        unknown
+      >,
     };
   } catch {
     return null;
@@ -73,7 +90,9 @@ export async function streamChatMessage(
   });
 
   if (!response.ok) {
-    const body = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
+    const body = await response
+      .json()
+      .catch(() => ({ error: `HTTP ${response.status}` }));
     throw new Error(body.error || `HTTP ${response.status}`);
   }
 

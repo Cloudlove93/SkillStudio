@@ -72,7 +72,8 @@ export function applyGuidedStreamEvent(
     const session = event.data.session;
     const completed = session.status === 'completed' && session.skill_id;
     const isStillActive =
-      state.active_session_id === null || state.active_session_id === session.id;
+      state.active_session_id === null ||
+      state.active_session_id === session.id;
     return {
       ...state,
       session,

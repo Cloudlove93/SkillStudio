@@ -73,19 +73,16 @@ export function useArenaThreadList({
     [token, threads, onThreadSwitched],
   );
 
-  const notifyCreated = useCallback(
-    (thread: ArenaThread) => {
-      setThreads((prev) => {
-        const exists = prev.some((t) => t.id === thread.id);
-        if (exists) {
-          return prev.map((t) => (t.id === thread.id ? thread : t));
-        }
-        return [thread, ...prev];
-      });
-      setCurrentThreadId(String(thread.id));
-    },
-    [],
-  );
+  const notifyCreated = useCallback((thread: ArenaThread) => {
+    setThreads((prev) => {
+      const exists = prev.some((t) => t.id === thread.id);
+      if (exists) {
+        return prev.map((t) => (t.id === thread.id ? thread : t));
+      }
+      return [thread, ...prev];
+    });
+    setCurrentThreadId(String(thread.id));
+  }, []);
 
   useEffect(() => {
     if (!packageId) {

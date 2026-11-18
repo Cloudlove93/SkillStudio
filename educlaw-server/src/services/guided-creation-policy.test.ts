@@ -123,11 +123,7 @@ describe('guided creation draft policy', () => {
       Object.keys(completeDraft).map((field) => [field, 'inferred']),
     );
 
-    const evaluation = evaluateGuidedFlow(
-      completeDraft,
-      allInferred,
-      [],
-    );
+    const evaluation = evaluateGuidedFlow(completeDraft, allInferred, []);
 
     expect(evaluation.ready_for_confirmation).toBe(false);
     expect(evaluation.next_stage).toBe('positioning');
@@ -150,29 +146,34 @@ describe('guided creation draft policy', () => {
 
   it('accepts explicit evidence only when it comes from the current user message', () => {
     expect(validateExplicitEvidence('帮教师设计实验', '教师')).toBe(true);
-    expect(
-      validateExplicitEvidence('帮教师设计实验', '学生自主探究'),
-    ).toBe(false);
+    expect(validateExplicitEvidence('帮教师设计实验', '学生自主探究')).toBe(
+      false,
+    );
   });
 
   it('downgrades unsupported explicit content and protects explicit user choices', () => {
-    const operations = sanitizeDraftOperations({ roles: '教师助手' }, {
-      roles: 'explicit',
-    }, [
+    const operations = sanitizeDraftOperations(
+      { roles: '教师助手' },
       {
-        op: 'replace',
-        path: 'roles',
-        value: '学生助手',
-        state: 'inferred',
+        roles: 'explicit',
       },
-      {
-        op: 'set',
-        path: 'usage_scenario',
-        value: '学生自主探究',
-        state: 'explicit',
-        evidence: '学生自主探究',
-      },
-    ], '我想让学生自主探究');
+      [
+        {
+          op: 'replace',
+          path: 'roles',
+          value: '学生助手',
+          state: 'inferred',
+        },
+        {
+          op: 'set',
+          path: 'usage_scenario',
+          value: '学生自主探究',
+          state: 'explicit',
+          evidence: '学生自主探究',
+        },
+      ],
+      '我想让学生自主探究',
+    );
 
     expect(operations).toEqual([
       {
@@ -184,13 +185,22 @@ describe('guided creation draft policy', () => {
       },
     ]);
 
-    expect(sanitizeDraftOperations({}, {}, [{
-      op: 'set',
-      path: 'workflow',
-      value: '先讲解再实验',
-      state: 'explicit',
-      evidence: '用户没有说过的原话',
-    }], '请你设计流程')[0]?.state).toBe('inferred');
+    expect(
+      sanitizeDraftOperations(
+        {},
+        {},
+        [
+          {
+            op: 'set',
+            path: 'workflow',
+            value: '先讲解再实验',
+            state: 'explicit',
+            evidence: '用户没有说过的原话',
+          },
+        ],
+        '请你设计流程',
+      )[0]?.state,
+    ).toBe('inferred');
   });
 
   it('adds compatible user details without erasing an earlier explicit goal', () => {

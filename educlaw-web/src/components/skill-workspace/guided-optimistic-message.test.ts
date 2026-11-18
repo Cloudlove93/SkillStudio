@@ -23,9 +23,11 @@ describe('guided creation optimistic message', () => {
       'session-1',
     );
 
-    expect(shouldDisplayPendingGuidedMessage(pending, 'session-1', [
-      { client_message_id: 'message-1001' },
-    ])).toBe(false);
+    expect(
+      shouldDisplayPendingGuidedMessage(pending, 'session-1', [
+        { client_message_id: 'message-1001' },
+      ]),
+    ).toBe(false);
   });
 
   it('does not leak a pending message into another conversation', () => {
@@ -35,6 +37,8 @@ describe('guided creation optimistic message', () => {
       'session-1',
     );
 
-    expect(shouldDisplayPendingGuidedMessage(pending, 'session-2', [])).toBe(false);
+    expect(shouldDisplayPendingGuidedMessage(pending, 'session-2', [])).toBe(
+      false,
+    );
   });
 });

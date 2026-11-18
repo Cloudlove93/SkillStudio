@@ -1,11 +1,11 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const geminiModel = "gemini-2.5-flash";
-const runIntegration = process.env.RUN_GEMINI_STREAMTEXT_TEST === "1";
+const geminiModel = 'gemini-2.5-flash';
+const runIntegration = process.env.RUN_GEMINI_STREAMTEXT_TEST === '1';
 
 async function loadService() {
   vi.resetModules();
-  return import("../services/llm-service.js");
+  return import('../services/llm-service.js');
 }
 
 afterEach(() => {
@@ -14,16 +14,16 @@ afterEach(() => {
   vi.resetModules();
 });
 
-describe("streamText gemini integration", () => {
+describe('streamText gemini integration', () => {
   it.skipIf(!runIntegration)(
-    "streams text from the configured LLM provider with a Gemini model",
+    'streams text from the configured LLM provider with a Gemini model',
     async () => {
       const { streamText } = await loadService();
       const chunks: string[] = [];
 
       for await (const chunk of streamText({
-        systemPrompt: "你是测试助手。回答必须按照字数要求。",
-        userPrompt: "只输出三百个汉字",
+        systemPrompt: '你是测试助手。回答必须按照字数要求。',
+        userPrompt: '只输出三百个汉字',
         model: geminiModel,
         temperature: 0.1,
         maxTokens: 16000,
@@ -33,11 +33,11 @@ describe("streamText gemini integration", () => {
         // chunk 实践指导，确保测试覆盖率和有效性。此外，我还能帮助您建立规范的缺陷报告流程，加速修复，并就测试工具选型、环境搭建、CI/CD中的测试集成提供专业建议。我的目标是帮助您的团队优化测试流程，降低发布风险，最终交付稳定、可靠
         // chunk 、用户满意的软件产品。期待与您携手，共同提升软件质量，实现卓越！
 
-        console.log('chunk', chunk)
+        console.log('chunk', chunk);
         chunks.push(chunk);
       }
 
-      const text = chunks.join("").trim();
+      const text = chunks.join('').trim();
       expect(chunks.length).toBeGreaterThan(0);
       expect(text.length).toBeGreaterThan(0);
     },

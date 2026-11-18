@@ -14,7 +14,10 @@ describe('answer optimization panel layout', () => {
   });
 
   it('moves between automatic, manual and collapsed modes', () => {
-    expect(createManualPanelLayout(220, 500)).toEqual({ mode: 'manual', height: 220 });
+    expect(createManualPanelLayout(220, 500)).toEqual({
+      mode: 'manual',
+      height: 220,
+    });
     expect(collapsePanelLayout()).toEqual({ mode: 'collapsed', height: null });
     expect(resetPanelLayout()).toEqual({ mode: 'auto', height: null });
   });

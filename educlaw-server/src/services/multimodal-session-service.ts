@@ -406,7 +406,10 @@ function withStableError<T>(operation: () => Promise<T>): Promise<T> {
       },
       'multimodal.session_service_failed',
     );
-    if (error instanceof MultimodalSessionServiceError || error instanceof RiaContentError) {
+    if (
+      error instanceof MultimodalSessionServiceError ||
+      error instanceof RiaContentError
+    ) {
       throw error;
     }
     throw new MultimodalSessionServiceError();

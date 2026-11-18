@@ -119,8 +119,9 @@ describe('Skill workspace sidebar actions', () => {
         )
         ?.click();
     });
-    const exportButton = [...container.querySelectorAll('[role="menuitem"]')]
-      .find((item) => item.textContent?.includes('导出 Skill')) as
+    const exportButton = [
+      ...container.querySelectorAll('[role="menuitem"]'),
+    ].find((item) => item.textContent?.includes('导出 Skill')) as
       | HTMLButtonElement
       | undefined;
     await act(async () => exportButton?.click());

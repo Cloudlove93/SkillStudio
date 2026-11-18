@@ -4,17 +4,17 @@ import type {
   AnswerSkillOptimizationStatus,
   AnswerSkillRefinementQualityEvidence,
   AnswerSkillRefinementTurn,
-} from "./answer-skill-optimization-contract.js";
+} from './answer-skill-optimization-contract.js';
 
 export type AnswerSkillConfirmIssue =
   | {
-      kind: "conflict";
+      kind: 'conflict';
       message: string;
     }
   | {
-      kind: "draft";
+      kind: 'draft';
       message: string;
-      failureCode?: AnswerOptimizationFailure["code"];
+      failureCode?: AnswerOptimizationFailure['code'];
     };
 
 export interface AnswerSkillConfirmPolicyInput {
@@ -29,22 +29,22 @@ export interface AnswerSkillConfirmPolicyInput {
 export function getAnswerSkillConfirmIssue(
   input: AnswerSkillConfirmPolicyInput,
 ): AnswerSkillConfirmIssue | null {
-  if (input.status === "completed") {
+  if (input.status === 'completed') {
     return {
-      kind: "conflict",
-      message: "Optimization has already been confirmed",
+      kind: 'conflict',
+      message: 'Optimization has already been confirmed',
     };
   }
-  if (input.status !== "test_ready") {
+  if (input.status !== 'test_ready') {
     return {
-      kind: "draft",
+      kind: 'draft',
       message: `Cannot confirm an optimization in ${input.status} status`,
     };
   }
   if (input.finalVersionId !== null) {
     return {
-      kind: "conflict",
-      message: "Optimization already references a final Package version",
+      kind: 'conflict',
+      message: 'Optimization already references a final Package version',
     };
   }
 
@@ -54,8 +54,8 @@ export function getAnswerSkillConfirmIssue(
   const testResult = input.result.testResult;
   if (!targetSkill || !patch || !draft || !testResult) {
     return {
-      kind: "draft",
-      message: "Optimization is missing a tested Skill draft",
+      kind: 'draft',
+      message: 'Optimization is missing a tested Skill draft',
     };
   }
   if (
@@ -65,18 +65,19 @@ export function getAnswerSkillConfirmIssue(
     draft.validation.errors.length > 0
   ) {
     return {
-      kind: "draft",
-      message: "Optimization Skill draft is invalid",
-      failureCode: "skill_validation_failed",
+      kind: 'draft',
+      message: 'Optimization Skill draft is invalid',
+      failureCode: 'skill_validation_failed',
     };
   }
   if (
     testResult.testedRevision !== input.revision ||
-    testResult.replayMode !== "recorded_context"
+    testResult.replayMode !== 'recorded_context'
   ) {
     return {
-      kind: "draft",
-      message: "Current optimization revision has not completed a faithful draft preview",
+      kind: 'draft',
+      message:
+        'Current optimization revision has not completed a faithful draft preview',
     };
   }
   const fixedSkillBindingMatches =
@@ -88,8 +89,8 @@ export function getAnswerSkillConfirmIssue(
       !fixedSkillBindingMatches)
   ) {
     return {
-      kind: "draft",
-      message: "Normal Skill selection did not select the target Skill",
+      kind: 'draft',
+      message: 'Normal Skill selection did not select the target Skill',
     };
   }
   return null;
@@ -102,7 +103,7 @@ export type AnswerSkillPreviewEvidenceResult =
     }
   | {
       ok: false;
-      reason: "missing_current_preview" | "preview_has_no_issues";
+      reason: 'missing_current_preview' | 'preview_has_no_issues';
     };
 
 export function getAnswerSkillPreviewIssueEvidence(input: {
@@ -112,14 +113,14 @@ export function getAnswerSkillPreviewIssueEvidence(input: {
 }): AnswerSkillPreviewEvidenceResult {
   const testResult = input.result.testResult;
   if (
-    input.status !== "test_ready" ||
+    input.status !== 'test_ready' ||
     !testResult ||
     testResult.testedRevision !== input.revision
   ) {
-    return { ok: false, reason: "missing_current_preview" };
+    return { ok: false, reason: 'missing_current_preview' };
   }
   if (testResult.qualityGate.passed) {
-    return { ok: false, reason: "preview_has_no_issues" };
+    return { ok: false, reason: 'preview_has_no_issues' };
   }
   return {
     ok: true,
@@ -169,7 +170,7 @@ export function buildAnswerSkillRefinementTransition(input: {
   }
   return {
     revision: input.currentRevision + 1,
-    status: "draft_ready",
+    status: 'draft_ready',
     result: {
       ...input.appliedResult,
       refinementHistory: input.refinementHistory,

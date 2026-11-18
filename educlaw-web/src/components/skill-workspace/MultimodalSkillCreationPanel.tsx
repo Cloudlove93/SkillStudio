@@ -125,7 +125,8 @@ function toUiError(error: unknown) {
   }
   return {
     code: 'MEDIA_ACTION_FAILED',
-    message: error instanceof Error ? error.message : '操作未完成，请检查当前状态',
+    message:
+      error instanceof Error ? error.message : '操作未完成，请检查当前状态',
     retryable: true,
   };
 }
@@ -195,11 +196,12 @@ export function MultimodalSkillCreationPanel({
   const appliedDetailRevisionRef = useRef<number | null>(null);
   const publishedNotificationRef = useRef<string | null>(null);
   const detail = state.detail;
-  const inspectorKind = inspectorState.descriptor?.owner === 'multimodal'
-    ? (Object.entries(MULTIMODAL_INSPECTOR_CONFIG).find(
-        ([, config]) => config.view === inspectorState.descriptor?.view,
-      )?.[0] as Exclude<MultimodalInspectorKind, null> | undefined) ?? null
-    : null;
+  const inspectorKind =
+    inspectorState.descriptor?.owner === 'multimodal'
+      ? ((Object.entries(MULTIMODAL_INSPECTOR_CONFIG).find(
+          ([, config]) => config.view === inspectorState.descriptor?.view,
+        )?.[0] as Exclude<MultimodalInspectorKind, null> | undefined) ?? null)
+      : null;
 
   const openMultimodalInspector = (
     kind: Exclude<MultimodalInspectorKind, null>,
@@ -243,7 +245,9 @@ export function MultimodalSkillCreationPanel({
       inspectorKind === 'overview' &&
       ADLER_LAYER_KEYS.includes(itemId as AdlerLayerKey)
     ) {
-      setSelectedLayer((current) => current === itemId ? current : itemId as AdlerLayerKey);
+      setSelectedLayer((current) =>
+        current === itemId ? current : (itemId as AdlerLayerKey),
+      );
       return;
     }
     if (inspectorKind === 'candidate' && candidateDraft) {
@@ -262,7 +266,9 @@ export function MultimodalSkillCreationPanel({
         (skill) => skill.id === itemId,
       );
       if (selected) {
-        setSelectedSkill((current) => current?.id === itemId ? current : selected);
+        setSelectedSkill((current) =>
+          current?.id === itemId ? current : selected,
+        );
       }
     }
   }, [
@@ -428,8 +434,8 @@ export function MultimodalSkillCreationPanel({
         state.connection,
         Boolean(
           state.error?.retryable &&
-            (detail.mediaStage === 'arena_testing' ||
-              detail.mediaStage === 'ready_to_publish'),
+          (detail.mediaStage === 'arena_testing' ||
+            detail.mediaStage === 'ready_to_publish'),
         ),
       )
     )
@@ -880,7 +886,8 @@ export function MultimodalSkillCreationPanel({
       !detail ||
       (detail.mediaStage !== 'arena_testing' &&
         detail.mediaStage !== 'ready_to_publish')
-    ) return;
+    )
+      return;
     const sessionId = detail.sessionId;
     const expectedRevisionNo = detail.revisionNo;
     const idempotencyKey = mediaOperationIdempotencyKey(
@@ -966,13 +973,15 @@ export function MultimodalSkillCreationPanel({
     (item) => item.key === activeStep,
   );
   const isReviewingCompletedStep = reviewStepIndex < activeStepIndex;
-  const visibleError = state.error ?? (detail?.error
-    ? {
-        code: detail.error.code,
-        message: detail.error.message,
-        retryable: detail.error.retryable,
-      }
-    : null);
+  const visibleError =
+    state.error ??
+    (detail?.error
+      ? {
+          code: detail.error.code,
+          message: detail.error.message,
+          retryable: detail.error.retryable,
+        }
+      : null);
 
   const actions = isReviewingCompletedStep ? (
     <button

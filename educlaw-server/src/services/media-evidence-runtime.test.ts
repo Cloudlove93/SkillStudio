@@ -73,10 +73,10 @@ describe('production media evidence runtime', () => {
     const generateJson = vi
       .fn()
       .mockImplementation(async (request: { userPrompt: string }) => {
-      const payload = JSON.parse(request.userPrompt) as {
-        analysisWindow: { startMs: number; endMs: number };
-      };
-      const { startMs, endMs } = payload.analysisWindow;
+        const payload = JSON.parse(request.userPrompt) as {
+          analysisWindow: { startMs: number; endMs: number };
+        };
+        const { startMs, endMs } = payload.analysisWindow;
         return {
           moments: [
             {
@@ -115,8 +115,18 @@ describe('production media evidence runtime', () => {
         status: 'ready',
         editable: true,
         segments: [
-          { startMs: 0, endMs: 10_000, text: '甲'.repeat(100), confidence: 0.9 },
-          { startMs: 10_000, endMs: 20_000, text: '乙'.repeat(100), confidence: 0.9 },
+          {
+            startMs: 0,
+            endMs: 10_000,
+            text: '甲'.repeat(100),
+            confidence: 0.9,
+          },
+          {
+            startMs: 10_000,
+            endMs: 20_000,
+            text: '乙'.repeat(100),
+            confidence: 0.9,
+          },
         ],
       },
     });
@@ -139,8 +149,13 @@ describe('production media evidence runtime', () => {
       );
       expect(request.systemPrompt).toContain('最多 8 个');
       expect(request.systemPrompt).toContain('不超过 80 字');
-      const example = request.systemPrompt.split('\n').find((line) => line.startsWith('{"moments":'));
-      expect(JSON.parse(example!).moments[0]).toMatchObject({selectionReason: expect.any(String), transcriptEvidence: null});
+      const example = request.systemPrompt
+        .split('\n')
+        .find((line) => line.startsWith('{"moments":'));
+      expect(JSON.parse(example!).moments[0]).toMatchObject({
+        selectionReason: expect.any(String),
+        transcriptEvidence: null,
+      });
       const payload = JSON.parse(request.userPrompt) as {
         transcript: unknown[];
       };
@@ -242,7 +257,10 @@ describe('production media evidence runtime', () => {
           candidateId: 'frame-001',
           score: 0.93,
           reason: '完整呈现定义与板书关系',
-          visualObservation:{visibleText:[],uncertainties:['模型未提供可见内容摘录，待人工核对。']},
+          visualObservation: {
+            visibleText: [],
+            uncertainties: ['模型未提供可见内容摘录，待人工核对。'],
+          },
         },
       ],
       model: 'kimi-k2.5',
@@ -260,7 +278,10 @@ describe('production media evidence runtime', () => {
           candidateId: 'frame-001',
           score: 0.96,
           reason: '画面展示函数定义',
-          visualObservation:{visibleText:['f(x) 的定义域为实数集。'],uncertainties:[]},
+          visualObservation: {
+            visibleText: ['f(x) 的定义域为实数集。'],
+            uncertainties: [],
+          },
         },
       ],
     });
@@ -331,7 +352,10 @@ describe('production media evidence runtime', () => {
           candidateId: 'frame-001',
           score: 0.96,
           reason: '画面展示函数定义',
-          visualObservation:{visibleText:['f(x) 的定义域为实数集。'],uncertainties:[]},
+          visualObservation: {
+            visibleText: ['f(x) 的定义域为实数集。'],
+            uncertainties: [],
+          },
         },
       ],
       model: 'kimi-k2.5',

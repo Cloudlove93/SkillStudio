@@ -62,8 +62,7 @@ const patterns = [
   },
   {
     name: 'database URL with password',
-    regex:
-      /\b(?:postgres(?:ql)?|mysql|mongodb):\/\/[^:\s/]+:([^@\s/]{8,})@/gi,
+    regex: /\b(?:postgres(?:ql)?|mysql|mongodb):\/\/[^:\s/]+:([^@\s/]{8,})@/gi,
     allow: (value) =>
       /\$\{/.test(value) ||
       /local|test|example|dummy|placeholder|change|educlaw|acceptance/i.test(
@@ -118,8 +117,12 @@ if (findings.length === 0) {
   process.exit(0);
 }
 
-console.error(`secret scan failed: ${findings.length} potential secret(s) found`);
+console.error(
+  `secret scan failed: ${findings.length} potential secret(s) found`,
+);
 for (const finding of findings) {
-  console.error(`- ${finding.file}:${finding.line} [${finding.name}] ${finding.value}`);
+  console.error(
+    `- ${finding.file}:${finding.line} [${finding.name}] ${finding.value}`,
+  );
 }
 process.exit(1);

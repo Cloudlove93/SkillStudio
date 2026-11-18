@@ -37,7 +37,10 @@ type ProgressEvent =
           updatedAt: string;
           mediaState: MultimodalSessionState;
         };
-        confirmationStage: 'adler_overview' | 'evidence_and_candidates' | 'publish';
+        confirmationStage:
+          | 'adler_overview'
+          | 'evidence_and_candidates'
+          | 'publish';
       };
     }
   | {
@@ -152,13 +155,54 @@ describe('multimodal progress stream service', () => {
   it('emits immediately, skips unchanged fingerprints, and pushes changed job progress before terminal done', async () => {
     const getSessionProgress = vi
       .fn()
-      .mockResolvedValueOnce(createProgress({ currentJob: { jobId: 'job-1', jobType: 'transcribe', status: 'leased', percent: 10, hint: 'processing' } }))
-      .mockResolvedValueOnce(createProgress({ currentJob: { jobId: 'job-1', jobType: 'transcribe', status: 'leased', percent: 10, hint: 'processing' } }))
-      .mockResolvedValueOnce(createProgress({ currentJob: { jobId: 'job-1', jobType: 'transcribe', status: 'leased', percent: 20, hint: 'processing' } }))
-      .mockResolvedValueOnce(createProgress({ status: 'completed', mediaStage: 'published', revisionNo: 4, currentJob: null }));
-    const getSessionDetail = vi
-      .fn()
-      .mockResolvedValue(createDetail({ status: 'completed', mediaStage: 'published', revisionNo: 4 }));
+      .mockResolvedValueOnce(
+        createProgress({
+          currentJob: {
+            jobId: 'job-1',
+            jobType: 'transcribe',
+            status: 'leased',
+            percent: 10,
+            hint: 'processing',
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        createProgress({
+          currentJob: {
+            jobId: 'job-1',
+            jobType: 'transcribe',
+            status: 'leased',
+            percent: 10,
+            hint: 'processing',
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        createProgress({
+          currentJob: {
+            jobId: 'job-1',
+            jobType: 'transcribe',
+            status: 'leased',
+            percent: 20,
+            hint: 'processing',
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        createProgress({
+          status: 'completed',
+          mediaStage: 'published',
+          revisionNo: 4,
+          currentJob: null,
+        }),
+      );
+    const getSessionDetail = vi.fn().mockResolvedValue(
+      createDetail({
+        status: 'completed',
+        mediaStage: 'published',
+        revisionNo: 4,
+      }),
+    );
     const wait = vi.fn().mockResolvedValue(undefined);
     const events: ProgressEvent[] = [];
 
@@ -173,7 +217,9 @@ describe('multimodal progress stream service', () => {
       authUserId: 'user-1',
       sessionId: '101',
       emit: async (event, data) => {
-        events.push(data === undefined ? { event } : { event, data } as ProgressEvent);
+        events.push(
+          data === undefined ? { event } : ({ event, data } as ProgressEvent),
+        );
       },
       isClosed: () => false,
     });
@@ -182,33 +228,64 @@ describe('multimodal progress stream service', () => {
     expect(getSessionDetail).toHaveBeenCalledTimes(1);
     expect(wait).toHaveBeenCalledTimes(3);
     expect(events).toEqual([
-      { event: 'progress', data: { progress: createProgress({ currentJob: { jobId: 'job-1', jobType: 'transcribe', status: 'leased', percent: 10, hint: 'processing' } }) } },
-      { event: 'progress', data: { progress: createProgress({ currentJob: { jobId: 'job-1', jobType: 'transcribe', status: 'leased', percent: 20, hint: 'processing' } }) } },
-      { event: 'done', data: { session: createDetail({ status: 'completed', mediaStage: 'published', revisionNo: 4 }) } },
+      {
+        event: 'progress',
+        data: {
+          progress: createProgress({
+            currentJob: {
+              jobId: 'job-1',
+              jobType: 'transcribe',
+              status: 'leased',
+              percent: 10,
+              hint: 'processing',
+            },
+          }),
+        },
+      },
+      {
+        event: 'progress',
+        data: {
+          progress: createProgress({
+            currentJob: {
+              jobId: 'job-1',
+              jobType: 'transcribe',
+              status: 'leased',
+              percent: 20,
+              hint: 'processing',
+            },
+          }),
+        },
+      },
+      {
+        event: 'done',
+        data: {
+          session: createDetail({
+            status: 'completed',
+            mediaStage: 'published',
+            revisionNo: 4,
+          }),
+        },
+      },
       { event: 'stream_end', data: {} },
     ]);
   });
 
   it('emits confirmation and ends on awaiting confirmation stages', async () => {
-    const getSessionProgress = vi
-      .fn()
-      .mockResolvedValue(
-        createProgress({
-          status: 'ready_for_confirmation',
-          mediaStage: 'awaiting_candidates',
-          revisionNo: 6,
-          currentJob: null,
-        }),
-      );
-    const getSessionDetail = vi
-      .fn()
-      .mockResolvedValue(
-        createDetail({
-          status: 'ready_for_confirmation',
-          mediaStage: 'awaiting_candidates',
-          revisionNo: 6,
-        }),
-      );
+    const getSessionProgress = vi.fn().mockResolvedValue(
+      createProgress({
+        status: 'ready_for_confirmation',
+        mediaStage: 'awaiting_candidates',
+        revisionNo: 6,
+        currentJob: null,
+      }),
+    );
+    const getSessionDetail = vi.fn().mockResolvedValue(
+      createDetail({
+        status: 'ready_for_confirmation',
+        mediaStage: 'awaiting_candidates',
+        revisionNo: 6,
+      }),
+    );
     const wait = vi.fn().mockResolvedValue(undefined);
     const events: ProgressEvent[] = [];
 
@@ -223,7 +300,9 @@ describe('multimodal progress stream service', () => {
       authUserId: 'user-1',
       sessionId: '101',
       emit: async (event, data) => {
-        events.push(data === undefined ? { event } : { event, data } as ProgressEvent);
+        events.push(
+          data === undefined ? { event } : ({ event, data } as ProgressEvent),
+        );
       },
       isClosed: () => false,
     });
@@ -269,9 +348,11 @@ describe('multimodal progress stream service', () => {
       revisionNo: 3,
     });
     const getSessionDetail = vi.fn().mockResolvedValue(readyDetail);
-    const wait = vi.fn().mockRejectedValue(
-      new Error('ready_to_process must not keep the SSE request open'),
-    );
+    const wait = vi
+      .fn()
+      .mockRejectedValue(
+        new Error('ready_to_process must not keep the SSE request open'),
+      );
     const events: ProgressEvent[] = [];
 
     const service = createMultimodalProgressStreamService({
@@ -285,7 +366,9 @@ describe('multimodal progress stream service', () => {
       authUserId: 'user-1',
       sessionId: '101',
       emit: async (event, data) => {
-        events.push(data === undefined ? { event } : { event, data } as ProgressEvent);
+        events.push(
+          data === undefined ? { event } : ({ event, data } as ProgressEvent),
+        );
       },
       isClosed: () => false,
     });
@@ -330,7 +413,9 @@ describe('multimodal progress stream service', () => {
       authUserId: 'user-1',
       sessionId: '101',
       emit: async (event, data) => {
-        events.push(data === undefined ? { event } : { event, data } as ProgressEvent);
+        events.push(
+          data === undefined ? { event } : ({ event, data } as ProgressEvent),
+        );
       },
       isClosed: () => false,
     });
@@ -413,16 +498,14 @@ describe('multimodal progress stream service', () => {
   );
 
   it('emits progress and not_started for draft subscriptions', async () => {
-    const getSessionProgress = vi
-      .fn()
-      .mockResolvedValue(
-        createProgress({
-          mediaStage: 'draft',
-          status: 'collecting',
-          revisionNo: 0,
-          currentJob: null,
-        }),
-      );
+    const getSessionProgress = vi.fn().mockResolvedValue(
+      createProgress({
+        mediaStage: 'draft',
+        status: 'collecting',
+        revisionNo: 0,
+        currentJob: null,
+      }),
+    );
     const getSessionDetail = vi.fn();
     const events: ProgressEvent[] = [];
 
@@ -437,7 +520,9 @@ describe('multimodal progress stream service', () => {
       authUserId: 'user-1',
       sessionId: '101',
       emit: async (event, data) => {
-        events.push(data === undefined ? { event } : { event, data } as ProgressEvent);
+        events.push(
+          data === undefined ? { event } : ({ event, data } as ProgressEvent),
+        );
       },
       isClosed: () => false,
     });
@@ -465,9 +550,17 @@ describe('multimodal progress stream service', () => {
   });
 
   it('stops polling after the client closes the stream', async () => {
-    const getSessionProgress = vi
-      .fn()
-      .mockResolvedValue(createProgress({ currentJob: { jobId: 'job-1', jobType: 'transcribe', status: 'leased', percent: 33, hint: 'processing' } }));
+    const getSessionProgress = vi.fn().mockResolvedValue(
+      createProgress({
+        currentJob: {
+          jobId: 'job-1',
+          jobType: 'transcribe',
+          status: 'leased',
+          percent: 33,
+          hint: 'processing',
+        },
+      }),
+    );
     let closed = false;
     const wait = vi.fn().mockImplementation(async () => {
       closed = true;
@@ -485,7 +578,9 @@ describe('multimodal progress stream service', () => {
       authUserId: 'user-1',
       sessionId: '101',
       emit: async (event, data) => {
-        events.push(data === undefined ? { event } : { event, data } as ProgressEvent);
+        events.push(
+          data === undefined ? { event } : ({ event, data } as ProgressEvent),
+        );
       },
       isClosed: () => closed,
     });
@@ -511,25 +606,21 @@ describe('multimodal progress stream service', () => {
   });
 
   it('maps ready_to_publish to the publish confirmation stage', async () => {
-    const getSessionProgress = vi
-      .fn()
-      .mockResolvedValue(
-        createProgress({
-          status: 'ready_for_confirmation',
-          mediaStage: 'ready_to_publish',
-          revisionNo: 9,
-          currentJob: null,
-        }),
-      );
-    const getSessionDetail = vi
-      .fn()
-      .mockResolvedValue(
-        createDetail({
-          status: 'ready_for_confirmation',
-          mediaStage: 'ready_to_publish',
-          revisionNo: 9,
-        }),
-      );
+    const getSessionProgress = vi.fn().mockResolvedValue(
+      createProgress({
+        status: 'ready_for_confirmation',
+        mediaStage: 'ready_to_publish',
+        revisionNo: 9,
+        currentJob: null,
+      }),
+    );
+    const getSessionDetail = vi.fn().mockResolvedValue(
+      createDetail({
+        status: 'ready_for_confirmation',
+        mediaStage: 'ready_to_publish',
+        revisionNo: 9,
+      }),
+    );
     const events: ProgressEvent[] = [];
 
     const service = createMultimodalProgressStreamService({
@@ -543,7 +634,9 @@ describe('multimodal progress stream service', () => {
       authUserId: 'user-1',
       sessionId: '101',
       emit: async (event, data) => {
-        events.push(data === undefined ? { event } : { event, data } as ProgressEvent);
+        events.push(
+          data === undefined ? { event } : ({ event, data } as ProgressEvent),
+        );
       },
       isClosed: () => false,
     });

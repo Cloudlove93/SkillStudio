@@ -456,4 +456,3 @@ it('limits the picker to twenty bindings including disabled ones', async () => {
     expect(add.disabled).toBe(true);
   expect(container.textContent).toContain('最多装配 20 个 Skill 模块');
 });
-

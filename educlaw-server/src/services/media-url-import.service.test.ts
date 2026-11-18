@@ -22,9 +22,9 @@ function response(input: {
 }
 
 function makeHarness() {
-  const resolveHost = vi.fn().mockResolvedValue([
-    { address: '8.8.8.8', family: 4 as const },
-  ]);
+  const resolveHost = vi
+    .fn()
+    .mockResolvedValue([{ address: '8.8.8.8', family: 4 as const }]);
   const openResponse = vi.fn().mockResolvedValue(response({}));
   const putStream = vi.fn(async (input: { body: Readable }) => {
     let stored = '';
@@ -208,9 +208,9 @@ describe('media URL import service', () => {
   });
 
   it('streams a safe URL into the existing upload-confirm quality gate', async () => {
-    const resolveHost = vi.fn().mockResolvedValue([
-      { address: '8.8.8.8', family: 4 as const },
-    ]);
+    const resolveHost = vi
+      .fn()
+      .mockResolvedValue([{ address: '8.8.8.8', family: 4 as const }]);
     const openResponse = vi.fn().mockResolvedValue(response({}));
     const putStream = vi.fn(async (input: { body: Readable }) => {
       for await (const chunk of input.body) {
@@ -381,9 +381,9 @@ describe('media URL import service', () => {
       createUploadConfirm: vi.fn(),
     };
     const service = createMediaUrlImportService({
-      resolveHost: vi.fn().mockResolvedValue([
-        { address: '8.8.8.8', family: 4 as const },
-      ]),
+      resolveHost: vi
+        .fn()
+        .mockResolvedValue([{ address: '8.8.8.8', family: 4 as const }]),
       openResponse,
       objectStorageService: {
         putStream: vi.fn(async (input: { body: Readable }) => {

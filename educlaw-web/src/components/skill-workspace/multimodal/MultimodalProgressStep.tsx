@@ -239,12 +239,11 @@ export function MultimodalProgressStep(props: Props) {
       {hasSource && (
         <ol className="skill-mm-process-nodes">
           {PROCESS_NODES.map((node, index) => {
-            const status =
-              readyToStart
-                ? index === 0
-                  ? 'complete'
-                  : 'future'
-                : isFailed && index === currentIndex
+            const status = readyToStart
+              ? index === 0
+                ? 'complete'
+                : 'future'
+              : isFailed && index === currentIndex
                 ? 'failed'
                 : processingComplete || index < currentIndex
                   ? 'complete'

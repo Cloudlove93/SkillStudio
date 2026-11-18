@@ -38,13 +38,24 @@ export function SkillImportDialog({ open, busy, onClose, onImport }: Props) {
         if (event.target === event.currentTarget && !busy) onClose();
       }}
     >
-      <section className="skill-import-dialog" role="dialog" aria-modal="true" aria-labelledby="skill-import-title">
+      <section
+        className="skill-import-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="skill-import-title"
+      >
         <header>
           <div>
             <h2 id="skill-import-title">导入 Skill</h2>
             <p>导入标准 Skill ZIP，校验后加入仓库。</p>
           </div>
-          <button type="button" className="skill-icon-button" onClick={onClose} disabled={busy} aria-label="关闭导入窗口">
+          <button
+            type="button"
+            className="skill-icon-button"
+            onClick={onClose}
+            disabled={busy}
+            aria-label="关闭导入窗口"
+          >
             <X size={16} />
           </button>
         </header>
@@ -71,12 +82,26 @@ export function SkillImportDialog({ open, busy, onClose, onImport }: Props) {
         >
           {file ? <FileArchive size={25} /> : <UploadCloud size={25} />}
           <strong>{file?.name || '选择 ZIP 文件'}</strong>
-          <span>{file ? '点击可以重新选择' : '点击选择，或将文件拖到这里'}</span>
+          <span>
+            {file ? '点击可以重新选择' : '点击选择，或将文件拖到这里'}
+          </span>
         </button>
 
         <footer>
-          <button type="button" className="skill-secondary-button" onClick={onClose} disabled={busy}>取消</button>
-          <button type="button" className="skill-primary-button" onClick={() => file && onImport(file)} disabled={!file || busy}>
+          <button
+            type="button"
+            className="skill-secondary-button"
+            onClick={onClose}
+            disabled={busy}
+          >
+            取消
+          </button>
+          <button
+            type="button"
+            className="skill-primary-button"
+            onClick={() => file && onImport(file)}
+            disabled={!file || busy}
+          >
             {busy && <Loader2 size={14} className="spin" />}
             开始导入
           </button>

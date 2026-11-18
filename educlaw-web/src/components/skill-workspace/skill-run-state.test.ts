@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import {
-  createSkillRunState,
-  skillRunReducer,
-} from './skill-run-state';
+import { createSkillRunState, skillRunReducer } from './skill-run-state';
 
 describe('Skill run stream state', () => {
   it('collects the fixed-version enhanced response and persists completed messages', () => {
     let state = createSkillRunState();
-    state = skillRunReducer(state, { type: 'submit', content: '设计一节阅读课' });
+    state = skillRunReducer(state, {
+      type: 'submit',
+      content: '设计一节阅读课',
+    });
     state = skillRunReducer(state, {
       type: 'delta',
       side: 'enhanced',
@@ -28,7 +28,11 @@ describe('Skill run stream state', () => {
 
   it('ignores baseline deltas in single Skill mode and exposes errors', () => {
     let state = createSkillRunState();
-    state = skillRunReducer(state, { type: 'delta', side: 'baseline', delta: '旧回答' });
+    state = skillRunReducer(state, {
+      type: 'delta',
+      side: 'baseline',
+      delta: '旧回答',
+    });
     state = skillRunReducer(state, { type: 'error', message: '执行失败' });
 
     expect(state.streaming).toBe('');
@@ -142,9 +146,7 @@ describe('Skill run stream state', () => {
       enabled: false,
       supported: false,
     });
-    expect(state.thinkingNotice).toBe(
-      '当前模型不支持深度思考，将正常生成回答',
-    );
+    expect(state.thinkingNotice).toBe('当前模型不支持深度思考，将正常生成回答');
 
     state = skillRunReducer(state, {
       type: 'hydrate',

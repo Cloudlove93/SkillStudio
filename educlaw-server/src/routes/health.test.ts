@@ -14,13 +14,15 @@ async function listen(app: express.Express) {
 
 async function close(server: Server) {
   await new Promise<void>((resolve, reject) => {
-    server.close((error) => error ? reject(error) : resolve());
+    server.close((error) => (error ? reject(error) : resolve()));
   });
 }
 
 describe('health routes', () => {
   it('keeps liveness independent from failing dependencies', async () => {
-    const check = vi.fn().mockResolvedValue({ ok: false, status: 'unavailable' });
+    const check = vi
+      .fn()
+      .mockResolvedValue({ ok: false, status: 'unavailable' });
     const app = express().use(createHealthRouter({ check }));
     const { server, url } = await listen(app);
 

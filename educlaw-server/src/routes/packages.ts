@@ -82,7 +82,9 @@ router.post('/packages/generate', requireAuth, async (req, res) => {
       String(req.body?.instruction || ''),
       typeof req.body?.model === 'string' ? req.body.model : undefined,
       Array.isArray(req.body?.documents) ? req.body.documents : undefined,
-      undefined, undefined, undefined,
+      undefined,
+      undefined,
+      undefined,
       req.body?.requestId,
     );
     res.json(pkg);
@@ -313,8 +315,14 @@ router.post(
   async (req, res) => {
     try {
       const expectedPackageVersionId = req.body?.expectedPackageVersionId;
-      if (typeof expectedPackageVersionId !== 'string' || !expectedPackageVersionId.trim()) {
-        res.status(422).json({ code: 'INVALID_ARGUMENT', error: 'expectedPackageVersionId is required' });
+      if (
+        typeof expectedPackageVersionId !== 'string' ||
+        !expectedPackageVersionId.trim()
+      ) {
+        res.status(422).json({
+          code: 'INVALID_ARGUMENT',
+          error: 'expectedPackageVersionId is required',
+        });
         return;
       }
       const result = await applyManualMarkdownEdit(

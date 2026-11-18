@@ -5,8 +5,10 @@ export const QUALITY_CHECK_JOB_TYPE = 'media_quality_check' as const;
 
 export type MediaKind = 'video' | 'audio';
 
-export const parseMediaQualityCheckJobInputManifest = parseQualityCheckInputManifest;
-export const parseMediaQualityCheckOutputManifest = parseQualityCheckOutputManifest;
+export const parseMediaQualityCheckJobInputManifest =
+  parseQualityCheckInputManifest;
+export const parseMediaQualityCheckOutputManifest =
+  parseQualityCheckOutputManifest;
 export const buildMediaQualityCheckResultHash = computeQualityCheckResultHash;
 
 export interface QualityCheckInputManifest {
@@ -181,7 +183,10 @@ export function parseQualityCheckInputManifest(
     'inputManifest',
   );
 
-  const schemaVersion = readInteger(value.schemaVersion, 'inputManifest.schemaVersion');
+  const schemaVersion = readInteger(
+    value.schemaVersion,
+    'inputManifest.schemaVersion',
+  );
   if (schemaVersion !== QUALITY_CHECK_SCHEMA_VERSION) {
     fail('inputManifest.schemaVersion must be 1');
   }
@@ -189,12 +194,26 @@ export function parseQualityCheckInputManifest(
   return {
     schemaVersion: 1,
     sourceId: readSafeId(value.sourceId, 'inputManifest.sourceId'),
-    mediaKind: readEnum(value.mediaKind, ['video', 'audio'] as const, 'inputManifest.mediaKind'),
+    mediaKind: readEnum(
+      value.mediaKind,
+      ['video', 'audio'] as const,
+      'inputManifest.mediaKind',
+    ),
     objectKey: readString(value.objectKey, 'inputManifest.objectKey'),
     fileName: readString(value.fileName, 'inputManifest.fileName'),
-    expectedSizeBytes: readInteger(value.expectedSizeBytes, 'inputManifest.expectedSizeBytes'),
-    expectedContentType: readString(value.expectedContentType, 'inputManifest.expectedContentType'),
-    uploadMode: readEnum(value.uploadMode, ['single_put', 'multipart'] as const, 'inputManifest.uploadMode'),
+    expectedSizeBytes: readInteger(
+      value.expectedSizeBytes,
+      'inputManifest.expectedSizeBytes',
+    ),
+    expectedContentType: readString(
+      value.expectedContentType,
+      'inputManifest.expectedContentType',
+    ),
+    uploadMode: readEnum(
+      value.uploadMode,
+      ['single_put', 'multipart'] as const,
+      'inputManifest.uploadMode',
+    ),
   };
 }
 
@@ -221,20 +240,34 @@ export function parseQualityCheckOutputManifest(
     'outputManifest',
   );
 
-  const schemaVersion = readInteger(value.schemaVersion, 'outputManifest.schemaVersion');
+  const schemaVersion = readInteger(
+    value.schemaVersion,
+    'outputManifest.schemaVersion',
+  );
   if (schemaVersion !== QUALITY_CHECK_SCHEMA_VERSION) {
     fail('outputManifest.schemaVersion must be 1');
   }
 
-  const jobType = readEnum(value.jobType, ['media_quality_check'] as const, 'outputManifest.jobType');
+  const jobType = readEnum(
+    value.jobType,
+    ['media_quality_check'] as const,
+    'outputManifest.jobType',
+  );
   if (jobType !== QUALITY_CHECK_JOB_TYPE) {
     fail('outputManifest.jobType must be media_quality_check');
   }
 
   const sessionId = readSafeId(value.sessionId, 'outputManifest.sessionId');
   const sourceId = readSafeId(value.sourceId, 'outputManifest.sourceId');
-  const sourceKind = readEnum(value.sourceKind, ['video', 'audio'] as const, 'outputManifest.sourceKind');
-  const processorVersion = readString(value.processorVersion, 'outputManifest.processorVersion');
+  const sourceKind = readEnum(
+    value.sourceKind,
+    ['video', 'audio'] as const,
+    'outputManifest.sourceKind',
+  );
+  const processorVersion = readString(
+    value.processorVersion,
+    'outputManifest.processorVersion',
+  );
   if (!SEMVER.test(processorVersion)) {
     fail('outputManifest.processorVersion must be semver');
   }
@@ -268,10 +301,7 @@ function validateProbeSemantics(
       'probe.primaryAudioStreamIndex must be null when probe.audioStreamCount is 0',
     );
   }
-  if (
-    probe.audioStreamCount > 0 &&
-    probe.primaryAudioStreamIndex === null
-  ) {
+  if (probe.audioStreamCount > 0 && probe.primaryAudioStreamIndex === null) {
     fail(
       'probe.primaryAudioStreamIndex must be set when probe.audioStreamCount is greater than 0',
     );
@@ -281,18 +311,15 @@ function validateProbeSemantics(
       'probe.primaryVideoStreamIndex must be null when probe.videoStreamCount is 0',
     );
   }
-  if (
-    probe.videoStreamCount > 0 &&
-    probe.primaryVideoStreamIndex === null
-  ) {
+  if (probe.videoStreamCount > 0 && probe.primaryVideoStreamIndex === null) {
     fail(
       'probe.primaryVideoStreamIndex must be set when probe.videoStreamCount is greater than 0',
     );
   }
-  if (probe.hasAudio !== (probe.audioStreamCount > 0)) {
+  if (probe.hasAudio !== probe.audioStreamCount > 0) {
     fail('probe.hasAudio must match probe.audioStreamCount');
   }
-  if (probe.hasVideo !== (probe.videoStreamCount > 0)) {
+  if (probe.hasVideo !== probe.videoStreamCount > 0) {
     fail('probe.hasVideo must match probe.videoStreamCount');
   }
   if (
@@ -358,10 +385,22 @@ function parseProbe(value: unknown): QualityCheckProbe {
     formatName: readString(value.formatName, 'probe.formatName'),
     hasAudio: readBoolean(value.hasAudio, 'probe.hasAudio'),
     hasVideo: readBoolean(value.hasVideo, 'probe.hasVideo'),
-    audioStreamCount: readInteger(value.audioStreamCount, 'probe.audioStreamCount'),
-    videoStreamCount: readInteger(value.videoStreamCount, 'probe.videoStreamCount'),
-    primaryAudioStreamIndex: readOptionalInt(value.primaryAudioStreamIndex, 'probe.primaryAudioStreamIndex'),
-    primaryVideoStreamIndex: readOptionalInt(value.primaryVideoStreamIndex, 'probe.primaryVideoStreamIndex'),
+    audioStreamCount: readInteger(
+      value.audioStreamCount,
+      'probe.audioStreamCount',
+    ),
+    videoStreamCount: readInteger(
+      value.videoStreamCount,
+      'probe.videoStreamCount',
+    ),
+    primaryAudioStreamIndex: readOptionalInt(
+      value.primaryAudioStreamIndex,
+      'probe.primaryAudioStreamIndex',
+    ),
+    primaryVideoStreamIndex: readOptionalInt(
+      value.primaryVideoStreamIndex,
+      'probe.primaryVideoStreamIndex',
+    ),
   };
 }
 
@@ -402,7 +441,10 @@ function parseDegradations(value: unknown): QualityCheckDegradation[] {
   return value.map((item, index) => parseDegradation(item, index));
 }
 
-function parseDegradation(value: unknown, index: number): QualityCheckDegradation {
+function parseDegradation(
+  value: unknown,
+  index: number,
+): QualityCheckDegradation {
   if (!isPlainObject(value)) {
     fail(`degradations[${index}] must be a plain object`);
   }

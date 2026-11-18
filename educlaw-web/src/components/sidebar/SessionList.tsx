@@ -1,6 +1,19 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Plus, Trash2, MessageSquare, MoreHorizontal, Copy, Share2, Archive, ArchiveRestore, Pencil, Minimize2, ChevronDown, Loader2 } from 'lucide-react';
+import {
+  Plus,
+  Trash2,
+  MessageSquare,
+  MoreHorizontal,
+  Copy,
+  Share2,
+  Archive,
+  ArchiveRestore,
+  Pencil,
+  Minimize2,
+  ChevronDown,
+  Loader2,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useT } from '../../i18n';
 import type { SessionInfo } from '../../stores/chat';
@@ -56,8 +69,14 @@ export default function SessionList({
   const editRef = useRef<HTMLInputElement>(null);
   const menuButtonRefs = useRef(new Map<string, HTMLButtonElement>());
 
-  const activeSessions = useMemo(() => sessions.filter((s) => !s.archived), [sessions]);
-  const archivedSessions = useMemo(() => sessions.filter((s) => !!s.archived), [sessions]);
+  const activeSessions = useMemo(
+    () => sessions.filter((s) => !s.archived),
+    [sessions],
+  );
+  const archivedSessions = useMemo(
+    () => sessions.filter((s) => !!s.archived),
+    [sessions],
+  );
 
   const updateMenuPosition = useCallback((sessionId: string) => {
     const trigger = menuButtonRefs.current.get(sessionId);
@@ -66,11 +85,17 @@ export default function SessionList({
     const rect = trigger.getBoundingClientRect();
     const left = Math.max(
       MENU_MARGIN,
-      Math.min(rect.right - MENU_WIDTH, window.innerWidth - MENU_WIDTH - MENU_MARGIN),
+      Math.min(
+        rect.right - MENU_WIDTH,
+        window.innerWidth - MENU_WIDTH - MENU_MARGIN,
+      ),
     );
     const top = Math.max(
       MENU_MARGIN,
-      Math.min(rect.bottom + MENU_OFFSET, window.innerHeight - MENU_MAX_HEIGHT - MENU_MARGIN),
+      Math.min(
+        rect.bottom + MENU_OFFSET,
+        window.innerHeight - MENU_MAX_HEIGHT - MENU_MARGIN,
+      ),
     );
 
     setMenu({ id: sessionId, left, top });
@@ -146,20 +171,37 @@ export default function SessionList({
       <div
         ref={menuRef}
         className="fixed z-[120] min-w-[160px] overflow-y-auto rounded-[12px] border border-border bg-popover p-1.5 shadow-[var(--shadow-md)] text-xs"
-        style={{ left: menu.left, top: menu.top, width: MENU_WIDTH, maxHeight: MENU_MAX_HEIGHT }}
+        style={{
+          left: menu.left,
+          top: menu.top,
+          width: MENU_WIDTH,
+          maxHeight: MENU_MAX_HEIGHT,
+        }}
         onClick={(e) => e.stopPropagation()}
       >
         {isArchived ? (
           <>
             {onUnarchive && (
-              <button className="flex w-full items-center gap-2 rounded-[8px] px-2.5 py-2 hover:bg-muted" onClick={() => { onUnarchive(session.id); setMenu(null); }}>
+              <button
+                className="flex w-full items-center gap-2 rounded-[8px] px-2.5 py-2 hover:bg-muted"
+                onClick={() => {
+                  onUnarchive(session.id);
+                  setMenu(null);
+                }}
+              >
                 <ArchiveRestore className="size-3.5" /> {t('session.unarchive')}
               </button>
             )}
             {onDelete && (
               <>
                 <div className="my-1 h-px bg-border" />
-                <button className="flex w-full items-center gap-2 rounded-[8px] px-2.5 py-2 text-destructive hover:bg-[rgba(240,45,45,0.08)]" onClick={() => { onDelete(session.id); setMenu(null); }}>
+                <button
+                  className="flex w-full items-center gap-2 rounded-[8px] px-2.5 py-2 text-destructive hover:bg-[rgba(240,45,45,0.08)]"
+                  onClick={() => {
+                    onDelete(session.id);
+                    setMenu(null);
+                  }}
+                >
                   <Trash2 className="size-3.5" /> {t('session.delete')}
                 </button>
               </>
@@ -167,16 +209,90 @@ export default function SessionList({
           </>
         ) : (
           <>
-            {onRename && <button className="flex w-full items-center gap-2 rounded-[8px] px-2.5 py-2 hover:bg-muted" onClick={() => handleRename(session.id)}><Pencil className="size-3.5" /> {t('session.rename')}</button>}
-            {onFork && <button className="flex w-full items-center gap-2 rounded-[8px] px-2.5 py-2 hover:bg-muted" onClick={() => { onFork(session.id); setMenu(null); }}><Copy className="size-3.5" /> {t('session.fork')}</button>}
-            {onShare && <button className="flex w-full items-center gap-2 rounded-[8px] px-2.5 py-2 hover:bg-muted" onClick={() => { onShare(session.id); setMenu(null); }}><Share2 className="size-3.5" /> {session.share ? t('session.share.copyLink') : t('session.share')}</button>}
-            {onUnshare && session.share && <button className="flex w-full items-center gap-2 rounded-[8px] px-2.5 py-2 hover:bg-muted" onClick={() => { onUnshare(session.id); setMenu(null); }}><Share2 className="size-3.5" /> {t('session.unshare')}</button>}
-            {onCompact && <button className="flex w-full items-center gap-2 rounded-[8px] px-2.5 py-2 hover:bg-muted" disabled={compactingId === session.id} onClick={() => { onCompact(session.id); setMenu(null); }}>{compactingId === session.id ? <Loader2 className="size-3.5 animate-spin" /> : <Minimize2 className="size-3.5" />} {compactingId === session.id ? t('session.compacting') : t('session.compact')}</button>}
-            {onArchive && <button className="flex w-full items-center gap-2 rounded-[8px] px-2.5 py-2 hover:bg-muted" onClick={() => { onArchive(session.id); setMenu(null); }}><Archive className="size-3.5" /> {t('session.archive')}</button>}
+            {onRename && (
+              <button
+                className="flex w-full items-center gap-2 rounded-[8px] px-2.5 py-2 hover:bg-muted"
+                onClick={() => handleRename(session.id)}
+              >
+                <Pencil className="size-3.5" /> {t('session.rename')}
+              </button>
+            )}
+            {onFork && (
+              <button
+                className="flex w-full items-center gap-2 rounded-[8px] px-2.5 py-2 hover:bg-muted"
+                onClick={() => {
+                  onFork(session.id);
+                  setMenu(null);
+                }}
+              >
+                <Copy className="size-3.5" /> {t('session.fork')}
+              </button>
+            )}
+            {onShare && (
+              <button
+                className="flex w-full items-center gap-2 rounded-[8px] px-2.5 py-2 hover:bg-muted"
+                onClick={() => {
+                  onShare(session.id);
+                  setMenu(null);
+                }}
+              >
+                <Share2 className="size-3.5" />{' '}
+                {session.share
+                  ? t('session.share.copyLink')
+                  : t('session.share')}
+              </button>
+            )}
+            {onUnshare && session.share && (
+              <button
+                className="flex w-full items-center gap-2 rounded-[8px] px-2.5 py-2 hover:bg-muted"
+                onClick={() => {
+                  onUnshare(session.id);
+                  setMenu(null);
+                }}
+              >
+                <Share2 className="size-3.5" /> {t('session.unshare')}
+              </button>
+            )}
+            {onCompact && (
+              <button
+                className="flex w-full items-center gap-2 rounded-[8px] px-2.5 py-2 hover:bg-muted"
+                disabled={compactingId === session.id}
+                onClick={() => {
+                  onCompact(session.id);
+                  setMenu(null);
+                }}
+              >
+                {compactingId === session.id ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <Minimize2 className="size-3.5" />
+                )}{' '}
+                {compactingId === session.id
+                  ? t('session.compacting')
+                  : t('session.compact')}
+              </button>
+            )}
+            {onArchive && (
+              <button
+                className="flex w-full items-center gap-2 rounded-[8px] px-2.5 py-2 hover:bg-muted"
+                onClick={() => {
+                  onArchive(session.id);
+                  setMenu(null);
+                }}
+              >
+                <Archive className="size-3.5" /> {t('session.archive')}
+              </button>
+            )}
             {onDelete && (
               <>
                 <div className="my-1 h-px bg-border" />
-                <button className="flex w-full items-center gap-2 rounded-[8px] px-2.5 py-2 text-destructive hover:bg-[rgba(240,45,45,0.08)]" onClick={() => { onDelete(session.id); setMenu(null); }}>
+                <button
+                  className="flex w-full items-center gap-2 rounded-[8px] px-2.5 py-2 text-destructive hover:bg-[rgba(240,45,45,0.08)]"
+                  onClick={() => {
+                    onDelete(session.id);
+                    setMenu(null);
+                  }}
+                >
                   <Trash2 className="size-3.5" /> {t('session.delete')}
                 </button>
               </>
@@ -188,9 +304,15 @@ export default function SessionList({
     );
   }
 
-  function renderSessionItem(s: SessionInfo, index: number, list: SessionInfo[], isArchived: boolean) {
+  function renderSessionItem(
+    s: SessionInfo,
+    index: number,
+    list: SessionInfo[],
+    isArchived: boolean,
+  ) {
     const active = s.id === activeSessionId;
-    const label = s.title || t('session.label').replace('{n}', String(list.length - index));
+    const label =
+      s.title || t('session.label').replace('{n}', String(list.length - index));
     const isEditing = editId === s.id;
     const sessionDate = formatSessionDate(s);
 
@@ -204,16 +326,24 @@ export default function SessionList({
               ? 'border-transparent text-muted-foreground/70 hover:border-border hover:bg-muted'
               : 'border-transparent text-muted-foreground hover:border-border hover:bg-muted'
         }`}
-        onClick={() => { if (!isEditing) onSelect(s.id); }}
+        onClick={() => {
+          if (!isEditing) onSelect(s.id);
+        }}
       >
-        <div className={`mr-3 flex size-8 shrink-0 items-center justify-center rounded-[10px] ${
-          active
-            ? 'bg-primary/12 text-primary'
-            : isArchived
-              ? 'bg-muted text-muted-foreground/50'
-              : 'bg-muted text-muted-foreground/70'
-        }`}>
-          {isArchived ? <Archive className="size-3.5" /> : <MessageSquare className="size-3.5" />}
+        <div
+          className={`mr-3 flex size-8 shrink-0 items-center justify-center rounded-[10px] ${
+            active
+              ? 'bg-primary/12 text-primary'
+              : isArchived
+                ? 'bg-muted text-muted-foreground/50'
+                : 'bg-muted text-muted-foreground/70'
+          }`}
+        >
+          {isArchived ? (
+            <Archive className="size-3.5" />
+          ) : (
+            <MessageSquare className="size-3.5" />
+          )}
         </div>
 
         {isEditing ? (
@@ -225,13 +355,18 @@ export default function SessionList({
             onBlur={commitRename}
             onKeyDown={(e) => {
               if (e.key === 'Enter') commitRename();
-              if (e.key === 'Escape') { setEditId(null); setEditValue(''); }
+              if (e.key === 'Escape') {
+                setEditId(null);
+                setEditValue('');
+              }
             }}
             onClick={(e) => e.stopPropagation()}
           />
         ) : (
           <div className="min-w-0 flex-1">
-            <span className={`block truncate ${active ? 'font-medium text-foreground' : 'text-inherit'} ${isArchived ? 'italic' : ''}`}>
+            <span
+              className={`block truncate ${active ? 'font-medium text-foreground' : 'text-inherit'} ${isArchived ? 'italic' : ''}`}
+            >
               {label}
             </span>
           </div>
@@ -251,7 +386,10 @@ export default function SessionList({
                 else menuButtonRefs.current.delete(s.id);
               }}
               className="rounded-[8px] p-1 text-muted-foreground/50 transition-colors hover:bg-card hover:text-foreground"
-              onClick={(e) => { e.stopPropagation(); toggleMenu(s.id); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleMenu(s.id);
+              }}
             >
               <MoreHorizontal className="size-3.5" />
             </button>
@@ -271,14 +409,22 @@ export default function SessionList({
           {t('session.list')}
         </span>
         {!readonly && (
-          <Button variant="outline" size="icon-xs" onClick={onCreate} title={t('session.new')} className="rounded-[8px]">
+          <Button
+            variant="outline"
+            size="icon-xs"
+            onClick={onCreate}
+            title={t('session.new')}
+            className="rounded-[8px]"
+          >
             <Plus className="size-3.5" />
           </Button>
         )}
       </div>
 
       <div className="flex-1 overflow-y-auto px-2 py-2">
-        {activeSessions.map((s, index) => renderSessionItem(s, index, activeSessions, false))}
+        {activeSessions.map((s, index) =>
+          renderSessionItem(s, index, activeSessions, false),
+        )}
 
         {activeSessions.length === 0 && archivedSessions.length === 0 && (
           <div className="flex flex-col items-center py-8 text-center text-muted-foreground/60">
@@ -296,12 +442,22 @@ export default function SessionList({
               onClick={() => setShowArchived((v) => !v)}
               className="mt-2 flex w-full items-center gap-1.5 rounded-[10px] px-2 py-1.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
-              <ChevronDown className={`size-3 transition-transform duration-200 ${showArchived ? '' : '-rotate-90'}`} />
+              <ChevronDown
+                className={`size-3 transition-transform duration-200 ${showArchived ? '' : '-rotate-90'}`}
+              />
               <Archive className="size-3" />
               <span>{t('session.archived')}</span>
-              <span className="ml-auto text-muted-foreground/60">{archivedSessions.length}</span>
+              <span className="ml-auto text-muted-foreground/60">
+                {archivedSessions.length}
+              </span>
             </button>
-            {showArchived && <div className="animate-fade-in">{archivedSessions.map((s, index) => renderSessionItem(s, index, archivedSessions, true))}</div>}
+            {showArchived && (
+              <div className="animate-fade-in">
+                {archivedSessions.map((s, index) =>
+                  renderSessionItem(s, index, archivedSessions, true),
+                )}
+              </div>
+            )}
           </>
         )}
       </div>

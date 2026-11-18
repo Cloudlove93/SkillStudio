@@ -22,8 +22,18 @@ interface LibraryStore {
   skillsLoading: boolean;
   fetchSkills: (force?: boolean) => Promise<void>;
   invalidateSkills: () => void;
-  doCreateUserSkill: (dirName: string, name: string, description: string, content: string) => Promise<void>;
-  doUpdateUserSkill: (dirName: string, name: string, description: string, content: string) => Promise<string>;
+  doCreateUserSkill: (
+    dirName: string,
+    name: string,
+    description: string,
+    content: string,
+  ) => Promise<void>;
+  doUpdateUserSkill: (
+    dirName: string,
+    name: string,
+    description: string,
+    content: string,
+  ) => Promise<string>;
   doDeleteUserSkill: (dirName: string) => Promise<void>;
   doPublishSkill: (dirName: string) => Promise<void>;
   doUnpublishSkill: (dirName: string) => Promise<void>;

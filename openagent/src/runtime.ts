@@ -27,7 +27,9 @@ export interface FetchOpenAgentSuggestionsOptions {
   getContext?: ResolvableValue<OpenAgentRuntimeContext>;
 }
 
-async function resolveValue<T>(value: ResolvableValue<T> | undefined): Promise<T | undefined> {
+async function resolveValue<T>(
+  value: ResolvableValue<T> | undefined,
+): Promise<T | undefined> {
   if (typeof value === 'function') {
     return (value as () => T | Promise<T>)();
   }
@@ -46,7 +48,12 @@ export function createOpenAgentTransport({
 }: CreateOpenAgentTransportOptions): DefaultChatTransport<OpenAgentMessage> {
   return new DefaultChatTransport<OpenAgentMessage>({
     api,
-    prepareSendMessagesRequest: async ({ messages, headers, credentials, api: requestApi }) => {
+    prepareSendMessagesRequest: async ({
+      messages,
+      headers,
+      credentials,
+      api: requestApi,
+    }) => {
       const context = await resolveOpenAgentRuntimeContext(getContext);
       return {
         api: requestApi,
@@ -63,7 +70,11 @@ export function createOpenAgentTransport({
         },
       };
     },
-    prepareReconnectToStreamRequest: async ({ headers, credentials, api: requestApi }) => {
+    prepareReconnectToStreamRequest: async ({
+      headers,
+      credentials,
+      api: requestApi,
+    }) => {
       const context = await resolveOpenAgentRuntimeContext(getContext);
       return {
         api: requestApi,
@@ -93,7 +104,9 @@ export async function fetchOpenAgentSuggestions({
     body: JSON.stringify({
       ...(context?.request?.body ?? {}),
       ...(context?.sessionId ? { sessionId: context.sessionId } : {}),
-      messages: toLegacyOpenAgentMessages(messages).map(({ role, content }) => ({ role, content })),
+      messages: toLegacyOpenAgentMessages(messages).map(
+        ({ role, content }) => ({ role, content }),
+      ),
     }),
   });
 

@@ -1,6 +1,10 @@
 import { create } from 'zustand';
 import { toast } from 'sonner';
-import type { OptimizationCreateResult, OptimizationRequestInput, OptimizationRunView } from '../api/manager';
+import type {
+  OptimizationCreateResult,
+  OptimizationRequestInput,
+  OptimizationRunView,
+} from '../api/manager';
 import {
   optimizeProfile,
   optimizeSkill,
@@ -25,13 +29,21 @@ function openOptimizePanel() {
   ui.setDeepStudyTab('optimize');
 }
 
-function upsertRun(runs: OptimizationRunView[], next: OptimizationRunView): OptimizationRunView[] {
+function upsertRun(
+  runs: OptimizationRunView[],
+  next: OptimizationRunView,
+): OptimizationRunView[] {
   return [next, ...runs.filter((run) => run.run.id !== next.run.id)].sort(
-    (a, b) => new Date(b.run.created_at).getTime() - new Date(a.run.created_at).getTime(),
+    (a, b) =>
+      new Date(b.run.created_at).getTime() -
+      new Date(a.run.created_at).getTime(),
   );
 }
 
-function chooseSelectedRunId(runs: OptimizationRunView[], current: string | null): string | null {
+function chooseSelectedRunId(
+  runs: OptimizationRunView[],
+  current: string | null,
+): string | null {
   if (current && runs.some((run) => run.run.id === current)) {
     return current;
   }
@@ -84,9 +96,21 @@ interface OptimizeStore {
   setSelectedRunId: (runId: string | null) => void;
   fetchRuns: (force?: boolean) => Promise<void>;
   refreshRun: (runId: string) => Promise<void>;
-  createProfileRun: (fileName: string, input?: OptimizationRequestInput, options?: CreateRunOptions) => Promise<OptimizationRunView | undefined>;
-  createSkillRun: (dirName: string, input?: OptimizationRequestInput, options?: CreateRunOptions) => Promise<OptimizationRunView | undefined>;
-  createAgentRun: (agentId: string, input?: OptimizationRequestInput, options?: CreateRunOptions) => Promise<OptimizationRunView | undefined>;
+  createProfileRun: (
+    fileName: string,
+    input?: OptimizationRequestInput,
+    options?: CreateRunOptions,
+  ) => Promise<OptimizationRunView | undefined>;
+  createSkillRun: (
+    dirName: string,
+    input?: OptimizationRequestInput,
+    options?: CreateRunOptions,
+  ) => Promise<OptimizationRunView | undefined>;
+  createAgentRun: (
+    agentId: string,
+    input?: OptimizationRequestInput,
+    options?: CreateRunOptions,
+  ) => Promise<OptimizationRunView | undefined>;
   applyRun: (runId: string, suggestionKey?: string) => Promise<void>;
   rejectRun: (runId: string, suggestionKey?: string) => Promise<void>;
   deleteRun: (runId: string) => Promise<void>;
@@ -132,9 +156,17 @@ export const useOptimizeStore = create<OptimizeStore>((set, get) => ({
     set({ creating: true });
     try {
       const result = await optimizeProfile(fileName, input);
-      return handleCreateResult(result, '\u5df2\u751f\u6210\u6a21\u677f\u4f18\u5316\u5efa\u8bae', set, options);
+      return handleCreateResult(
+        result,
+        '\u5df2\u751f\u6210\u6a21\u677f\u4f18\u5316\u5efa\u8bae',
+        set,
+        options,
+      );
     } catch (error) {
-      toast.error('\u751f\u6210\u6a21\u677f\u4f18\u5316\u5efa\u8bae\u5931\u8d25', { description: error instanceof Error ? error.message : undefined });
+      toast.error(
+        '\u751f\u6210\u6a21\u677f\u4f18\u5316\u5efa\u8bae\u5931\u8d25',
+        { description: error instanceof Error ? error.message : undefined },
+      );
       await get().fetchRuns(true);
       return undefined;
     } finally {
@@ -146,9 +178,17 @@ export const useOptimizeStore = create<OptimizeStore>((set, get) => ({
     set({ creating: true });
     try {
       const result = await optimizeSkill(dirName, input);
-      return handleCreateResult(result, '\u5df2\u751f\u6210\u6280\u80fd\u4f18\u5316\u5efa\u8bae', set, options);
+      return handleCreateResult(
+        result,
+        '\u5df2\u751f\u6210\u6280\u80fd\u4f18\u5316\u5efa\u8bae',
+        set,
+        options,
+      );
     } catch (error) {
-      toast.error('\u751f\u6210\u6280\u80fd\u4f18\u5316\u5efa\u8bae\u5931\u8d25', { description: error instanceof Error ? error.message : undefined });
+      toast.error(
+        '\u751f\u6210\u6280\u80fd\u4f18\u5316\u5efa\u8bae\u5931\u8d25',
+        { description: error instanceof Error ? error.message : undefined },
+      );
       await get().fetchRuns(true);
       return undefined;
     } finally {
@@ -160,9 +200,17 @@ export const useOptimizeStore = create<OptimizeStore>((set, get) => ({
     set({ creating: true });
     try {
       const result = await optimizeAgent(agentId, input);
-      return handleCreateResult(result, '\u5df2\u751f\u6210\u667a\u80fd\u4f53\u4f18\u5316\u5efa\u8bae', set, options);
+      return handleCreateResult(
+        result,
+        '\u5df2\u751f\u6210\u667a\u80fd\u4f53\u4f18\u5316\u5efa\u8bae',
+        set,
+        options,
+      );
     } catch (error) {
-      toast.error('\u751f\u6210\u667a\u80fd\u4f53\u4f18\u5316\u5efa\u8bae\u5931\u8d25', { description: error instanceof Error ? error.message : undefined });
+      toast.error(
+        '\u751f\u6210\u667a\u80fd\u4f53\u4f18\u5316\u5efa\u8bae\u5931\u8d25',
+        { description: error instanceof Error ? error.message : undefined },
+      );
       await get().fetchRuns(true);
       return undefined;
     } finally {
@@ -179,9 +227,15 @@ export const useOptimizeStore = create<OptimizeStore>((set, get) => ({
         selectedRunId: next.run.id,
       }));
       await refreshRelatedResources(next);
-      toast.success(suggestionKey ? '\u5df2\u5e94\u7528\u5efa\u8bae' : '\u5df2\u5e94\u7528\u5168\u90e8\u5efa\u8bae');
+      toast.success(
+        suggestionKey
+          ? '\u5df2\u5e94\u7528\u5efa\u8bae'
+          : '\u5df2\u5e94\u7528\u5168\u90e8\u5efa\u8bae',
+      );
     } catch (error) {
-      toast.error('\u5e94\u7528\u5efa\u8bae\u5931\u8d25', { description: error instanceof Error ? error.message : undefined });
+      toast.error('\u5e94\u7528\u5efa\u8bae\u5931\u8d25', {
+        description: error instanceof Error ? error.message : undefined,
+      });
     } finally {
       set({ acting: false });
     }
@@ -195,9 +249,15 @@ export const useOptimizeStore = create<OptimizeStore>((set, get) => ({
         runs: upsertRun(state.runs, next),
         selectedRunId: next.run.id,
       }));
-      toast.success(suggestionKey ? '\u5df2\u62d2\u7edd\u5efa\u8bae' : '\u5df2\u62d2\u7edd\u5168\u90e8\u5efa\u8bae');
+      toast.success(
+        suggestionKey
+          ? '\u5df2\u62d2\u7edd\u5efa\u8bae'
+          : '\u5df2\u62d2\u7edd\u5168\u90e8\u5efa\u8bae',
+      );
     } catch (error) {
-      toast.error('\u62d2\u7edd\u5efa\u8bae\u5931\u8d25', { description: error instanceof Error ? error.message : undefined });
+      toast.error('\u62d2\u7edd\u5efa\u8bae\u5931\u8d25', {
+        description: error instanceof Error ? error.message : undefined,
+      });
     } finally {
       set({ acting: false });
     }
@@ -211,12 +271,17 @@ export const useOptimizeStore = create<OptimizeStore>((set, get) => ({
         const runs = state.runs.filter((run) => run.run.id !== runId);
         return {
           runs,
-          selectedRunId: chooseSelectedRunId(runs, state.selectedRunId === runId ? null : state.selectedRunId),
+          selectedRunId: chooseSelectedRunId(
+            runs,
+            state.selectedRunId === runId ? null : state.selectedRunId,
+          ),
         };
       });
       toast.success('\u5df2\u5220\u9664\u4f18\u5316\u8bb0\u5f55');
     } catch (error) {
-      toast.error('\u5220\u9664\u4f18\u5316\u8bb0\u5f55\u5931\u8d25', { description: error instanceof Error ? error.message : undefined });
+      toast.error('\u5220\u9664\u4f18\u5316\u8bb0\u5f55\u5931\u8d25', {
+        description: error instanceof Error ? error.message : undefined,
+      });
     } finally {
       set({ acting: false });
     }

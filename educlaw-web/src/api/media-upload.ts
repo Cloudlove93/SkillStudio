@@ -75,7 +75,10 @@ export async function uploadMediaFile(input: {
   const completedParts: Array<{ partNumber: number; etag: string }> = [];
   for (const part of input.intent.multipart.parts) {
     const start = (part.partNumber - 1) * input.intent.multipart.partSizeBytes;
-    const end = Math.min(start + input.intent.multipart.partSizeBytes, input.file.size);
+    const end = Math.min(
+      start + input.intent.multipart.partSizeBytes,
+      input.file.size,
+    );
     const body = input.file.slice(start, end);
     const etag = await putBlob({
       url: part.url,

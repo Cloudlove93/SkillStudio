@@ -15,8 +15,7 @@ export function getPackageSwitchDecision({
   hasActiveProgress,
   preserveGenerateProgress,
 }: PackageSwitchDecisionInput): PackageSwitchDecision {
-  const preserveTransientState =
-    hasActiveProgress || preserveGenerateProgress;
+  const preserveTransientState = hasActiveProgress || preserveGenerateProgress;
 
   return {
     preserveTransientState,

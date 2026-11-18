@@ -50,16 +50,30 @@ export default function HomeChatInput({
             disabled={!modelsAvailable}
           />
           {streaming ? (
-            <Button type="button" variant="destructive" size="icon-sm" onClick={onAbort} className="shrink-0 rounded-2xl">
+            <Button
+              type="button"
+              variant="destructive"
+              size="icon-sm"
+              onClick={onAbort}
+              className="shrink-0 rounded-2xl"
+            >
               <Square className="size-3.5" />
             </Button>
           ) : (
-            <Button type="button" size="icon-sm" disabled={!input.trim() || !modelsAvailable} onClick={() => onSend(input.trim())} className="btn-premium shrink-0 rounded-2xl">
+            <Button
+              type="button"
+              size="icon-sm"
+              disabled={!input.trim() || !modelsAvailable}
+              onClick={() => onSend(input.trim())}
+              className="btn-premium shrink-0 rounded-2xl"
+            >
               <Send className="size-3.5" />
             </Button>
           )}
         </div>
-        <p className="mt-2 text-center text-[10px] text-muted-foreground/35">{t('prompt.disclaimer')}</p>
+        <p className="mt-2 text-center text-[10px] text-muted-foreground/35">
+          {t('prompt.disclaimer')}
+        </p>
       </div>
     </div>
   );

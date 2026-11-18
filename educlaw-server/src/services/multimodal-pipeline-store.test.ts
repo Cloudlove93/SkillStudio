@@ -1,8 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
-import { parseMultimodalSessionState, type MultimodalSessionState } from '@educlaw/shared';
+import {
+  parseMultimodalSessionState,
+  type MultimodalSessionState,
+} from '@educlaw/shared';
 import { createMultimodalPipelineStore } from './multimodal-pipeline-store';
 
-function makeState(overrides?: Partial<MultimodalSessionState>): MultimodalSessionState {
+function makeState(
+  overrides?: Partial<MultimodalSessionState>,
+): MultimodalSessionState {
   const base = parseMultimodalSessionState({
     schemaVersion: 1,
     primarySource: {
@@ -102,7 +107,9 @@ function makeState(overrides?: Partial<MultimodalSessionState>): MultimodalSessi
 }
 
 function makeRow(overrides?: Record<string, unknown>) {
-  const state = makeState(overrides?.media_state_json as Partial<MultimodalSessionState> | undefined);
+  const state = makeState(
+    overrides?.media_state_json as Partial<MultimodalSessionState> | undefined,
+  );
   return {
     id: '101',
     display_name: '多模态课程',
@@ -214,11 +221,11 @@ describe('multimodal pipeline store', () => {
   });
 
   it('rejects malformed runnable scan rows and invalid limits before widening recovery scope', async () => {
-    const query = vi
-      .fn()
-      .mockResolvedValueOnce({
-        rows: [{ id: 'bad', user_id: 'user-1', media_stage: 'extracting_candidates' }],
-      });
+    const query = vi.fn().mockResolvedValueOnce({
+      rows: [
+        { id: 'bad', user_id: 'user-1', media_stage: 'extracting_candidates' },
+      ],
+    });
     const store = createMultimodalPipelineStore({
       query,
       withTransaction: vi.fn(),
@@ -335,10 +342,19 @@ describe('multimodal pipeline store', () => {
                   terms: [],
                 },
                 candidatePassMeta: {
-                  frameworks: { model: 'framework-model', promptVersion: 'framework-prompt' },
-                  principles: { model: 'principle-model', promptVersion: 'principle-prompt' },
+                  frameworks: {
+                    model: 'framework-model',
+                    promptVersion: 'framework-prompt',
+                  },
+                  principles: {
+                    model: 'principle-model',
+                    promptVersion: 'principle-prompt',
+                  },
                   cases: { model: 'case-model', promptVersion: 'case-prompt' },
-                  counterexamples: { model: 'counter-model', promptVersion: 'counter-prompt' },
+                  counterexamples: {
+                    model: 'counter-model',
+                    promptVersion: 'counter-prompt',
+                  },
                   terms: { model: 'term-model', promptVersion: 'term-prompt' },
                 },
               },
@@ -377,10 +393,19 @@ describe('multimodal pipeline store', () => {
         terms: [],
       },
       candidatePassMeta: {
-        frameworks: { model: 'framework-model', promptVersion: 'framework-prompt' },
-        principles: { model: 'principle-model', promptVersion: 'principle-prompt' },
+        frameworks: {
+          model: 'framework-model',
+          promptVersion: 'framework-prompt',
+        },
+        principles: {
+          model: 'principle-model',
+          promptVersion: 'principle-prompt',
+        },
         cases: { model: 'case-model', promptVersion: 'case-prompt' },
-        counterexamples: { model: 'counter-model', promptVersion: 'counter-prompt' },
+        counterexamples: {
+          model: 'counter-model',
+          promptVersion: 'counter-prompt',
+        },
         terms: { model: 'term-model', promptVersion: 'term-prompt' },
       },
     });
@@ -477,12 +502,12 @@ describe('multimodal pipeline store', () => {
             ],
           }),
       };
-    const withTransaction = vi.fn(async (callback) => callback(db));
-    const store = createMultimodalPipelineStore({
-      query: vi.fn(),
-      withTransaction,
-      now: () => new Date('2026-08-21T10:01:00.000Z'),
-    });
+      const withTransaction = vi.fn(async (callback) => callback(db));
+      const store = createMultimodalPipelineStore({
+        query: vi.fn(),
+        withTransaction,
+        now: () => new Date('2026-08-21T10:01:00.000Z'),
+      });
 
       const snapshot = await store.persistPipelineFailure({
         authUserId: 'user-1',
@@ -499,8 +524,8 @@ describe('multimodal pipeline store', () => {
       });
 
       expect(snapshot.mediaStage).toBe('failed');
-    const [selectSql] = db.query.mock.calls[0]!;
-    const [updateSql] = db.query.mock.calls[1]!;
+      const [selectSql] = db.query.mock.calls[0]!;
+      const [updateSql] = db.query.mock.calls[1]!;
       expect(selectSql).toContain('for update');
       expect(updateSql).toContain('error_json = $5::jsonb');
       expect(updateSql).toContain('and revision_no = $9');

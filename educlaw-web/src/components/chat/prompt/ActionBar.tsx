@@ -1,4 +1,10 @@
-import { Terminal, MessageSquare, BookOpen, Check, Loader2 } from 'lucide-react';
+import {
+  Terminal,
+  MessageSquare,
+  BookOpen,
+  Check,
+  Loader2,
+} from 'lucide-react';
 import type { PromptMode } from '../PromptInput';
 import { useT } from '../../../i18n';
 
@@ -29,18 +35,30 @@ export default function ActionBar({
       {/* Mode toggle */}
       {hasModes && (
         <button
-          onClick={() => onModeChange?.(currentMode === 'normal' ? 'shell' : 'normal')}
+          onClick={() =>
+            onModeChange?.(currentMode === 'normal' ? 'shell' : 'normal')
+          }
           className={`flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] transition-colors ${
             currentMode === 'shell'
               ? 'bg-orange-500/10 text-orange-500 hover:bg-orange-500/20'
               : 'text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/60'
           }`}
-          title={currentMode === 'shell' ? t('prompt.switchToChat') : t('prompt.switchToShell')}
+          title={
+            currentMode === 'shell'
+              ? t('prompt.switchToChat')
+              : t('prompt.switchToShell')
+          }
         >
           {currentMode === 'shell' ? (
-            <><Terminal className="size-3" /><span>{t('prompt.shellMode')}</span></>
+            <>
+              <Terminal className="size-3" />
+              <span>{t('prompt.shellMode')}</span>
+            </>
           ) : (
-            <><MessageSquare className="size-3" /><span>{t('prompt.chatMode')}</span></>
+            <>
+              <MessageSquare className="size-3" />
+              <span>{t('prompt.chatMode')}</span>
+            </>
           )}
         </button>
       )}
@@ -49,7 +67,9 @@ export default function ActionBar({
       {agentSelector}
 
       <span className="flex-1" />
-      <span className="text-[10px] text-muted-foreground/30">{t('prompt.slashHint')}</span>
+      <span className="text-[10px] text-muted-foreground/30">
+        {t('prompt.slashHint')}
+      </span>
     </div>
   );
 }
@@ -72,8 +92,8 @@ export function DiaryButton({
         diaryStatus === 'success'
           ? 'border-rose-500/40 bg-rose-500 text-white shadow-sm'
           : diaryStatus === 'error'
-          ? 'bg-destructive/10 border-destructive/30 text-destructive'
-          : 'border-rose-500/25 bg-rose-500/8 text-rose-600/80 hover:scale-105 hover:border-rose-500/50 hover:bg-rose-500/12 hover:text-rose-700 dark:text-rose-300'
+            ? 'bg-destructive/10 border-destructive/30 text-destructive'
+            : 'border-rose-500/25 bg-rose-500/8 text-rose-600/80 hover:scale-105 hover:border-rose-500/50 hover:bg-rose-500/12 hover:text-rose-700 dark:text-rose-300'
       }`}
       title={t('home.saveToDiaryDesc')}
     >
@@ -85,10 +105,13 @@ export function DiaryButton({
         <BookOpen className="size-5" />
       )}
       <span className="text-[10px] font-medium leading-tight whitespace-nowrap">
-        {diaryStatus === 'loading' ? t('home.savingToDiary')
-          : diaryStatus === 'success' ? t('home.saveToDiarySuccess')
-          : diaryStatus === 'error' ? t('home.saveToDiaryFail')
-          : t('home.saveToDiary')}
+        {diaryStatus === 'loading'
+          ? t('home.savingToDiary')
+          : diaryStatus === 'success'
+            ? t('home.saveToDiarySuccess')
+            : diaryStatus === 'error'
+              ? t('home.saveToDiaryFail')
+              : t('home.saveToDiary')}
       </span>
     </button>
   );

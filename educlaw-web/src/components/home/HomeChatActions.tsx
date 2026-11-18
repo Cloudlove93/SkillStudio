@@ -1,14 +1,22 @@
 import { useState } from 'react';
 import { BookOpen, Check, Loader2, GraduationCap } from 'lucide-react';
-import { getOpenAgentMessageText, toLegacyOpenAgentMessages } from '@openagent/core/messages';
+import {
+  getOpenAgentMessageText,
+  toLegacyOpenAgentMessages,
+} from '@openagent/core/messages';
 import type { OpenAgentMessage } from '@openagent/core/types';
 import { useT } from '../../i18n';
 import { apiPost, matchProfiles, API_BASE } from '../../api/client';
 import { useDiaryStore } from '../../stores/diary';
 import { useHomeChatStore } from '../../stores/home-chat';
 
-export function useDiaryAction(sessionId: string, getMessages: () => OpenAgentMessage[]) {
-  const diaryStatus = useHomeChatStore((s) => s.diaryStatusMap.get(sessionId) ?? 'idle');
+export function useDiaryAction(
+  sessionId: string,
+  getMessages: () => OpenAgentMessage[],
+) {
+  const diaryStatus = useHomeChatStore(
+    (s) => s.diaryStatusMap.get(sessionId) ?? 'idle',
+  );
   const setDiaryStatus = useHomeChatStore((s) => s.setDiaryStatus);
 
   async function handleSaveToDiary() {
@@ -16,16 +24,22 @@ export function useDiaryAction(sessionId: string, getMessages: () => OpenAgentMe
     if (diaryStatus === 'loading' || messages.length === 0) return;
     setDiaryStatus(sessionId, 'loading');
     try {
-      const res = await apiPost<{ ok: boolean; date: string }>(`${API_BASE}/api/chat/summarize-to-diary`, {
-        messages: toLegacyOpenAgentMessages(messages).map((message) => ({
-          role: message.role,
-          content: message.content,
-        })),
-        sessionId,
-      });
+      const res = await apiPost<{ ok: boolean; date: string }>(
+        `${API_BASE}/api/chat/summarize-to-diary`,
+        {
+          messages: toLegacyOpenAgentMessages(messages).map((message) => ({
+            role: message.role,
+            content: message.content,
+          })),
+          sessionId,
+        },
+      );
       const diaryStore = useDiaryStore.getState();
       if (diaryStore.selectedDate !== res.date) {
-        useDiaryStore.setState({ selectedDate: res.date, autoSaveStatus: 'idle' });
+        useDiaryStore.setState({
+          selectedDate: res.date,
+          autoSaveStatus: 'idle',
+        });
       }
       diaryStore.loadDiary(res.date);
       setDiaryStatus(sessionId, 'success');
@@ -36,7 +50,9 @@ export function useDiaryAction(sessionId: string, getMessages: () => OpenAgentMe
     }
   }
 
-  function resetDiaryStatus() { setDiaryStatus(sessionId, 'idle'); }
+  function resetDiaryStatus() {
+    setDiaryStatus(sessionId, 'idle');
+  }
 
   return { diaryStatus, handleSaveToDiary, resetDiaryStatus };
 }
@@ -44,11 +60,15 @@ export function useDiaryAction(sessionId: string, getMessages: () => OpenAgentMe
 export function useDeepStudyAction(getMessages: () => OpenAgentMessage[]) {
   const [deepStudyOpen, setDeepStudyOpen] = useState(false);
   const [deepStudyLoading, setDeepStudyLoading] = useState(false);
-  const [deepStudyProfiles, setDeepStudyProfiles] = useState<{ fileName: string; name: string; description: string; score: number }[]>([]);
+  const [deepStudyProfiles, setDeepStudyProfiles] = useState<
+    { fileName: string; name: string; description: string; score: number }[]
+  >([]);
   const [deepStudyChatText, setDeepStudyChatText] = useState('');
 
   async function handleDeepStudy() {
-    const chatText = getMessages().map((message) => getOpenAgentMessageText(message)).join('\n');
+    const chatText = getMessages()
+      .map((message) => getOpenAgentMessageText(message))
+      .join('\n');
     if (!chatText.trim()) return;
     setDeepStudyChatText(chatText);
     setDeepStudyOpen(true);
@@ -64,7 +84,14 @@ export function useDeepStudyAction(getMessages: () => OpenAgentMessage[]) {
     }
   }
 
-  return { deepStudyOpen, setDeepStudyOpen, deepStudyLoading, deepStudyProfiles, deepStudyChatText, handleDeepStudy };
+  return {
+    deepStudyOpen,
+    setDeepStudyOpen,
+    deepStudyLoading,
+    deepStudyProfiles,
+    deepStudyChatText,
+    handleDeepStudy,
+  };
 }
 
 export function HomeChatActionButtons({
@@ -89,8 +116,12 @@ export function HomeChatActionButtons({
           <GraduationCap className="size-6 text-white drop-shadow" />
         </div>
         <div className="relative text-left">
-          <p className="text-sm font-semibold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">{t('home.deepStudy')}</p>
-          <p className="text-[10px] text-muted-foreground/60">{t('home.deepStudyDesc')}</p>
+          <p className="text-sm font-semibold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+            {t('home.deepStudy')}
+          </p>
+          <p className="text-[10px] text-muted-foreground/60">
+            {t('home.deepStudyDesc')}
+          </p>
         </div>
       </button>
 
@@ -101,18 +132,27 @@ export function HomeChatActionButtons({
       >
         <div className="absolute inset-0 opacity-0 transition-opacity duration-500 group-hover:opacity-100 bg-[radial-gradient(circle_at_50%_50%,rgba(244,63,94,0.2),transparent_70%)]" />
         <div className="relative flex items-center justify-center size-10 rounded-xl bg-gradient-to-br from-rose-500 to-red-600 shadow-lg shadow-rose-500/25 transition-all duration-300 group-hover:scale-110 group-hover:shadow-rose-500/45">
-          {diaryStatus === 'loading' ? <Loader2 className="size-5 text-white animate-spin" />
-            : diaryStatus === 'success' ? <Check className="size-5 text-white" />
-            : <BookOpen className="size-5 text-white drop-shadow" />}
+          {diaryStatus === 'loading' ? (
+            <Loader2 className="size-5 text-white animate-spin" />
+          ) : diaryStatus === 'success' ? (
+            <Check className="size-5 text-white" />
+          ) : (
+            <BookOpen className="size-5 text-white drop-shadow" />
+          )}
         </div>
         <div className="relative text-left">
           <p className="bg-gradient-to-r from-rose-500 to-orange-500 bg-clip-text text-sm font-semibold text-transparent">
-            {diaryStatus === 'loading' ? t('home.savingToDiary')
-              : diaryStatus === 'success' ? t('home.saveToDiarySuccess')
-              : diaryStatus === 'error' ? t('home.saveToDiaryFail')
-              : t('home.saveToDiary')}
+            {diaryStatus === 'loading'
+              ? t('home.savingToDiary')
+              : diaryStatus === 'success'
+                ? t('home.saveToDiarySuccess')
+                : diaryStatus === 'error'
+                  ? t('home.saveToDiaryFail')
+                  : t('home.saveToDiary')}
           </p>
-          <p className="text-[10px] text-muted-foreground/60">{t('home.saveToDiaryDesc')}</p>
+          <p className="text-[10px] text-muted-foreground/60">
+            {t('home.saveToDiaryDesc')}
+          </p>
         </div>
       </button>
     </div>

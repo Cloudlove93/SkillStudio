@@ -35,7 +35,12 @@ describe('education Skill conversation starters', () => {
     expect(differentiation?.prompt).toMatch(/不标注能力等级/);
     expect(differentiation?.prompt).toMatch(/避免标签化/);
 
-    const localizedPrompts = [lessonPlanning?.prompt, differentiation?.prompt].join('\n');
-    expect(localizedPrompts).not.toMatch(/CCSS|NGSS|美国州标准|Learning Commons/i);
+    const localizedPrompts = [
+      lessonPlanning?.prompt,
+      differentiation?.prompt,
+    ].join('\n');
+    expect(localizedPrompts).not.toMatch(
+      /CCSS|NGSS|美国州标准|Learning Commons/i,
+    );
   });
 });

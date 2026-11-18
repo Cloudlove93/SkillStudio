@@ -26,9 +26,18 @@ export function StructuredInspectorContent({
   return (
     <div className="skill-inspector-structured">
       <div className="skill-context-progress">
-        <div><span>已填写</span><strong>{completed}/{FIELDS.length}</strong></div>
+        <div>
+          <span>已填写</span>
+          <strong>
+            {completed}/{FIELDS.length}
+          </strong>
+        </div>
         <div className="skill-context-progress-track">
-          <span style={{ width: `${Math.round((completed / FIELDS.length) * 100)}%` }} />
+          <span
+            style={{
+              width: `${Math.round((completed / FIELDS.length) * 100)}%`,
+            }}
+          />
         </div>
       </div>
       <div className="skill-inspector-field-list">
@@ -37,26 +46,36 @@ export function StructuredInspectorContent({
           return (
             <section key={field.key} className={value ? 'is-complete' : ''}>
               <span>{value ? <Check size={13} /> : null}</span>
-              <div><strong>{field.label}</strong><p>{value || '等待填写'}</p></div>
+              <div>
+                <strong>{field.label}</strong>
+                <p>{value || '等待填写'}</p>
+              </div>
             </section>
           );
         })}
       </div>
       <section className="skill-inspector-materials">
-        <h3>教学材料 <span>{documents.length}</span></h3>
+        <h3>
+          教学材料 <span>{documents.length}</span>
+        </h3>
         {documents.length === 0 ? (
           <p>尚未添加材料。</p>
-        ) : documents.map((document, index) => (
-          <div key={`${document.name}-${index}`}>
-            <FileText size={14} />
-            <span>{document.name}</span>
-            <button type="button" onClick={() => onRemoveDocument(index)} aria-label={`移除 ${document.name}`}>
-              <X size={13} />
-            </button>
-          </div>
-        ))}
+        ) : (
+          documents.map((document, index) => (
+            <div key={`${document.name}-${index}`}>
+              <FileText size={14} />
+              <span>{document.name}</span>
+              <button
+                type="button"
+                onClick={() => onRemoveDocument(index)}
+                aria-label={`移除 ${document.name}`}
+              >
+                <X size={13} />
+              </button>
+            </div>
+          ))
+        )}
       </section>
     </div>
   );
 }
-

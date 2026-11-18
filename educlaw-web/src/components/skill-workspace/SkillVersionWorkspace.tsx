@@ -90,10 +90,12 @@ export function SkillVersionWorkspace(props: Props) {
     props.versions.find((version) => version.id === props.currentVersionId) ??
     null;
   const comparisonBase = comparison
-    ? visible.find((version) => version.id === comparison.baseVersionId) ?? null
+    ? (visible.find((version) => version.id === comparison.baseVersionId) ??
+      null)
     : null;
   const comparisonTarget = comparison
-    ? visible.find((version) => version.id === comparison.targetVersionId) ?? null
+    ? (visible.find((version) => version.id === comparison.targetVersionId) ??
+      null)
     : null;
 
   useEffect(() => {
@@ -109,9 +111,7 @@ export function SkillVersionWorkspace(props: Props) {
       return;
     const target = defaultComparisonTarget(base, visible);
     setComparison(
-      target
-        ? { baseVersionId: base.id, targetVersionId: target.id }
-        : null,
+      target ? { baseVersionId: base.id, targetVersionId: target.id } : null,
     );
   }, [comparison, visible]);
 
@@ -243,7 +243,9 @@ export function SkillVersionWorkspace(props: Props) {
                     .map((version) => (
                       <option key={version.id} value={version.id}>
                         v{version.versionNumber}
-                        {version.id === props.currentVersionId ? '（当前）' : ''}
+                        {version.id === props.currentVersionId
+                          ? '（当前）'
+                          : ''}
                       </option>
                     ))}
                 </select>

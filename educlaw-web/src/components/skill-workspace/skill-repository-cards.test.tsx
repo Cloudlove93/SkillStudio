@@ -5,7 +5,10 @@ import type { GuidedCreationSession } from '@educlaw/shared';
 import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { SkillRepositoryWorkspace, type RepositorySkill } from './SkillRepositoryWorkspace';
+import {
+  SkillRepositoryWorkspace,
+  type RepositorySkill,
+} from './SkillRepositoryWorkspace';
 import { RepositorySkillCard } from './RepositoryCards';
 import { WorkspaceInspectorProvider } from './WorkspaceInspectorProvider';
 
@@ -167,8 +170,9 @@ describe('Skill repository cards', () => {
         .querySelector<HTMLButtonElement>('[aria-label="函数概念教学操作"]')
         ?.click();
     });
-    const versionButton = [...container.querySelectorAll('[role="menuitem"]')]
-      .find((item) => item.textContent?.includes('版本管理')) as
+    const versionButton = [
+      ...container.querySelectorAll('[role="menuitem"]'),
+    ].find((item) => item.textContent?.includes('版本管理')) as
       | HTMLButtonElement
       | undefined;
     await act(async () => versionButton?.click());
@@ -179,8 +183,9 @@ describe('Skill repository cards', () => {
         .querySelector<HTMLButtonElement>('[aria-label="函数概念教学操作"]')
         ?.click();
     });
-    const exportButton = [...container.querySelectorAll('[role="menuitem"]')]
-      .find((item) => item.textContent?.includes('导出 Skill')) as
+    const exportButton = [
+      ...container.querySelectorAll('[role="menuitem"]'),
+    ].find((item) => item.textContent?.includes('导出 Skill')) as
       | HTMLButtonElement
       | undefined;
     await act(async () => exportButton?.click());
@@ -255,7 +260,9 @@ describe('Skill repository cards', () => {
     );
     await act(async () => renameButton?.click());
 
-    const dialog = container.querySelector('[role="dialog"][aria-label="重命名 Skill"]');
+    const dialog = container.querySelector(
+      '[role="dialog"][aria-label="重命名 Skill"]',
+    );
     const input = dialog?.querySelector<HTMLInputElement>(
       'input[name="skill-display-name"]',
     );
@@ -268,10 +275,7 @@ describe('Skill repository cards', () => {
     );
     await act(async () => saveButton?.click());
 
-    expect(onRenameSkill).toHaveBeenCalledWith(
-      skills[0],
-      '函数概念辨析',
-    );
+    expect(onRenameSkill).toHaveBeenCalledWith(skills[0], '函数概念辨析');
     expect(
       container.querySelector('[role="dialog"][aria-label="重命名 Skill"]'),
     ).toBeNull();
@@ -335,8 +339,12 @@ describe('Skill repository cards', () => {
     );
 
     await act(async () => {
-      form?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-      form?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      form?.dispatchEvent(
+        new Event('submit', { bubbles: true, cancelable: true }),
+      );
+      form?.dispatchEvent(
+        new Event('submit', { bubbles: true, cancelable: true }),
+      );
     });
 
     expect(onRenameSkill).toHaveBeenCalledTimes(1);

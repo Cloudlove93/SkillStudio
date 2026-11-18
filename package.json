@@ -10,7 +10,8 @@
     "check": "pnpm check:types && pnpm lint && pnpm test && pnpm build",
     "check:types": "node scripts/check-web-types.mjs",
     "check:python": "pnpm run test:worker",
-    "format": "pnpm --filter educlaw-server format && pnpm --filter educlaw-web format",
+    "format": "prettier --write \"educlaw-web/src/**/*.{ts,tsx}\" \"educlaw-web/*.ts\" \"educlaw-server/src/**/*.ts\" \"educlaw-server/*.ts\" \"educlaw-shared/**/*.ts\" \"openagent/src/**/*.ts\" \"scripts/**/*.{ts,mjs}\"",
+    "format:check": "prettier --check \"educlaw-web/src/**/*.{ts,tsx}\" \"educlaw-web/*.ts\" \"educlaw-server/src/**/*.ts\" \"educlaw-server/*.ts\" \"educlaw-shared/**/*.ts\" \"openagent/src/**/*.ts\" \"scripts/**/*.{ts,mjs}\"",
     "lint": "pnpm --filter educlaw-server lint && pnpm --filter educlaw-web lint",
     "security:audit": "pnpm audit --prod --audit-level moderate",
     "test": "pnpm run test:scripts && pnpm run test:server && pnpm run test:web && pnpm run test:worker",
@@ -22,5 +23,8 @@
     "smoke:preview": "node scripts/smoke-preview.mjs",
     "secret:check": "node scripts/check-secrets.mjs"
   },
-  "packageManager": "pnpm@10.33.0+sha512.10568bb4a6afb58c9eb3630da90cc9516417abebd3fabbe6739f0ae795728da1491e9db5a544c76ad8eb7570f5c4bb3d6c637b2cb41bfdcdb47fa823c8649319"
+  "packageManager": "pnpm@10.33.0+sha512.10568bb4a6afb58c9eb3630da90cc9516417abebd3fabbe6739f0ae795728da1491e9db5a544c76ad8eb7570f5c4bb3d6c637b2cb41bfdcdb47fa823c8649319",
+  "devDependencies": {
+    "prettier": "^3.8.3"
+  }
 }

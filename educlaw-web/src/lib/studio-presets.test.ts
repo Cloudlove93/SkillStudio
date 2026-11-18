@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  LESSON_PACK_COUNTS,
-  LESSON_TOTAL_COUNT,
-} from './lesson-pack-counts';
+import { LESSON_PACK_COUNTS, LESSON_TOTAL_COUNT } from './lesson-pack-counts';
 import {
   AGENT_TEMPLATE_PRESETS,
   ANALYSIS_SKILL_PRESETS,
@@ -89,7 +86,10 @@ describe('studio presets', () => {
   it('keeps preset lesson counts aligned with the generated manifest counts', () => {
     expect(LESSON_TOTAL_COUNT).toBe(1404);
     expect(
-      Object.values(LESSON_PACK_COUNTS).reduce((total, count) => total + count, 0),
+      Object.values(LESSON_PACK_COUNTS).reduce(
+        (total, count) => total + count,
+        0,
+      ),
     ).toBe(1404);
     for (const pack of LESSON_PACK_PRESETS) {
       expect(pack.lessonCount, pack.id).toBe(LESSON_PACK_COUNTS[pack.id]);
@@ -102,9 +102,9 @@ describe('studio presets', () => {
   it('matches subject and grade lesson pack first', () => {
     const matches = recommendPresets('三年级数学课例的提问链分析');
     expect(matches[0]?.preset.id).toBe('lesson-pack-数学-3年级');
-    expect(matches.some((match) => match.preset.id === 'analysis-question-chain')).toBe(
-      true,
-    );
+    expect(
+      matches.some((match) => match.preset.id === 'analysis-question-chain'),
+    ).toBe(true);
   });
 
   it('normalizes Chinese and arabic grade numbers', () => {

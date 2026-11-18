@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   connect: vi.fn(),
@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   release: vi.fn(),
 }));
 
-vi.mock("pg", () => ({
+vi.mock('pg', () => ({
   Pool: class {
     connect = mocks.connect;
     query = mocks.poolQuery;
@@ -16,11 +16,11 @@ vi.mock("pg", () => ({
   },
 }));
 
-vi.mock("../config.js", () => ({
-  config: { databaseUrl: "postgres://test" },
+vi.mock('../config.js', () => ({
+  config: { databaseUrl: 'postgres://test' },
 }));
 
-describe("withTransaction", () => {
+describe('withTransaction', () => {
   beforeEach(() => {
     Object.values(mocks).forEach((mock) => mock.mockReset());
     mocks.connect.mockResolvedValue({
@@ -30,37 +30,37 @@ describe("withTransaction", () => {
     mocks.clientQuery.mockResolvedValue({ rows: [], rowCount: 0 });
   });
 
-  it("commits successful short work and releases the client", async () => {
-    const { withTransaction } = await import("./db.js");
+  it('commits successful short work and releases the client', async () => {
+    const { withTransaction } = await import('./db.js');
 
     const result = await withTransaction(async (client) => {
-      await client.query("insert work");
-      return "saved";
+      await client.query('insert work');
+      return 'saved';
     });
 
-    expect(result).toBe("saved");
+    expect(result).toBe('saved');
     expect(mocks.clientQuery.mock.calls.map((call) => call[0])).toEqual([
-      "begin",
-      "insert work",
-      "commit",
+      'begin',
+      'insert work',
+      'commit',
     ]);
     expect(mocks.release).toHaveBeenCalledOnce();
   });
 
-  it("rolls back failed work and releases the client", async () => {
-    const { withTransaction } = await import("./db.js");
+  it('rolls back failed work and releases the client', async () => {
+    const { withTransaction } = await import('./db.js');
 
     await expect(
       withTransaction(async (client) => {
-        await client.query("insert work");
-        throw new Error("write failed");
+        await client.query('insert work');
+        throw new Error('write failed');
       }),
-    ).rejects.toThrow("write failed");
+    ).rejects.toThrow('write failed');
 
     expect(mocks.clientQuery.mock.calls.map((call) => call[0])).toEqual([
-      "begin",
-      "insert work",
-      "rollback",
+      'begin',
+      'insert work',
+      'rollback',
     ]);
     expect(mocks.release).toHaveBeenCalledOnce();
   });

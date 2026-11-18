@@ -1,7 +1,9 @@
 import type { WorkflowDefinition } from '@educlaw/shared';
 
 /** 工作流里已绑定的 Skill，按出现顺序去重。 */
-export function collectWorkflowSkillIds(workflow: WorkflowDefinition): string[] {
+export function collectWorkflowSkillIds(
+  workflow: WorkflowDefinition,
+): string[] {
   const seen = new Set<string>();
   workflow.nodes.forEach((node) => {
     if (node.type !== 'skill') return;
@@ -21,7 +23,8 @@ export function buildWorkflowAgentInstructions(
   const steps = workflow.nodes
     .filter((node) => node.type !== 'start' && node.type !== 'end')
     .map((node) => node.name);
-  if (!steps.length) return source || `你是由工作流「${workflowName}」生成的 Agent。`;
+  if (!steps.length)
+    return source || `你是由工作流「${workflowName}」生成的 Agent。`;
   const header = source
     ? `${source}\n\n以下是「${workflowName}」的执行顺序：`
     : `你是由工作流「${workflowName}」生成的 Agent。\n\n面对用户任务时，请按下面的顺序组织处理：`;

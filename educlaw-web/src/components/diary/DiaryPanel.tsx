@@ -11,12 +11,17 @@ import { useTheme } from '../theme-provider';
 function countWords(text: string): number {
   if (!text.trim()) return 0;
   const cjk = text.match(/[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/g);
-  const latin = text.replace(/[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/g, ' ').trim();
+  const latin = text
+    .replace(/[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/g, ' ')
+    .trim();
   const latinWords = latin ? latin.split(/\s+/).filter(Boolean).length : 0;
   return (cjk?.length ?? 0) + latinWords;
 }
 
-function calcStreak(diaryDates: Set<string>, todayStr: string): { days: number; includestoday: boolean } {
+function calcStreak(
+  diaryDates: Set<string>,
+  todayStr: string,
+): { days: number; includestoday: boolean } {
   const todayHas = diaryDates.has(todayStr);
   const d = new Date(todayStr);
   if (!todayHas) d.setDate(d.getDate() - 1);
@@ -30,7 +35,10 @@ function calcStreak(diaryDates: Set<string>, todayStr: string): { days: number; 
   return { days, includestoday: todayHas };
 }
 
-function formatDisplayDate(dateStr: string, lang: string): { day: number; monthLabel: string; weekday: string } {
+function formatDisplayDate(
+  dateStr: string,
+  lang: string,
+): { day: number; monthLabel: string; weekday: string } {
   const parts = dateStr.split('-');
   const y = parseInt(parts[0], 10);
   const m = parseInt(parts[1], 10);
@@ -38,11 +46,40 @@ function formatDisplayDate(dateStr: string, lang: string): { day: number; monthL
   const date = new Date(y, m - 1, d);
   if (lang === 'zh') {
     const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
-    return { day: d, monthLabel: `${y}年${m}月`, weekday: weekdays[date.getDay()] };
+    return {
+      day: d,
+      monthLabel: `${y}年${m}月`,
+      weekday: weekdays[date.getDay()],
+    };
   }
-  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  return { day: d, monthLabel: `${monthNames[m - 1]} ${y}`, weekday: weekdays[date.getDay()] };
+  const monthNames = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  const weekdays = [
+    'Sunday',
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+  ];
+  return {
+    day: d,
+    monthLabel: `${monthNames[m - 1]} ${y}`,
+    weekday: weekdays[date.getDay()],
+  };
 }
 
 let diaryEditorSingleton: BlockNoteEditor | null = null;
@@ -53,8 +90,10 @@ function createDiaryEditor(): BlockNoteEditor {
   console.warn = (...args: unknown[]) => {
     const [firstArg] = args;
     if (
-      typeof firstArg === 'string'
-      && firstArg.includes('linkifyjs: already initialized - will not register custom scheme')
+      typeof firstArg === 'string' &&
+      firstArg.includes(
+        'linkifyjs: already initialized - will not register custom scheme',
+      )
     ) {
       return;
     }
@@ -79,12 +118,22 @@ export default function DiaryPanel() {
   const t = useT();
   const { theme } = useTheme();
   const {
-    selectedDate, content, diaryDates, loading, autoSaveStatus,
-    setSelectedDate, loadDiary, setContent, save, loadDiaryDates,
+    selectedDate,
+    content,
+    diaryDates,
+    loading,
+    autoSaveStatus,
+    setSelectedDate,
+    loadDiary,
+    setContent,
+    save,
+    loadDiaryDates,
   } = useDiaryStore();
 
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const savedIndicatorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savedIndicatorTimer = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
   const editorOrigin = useRef(false);
   const editor = getDiaryEditor();
 
@@ -100,7 +149,10 @@ export default function DiaryPanel() {
   }, [selectedDate]);
 
   useEffect(() => {
-    if (editorOrigin.current) { editorOrigin.current = false; return; }
+    if (editorOrigin.current) {
+      editorOrigin.current = false;
+      return;
+    }
     async function syncBlocks() {
       const blocks = await editor.tryParseMarkdownToBlocks(content);
       editor.replaceBlocks(editor.document, blocks);
@@ -126,24 +178,40 @@ export default function DiaryPanel() {
   useEffect(() => {
     return () => {
       if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-      if (savedIndicatorTimer.current) clearTimeout(savedIndicatorTimer.current);
+      if (savedIndicatorTimer.current)
+        clearTimeout(savedIndicatorTimer.current);
     };
   }, []);
 
-  const handleSelectDate = useCallback((date: string) => {
-    // Clear pending auto-save timers before switching dates
-    if (autoSaveTimer.current) { clearTimeout(autoSaveTimer.current); autoSaveTimer.current = null; }
-    if (savedIndicatorTimer.current) { clearTimeout(savedIndicatorTimer.current); savedIndicatorTimer.current = null; }
-    setSelectedDate(date);
-  }, [setSelectedDate]);
+  const handleSelectDate = useCallback(
+    (date: string) => {
+      // Clear pending auto-save timers before switching dates
+      if (autoSaveTimer.current) {
+        clearTimeout(autoSaveTimer.current);
+        autoSaveTimer.current = null;
+      }
+      if (savedIndicatorTimer.current) {
+        clearTimeout(savedIndicatorTimer.current);
+        savedIndicatorTimer.current = null;
+      }
+      setSelectedDate(date);
+    },
+    [setSelectedDate],
+  );
 
-  const handleMonthChange = useCallback((year: number, month: number) => {
-    loadDiaryDates(year, month);
-  }, [loadDiaryDates]);
+  const handleMonthChange = useCallback(
+    (year: number, month: number) => {
+      loadDiaryDates(year, month);
+    },
+    [loadDiaryDates],
+  );
 
-  const resolvedTheme = theme === 'system'
-    ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
-    : theme;
+  const resolvedTheme =
+    theme === 'system'
+      ? window.matchMedia('(prefers-color-scheme: dark)').matches
+        ? 'dark'
+        : 'light'
+      : theme;
 
   const lang = t('diary.weekdays').startsWith('日') ? 'zh' : 'en';
 
@@ -154,8 +222,14 @@ export default function DiaryPanel() {
 
   const wordCount = useMemo(() => countWords(content), [content]);
   const monthEntries = diaryDates.size;
-  const streak = useMemo(() => calcStreak(diaryDates, todayStr), [diaryDates, todayStr]);
-  const displayDate = useMemo(() => formatDisplayDate(selectedDate, lang), [selectedDate, lang]);
+  const streak = useMemo(
+    () => calcStreak(diaryDates, todayStr),
+    [diaryDates, todayStr],
+  );
+  const displayDate = useMemo(
+    () => formatDisplayDate(selectedDate, lang),
+    [selectedDate, lang],
+  );
 
   return (
     <div className="flex h-full flex-col bg-transparent">
@@ -164,10 +238,16 @@ export default function DiaryPanel() {
           <div className="flex items-stretch gap-6">
             <div className="flex-1 min-w-0 flex items-center justify-center gap-8">
               <div className="flex items-center gap-1 select-none">
-                <span className="text-6xl font-black leading-none tabular-nums text-foreground">{displayDate.day}</span>
+                <span className="text-6xl font-black leading-none tabular-nums text-foreground">
+                  {displayDate.day}
+                </span>
                 <div className="flex flex-col pl-1 gap-0.5">
-                  <span className="text-sm font-semibold text-foreground/80 tracking-wide">{displayDate.monthLabel}</span>
-                  <span className="text-xs text-muted-foreground/70">{displayDate.weekday}</span>
+                  <span className="text-sm font-semibold text-foreground/80 tracking-wide">
+                    {displayDate.monthLabel}
+                  </span>
+                  <span className="text-xs text-muted-foreground/70">
+                    {displayDate.weekday}
+                  </span>
                   {autoSaveStatus === 'saving' && (
                     <span className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
                       <Loader2 className="size-2.5 animate-spin" />
@@ -175,30 +255,48 @@ export default function DiaryPanel() {
                     </span>
                   )}
                   {autoSaveStatus === 'saved' && (
-                    <span className="mt-0.5 text-[11px] text-emerald-500/70">{t('diary.saved')}</span>
+                    <span className="mt-0.5 text-[11px] text-emerald-500/70">
+                      {t('diary.saved')}
+                    </span>
                   )}
                 </div>
               </div>
 
               <div className="flex gap-2.5">
                 <div className="flex min-w-[88px] flex-col items-center gap-1 rounded-[20px] border border-orange-500/12 bg-orange-500/6 px-4 py-3">
-                  <Flame className={`size-5 ${streak.days > 0 ? 'text-orange-500' : 'text-muted-foreground/25'}`} />
-                  <span className={`text-lg font-bold leading-none ${streak.days > 0 ? 'text-orange-600 dark:text-orange-400' : 'text-muted-foreground/40'}`}>
+                  <Flame
+                    className={`size-5 ${streak.days > 0 ? 'text-orange-500' : 'text-muted-foreground/25'}`}
+                  />
+                  <span
+                    className={`text-lg font-bold leading-none ${streak.days > 0 ? 'text-orange-600 dark:text-orange-400' : 'text-muted-foreground/40'}`}
+                  >
                     {streak.days}
                   </span>
                   <span className="text-[10px] text-muted-foreground/60">
-                    {streak.days > 0 ? t('diary.streak').replace('{n} ', '') : t('diary.streakBroken')}
+                    {streak.days > 0
+                      ? t('diary.streak').replace('{n} ', '')
+                      : t('diary.streakBroken')}
                   </span>
                 </div>
                 <div className="flex min-w-[88px] flex-col items-center gap-1 rounded-[20px] border border-primary/10 bg-primary/5 px-4 py-3">
                   <FileText className="size-5 text-primary/50" />
-                  <span className="text-lg font-bold leading-none text-primary/80">{monthEntries}</span>
-                  <span className="text-[10px] text-muted-foreground/60">{t('diary.monthEntries').replace('{n} ', '').replace('{n}', '')}</span>
+                  <span className="text-lg font-bold leading-none text-primary/80">
+                    {monthEntries}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground/60">
+                    {t('diary.monthEntries')
+                      .replace('{n} ', '')
+                      .replace('{n}', '')}
+                  </span>
                 </div>
                 <div className="flex min-w-[88px] flex-col items-center gap-1 rounded-[20px] border border-emerald-500/12 bg-emerald-500/6 px-4 py-3">
                   <PenLine className="size-5 text-emerald-500/50" />
-                  <span className="text-lg font-bold leading-none text-emerald-600 dark:text-emerald-400">{wordCount}</span>
-                  <span className="text-[10px] text-muted-foreground/60">{t('diary.wordCount')}</span>
+                  <span className="text-lg font-bold leading-none text-emerald-600 dark:text-emerald-400">
+                    {wordCount}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground/60">
+                    {t('diary.wordCount')}
+                  </span>
                 </div>
               </div>
             </div>

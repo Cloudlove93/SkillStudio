@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react';
 
-export default function CodeBlock({ code, language }: { code: string; language: string }) {
+export default function CodeBlock({
+  code,
+  language,
+}: {
+  code: string;
+  language: string;
+}) {
   const [html, setHtml] = useState<string>('');
 
   useEffect(() => {
@@ -21,7 +27,9 @@ export default function CodeBlock({ code, language }: { code: string; language: 
       }
     }
     highlight();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [code, language]);
 
   if (!html) {

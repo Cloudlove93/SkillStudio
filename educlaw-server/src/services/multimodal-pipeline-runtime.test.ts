@@ -43,9 +43,8 @@ describe('multimodal pipeline runtime composition', () => {
   });
 
   it('wires production model adapters into the session service, orchestrator, and runner', async () => {
-    const { createProductionMultimodalPipelineRuntime } = await import(
-      './multimodal-pipeline-runtime'
-    );
+    const { createProductionMultimodalPipelineRuntime } =
+      await import('./multimodal-pipeline-runtime');
 
     const runtime = createProductionMultimodalPipelineRuntime({
       pollIntervalMs: 12_000,
@@ -78,9 +77,8 @@ describe('multimodal pipeline runtime composition', () => {
   });
 
   it('does not construct or start the runtime when disabled, and starts exactly once when enabled', async () => {
-    const { startProductionMultimodalPipelineRuntimeIfEnabled } = await import(
-      './multimodal-pipeline-runtime'
-    );
+    const { startProductionMultimodalPipelineRuntimeIfEnabled } =
+      await import('./multimodal-pipeline-runtime');
     const start = vi.fn();
     const createRuntime = vi.fn(() => ({
       runner: { start },

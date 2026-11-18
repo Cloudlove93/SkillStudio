@@ -111,7 +111,11 @@ export function SkillRenameDialog({ skill, onCancel, onRename }: Props) {
           >
             {busy ? (
               <>
-                <LoaderCircle size={14} className="is-spinning" aria-hidden="true" />
+                <LoaderCircle
+                  size={14}
+                  className="is-spinning"
+                  aria-hidden="true"
+                />
                 正在保存…
               </>
             ) : (

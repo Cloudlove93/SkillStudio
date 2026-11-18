@@ -21,9 +21,14 @@ export default function HomeChat({ sessionId }: HomeChatProps) {
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const updateSessionTitle = useHomeChatStore((s) => s.updateSessionTitle);
-  const consumePendingMessage = useHomeChatStore((s) => s.consumePendingMessage);
-  const currentSessionModel = useHomeChatStore((s) => s.sessions.find((session) => session.id === sessionId)?.model ?? '');
-  const { models, selectedModel, setSelectedModel, hasModels } = useHomeChatModels();
+  const consumePendingMessage = useHomeChatStore(
+    (s) => s.consumePendingMessage,
+  );
+  const currentSessionModel = useHomeChatStore(
+    (s) => s.sessions.find((session) => session.id === sessionId)?.model ?? '',
+  );
+  const { models, selectedModel, setSelectedModel, hasModels } =
+    useHomeChatModels();
   const messagesRef = useRef<OpenAgentMessage[]>([]);
   const {
     messages,
@@ -37,22 +42,37 @@ export default function HomeChat({ sessionId }: HomeChatProps) {
   const streaming = status === 'streaming';
   const submitting = status === 'submitted';
 
-  const { diaryStatus, handleSaveToDiary, resetDiaryStatus } = useDiaryAction(sessionId, getCurrentMessages);
-  const { deepStudyOpen, setDeepStudyOpen, deepStudyLoading, deepStudyProfiles, deepStudyChatText, handleDeepStudy } = useDeepStudyAction(getCurrentMessages);
+  const { diaryStatus, handleSaveToDiary, resetDiaryStatus } = useDiaryAction(
+    sessionId,
+    getCurrentMessages,
+  );
+  const {
+    deepStudyOpen,
+    setDeepStudyOpen,
+    deepStudyLoading,
+    deepStudyProfiles,
+    deepStudyChatText,
+    handleDeepStudy,
+  } = useDeepStudyAction(getCurrentMessages);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, status]);
 
   useEffect(() => {
-    if (currentSessionModel && models.some((model) => model.name === currentSessionModel)) {
+    if (
+      currentSessionModel &&
+      models.some((model) => model.name === currentSessionModel)
+    ) {
       setSelectedModel(currentSessionModel);
     }
   }, [currentSessionModel, models, setSelectedModel]);
 
   const refreshSuggestions = useCallback(async () => {
     const currentMessages = getCurrentMessages()
-      .filter((message) => message.role === 'user' || message.role === 'assistant')
+      .filter(
+        (message) => message.role === 'user' || message.role === 'assistant',
+      )
       .map((message) => ({
         role: message.role,
         content: message.parts
@@ -75,7 +95,7 @@ export default function HomeChat({ sessionId }: HomeChatProps) {
         body: JSON.stringify({ messages: currentMessages, sessionId }),
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const nextSuggestions = await response.json() as string[];
+      const nextSuggestions = (await response.json()) as string[];
       setSuggestions(Array.isArray(nextSuggestions) ? nextSuggestions : []);
     } catch {
       setSuggestions([]);
@@ -84,28 +104,32 @@ export default function HomeChat({ sessionId }: HomeChatProps) {
     }
   }, [getCurrentMessages, sessionId]);
 
-  const sendMessage = useCallback(async (text: string) => {
-    if (!text.trim() || streaming || submitting || !hasModels || !sessionId) return;
+  const sendMessage = useCallback(
+    async (text: string) => {
+      if (!text.trim() || streaming || submitting || !hasModels || !sessionId)
+        return;
 
-    setInput('');
-    setSuggestions([]);
+      setInput('');
+      setSuggestions([]);
 
-    if (messagesRef.current.length === 0) {
-      updateSessionTitle(sessionId, text.replace(/\n/g, ' ').slice(0, 50));
-    }
+      if (messagesRef.current.length === 0) {
+        updateSessionTitle(sessionId, text.replace(/\n/g, ' ').slice(0, 50));
+      }
 
-    await sendTextMessage(text, selectedModel || undefined);
-    await refreshSuggestions();
-  }, [
-    streaming,
-    submitting,
-    hasModels,
-    sessionId,
-    updateSessionTitle,
-    sendTextMessage,
-    selectedModel,
-    refreshSuggestions,
-  ]);
+      await sendTextMessage(text, selectedModel || undefined);
+      await refreshSuggestions();
+    },
+    [
+      streaming,
+      submitting,
+      hasModels,
+      sessionId,
+      updateSessionTitle,
+      sendTextMessage,
+      selectedModel,
+      refreshSuggestions,
+    ],
+  );
 
   useHomeChatSessionLifecycle({
     sessionId,

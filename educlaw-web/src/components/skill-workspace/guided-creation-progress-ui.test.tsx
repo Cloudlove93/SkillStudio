@@ -12,8 +12,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GuidedSkillCreationPanel } from './GuidedSkillCreationPanel';
 import { SkillInspectorContent } from './SkillInspectorContent';
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
-  true;
+(
+  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 const draftFields: GuidedDraftField[] = [
   'roles',
@@ -110,7 +111,11 @@ function panelProps(currentSession: GuidedCreationSessionDetail) {
 
 function inspectorProps(currentSession: GuidedCreationSessionDetail) {
   return {
-    descriptor: { owner: 'guided', view: 'summary', title: '需求摘要' } as const,
+    descriptor: {
+      owner: 'guided',
+      view: 'summary',
+      title: '需求摘要',
+    } as const,
     session: currentSession,
     activeView: 'create' as const,
     versions: [],
@@ -150,8 +155,12 @@ describe('guided creation progress UI', () => {
       );
     });
 
-    const conversationProgress = container.querySelector('[aria-label="Agent 创建进度"]');
-    const requirementProgress = container.querySelector('.skill-context-progress');
+    const conversationProgress = container.querySelector(
+      '[aria-label="Agent 创建进度"]',
+    );
+    const requirementProgress = container.querySelector(
+      '.skill-context-progress',
+    );
 
     expect(conversationProgress?.textContent).toContain('已完成 0/5');
     expect(conversationProgress?.textContent).toContain(
@@ -198,12 +207,14 @@ describe('guided creation progress UI', () => {
     });
 
     await act(async () => {
-      root.render(<SkillInspectorContent {...inspectorProps(currentSession)} />);
+      root.render(
+        <SkillInspectorContent {...inspectorProps(currentSession)} />,
+      );
     });
 
-    expect(container.querySelector('.skill-context-progress')?.textContent).toContain(
-      '已完成 0/5',
-    );
+    expect(
+      container.querySelector('.skill-context-progress')?.textContent,
+    ).toContain('已完成 0/5');
     expect(container.textContent).toContain('已确认');
     expect(container.textContent).toContain('需要澄清');
     expect(container.textContent).toContain('AI 已整理，待确认');
@@ -256,9 +267,9 @@ describe('guided creation progress UI', () => {
     await act(async () => {
       root.render(<SkillInspectorContent {...inspectorProps(v1Session)} />);
     });
-    expect(container.querySelector('.skill-context-progress')?.textContent).toContain(
-      '1/11',
-    );
+    expect(
+      container.querySelector('.skill-context-progress')?.textContent,
+    ).toContain('1/11');
 
     const v2Session = session({
       flow_version: 2,
@@ -270,11 +281,11 @@ describe('guided creation progress UI', () => {
     await act(async () => {
       root.render(<GuidedSkillCreationPanel {...panelProps(v2Session)} />);
     });
-    expect(container.querySelector('[aria-label="Agent 创建进度"]')?.textContent).toContain(
-      '已完成 2/6',
-    );
-    expect(container.querySelector('[aria-label="Agent 创建进度"]')?.textContent).toContain(
-      '当前：说清理想结果',
-    );
+    expect(
+      container.querySelector('[aria-label="Agent 创建进度"]')?.textContent,
+    ).toContain('已完成 2/6');
+    expect(
+      container.querySelector('[aria-label="Agent 创建进度"]')?.textContent,
+    ).toContain('当前：说清理想结果');
   });
 });

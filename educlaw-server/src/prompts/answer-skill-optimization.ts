@@ -336,8 +336,7 @@ export function buildAnswerSkillAlternativeRegenerationPrompt(
     ].join('\n'),
     userPrompt: JSON.stringify(
       {
-        task:
-          'Generate another draft approach from the base Skill while preserving all confirmed requirements.',
+        task: 'Generate another draft approach from the base Skill while preserving all confirmed requirements.',
         outputShape: REFINEMENT_OUTPUT_SHAPES[0],
         input: {
           question: input.question,

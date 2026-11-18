@@ -64,7 +64,10 @@ export function AgentRepositoryPanel({
     return (
       <div className="agent-repository-state is-error" role="alert">
         <span>{error}</span>
-        <button type="button" onClick={() => setRetry((current) => current + 1)}>
+        <button
+          type="button"
+          onClick={() => setRetry((current) => current + 1)}
+        >
           重试
         </button>
       </div>

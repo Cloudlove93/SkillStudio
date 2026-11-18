@@ -34,9 +34,15 @@ interface Dependencies {
   sessionService: SessionModelService;
 }
 
-const VISUAL_CUE = /(看这里|看图|观察|图表|曲线|坐标|板书|实验|示意图|受力图|电路图|光路图)/u;
+const VISUAL_CUE =
+  /(看这里|看图|观察|图表|曲线|坐标|板书|实验|示意图|受力图|电路图|光路图)/u;
 
-function fail(code: string, message: string, statusCode: number, retryable = false): never {
+function fail(
+  code: string,
+  message: string,
+  statusCode: number,
+  retryable = false,
+): never {
   throw new GuidedCreationError(code, message, statusCode, retryable);
 }
 
@@ -84,7 +90,8 @@ function frameJobInput(input: {
 export function createMultimodalDistillationPipelineOrchestrator(
   dependencies: Dependencies,
 ) {
-  const store = dependencies.store ?? createMultimodalDistillationPipelineStore();
+  const store =
+    dependencies.store ?? createMultimodalDistillationPipelineStore();
   const evidence = dependencies.mediaEvidenceService;
   const sessionService = dependencies.sessionService;
 
@@ -336,9 +343,10 @@ export function createMultimodalDistillationPipelineOrchestrator(
     ) {
       fail('MULTIMODAL_PIPELINE_FAILED', 'Adler 生成前置证据损坏', 500);
     }
-    const hasFrameEvidence = snapshot.mediaState.evidenceTimeline.evidenceItems.some(
-      (item) => item.kind === 'frame',
-    );
+    const hasFrameEvidence =
+      snapshot.mediaState.evidenceTimeline.evidenceItems.some(
+        (item) => item.kind === 'frame',
+      );
     const repairAlreadyAttempted = snapshot.mediaState.degradations.some(
       (item) => item.code === 'FRAME_EVIDENCE_REPAIR_ATTEMPTED',
     );

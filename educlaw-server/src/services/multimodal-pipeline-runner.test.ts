@@ -3,17 +3,62 @@ import { GuidedCreationError } from './guided-creation-service.js';
 import { createMultimodalPipelineRunner } from './multimodal-pipeline-runner';
 
 describe('multimodal pipeline runner', () => {
-  it('stops claiming the rest of a scanned batch and waits for the accepted session',async()=>{
-    let release!:()=>void;const pending=new Promise<void>(r=>{release=r;});let entered!:()=>void;const started=new Promise<void>(r=>{entered=r;});const seen:string[]=[];
-    const runner=createMultimodalPipelineRunner({store:{scanRunnableSessions:async()=>['1','2'].map(sessionId=>({sessionId,authUserId:'owner',mediaStage:'building_skills'}))},orchestrator:{runCandidatePipeline:vi.fn(),runSkillBuildPipeline:async({sessionId})=>{seen.push(sessionId);entered();await pending;return {}; }},logger:{info:vi.fn(),warn:vi.fn(),error:vi.fn()},pollIntervalMs:1000,batchLimit:2,concurrency:1});
-    const work=runner.runOnce();await started;runner.stop();let idle=false;const wait=runner.waitForIdle().then(()=>{idle=true;});await Promise.resolve();expect(idle).toBe(false);
-    release();await work;await wait;await runner.runOnce();expect(seen).toEqual(['1']);
+  it('stops claiming the rest of a scanned batch and waits for the accepted session', async () => {
+    let release!: () => void;
+    const pending = new Promise<void>((r) => {
+      release = r;
+    });
+    let entered!: () => void;
+    const started = new Promise<void>((r) => {
+      entered = r;
+    });
+    const seen: string[] = [];
+    const runner = createMultimodalPipelineRunner({
+      store: {
+        scanRunnableSessions: async () =>
+          ['1', '2'].map((sessionId) => ({
+            sessionId,
+            authUserId: 'owner',
+            mediaStage: 'building_skills',
+          })),
+      },
+      orchestrator: {
+        runCandidatePipeline: vi.fn(),
+        runSkillBuildPipeline: async ({ sessionId }) => {
+          seen.push(sessionId);
+          entered();
+          await pending;
+          return {};
+        },
+      },
+      logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+      pollIntervalMs: 1000,
+      batchLimit: 2,
+      concurrency: 1,
+    });
+    const work = runner.runOnce();
+    await started;
+    runner.stop();
+    let idle = false;
+    const wait = runner.waitForIdle().then(() => {
+      idle = true;
+    });
+    await Promise.resolve();
+    expect(idle).toBe(false);
+    release();
+    await work;
+    await wait;
+    await runner.runOnce();
+    expect(seen).toEqual(['1']);
   });
   it.each([
     ['LLM request failed: 401', 1],
     ['LLM request failed: 404', 1],
     ['LLM request failed: 503', 3],
-    ['LLM output was truncated because the output token limit was exhausted', 1],
+    [
+      'LLM output was truncated because the output token limit was exhausted',
+      1,
+    ],
   ])(
     'stops bounded attempts for %s and persists a safe failure',
     async (message, limit) => {
@@ -68,7 +113,9 @@ describe('multimodal pipeline runner', () => {
         }),
       );
       if (message.includes('truncated')) {
-        expect(persistPipelineFailure.mock.calls[0]![0].error.message).toContain('模型输出被截断');
+        expect(
+          persistPipelineFailure.mock.calls[0]![0].error.message,
+        ).toContain('模型输出被截断');
       }
     },
   );
@@ -111,11 +158,13 @@ describe('multimodal pipeline runner', () => {
     const runWithPipelineLease = vi.fn().mockResolvedValue({ acquired: false });
     const runner = createMultimodalPipelineRunner({
       store: {
-        scanRunnableSessions: vi.fn().mockResolvedValue([{
-          sessionId: '101',
-          authUserId: 'user-1',
-          mediaStage: 'extracting_candidates',
-        }]),
+        scanRunnableSessions: vi.fn().mockResolvedValue([
+          {
+            sessionId: '101',
+            authUserId: 'user-1',
+            mediaStage: 'extracting_candidates',
+          },
+        ]),
         runWithPipelineLease,
       },
       orchestrator: {
@@ -292,11 +341,13 @@ describe('multimodal pipeline runner', () => {
     };
     const runner = createMultimodalPipelineRunner({
       store: {
-        scanRunnableSessions: vi.fn().mockResolvedValue([{
-          sessionId: '204',
-          authUserId: 'user-4',
-          mediaStage: 'building_evidence',
-        }]),
+        scanRunnableSessions: vi.fn().mockResolvedValue([
+          {
+            sessionId: '204',
+            authUserId: 'user-4',
+            mediaStage: 'building_evidence',
+          },
+        ]),
       },
       orchestrator: {
         runDistillationPipeline: vi.fn().mockResolvedValue({
@@ -417,9 +468,16 @@ describe('multimodal pipeline runner', () => {
         ),
       )
       .mockResolvedValueOnce(undefined);
-    const runSkillBuildPipeline = vi.fn().mockRejectedValueOnce(
-      new GuidedCreationError('INVALID_MEDIA_STAGE', 'stale-stage', 409, false),
-    );
+    const runSkillBuildPipeline = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new GuidedCreationError(
+          'INVALID_MEDIA_STAGE',
+          'stale-stage',
+          409,
+          false,
+        ),
+      );
     const logger = {
       info: vi.fn(),
       warn: vi.fn(),
@@ -487,7 +545,9 @@ describe('multimodal pipeline runner', () => {
         scanRunnableSessions,
       },
       orchestrator: {
-        runCandidatePipeline: vi.fn().mockRejectedValue(new Error('secret transcript text')),
+        runCandidatePipeline: vi
+          .fn()
+          .mockRejectedValue(new Error('secret transcript text')),
         runSkillBuildPipeline: vi.fn(),
       },
       logger,
@@ -529,14 +589,16 @@ describe('multimodal pipeline runner', () => {
         ]),
       },
       orchestrator: {
-        runDistillationPipeline: vi.fn().mockRejectedValue(
-          new GuidedCreationError(
-            'MULTIMODAL_PIPELINE_FAILED',
-            'secret transcript text',
-            500,
-            true,
+        runDistillationPipeline: vi
+          .fn()
+          .mockRejectedValue(
+            new GuidedCreationError(
+              'MULTIMODAL_PIPELINE_FAILED',
+              'secret transcript text',
+              500,
+              true,
+            ),
           ),
-        ),
         runCandidatePipeline: vi.fn(),
         runSkillBuildPipeline: vi.fn(),
       },
@@ -567,9 +629,16 @@ describe('multimodal pipeline runner', () => {
 
   it('backs off a failed session instead of retrying it on every poll', async () => {
     let now = 1_000;
-    const runDistillationPipeline = vi.fn().mockRejectedValue(
-      new GuidedCreationError('MULTIMODAL_PIPELINE_FAILED', 'transient failure', 500, true),
-    );
+    const runDistillationPipeline = vi
+      .fn()
+      .mockRejectedValue(
+        new GuidedCreationError(
+          'MULTIMODAL_PIPELINE_FAILED',
+          'transient failure',
+          500,
+          true,
+        ),
+      );
     const runner = createMultimodalPipelineRunner({
       store: {
         scanRunnableSessions: vi.fn().mockResolvedValue([

@@ -60,11 +60,11 @@ export function useEduclawAgentChat({
     transport,
     onFinish: async ({ messages, isAbort, isDisconnect, isError }) => {
       if (
-        isAbort
-        || isDisconnect
-        || isError
-        || !optionsRef.current.suggestionsApi
-        || messages.length === 0
+        isAbort ||
+        isDisconnect ||
+        isError ||
+        !optionsRef.current.suggestionsApi ||
+        messages.length === 0
       ) {
         return;
       }

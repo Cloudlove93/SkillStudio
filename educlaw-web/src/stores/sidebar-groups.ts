@@ -15,16 +15,34 @@ interface SidebarGroupStore {
   loading: boolean;
   fetchGroups: () => Promise<void>;
   createGroup: (name: string, icon: string) => Promise<void>;
-  updateGroup: (id: string, updates: { name?: string; icon?: string }) => Promise<void>;
+  updateGroup: (
+    id: string,
+    updates: { name?: string; icon?: string },
+  ) => Promise<void>;
   deleteGroup: (id: string) => Promise<void>;
-  addItem: (groupId: string, itemId: string, itemType: 'agent' | 'chat') => Promise<void>;
-  removeItem: (groupId: string, itemId: string, itemType: 'agent' | 'chat') => Promise<void>;
-  moveItem: (itemId: string, itemType: 'agent' | 'chat', targetGroupId: string | null) => Promise<void>;
+  addItem: (
+    groupId: string,
+    itemId: string,
+    itemType: 'agent' | 'chat',
+  ) => Promise<void>;
+  removeItem: (
+    groupId: string,
+    itemId: string,
+    itemType: 'agent' | 'chat',
+  ) => Promise<void>;
+  moveItem: (
+    itemId: string,
+    itemType: 'agent' | 'chat',
+    targetGroupId: string | null,
+  ) => Promise<void>;
   toggleCollapsed: (groupId: string) => void;
   getItemGroupId: (itemId: string, itemType: 'agent' | 'chat') => string | null;
 }
 
-function mapGroup(g: api.SidebarGroupResponse, collapsed: boolean): SidebarGroup {
+function mapGroup(
+  g: api.SidebarGroupResponse,
+  collapsed: boolean,
+): SidebarGroup {
   return {
     id: g.id,
     name: g.name,
@@ -63,60 +81,87 @@ export const useSidebarGroupStore = create<SidebarGroupStore>((set, get) => ({
 
   async updateGroup(id, updates) {
     set((s) => ({
-      groups: s.groups.map((g) =>
-        g.id === id ? { ...g, ...updates } : g
-      ),
+      groups: s.groups.map((g) => (g.id === id ? { ...g, ...updates } : g)),
     }));
-    try { await api.updateSidebarGroup(id, updates); } catch { /* best effort */ }
+    try {
+      await api.updateSidebarGroup(id, updates);
+    } catch {
+      /* best effort */
+    }
   },
 
   async deleteGroup(id) {
     set((s) => ({ groups: s.groups.filter((g) => g.id !== id) }));
-    try { await api.deleteSidebarGroup(id); } catch { /* best effort */ }
+    try {
+      await api.deleteSidebarGroup(id);
+    } catch {
+      /* best effort */
+    }
   },
 
   async addItem(groupId, itemId, itemType) {
     set((s) => ({
       groups: s.groups.map((g) => {
         // Remove item from other groups
-        const filtered = g.items.filter((i) => !(i.itemId === itemId && i.itemType === itemType));
+        const filtered = g.items.filter(
+          (i) => !(i.itemId === itemId && i.itemType === itemType),
+        );
         if (g.id === groupId) {
           return { ...g, items: [...filtered, { itemId, itemType }] };
         }
         return { ...g, items: filtered };
       }),
     }));
-    try { await api.addGroupItem(groupId, itemId, itemType); } catch { /* best effort */ }
+    try {
+      await api.addGroupItem(groupId, itemId, itemType);
+    } catch {
+      /* best effort */
+    }
   },
 
   async removeItem(groupId, itemId, itemType) {
     set((s) => ({
       groups: s.groups.map((g) =>
         g.id === groupId
-          ? { ...g, items: g.items.filter((i) => !(i.itemId === itemId && i.itemType === itemType)) }
-          : g
+          ? {
+              ...g,
+              items: g.items.filter(
+                (i) => !(i.itemId === itemId && i.itemType === itemType),
+              ),
+            }
+          : g,
       ),
     }));
-    try { await api.removeGroupItem(groupId, itemId, itemType); } catch { /* best effort */ }
+    try {
+      await api.removeGroupItem(groupId, itemId, itemType);
+    } catch {
+      /* best effort */
+    }
   },
 
   async moveItem(itemId, itemType, targetGroupId) {
     set((s) => ({
       groups: s.groups.map((g) => {
-        const filtered = g.items.filter((i) => !(i.itemId === itemId && i.itemType === itemType));
+        const filtered = g.items.filter(
+          (i) => !(i.itemId === itemId && i.itemType === itemType),
+        );
         if (targetGroupId && g.id === targetGroupId) {
           return { ...g, items: [...filtered, { itemId, itemType }] };
         }
         return { ...g, items: filtered };
       }),
     }));
-    try { await api.moveGroupItemApi(itemId, itemType, targetGroupId); } catch { /* best effort */ }
+    try {
+      await api.moveGroupItemApi(itemId, itemType, targetGroupId);
+    } catch {
+      /* best effort */
+    }
   },
 
   toggleCollapsed(groupId) {
     set((s) => ({
       groups: s.groups.map((g) =>
-        g.id === groupId ? { ...g, collapsed: !g.collapsed } : g
+        g.id === groupId ? { ...g, collapsed: !g.collapsed } : g,
       ),
     }));
   },

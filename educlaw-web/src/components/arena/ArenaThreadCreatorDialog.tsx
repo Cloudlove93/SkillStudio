@@ -71,10 +71,12 @@ export function ArenaThreadCreatorDialog({
     setPending(false);
     if (packageSkills.length > 0) {
       const validLeftUid = initialLeftSkillUid
-        ? packageSkills.find((s) => s.skillUid === initialLeftSkillUid)?.skillUid
+        ? packageSkills.find((s) => s.skillUid === initialLeftSkillUid)
+            ?.skillUid
         : undefined;
       const validRightUid = initialRightSkillUid
-        ? packageSkills.find((s) => s.skillUid === initialRightSkillUid)?.skillUid
+        ? packageSkills.find((s) => s.skillUid === initialRightSkillUid)
+            ?.skillUid
         : undefined;
       const first = validLeftUid || packageSkills[0].skillUid;
       const second =
@@ -95,14 +97,9 @@ export function ArenaThreadCreatorDialog({
   }, [open, packageSkills, initialLeftSkillUid, initialRightSkillUid]);
 
   const loadVersions = useCallback(
-    async (
-      side: Side,
-      skillRecordId: string,
-      preferredVersionId?: string,
-    ) => {
+    async (side: Side, skillRecordId: string, preferredVersionId?: string) => {
       if (!token || !packageId || !skillRecordId) return;
-      const requestRef =
-        side === 'left' ? leftRequestIdRef : rightRequestIdRef;
+      const requestRef = side === 'left' ? leftRequestIdRef : rightRequestIdRef;
       const requestId = requestRef.current + 1;
       requestRef.current = requestId;
       setLoading((prev) => ({ ...prev, [side]: true }));
@@ -199,7 +196,14 @@ export function ArenaThreadCreatorDialog({
       const alt = rightVersions.find((v) => v.id !== leftVersionId)?.id;
       if (alt) setRightVersionId(alt);
     }
-  }, [open, leftSkillId, rightSkillId, leftVersionId, rightVersionId, rightVersions]);
+  }, [
+    open,
+    leftSkillId,
+    rightSkillId,
+    leftVersionId,
+    rightVersionId,
+    rightVersions,
+  ]);
 
   const canSubmit =
     !pending &&
@@ -209,10 +213,7 @@ export function ArenaThreadCreatorDialog({
         Boolean(rightSkillId) &&
         Boolean(leftVersionId) &&
         Boolean(rightVersionId) &&
-        !(
-          leftSkillId === rightSkillId &&
-          leftVersionId === rightVersionId
-        )));
+        !(leftSkillId === rightSkillId && leftVersionId === rightVersionId)));
 
   const handleCreate = async () => {
     if (!token || !packageId || !canSubmit) return;
@@ -284,10 +285,10 @@ export function ArenaThreadCreatorDialog({
 
         {/* 模式切换 */}
         <div className="inline-flex w-fit rounded-[12px] border border-border/70 bg-muted/40 p-0.5">
-          {([
+          {[
             { key: 'package_arena' as const, label: '标准 Arena' },
             { key: 'skill_arena' as const, label: 'Skill Arena' },
-          ]).map((kind) => (
+          ].map((kind) => (
             <button
               key={kind.key}
               onClick={() => setMode(kind.key)}
@@ -310,7 +311,9 @@ export function ArenaThreadCreatorDialog({
                 <Swords className="size-4" />
               </div>
               <div>
-                <div className="text-sm font-medium">基线模型 vs 当前智能体</div>
+                <div className="text-sm font-medium">
+                  基线模型 vs 当前智能体
+                </div>
                 <div className="mt-1 text-xs text-muted-foreground leading-5">
                   使用智能体的最新快照进行对比，无需额外配置。
                 </div>

@@ -50,9 +50,27 @@ describe('multimodal draft Arena', () => {
       .mockResolvedValueOnce('baseline-3')
       .mockResolvedValueOnce('enhanced-3');
     const judges = [
-      { baselineScore: 2, enhancedScore: 4, safetyPassed: true, groundedPassed: true, reason: '更可执行' },
-      { baselineScore: 3, enhancedScore: 4, safetyPassed: true, groundedPassed: true, reason: '边界清晰' },
-      { baselineScore: 4, enhancedScore: 2, safetyPassed: true, groundedPassed: true, reason: '第三项较弱' },
+      {
+        baselineScore: 2,
+        enhancedScore: 4,
+        safetyPassed: true,
+        groundedPassed: true,
+        reason: '更可执行',
+      },
+      {
+        baselineScore: 3,
+        enhancedScore: 4,
+        safetyPassed: true,
+        groundedPassed: true,
+        reason: '边界清晰',
+      },
+      {
+        baselineScore: 4,
+        enhancedScore: 2,
+        safetyPassed: true,
+        groundedPassed: true,
+        reason: '第三项较弱',
+      },
     ];
     const generateJson = vi.fn().mockImplementation(async () => judges.shift());
 
@@ -68,7 +86,10 @@ describe('multimodal draft Arena', () => {
 
     expect(result.configVersion).toBe(MULTIMODAL_ARENA_CONFIG_VERSION);
     expect(result.candidateRevisionNo).toBe(17);
-    expect(result.models).toEqual({ baseline: 'baseline-fixed', enhanced: 'enhanced-fixed' });
+    expect(result.models).toEqual({
+      baseline: 'baseline-fixed',
+      enhanced: 'enhanced-fixed',
+    });
     expect(result.cases).toHaveLength(3);
     expect(result.cases.map((item) => item.caseId)).toEqual([
       'novel-scenario-transfer',
@@ -77,7 +98,9 @@ describe('multimodal draft Arena', () => {
     ]);
     expect(result.passed).toBe(true);
     expect(result.passedCaseCount).toBe(2);
-    expect(result.snapshotHash).toBe(computeMultimodalArenaSnapshotHash(snapshot));
+    expect(result.snapshotHash).toBe(
+      computeMultimodalArenaSnapshotHash(snapshot),
+    );
     expect(result.resultHash).toMatch(/^[a-f0-9]{64}$/);
     expect(generateText).toHaveBeenCalledTimes(6);
     expect(generateJson).toHaveBeenCalledTimes(3);
@@ -94,7 +117,12 @@ describe('multimodal draft Arena', () => {
     });
 
     const result = await evaluateMultimodalSkillPackDraft(
-      { snapshot, candidateRevisionNo: 18, baselineModel: 'b', enhancedModel: 'e' },
+      {
+        snapshot,
+        candidateRevisionNo: 18,
+        baselineModel: 'b',
+        enhancedModel: 'e',
+      },
       { generateText, generateJson },
     );
 
@@ -119,7 +147,12 @@ describe('multimodal draft Arena', () => {
       .mockResolvedValueOnce(validJudge);
 
     const result = await evaluateMultimodalSkillPackDraft(
-      { snapshot, candidateRevisionNo: 19, baselineModel: 'b', enhancedModel: 'e' },
+      {
+        snapshot,
+        candidateRevisionNo: 19,
+        baselineModel: 'b',
+        enhancedModel: 'e',
+      },
       { generateText, generateJson },
     );
 

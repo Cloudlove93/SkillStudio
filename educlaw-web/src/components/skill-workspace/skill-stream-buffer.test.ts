@@ -19,7 +19,10 @@ describe('Skill stream frame buffer', () => {
 
     expect(schedule).toHaveBeenCalledTimes(1);
     callbacks.get(1)?.();
-    expect(flush).toHaveBeenCalledWith({ reasoning: '先分析', content: '答案' });
+    expect(flush).toHaveBeenCalledWith({
+      reasoning: '先分析',
+      content: '答案',
+    });
   });
 
   it('flushes synchronously before completion and ignores work after disposal', () => {

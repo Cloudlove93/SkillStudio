@@ -12,9 +12,10 @@ export function DiscardInspectorChangesDialog({
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    const previousFocus = document.activeElement instanceof HTMLElement
-      ? document.activeElement
-      : null;
+    const previousFocus =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
     cancelButtonRef.current?.focus();
 
     const onKeyDown = (event: KeyboardEvent) => {

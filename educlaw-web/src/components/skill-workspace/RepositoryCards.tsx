@@ -59,7 +59,9 @@ export function RepositorySkillCard({
       <button
         type="button"
         className="skill-repository-card-main"
-        aria-label={managing ? `选择${skill.name}` : `用 Agent 打开${skill.name}`}
+        aria-label={
+          managing ? `选择${skill.name}` : `用 Agent 打开${skill.name}`
+        }
         aria-pressed={managing ? selected : undefined}
         onClick={cardAction}
       >
@@ -130,8 +132,7 @@ export function RepositorySkillCard({
           {menuOpen ? (
             <div role="menu" onClick={(event) => event.stopPropagation()}>
               <button type="button" role="menuitem" onClick={onOpen}>
-                <Play size={14} aria-hidden="true" />
-                用 Agent 打开
+                <Play size={14} aria-hidden="true" />用 Agent 打开
               </button>
               <button type="button" role="menuitem" onClick={onPreview}>
                 <ArrowUpRight size={14} aria-hidden="true" />

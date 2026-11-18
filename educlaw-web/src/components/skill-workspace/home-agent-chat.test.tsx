@@ -49,7 +49,9 @@ afterEach(async () => {
   container.remove();
 });
 
-async function render(overrides: Partial<Parameters<typeof HomeAgentChat>[0]> = {}) {
+async function render(
+  overrides: Partial<Parameters<typeof HomeAgentChat>[0]> = {},
+) {
   const onNewConversation = vi.fn();
   const onRetry = vi.fn();
   await act(async () =>
@@ -74,16 +76,16 @@ async function render(overrides: Partial<Parameters<typeof HomeAgentChat>[0]> = 
 
 it('shows only the Agent identity, actions and the conversation', async () => {
   const { onNewConversation } = await render();
-  expect(container.querySelector('.home-agent-chat-identity h1')?.textContent).toBe(
-    '课程设计助手',
-  );
+  expect(
+    container.querySelector('.home-agent-chat-identity h1')?.textContent,
+  ).toBe('课程设计助手');
   expect(container.querySelector('[data-thread]')?.textContent).toBe('91');
-  const assembly = [...container.querySelectorAll('a')].find(
-    (link) => link.textContent?.includes('装配'),
+  const assembly = [...container.querySelectorAll('a')].find((link) =>
+    link.textContent?.includes('装配'),
   );
   expect(assembly?.getAttribute('href')).toBe('/agents?tab=agents&agentId=9');
-  const newChat = [...container.querySelectorAll('button')].find(
-    (button) => button.textContent?.includes('新对话'),
+  const newChat = [...container.querySelectorAll('button')].find((button) =>
+    button.textContent?.includes('新对话'),
   )!;
   await act(async () => newChat.click());
   expect(onNewConversation).toHaveBeenCalledOnce();
@@ -101,8 +103,8 @@ it('shows the failure with a retry action', async () => {
     error: 'Agent 服务暂时不可用',
   });
   expect(container.textContent).toContain('Agent 服务暂时不可用');
-  const retry = [...container.querySelectorAll('button')].find(
-    (button) => button.textContent?.includes('重新加载'),
+  const retry = [...container.querySelectorAll('button')].find((button) =>
+    button.textContent?.includes('重新加载'),
   )!;
   await act(async () => retry.click());
   expect(onRetry).toHaveBeenCalledOnce();

@@ -48,7 +48,9 @@ async function submitPasswordAuth(
     const tokens = await apiFetchJson<StoredTokenResponse>(`/auth/password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(buildPasswordAuthRequest(mode, username, password, inviteCode, email)),
+      body: JSON.stringify(
+        buildPasswordAuthRequest(mode, username, password, inviteCode, email),
+      ),
     });
     return persistPasswordAuth(tokens);
   } catch (err: unknown) {
@@ -78,7 +80,13 @@ export async function register(
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(
-        buildPasswordAuthRequest('register', loginName, password, inviteCode, email),
+        buildPasswordAuthRequest(
+          'register',
+          loginName,
+          password,
+          inviteCode,
+          email,
+        ),
       ),
     });
   } catch (err: unknown) {

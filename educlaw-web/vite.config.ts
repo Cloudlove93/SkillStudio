@@ -1,7 +1,7 @@
-import path from 'path'
-import { defineConfig } from 'vitest/config'
-import react from '@vitejs/plugin-react'
-import tailwindcss from '@tailwindcss/vite'
+import path from 'path';
+import { configDefaults, defineConfig } from 'vitest/config';
+import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
   // The web app is served from the domain root. Root-relative assets keep the
@@ -11,9 +11,18 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      '@openagent/core/messages': path.resolve(__dirname, '../openagent/src/messages.ts'),
-      '@openagent/core/runtime': path.resolve(__dirname, '../openagent/src/runtime.ts'),
-      '@openagent/core/types': path.resolve(__dirname, '../openagent/src/types.ts'),
+      '@openagent/core/messages': path.resolve(
+        __dirname,
+        '../openagent/src/messages.ts',
+      ),
+      '@openagent/core/runtime': path.resolve(
+        __dirname,
+        '../openagent/src/runtime.ts',
+      ),
+      '@openagent/core/types': path.resolve(
+        __dirname,
+        '../openagent/src/types.ts',
+      ),
       '@openagent/core': path.resolve(__dirname, '../openagent/src/index.ts'),
     },
   },
@@ -49,8 +58,11 @@ export default defineConfig({
       '/optimize': { target: 'http://127.0.0.1:3001', changeOrigin: true },
       '/profiles': { target: 'http://127.0.0.1:3001', changeOrigin: true },
       '/agents': {
-        target: 'http://127.0.0.1:3001', changeOrigin: true,
-        bypass(req) { if (req.headers.accept?.includes('text/html')) return '/index.html'; },
+        target: 'http://127.0.0.1:3001',
+        changeOrigin: true,
+        bypass(req) {
+          if (req.headers.accept?.includes('text/html')) return '/index.html';
+        },
       },
       '/runtimes': { target: 'http://127.0.0.1:3001', changeOrigin: true },
       '/llm': { target: 'http://127.0.0.1:3001', changeOrigin: true },
@@ -59,6 +71,8 @@ export default defineConfig({
     },
   },
   test: {
+    // Playwright specs live under e2e/ and must not be collected by Vitest.
+    exclude: [...configDefaults.exclude, 'e2e/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json-summary', 'html'],
@@ -73,4 +87,4 @@ export default defineConfig({
       ],
     },
   },
-})
+});

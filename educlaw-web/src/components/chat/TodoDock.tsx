@@ -1,5 +1,11 @@
 import { useState } from 'react';
-import { ChevronDown, CheckCircle2, Circle, Loader2, ListTodo } from 'lucide-react';
+import {
+  ChevronDown,
+  CheckCircle2,
+  Circle,
+  Loader2,
+  ListTodo,
+} from 'lucide-react';
 import type { Todo } from '../../stores/todo';
 import { useT } from '../../i18n';
 import { PremiumPill } from '@/components/ui/premium';
@@ -29,7 +35,10 @@ export default function TodoDock({ todos }: { todos: Todo[] }) {
             <span className="font-medium">{done}</span>
             <span className="text-muted-foreground"> {t('todo.of')} </span>
             <span className="font-medium">{total}</span>
-            <span className="text-muted-foreground"> {t('todo.completed')}</span>
+            <span className="text-muted-foreground">
+              {' '}
+              {t('todo.completed')}
+            </span>
           </div>
           <div className="mt-1">
             <PremiumPill accent="emerald">{progressPct}%</PremiumPill>
@@ -70,7 +79,9 @@ export default function TodoDock({ todos }: { todos: Todo[] }) {
                   <Circle className="size-4 text-muted-foreground/40" />
                 )}
               </span>
-              <span className={`min-w-0 flex-1 ${td.status === 'completed' || td.status === 'cancelled' ? 'line-through' : ''}`}>
+              <span
+                className={`min-w-0 flex-1 ${td.status === 'completed' || td.status === 'cancelled' ? 'line-through' : ''}`}
+              >
                 {td.content}
               </span>
             </div>

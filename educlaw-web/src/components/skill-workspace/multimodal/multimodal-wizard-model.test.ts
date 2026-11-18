@@ -10,7 +10,8 @@ import {
 
 describe('multimodal wizard model', () => {
   it('names the final user step as direct generation', async () => {
-    const { MULTIMODAL_WIZARD_STEPS } = await import('./multimodal-wizard-model');
+    const { MULTIMODAL_WIZARD_STEPS } =
+      await import('./multimodal-wizard-model');
     expect(MULTIMODAL_WIZARD_STEPS.at(-1)?.label).toBe('确认生成');
   });
 
@@ -25,9 +26,9 @@ describe('multimodal wizard model', () => {
     'building_evidence',
     'building_adler',
   ] as const)('maps processing stage %s', (mediaStage) => {
-    expect(deriveMultimodalWizardStep({ mediaStage } as MediaSessionDetail)).toBe(
-      'processing',
-    );
+    expect(
+      deriveMultimodalWizardStep({ mediaStage } as MediaSessionDetail),
+    ).toBe('processing');
   });
 
   it.each(['awaiting_adler_overview', 'extracting_candidates'] as const)(
@@ -44,9 +45,9 @@ describe('multimodal wizard model', () => {
     'awaiting_candidates',
     'building_skills',
   ] as const)('maps candidate stage %s', (mediaStage) => {
-    expect(deriveMultimodalWizardStep({ mediaStage } as MediaSessionDetail)).toBe(
-      'candidates',
-    );
+    expect(
+      deriveMultimodalWizardStep({ mediaStage } as MediaSessionDetail),
+    ).toBe('candidates');
   });
 
   it.each([
@@ -55,9 +56,9 @@ describe('multimodal wizard model', () => {
     'publishing',
     'published',
   ] as const)('maps release stage %s', (mediaStage) => {
-    expect(deriveMultimodalWizardStep({ mediaStage } as MediaSessionDetail)).toBe(
-      'release',
-    );
+    expect(
+      deriveMultimodalWizardStep({ mediaStage } as MediaSessionDetail),
+    ).toBe('release');
   });
 
   it('infers the furthest safe failed step', () => {
@@ -107,19 +108,24 @@ describe('multimodal wizard model', () => {
     ['extracting_candidates', 'overview'],
     ['validating_candidates', 'candidates'],
     ['building_skills', 'candidates'],
-  ] as const)('maps failed resume stage %s to its exact step', (resumeStage, step) => {
-    expect(deriveMultimodalWizardStep({
-      mediaStage: 'failed',
-      error: {
-        code: 'MULTIMODAL_PIPELINE_FAILED',
-        stage: resumeStage,
-        resumeStage,
-        retryable: true,
-        message: '处理失败',
-      },
-      mediaState: {},
-    } as MediaSessionDetail)).toBe(step);
-  });
+  ] as const)(
+    'maps failed resume stage %s to its exact step',
+    (resumeStage, step) => {
+      expect(
+        deriveMultimodalWizardStep({
+          mediaStage: 'failed',
+          error: {
+            code: 'MULTIMODAL_PIPELINE_FAILED',
+            stage: resumeStage,
+            resumeStage,
+            retryable: true,
+            message: '处理失败',
+          },
+          mediaState: {},
+        } as MediaSessionDetail),
+      ).toBe(step);
+    },
+  );
 
   it('uses Chinese Adler labels', () => {
     expect(ADLER_LAYER_LABELS).toEqual({
@@ -202,9 +208,7 @@ describe('multimodal wizard model', () => {
     ];
 
     expect(
-      evidenceByIds(evidence, ['ev-3', 'ev-1']).map(
-        (item) => item.evidenceId,
-      ),
+      evidenceByIds(evidence, ['ev-3', 'ev-1']).map((item) => item.evidenceId),
     ).toEqual(['ev-1', 'ev-3']);
     expect(evidence).toHaveLength(3);
   });

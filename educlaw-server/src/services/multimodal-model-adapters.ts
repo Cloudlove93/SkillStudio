@@ -15,7 +15,10 @@ import {
 import { config } from '../config.js';
 import { getLogger } from '../lib/request-context.js';
 import { generateJson, resolveEnhancedModel } from './llm-service.js';
-import { assembleRiaSkillMarkdown, RiaContentError } from './ria-skill-markdown.js';
+import {
+  assembleRiaSkillMarkdown,
+  RiaContentError,
+} from './ria-skill-markdown.js';
 import {
   MultimodalSessionServiceError,
   parseValidationEnvelope,
@@ -184,7 +187,10 @@ function withStableError<T>(operation: () => Promise<T>): Promise<T> {
       },
       'multimodal.model_adapter_failed',
     );
-    if (error instanceof MultimodalSessionServiceError || error instanceof RiaContentError) {
+    if (
+      error instanceof MultimodalSessionServiceError ||
+      error instanceof RiaContentError
+    ) {
       throw error;
     }
     throw new MultimodalSessionServiceError();
@@ -229,7 +235,9 @@ function evidencePayload(evidenceTimeline: MultimodalEvidence[]) {
       model: evidence.provenance.model ?? null,
     },
     selectionReason: evidence.selectionReason,
-    ...(evidence.visualObservation ? {visualObservation:evidence.visualObservation} : {}),
+    ...(evidence.visualObservation
+      ? { visualObservation: evidence.visualObservation }
+      : {}),
   }));
 }
 
@@ -868,7 +876,8 @@ function parseFusedCandidatePayload(input: {
 
   if (
     input.candidates.length > 0 &&
-    (strippedCandidates.length === 0 || coveredSourceIds.size !== sourceById.size)
+    (strippedCandidates.length === 0 ||
+      coveredSourceIds.size !== sourceById.size)
   ) {
     fail();
   }
@@ -1429,29 +1438,34 @@ export function createProductionMultimodalModelAdapters(options?: {
               const relations = readDenseArray(
                 record.relations,
                 MAX_RELATIONS,
-              ).map((relation, relationIndex): RiaSkillDraft['relations'][number] => {
-                const relationRecord = readRecord(relation);
-                ensureExactKeys(relationRecord, ['type', 'targetSkillId']);
-                const type = readRiaString(
-                  relationRecord.type,
-                  `skills[${index}].relations[${relationIndex}].type`,
-                  64,
-                );
-                const relationType =
-                  type === 'depends-on' ||
-                  type === 'contrasts-with' ||
-                  type === 'composes-with'
-                    ? type
-                    : fail(`RIA contract relation type ${type} is invalid`);
-                return {
-                  type: relationType,
-                  targetSkillId: readRiaString(
-                    relationRecord.targetSkillId,
-                    `skills[${index}].relations[${relationIndex}].targetSkillId`,
-                    128,
-                  ),
-                };
-              });
+              ).map(
+                (
+                  relation,
+                  relationIndex,
+                ): RiaSkillDraft['relations'][number] => {
+                  const relationRecord = readRecord(relation);
+                  ensureExactKeys(relationRecord, ['type', 'targetSkillId']);
+                  const type = readRiaString(
+                    relationRecord.type,
+                    `skills[${index}].relations[${relationIndex}].type`,
+                    64,
+                  );
+                  const relationType =
+                    type === 'depends-on' ||
+                    type === 'contrasts-with' ||
+                    type === 'composes-with'
+                      ? type
+                      : fail(`RIA contract relation type ${type} is invalid`);
+                  return {
+                    type: relationType,
+                    targetSkillId: readRiaString(
+                      relationRecord.targetSkillId,
+                      `skills[${index}].relations[${relationIndex}].targetSkillId`,
+                      128,
+                    ),
+                  };
+                },
+              );
               const assembledSkill = {
                 candidateId,
                 id,
@@ -1536,7 +1550,13 @@ export function createProductionMultimodalModelAdapters(options?: {
                 promptVersion: MULTIMODAL_PROMPT_VERSIONS.ria,
                 generatorVersion: MULTIMODAL_GENERATOR_VERSION,
               };
-              return {...assembledSkill,skillMd:assembleRiaSkillMarkdown(assembledSkill,input.evidenceTimeline)};
+              return {
+                ...assembledSkill,
+                skillMd: assembleRiaSkillMarkdown(
+                  assembledSkill,
+                  input.evidenceTimeline,
+                ),
+              };
             });
             for (const skill of skills) {
               const ownPackSkillId = directoryByCandidateId.get(
@@ -1626,7 +1646,8 @@ export function createProductionMultimodalModelAdapters(options?: {
             };
           }
           const compactCandidates = candidates.map((candidate) => {
-            const { evidenceIds: _evidenceIds, ...compactCandidate } = candidate;
+            const { evidenceIds: _evidenceIds, ...compactCandidate } =
+              candidate;
             void _evidenceIds;
             return compactCandidate;
           });

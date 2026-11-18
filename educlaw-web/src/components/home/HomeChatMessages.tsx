@@ -6,12 +6,20 @@ import { LoaderCircle, User, MessageCircleQuestion } from 'lucide-react';
 import { useT } from '../../i18n';
 import { BASE } from '../../api/client';
 
-export function MessageBubble({ msg, isStreaming }: { msg: OpenAgentMessage; isStreaming?: boolean }) {
+export function MessageBubble({
+  msg,
+  isStreaming,
+}: {
+  msg: OpenAgentMessage;
+  isStreaming?: boolean;
+}) {
   const isUser = msg.role === 'user';
   const text = getOpenAgentMessageText(msg);
 
   return (
-    <div className={`flex items-start gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
+    <div
+      className={`flex items-start gap-3 ${isUser ? 'flex-row-reverse' : ''}`}
+    >
       {isUser ? (
         <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary shadow-sm">
           <User className="size-4 text-white" />
@@ -19,21 +27,31 @@ export function MessageBubble({ msg, isStreaming }: { msg: OpenAgentMessage; isS
       ) : (
         <div className="relative shrink-0">
           <div className="absolute -inset-2 rounded-full bg-primary/12 blur-lg" />
-          <img src={`${BASE}/logo.png`} alt="" className="relative size-9 rounded-2xl drop-shadow-md" />
+          <img
+            src={`${BASE}/logo.png`}
+            alt=""
+            className="relative size-9 rounded-2xl drop-shadow-md"
+          />
         </div>
       )}
       <div className={`min-w-0 max-w-[85%] ${isUser ? 'text-right' : ''}`}>
-        <div className={`inline-block text-sm leading-relaxed shadow-sm ${
-          isUser
-            ? 'rounded-[24px] rounded-tr-sm bg-primary px-4 py-3 text-primary-foreground shadow-sm'
-            : 'rounded-[24px] rounded-tl-sm border border-border/70 bg-background/95 px-4 py-3 text-foreground shadow-sm'
-        }`}>
+        <div
+          className={`inline-block text-sm leading-relaxed shadow-sm ${
+            isUser
+              ? 'rounded-[24px] rounded-tr-sm bg-primary px-4 py-3 text-primary-foreground shadow-sm'
+              : 'rounded-[24px] rounded-tl-sm border border-border/70 bg-background/95 px-4 py-3 text-foreground shadow-sm'
+          }`}
+        >
           {isUser ? (
             <span className="whitespace-pre-wrap">{text}</span>
           ) : (
             <div className="prose prose-sm max-w-none dark:prose-invert [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_code]:text-[13px] [&_p]:leading-relaxed [&_pre]:rounded-2xl [&_pre]:border [&_pre]:border-border/70 [&_pre]:bg-muted/35">
-              <ReactMarkdown rehypePlugins={[rehypeHighlight]}>{text}</ReactMarkdown>
-              {isStreaming && <span className="inline-block w-1.5 h-4 ml-0.5 bg-foreground/60 animate-pulse rounded-sm align-text-bottom" />}
+              <ReactMarkdown rehypePlugins={[rehypeHighlight]}>
+                {text}
+              </ReactMarkdown>
+              {isStreaming && (
+                <span className="inline-block w-1.5 h-4 ml-0.5 bg-foreground/60 animate-pulse rounded-sm align-text-bottom" />
+              )}
             </div>
           )}
         </div>
@@ -103,12 +121,26 @@ export function LoadingSuggestions() {
 export function ThinkingDots() {
   return (
     <div className="mt-5 flex items-start gap-3">
-      <img src={`${BASE}/logo.png`} alt="" className="size-9 shrink-0 rounded-2xl drop-shadow-sm" />
+      <img
+        src={`${BASE}/logo.png`}
+        alt=""
+        className="size-9 shrink-0 rounded-2xl drop-shadow-sm"
+      />
       <div className="rounded-[24px] rounded-tl-sm border border-border/70 bg-background/95 px-4 py-3 text-sm shadow-sm">
         <span className="inline-flex gap-1 text-muted-foreground">
           <span className="animate-pulse-dot">&bull;</span>
-          <span className="animate-pulse-dot" style={{ animationDelay: '0.3s' }}>&bull;</span>
-          <span className="animate-pulse-dot" style={{ animationDelay: '0.6s' }}>&bull;</span>
+          <span
+            className="animate-pulse-dot"
+            style={{ animationDelay: '0.3s' }}
+          >
+            &bull;
+          </span>
+          <span
+            className="animate-pulse-dot"
+            style={{ animationDelay: '0.6s' }}
+          >
+            &bull;
+          </span>
         </span>
       </div>
     </div>

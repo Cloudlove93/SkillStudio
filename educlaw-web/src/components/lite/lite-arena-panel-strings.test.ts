@@ -37,11 +37,11 @@ test('LiteArenaPanel should keep rubric edit wired to the manual edit flow', () 
 test('LiteArenaPanel should require configured rubric before report actions are enabled', () => {
   assert.match(
     source,
-    /getReportReadiness\(\s*messages,\s*rubricConfigured,\s*replyGenerating,\s*\)/,
+    /getReportReadiness\(\s*messages,\s*rubricConfigured,\s*replyGenerating\s*,?\s*\)/,
   );
   assert.match(
     source,
-    /canOpenReportAction\(\s*Boolean\(thread\),\s*canGenerateReport,\s*\)/,
+    /canOpenReportAction\(\s*Boolean\(thread\),\s*canGenerateReport\s*,?\s*\)/,
   );
   assert.doesNotMatch(
     source,
@@ -71,7 +71,10 @@ test('LiteArenaPanel should generate batch documents with a limited concurrency 
   assert.ok(handleGeneratePackages);
   assert.match(source, /const BATCH_GENERATE_CONCURRENCY = 2;/);
   assert.match(handleGeneratePackages, /nextBatchIndex/);
-  assert.match(handleGeneratePackages, /Math\.min\(BATCH_GENERATE_CONCURRENCY, batchPlan\.length\)/);
+  assert.match(
+    handleGeneratePackages,
+    /Math\.min\(BATCH_GENERATE_CONCURRENCY, batchPlan\.length\)/,
+  );
   assert.match(handleGeneratePackages, /Promise\.all\(workers\)/);
   assert.doesNotMatch(
     handleGeneratePackages,
@@ -139,10 +142,7 @@ test('LiteArenaPanel should wait for reply save before starting interactive opti
     )?.length || 0) >= 3,
   );
   assert.match(source, /disabled=\{replyGenerating\}/);
-  assert.match(
-    source,
-    /const interactiveActionTitle =[\s\S]*'开始交互式优化'/,
-  );
+  assert.match(source, /const interactiveActionTitle =[\s\S]*'开始交互式优化'/);
   assert.doesNotMatch(source, /title=\{interactiveRequiredMessage\}/);
 });
 
@@ -177,12 +177,18 @@ test('LiteArenaPanel should load skill history through the new action APIs', () 
     /liteApi\.listSkillVersions\(\s*token,\s*packageId,\s*skillRecordId,/,
   );
   assert.match(source, /expectedPackageVersionId: currentPackageVersionId/);
-  assert.match(source, /const idempotencyKey = createClientIdempotencyKey\(\);/);
+  assert.match(
+    source,
+    /const idempotencyKey = createClientIdempotencyKey\(\);/,
+  );
 });
 
 test('LiteArenaPanel should ignore stale skill history responses and clear loading when selection changes', () => {
   assert.match(source, /const skillVersionsRequestIdRef = useRef\(0\);/);
-  assert.match(source, /const requestId = skillVersionsRequestIdRef\.current \+ 1;/);
+  assert.match(
+    source,
+    /const requestId = skillVersionsRequestIdRef\.current \+ 1;/,
+  );
   assert.match(
     source,
     /skillVersionsRequestIdRef\.current !== requestId \|\|\s*selectedPackageIdRef\.current !== packageId/,
@@ -203,5 +209,5 @@ test('LiteArenaPanel should expose skill history controls in the skills tab', ()
   assert.match(source, /显示已废弃/);
   assert.match(source, /回退到此版本/);
   assert.match(source, /恢复可用/);
-  assert.match(source, /版本预览 v\{/);
+  assert.match(source, /版本预览 v\s*\{/);
 });

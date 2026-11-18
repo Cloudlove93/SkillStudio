@@ -31,8 +31,8 @@ describe('HTTP error responses', () => {
       retryable: true,
       requestId: 'request-500',
     });
-    expect(JSON.stringify(buildInternalErrorPayload('request-500'))).not.toContain(
-      'duplicate key',
-    );
+    expect(
+      JSON.stringify(buildInternalErrorPayload('request-500')),
+    ).not.toContain('duplicate key');
   });
 });

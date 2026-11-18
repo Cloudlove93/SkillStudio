@@ -30,7 +30,11 @@ import { SkillContextMenu } from './SkillContextMenu';
 import type { RepositorySkill } from './SkillRepositoryWorkspace';
 // skill-conversation-list / 新建对话 / 鏂板缓瀵硅瘽 / onConversationSelect
 
-export type SkillCreateMode = 'conversation' | 'multimodal' | 'document' | 'manual';
+export type SkillCreateMode =
+  | 'conversation'
+  | 'multimodal'
+  | 'document'
+  | 'manual';
 export type SkillCreateAction = SkillCreateMode | 'import';
 export type SkillMenuAction =
   | 'open'
@@ -59,7 +63,10 @@ type Props = {
   activeSkillName?: string | null;
   onSelectSkill?: (skill: RepositorySkill) => void;
   onSkillAction?: (skill: RepositorySkill, action: SkillMenuAction) => void;
-  onRename: (session: GuidedCreationSession, displayName: string) => Promise<void>;
+  onRename: (
+    session: GuidedCreationSession,
+    displayName: string,
+  ) => Promise<void>;
   onDelete: (session: GuidedCreationSession) => Promise<void>;
   conversations?: ArenaThread[];
   selectedConversationId?: string | null;
@@ -69,7 +76,10 @@ type Props = {
   completedConversationIds?: ReadonlySet<string>;
   onConversationSelect?: (id: string) => void;
   onNewConversation?: () => void;
-  onConversationRename?: (thread: ArenaThread, title: string) => Promise<void> | void;
+  onConversationRename?: (
+    thread: ArenaThread,
+    title: string,
+  ) => Promise<void> | void;
   onConversationDelete?: (thread: ArenaThread) => Promise<void> | void;
   onLogout: () => void;
 };
@@ -177,21 +187,29 @@ export function SkillWorkspaceSidebar({
   } | null>(null);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [addDialogQuery, setAddDialogQuery] = useState('');
-  const [expandedSkillKey, setExpandedSkillKey] = useState<string | null>(activeSkillKey);
-  const skillEntries = activeSkillKey && activeSkillName && !skills.some((skill) => skill.key === activeSkillKey)
-    ? [{
-        key: activeSkillKey,
-        packageId: '',
-        skillId: '',
-        name: activeSkillName,
-        description: '',
-        updatedAt: '',
-        latestVersionId: null,
-        latestVersionNumber: null,
-        currentVersionId: null,
-        currentVersionNumber: null,
-      }, ...skills]
-    : skills;
+  const [expandedSkillKey, setExpandedSkillKey] = useState<string | null>(
+    activeSkillKey,
+  );
+  const skillEntries =
+    activeSkillKey &&
+    activeSkillName &&
+    !skills.some((skill) => skill.key === activeSkillKey)
+      ? [
+          {
+            key: activeSkillKey,
+            packageId: '',
+            skillId: '',
+            name: activeSkillName,
+            description: '',
+            updatedAt: '',
+            latestVersionId: null,
+            latestVersionNumber: null,
+            currentVersionId: null,
+            currentVersionNumber: null,
+          },
+          ...skills,
+        ]
+      : skills;
   const visibleDrafts = sessions.filter((item) => {
     if (item.status === 'completed') return false;
     const keyword = search.trim().toLowerCase();
@@ -199,12 +217,12 @@ export function SkillWorkspaceSidebar({
     return getSessionName(item).toLowerCase().includes(keyword);
   });
   const showSkillConversations = Boolean(
-    activeSkillKey
-      && !repositoryActive
-      && onConversationSelect
-      && onNewConversation
-      && onConversationRename
-      && onConversationDelete,
+    activeSkillKey &&
+    !repositoryActive &&
+    onConversationSelect &&
+    onNewConversation &&
+    onConversationRename &&
+    onConversationDelete,
   );
   const skillMenuItems = [
     { id: 'open', label: '打开 Skill', icon: Play },
@@ -251,51 +269,83 @@ export function SkillWorkspaceSidebar({
           <img src="/innoskill-logo.svg" alt="" aria-hidden="true" />
           <strong>{PRODUCT_NAME}</strong>
         </div>
-          <button
-            type="button"
-            className="skill-icon-button"
+        <button
+          type="button"
+          className="skill-icon-button"
           onClick={onToggle}
           aria-label={collapsed ? '展开左侧栏' : '收起左侧栏'}
           title={collapsed ? '展开左侧栏' : '收起左侧栏'}
         >
-          {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+          {collapsed ? (
+            <PanelLeftOpen size={16} />
+          ) : (
+            <PanelLeftClose size={16} />
+          )}
         </button>
       </div>
 
-      <details ref={createMenuRef} className="skill-create-menu skill-create-menu-primary">
-        <summary className="skill-new-button" aria-haspopup="menu" title="新建 Skill">
-          <Plus size={16} /><span>新建 Skill</span>
+      <details
+        ref={createMenuRef}
+        className="skill-create-menu skill-create-menu-primary"
+      >
+        <summary
+          className="skill-new-button"
+          aria-haspopup="menu"
+          title="新建 Skill"
+        >
+          <Plus size={16} />
+          <span>新建 Skill</span>
         </summary>
-        <div className="skill-create-popover" role="menu" aria-label="新建 Skill 的方式">
+        <div
+          className="skill-create-popover"
+          role="menu"
+          aria-label="新建 Skill 的方式"
+        >
           <span className="skill-create-popover-title">创建方式</span>
           {creationModes
-            .filter(({ mode }) => mode !== 'multimodal' || multimodalCreationEnabled)
+            .filter(
+              ({ mode }) => mode !== 'multimodal' || multimodalCreationEnabled,
+            )
             .map(({ mode, label, description, icon: Icon }) => (
-            <button
-              key={mode}
-              type="button"
-              role="menuitem"
-              className={`skill-create-menu-item ${mode === selectedCreateMode ? 'is-active' : ''}`}
-              onClick={(event) => {
-                event.currentTarget.closest('details')?.removeAttribute('open');
-                onCreateMode(mode);
-              }}
-            >
-              <span className="skill-create-menu-icon"><Icon size={15} /></span>
-              <span className="skill-create-menu-copy">
-                <strong>{label}</strong>
-                <small>{description}</small>
-              </span>
-              <ChevronRight size={14} />
-            </button>
-          ))}
+              <button
+                key={mode}
+                type="button"
+                role="menuitem"
+                className={`skill-create-menu-item ${mode === selectedCreateMode ? 'is-active' : ''}`}
+                onClick={(event) => {
+                  event.currentTarget
+                    .closest('details')
+                    ?.removeAttribute('open');
+                  onCreateMode(mode);
+                }}
+              >
+                <span className="skill-create-menu-icon">
+                  <Icon size={15} />
+                </span>
+                <span className="skill-create-menu-copy">
+                  <strong>{label}</strong>
+                  <small>{description}</small>
+                </span>
+                <ChevronRight size={14} />
+              </button>
+            ))}
         </div>
       </details>
-      <button type="button" className="skill-repository-link" onClick={() => setAddDialogOpen(true)}>
-        <Layers2 size={14} /><span>加入工作区</span>
+      <button
+        type="button"
+        className="skill-repository-link"
+        onClick={() => setAddDialogOpen(true)}
+      >
+        <Layers2 size={14} />
+        <span>加入工作区</span>
       </button>
-      <button type="button" className="skill-repository-link" onClick={onRepository}>
-        <Library size={14} /><span>Skill 仓库</span>
+      <button
+        type="button"
+        className="skill-repository-link"
+        onClick={onRepository}
+      >
+        <Library size={14} />
+        <span>Skill 仓库</span>
       </button>
 
       <label className="skill-search">
@@ -309,70 +359,87 @@ export function SkillWorkspaceSidebar({
 
       <div className="skill-sidebar-scroll">
         {skillEntries.length === 0 ? (
-          <div className="skill-sidebar-empty">工作区为空，前往「Skill 仓库」选择要使用的 Skill</div>
-        ) : skillEntries.map((skill, index) => (
-          <div key={skill.key} className={`skill-skill-group ${activeSkillKey === skill.key ? 'is-active' : ''}`}>
-            <div
-              className="skill-session-row skill-skill-row"
-              onContextMenu={(event) => openSkillMenu(event, skill)}
-            >
-               <button
-                 type="button"
-                 className="skill-skill-main"
-                 onClick={() => {
-                   if (activeSkillKey === skill.key && expandedSkillKey === skill.key) {
-                     setExpandedSkillKey(null);
-                     return;
-                   }
-                   setExpandedSkillKey(skill.key);
-                   onSelectSkill?.(skill);
-                 }}
-                 title={skill.description}
-              >
-                <Layers2
-                  size={15}
-                  strokeWidth={1.8}
-                  className={`skill-skill-symbol skill-skill-symbol-${index % 3}`}
-                  aria-hidden="true"
-                />
-                <span className="skill-session-copy">
-                  <strong>{skill.name}</strong>
-                </span>
-              </button>
-              <button
-                type="button"
-                className="skill-skill-more"
-                aria-label={`${skill.name} 更多操作`}
-                title="更多操作"
-                onClick={(event) => openSkillMenu(event, skill)}
-              >
-                <MoreHorizontal size={14} />
-              </button>
-            </div>
-             {activeSkillKey === skill.key && expandedSkillKey === skill.key && showSkillConversations ? (
-              <div className="skill-skill-conversations">
-                <SkillConversationList
-                  conversations={conversations}
-                  selectedConversationId={selectedConversationId}
-                  runningConversationId={conversationRunningId}
-                  runningConversationIds={conversationRunningIds}
-                  completedConversationIds={completedConversationIds}
-                  loading={conversationLoading}
-                  onConversationSelect={onConversationSelect}
-                  onNewConversation={onNewConversation}
-                  onRename={onConversationRename}
-                  onDelete={onConversationDelete}
-                />
-              </div>
-            ) : null}
+          <div className="skill-sidebar-empty">
+            工作区为空，前往「Skill 仓库」选择要使用的 Skill
           </div>
-        ))}
+        ) : (
+          skillEntries.map((skill, index) => (
+            <div
+              key={skill.key}
+              className={`skill-skill-group ${activeSkillKey === skill.key ? 'is-active' : ''}`}
+            >
+              <div
+                className="skill-session-row skill-skill-row"
+                onContextMenu={(event) => openSkillMenu(event, skill)}
+              >
+                <button
+                  type="button"
+                  className="skill-skill-main"
+                  onClick={() => {
+                    if (
+                      activeSkillKey === skill.key &&
+                      expandedSkillKey === skill.key
+                    ) {
+                      setExpandedSkillKey(null);
+                      return;
+                    }
+                    setExpandedSkillKey(skill.key);
+                    onSelectSkill?.(skill);
+                  }}
+                  title={skill.description}
+                >
+                  <Layers2
+                    size={15}
+                    strokeWidth={1.8}
+                    className={`skill-skill-symbol skill-skill-symbol-${index % 3}`}
+                    aria-hidden="true"
+                  />
+                  <span className="skill-session-copy">
+                    <strong>{skill.name}</strong>
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className="skill-skill-more"
+                  aria-label={`${skill.name} 更多操作`}
+                  title="更多操作"
+                  onClick={(event) => openSkillMenu(event, skill)}
+                >
+                  <MoreHorizontal size={14} />
+                </button>
+              </div>
+              {activeSkillKey === skill.key &&
+              expandedSkillKey === skill.key &&
+              showSkillConversations ? (
+                <div className="skill-skill-conversations">
+                  <SkillConversationList
+                    conversations={conversations}
+                    selectedConversationId={selectedConversationId}
+                    runningConversationId={conversationRunningId}
+                    runningConversationIds={conversationRunningIds}
+                    completedConversationIds={completedConversationIds}
+                    loading={conversationLoading}
+                    onConversationSelect={onConversationSelect}
+                    onNewConversation={onNewConversation}
+                    onRename={onConversationRename}
+                    onDelete={onConversationDelete}
+                  />
+                </div>
+              ) : null}
+            </div>
+          ))
+        )}
 
         {visibleDrafts.length > 0 && (
           <div className="skill-draft-section">
-            <div className="skill-sidebar-heading"><span>未完成草稿</span></div>
+            <div className="skill-sidebar-heading">
+              <span>未完成草稿</span>
+            </div>
             {visibleDrafts.map((item) => (
-              <div key={item.id} className={`skill-session-row ${selectedSessionId === item.id ? 'is-active' : ''}`}>
+              <div
+                key={item.id}
+                className={`skill-session-row ${selectedSessionId === item.id ? 'is-active' : ''}`}
+              >
                 <button
                   type="button"
                   className="skill-session-item"
@@ -398,23 +465,29 @@ export function SkillWorkspaceSidebar({
                         type="button"
                         role="menuitem"
                         onClick={(event) => {
-                          event.currentTarget.closest('details')?.removeAttribute('open');
+                          event.currentTarget
+                            .closest('details')
+                            ?.removeAttribute('open');
                           setDisplayName(getSessionName(item));
                           setDialog({ mode: 'rename', session: item });
                         }}
                       >
-                        <PencilLine size={14} />重命名
+                        <PencilLine size={14} />
+                        重命名
                       </button>
                       <button
                         type="button"
                         role="menuitem"
                         className="is-destructive"
                         onClick={(event) => {
-                          event.currentTarget.closest('details')?.removeAttribute('open');
+                          event.currentTarget
+                            .closest('details')
+                            ?.removeAttribute('open');
                           setDialog({ mode: 'delete', session: item });
                         }}
                       >
-                        <Trash2 size={14} />删除
+                        <Trash2 size={14} />
+                        删除
                       </button>
                     </div>
                   </details>
@@ -463,13 +536,21 @@ export function SkillWorkspaceSidebar({
       <div className="skill-sidebar-footer">
         <details className="skill-user-menu">
           <summary className="skill-user-row">
-            <div className="skill-user-avatar">{userName.slice(0, 1).toUpperCase()}</div>
+            <div className="skill-user-avatar">
+              {userName.slice(0, 1).toUpperCase()}
+            </div>
             <span className="skill-user-name">{userName}</span>
             <MoreHorizontal size={15} />
           </summary>
           <div className="skill-user-popover">
-            <div><span>外观</span><ThemeToggle /></div>
-            <button onClick={onLogout}><LogOut size={14} />退出登录</button>
+            <div>
+              <span>外观</span>
+              <ThemeToggle />
+            </div>
+            <button onClick={onLogout}>
+              <LogOut size={14} />
+              退出登录
+            </button>
           </div>
         </details>
       </div>
@@ -478,7 +559,8 @@ export function SkillWorkspaceSidebar({
           className="skill-session-dialog-backdrop"
           role="presentation"
           onMouseDown={(event) => {
-            if (event.target === event.currentTarget && !actionBusy) setDialog(null);
+            if (event.target === event.currentTarget && !actionBusy)
+              setDialog(null);
           }}
         >
           <form
@@ -502,7 +584,13 @@ export function SkillWorkspaceSidebar({
               }
             }}
           >
-            <h2>{dialog.mode === 'rename' ? '重命名会话' : dialog.session.status === 'completed' ? '移除这段会话？' : '删除这份草稿？'}</h2>
+            <h2>
+              {dialog.mode === 'rename'
+                ? '重命名会话'
+                : dialog.session.status === 'completed'
+                  ? '移除这段会话？'
+                  : '删除这份草稿？'}
+            </h2>
             {dialog.mode === 'rename' ? (
               <input
                 autoFocus
@@ -521,11 +609,22 @@ export function SkillWorkspaceSidebar({
               </p>
             )}
             <footer>
-              <button type="button" onClick={() => setDialog(null)} disabled={actionBusy}>取消</button>
+              <button
+                type="button"
+                onClick={() => setDialog(null)}
+                disabled={actionBusy}
+              >
+                取消
+              </button>
               <button
                 type="submit"
-                className={dialog.mode === 'delete' ? 'is-destructive' : 'is-primary'}
-                disabled={actionBusy || (dialog.mode === 'rename' && !displayName.trim())}
+                className={
+                  dialog.mode === 'delete' ? 'is-destructive' : 'is-primary'
+                }
+                disabled={
+                  actionBusy ||
+                  (dialog.mode === 'rename' && !displayName.trim())
+                }
               >
                 {dialog.mode === 'rename' ? '保存' : '确认删除'}
               </button>
@@ -569,7 +668,12 @@ function SkillAddDialog({
             <h2>加入工作区</h2>
             <p>从仓库选择 Skill 加入左侧工作区</p>
           </div>
-          <button type="button" className="skill-icon-button" onClick={onClose} aria-label="关闭">
+          <button
+            type="button"
+            className="skill-icon-button"
+            onClick={onClose}
+            aria-label="关闭"
+          >
             <X size={16} />
           </button>
         </header>
@@ -587,23 +691,25 @@ function SkillAddDialog({
             <div className="skill-add-dialog-empty">
               {skills.length === 0 ? '仓库中暂无 Skill' : '没有匹配的 Skill'}
             </div>
-          ) : addable.map((skill) => (
-            <button
-              key={skill.key}
-              type="button"
-              className="skill-add-dialog-item"
-              onClick={() => onSelect(skill)}
-            >
-              <span className="skill-add-dialog-item-icon">
-                <Sparkles size={15} />
-              </span>
-              <span className="skill-add-dialog-item-copy">
-                <strong>{skill.name}</strong>
-                <small>{skill.description || '无描述'}</small>
-              </span>
-              <Plus size={15} />
-            </button>
-          ))}
+          ) : (
+            addable.map((skill) => (
+              <button
+                key={skill.key}
+                type="button"
+                className="skill-add-dialog-item"
+                onClick={() => onSelect(skill)}
+              >
+                <span className="skill-add-dialog-item-icon">
+                  <Sparkles size={15} />
+                </span>
+                <span className="skill-add-dialog-item-copy">
+                  <strong>{skill.name}</strong>
+                  <small>{skill.description || '无描述'}</small>
+                </span>
+                <Plus size={15} />
+              </button>
+            ))
+          )}
         </div>
       </div>
     </div>

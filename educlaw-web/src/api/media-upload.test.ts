@@ -26,7 +26,9 @@ class FakeXhr extends FakeTarget {
     this.headers[name] = value;
   }
   getResponseHeader(name: string) {
-    return name.toLowerCase() === 'etag' ? `etag-${FakeXhr.instances.length}` : null;
+    return name.toLowerCase() === 'etag'
+      ? `etag-${FakeXhr.instances.length}`
+      : null;
   }
   send(body: Blob) {
     this.body = body;
@@ -61,15 +63,27 @@ describe('media upload transport', () => {
           partSizeBytes: 4,
           partCount: 2,
           parts: [
-            { partNumber: 1, url: 'https://one', expiresAt: '', requiredHeaders: {} },
-            { partNumber: 2, url: 'https://two', expiresAt: '', requiredHeaders: {} },
+            {
+              partNumber: 1,
+              url: 'https://one',
+              expiresAt: '',
+              requiredHeaders: {},
+            },
+            {
+              partNumber: 2,
+              url: 'https://two',
+              expiresAt: '',
+              requiredHeaders: {},
+            },
           ],
         },
       },
       onProgress: (value) => progress.push(value),
     });
 
-    expect(FakeXhr.instances.map((request) => request.body?.size)).toEqual([4, 4]);
+    expect(FakeXhr.instances.map((request) => request.body?.size)).toEqual([
+      4, 4,
+    ]);
     expect(result.parts).toEqual([
       { partNumber: 1, etag: 'etag-1' },
       { partNumber: 2, etag: 'etag-2' },

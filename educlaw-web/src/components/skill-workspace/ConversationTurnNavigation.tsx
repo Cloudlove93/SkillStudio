@@ -23,12 +23,16 @@ export function ConversationTurnNavigation({ containerRef, turns }: Props) {
     const updateActiveTurn = () => {
       window.cancelAnimationFrame(animationFrame);
       animationFrame = window.requestAnimationFrame(() => {
-        const offsets = turns.map((turn) => document.getElementById(turn.id)?.offsetTop ?? 0);
-        setActiveIndex(findActiveConversationTurn(
-          offsets,
-          container.scrollTop,
-          container.clientHeight,
-        ));
+        const offsets = turns.map(
+          (turn) => document.getElementById(turn.id)?.offsetTop ?? 0,
+        );
+        setActiveIndex(
+          findActiveConversationTurn(
+            offsets,
+            container.scrollTop,
+            container.clientHeight,
+          ),
+        );
       });
     };
 
@@ -66,7 +70,11 @@ export function ConversationTurnNavigation({ containerRef, turns }: Props) {
           aria-describedby={`${turn.id}-tooltip`}
           onClick={() => jumpToTurn(turn, index)}
         >
-          <span id={`${turn.id}-tooltip`} className="skill-turn-tooltip" role="tooltip">
+          <span
+            id={`${turn.id}-tooltip`}
+            className="skill-turn-tooltip"
+            role="tooltip"
+          >
             <b>{index + 1}</b>
             <span>{turn.label}</span>
           </span>

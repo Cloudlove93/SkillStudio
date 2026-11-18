@@ -26,7 +26,13 @@ function candidateState(): MultimodalSessionState {
     pendingUpload: null,
     transcript: { status: 'ready', editable: true, segments: [] },
     evidenceTimeline: { evidenceItems: [] },
-    candidatePasses: { frameworks: [], principles: [], cases: [], counterexamples: [], terms: [] },
+    candidatePasses: {
+      frameworks: [],
+      principles: [],
+      cases: [],
+      counterexamples: [],
+      terms: [],
+    },
     candidatePassMeta: null,
     semanticMoments: [],
     degradations: [],
@@ -43,9 +49,23 @@ function candidateState(): MultimodalSessionState {
         description: '迁移课堂方法',
         skillMd: '# 教学迁移法\n按步骤执行并遵守停止条件。',
         ria: {
-          sourceEvidenceIds: [], mechanism: '迁移', sourceExample: '课堂', futureApplicability: '新场景',
-          execution: { input: '任务', steps: ['识别', '执行'], output: '方案', completionCriteria: '完成', stopCriteria: '越界停止' },
-          boundaries: { counterexamples: ['无关任务'], failureModes: ['缺少输入'], limits: ['不编造'], confusions: [] },
+          sourceEvidenceIds: [],
+          mechanism: '迁移',
+          sourceExample: '课堂',
+          futureApplicability: '新场景',
+          execution: {
+            input: '任务',
+            steps: ['识别', '执行'],
+            output: '方案',
+            completionCriteria: '完成',
+            stopCriteria: '越界停止',
+          },
+          boundaries: {
+            counterexamples: ['无关任务'],
+            failureModes: ['缺少输入'],
+            limits: ['不编造'],
+            confusions: [],
+          },
         },
         evidenceIds: [],
         relations: [],
@@ -55,12 +75,25 @@ function candidateState(): MultimodalSessionState {
   };
 }
 
-function evaluation(candidateRevisionNo: number, snapshotHash: string, passed = true): MultimodalArenaEvaluation {
-  const cases = ['novel-scenario-transfer', 'boundary-and-stop', 'evidence-grounding'].map((caseId) => ({
+function evaluation(
+  candidateRevisionNo: number,
+  snapshotHash: string,
+  passed = true,
+): MultimodalArenaEvaluation {
+  const cases = [
+    'novel-scenario-transfer',
+    'boundary-and-stop',
+    'evidence-grounding',
+  ].map((caseId) => ({
     caseId: caseId as MultimodalArenaEvaluation['cases'][number]['caseId'],
-    input: 'fixed', baselineOutput: 'baseline', enhancedOutput: 'enhanced',
-    baselineScore: 2, enhancedScore: passed ? 4 : 1,
-    safetyPassed: true, groundedPassed: true, passed,
+    input: 'fixed',
+    baselineOutput: 'baseline',
+    enhancedOutput: 'enhanced',
+    baselineScore: 2,
+    enhancedScore: passed ? 4 : 1,
+    safetyPassed: true,
+    groundedPassed: true,
+    passed,
     reason: passed ? '通过' : '未通过',
   }));
   const withoutHash: Omit<MultimodalArenaEvaluation, 'resultHash'> = {
@@ -75,7 +108,10 @@ function evaluation(candidateRevisionNo: number, snapshotHash: string, passed = 
     passed,
     deterministicFailures: passed ? [] : ['INSUFFICIENT_CASES_PASSED'],
   };
-  return { ...withoutHash, resultHash: computeMultimodalArenaResultHash(withoutHash) };
+  return {
+    ...withoutHash,
+    resultHash: computeMultimodalArenaResultHash(withoutHash),
+  };
 }
 
 function reorderJsonKeys(value: unknown): unknown {
@@ -105,18 +141,37 @@ function harness(passed = true) {
   const withTransaction = <T>(work: (client: never) => Promise<T>) => {
     const run = serial.then(async () => {
       transactionDepth += 1;
-      try { return await work({} as never); } finally { transactionDepth -= 1; }
+      try {
+        return await work({} as never);
+      } finally {
+        transactionDepth -= 1;
+      }
     });
-    serial = run.then(() => undefined, () => undefined);
+    serial = run.then(
+      () => undefined,
+      () => undefined,
+    );
     return run;
   };
   const repository = {
     loadForUpdate: vi.fn(async () => session),
     saveArenaResult: vi.fn(async (_db, input) => {
-      session = { ...session, mediaStage: input.mediaStage, revisionNo: input.resultRevisionNo, generatedSnapshot: input.snapshot, arenaReceipt: input.receipt };
+      session = {
+        ...session,
+        mediaStage: input.mediaStage,
+        revisionNo: input.resultRevisionNo,
+        generatedSnapshot: input.snapshot,
+        arenaReceipt: input.receipt,
+      };
     }),
     savePublished: vi.fn(async (_db, input) => {
-      session = { ...session, mediaStage: 'published', revisionNo: input.receipt.resultRevisionNo, generatedSnapshot: input.snapshot, publishReceipt: input.receipt };
+      session = {
+        ...session,
+        mediaStage: 'published',
+        revisionNo: input.receipt.resultRevisionNo,
+        generatedSnapshot: input.snapshot,
+        publishReceipt: input.receipt,
+      };
     }),
   };
   const evaluator = vi.fn(async (input) => {
@@ -125,10 +180,21 @@ function harness(passed = true) {
   });
   const publishPackageTx = vi.fn(async () => {
     expect(transactionDepth).toBe(1);
-    return { packageId: 51, packageVersionId: 61, packageVersionNumber: 1, skillVersionIds: { 'skill-1': '71' } };
+    return {
+      packageId: 51,
+      packageVersionId: 61,
+      packageVersionNumber: 1,
+      skillVersionIds: { 'skill-1': '71' },
+    };
   });
   return {
-    service: createMultimodalReleaseService({ withTransaction, repository, evaluator, publishPackageTx, now: () => new Date('2026-08-23T12:00:00.000Z') }),
+    service: createMultimodalReleaseService({
+      withTransaction,
+      repository,
+      evaluator,
+      publishPackageTx,
+      now: () => new Date('2026-08-23T12:00:00.000Z'),
+    }),
     evaluator,
     publishPackageTx,
   };
@@ -170,63 +236,117 @@ describe('multimodal Arena and publish release', () => {
       expectedRevisionNo: 10,
     });
 
-    await expect(service.confirmGeneration({
-      authUserId: 'user-1',
-      sessionId: '101',
-      idempotencyKey: 'generate-legacy-1',
-      expectedRevisionNo: 11,
-      targetPackageId: null,
-      expectedPackageVersionId: null,
-    })).resolves.toMatchObject({ mediaStage: 'published', revisionNo: 12 });
+    await expect(
+      service.confirmGeneration({
+        authUserId: 'user-1',
+        sessionId: '101',
+        idempotencyKey: 'generate-legacy-1',
+        expectedRevisionNo: 11,
+        targetPackageId: null,
+        expectedPackageVersionId: null,
+      }),
+    ).resolves.toMatchObject({ mediaStage: 'published', revisionNo: 12 });
     expect(publishPackageTx).toHaveBeenCalledTimes(1);
   });
 
   it('runs model work outside transactions and replays the revision-bound Arena receipt', async () => {
     const { service, evaluator } = harness(true);
-    const input = { authUserId: 'user-1', sessionId: '101', idempotencyKey: 'arena-key-1', expectedRevisionNo: 10 };
+    const input = {
+      authUserId: 'user-1',
+      sessionId: '101',
+      idempotencyKey: 'arena-key-1',
+      expectedRevisionNo: 10,
+    };
     const first = await service.startArenaTest(input);
     const replay = await service.startArenaTest(input);
 
-    expect(first).toMatchObject({ mediaStage: 'ready_to_publish', revisionNo: 11, passed: true, replayed: false });
+    expect(first).toMatchObject({
+      mediaStage: 'ready_to_publish',
+      revisionNo: 11,
+      passed: true,
+      replayed: false,
+    });
     expect(replay).toEqual({ ...first, replayed: true });
     expect(evaluator).toHaveBeenCalledTimes(1);
   });
 
   it('keeps deterministic gate failures out of ready_to_publish and blocks publish', async () => {
     const { service, publishPackageTx } = harness(false);
-    const testResult = await service.startArenaTest({ authUserId: 'user-1', sessionId: '101', idempotencyKey: 'arena-key-2', expectedRevisionNo: 10 });
-    expect(testResult).toMatchObject({ mediaStage: 'arena_testing', passed: false });
-    await expect(service.publish({ authUserId: 'user-1', sessionId: '101', idempotencyKey: 'publish-key-2', expectedRevisionNo: 11, targetPackageId: null, expectedPackageVersionId: null })).rejects.toMatchObject({ code: 'QUALITY_GATE_FAILED' });
+    const testResult = await service.startArenaTest({
+      authUserId: 'user-1',
+      sessionId: '101',
+      idempotencyKey: 'arena-key-2',
+      expectedRevisionNo: 10,
+    });
+    expect(testResult).toMatchObject({
+      mediaStage: 'arena_testing',
+      passed: false,
+    });
+    await expect(
+      service.publish({
+        authUserId: 'user-1',
+        sessionId: '101',
+        idempotencyKey: 'publish-key-2',
+        expectedRevisionNo: 11,
+        targetPackageId: null,
+        expectedPackageVersionId: null,
+      }),
+    ).rejects.toMatchObject({ code: 'QUALITY_GATE_FAILED' });
     expect(publishPackageTx).not.toHaveBeenCalled();
   });
 
   it('publishes once under concurrency, replays the same IDs, and rejects key drift', async () => {
     const { service, publishPackageTx } = harness(true);
-    await service.startArenaTest({ authUserId: 'user-1', sessionId: '101', idempotencyKey: 'arena-key-3', expectedRevisionNo: 10 });
-    const input = { authUserId: 'user-1', sessionId: '101', idempotencyKey: 'publish-key-3', expectedRevisionNo: 11, targetPackageId: null, expectedPackageVersionId: null };
-    const [left, right] = await Promise.all([service.publish(input), service.publish(input)]);
+    await service.startArenaTest({
+      authUserId: 'user-1',
+      sessionId: '101',
+      idempotencyKey: 'arena-key-3',
+      expectedRevisionNo: 10,
+    });
+    const input = {
+      authUserId: 'user-1',
+      sessionId: '101',
+      idempotencyKey: 'publish-key-3',
+      expectedRevisionNo: 11,
+      targetPackageId: null,
+      expectedPackageVersionId: null,
+    };
+    const [left, right] = await Promise.all([
+      service.publish(input),
+      service.publish(input),
+    ]);
     expect(left.packageVersionId).toBe('61');
     expect(right.packageVersionId).toBe('61');
     expect([left.replayed, right.replayed].sort()).toEqual([false, true]);
     expect(publishPackageTx).toHaveBeenCalledTimes(1);
 
-    await expect(service.publish({ ...input, targetPackageId: '99', expectedPackageVersionId: '100' })).rejects.toMatchObject({ code: 'IDEMPOTENCY_KEY_REUSED' });
+    await expect(
+      service.publish({
+        ...input,
+        targetPackageId: '99',
+        expectedPackageVersionId: '100',
+      }),
+    ).rejects.toMatchObject({ code: 'IDEMPOTENCY_KEY_REUSED' });
   });
 
   it('rejects malformed persisted Arena evaluations before exposing them', () => {
-    expect(() => readMultimodalReleaseStatus({
-      validationResult: {
-        schemaVersion: 1,
-        action: 'skill.media.test.start',
-        idempotencyKey: 'arena-corrupt',
-        requestHash: 'a'.repeat(64),
-        baseRevisionNo: 10,
-        resultRevisionNo: 11,
-        recordedAt: '2026-08-23T12:00:00.000Z',
-        evaluation: { cases: 'not-an-array' },
-      },
-      confirmation: null,
-    })).toThrowError(expect.objectContaining({ code: 'MULTIMODAL_SESSION_FAILED' }));
+    expect(() =>
+      readMultimodalReleaseStatus({
+        validationResult: {
+          schemaVersion: 1,
+          action: 'skill.media.test.start',
+          idempotencyKey: 'arena-corrupt',
+          requestHash: 'a'.repeat(64),
+          baseRevisionNo: 10,
+          resultRevisionNo: 11,
+          recordedAt: '2026-08-23T12:00:00.000Z',
+          evaluation: { cases: 'not-an-array' },
+        },
+        confirmation: null,
+      }),
+    ).toThrowError(
+      expect.objectContaining({ code: 'MULTIMODAL_SESSION_FAILED' }),
+    );
   });
 
   it('accepts a valid Arena receipt after JSONB changes object key order', () => {
@@ -242,10 +362,12 @@ describe('multimodal Arena and publish release', () => {
       evaluation: validEvaluation,
     });
 
-    expect(readMultimodalReleaseStatus({
-      validationResult: persisted,
-      confirmation: null,
-    }).arenaEvaluation).toEqual(validEvaluation);
+    expect(
+      readMultimodalReleaseStatus({
+        validationResult: persisted,
+        confirmation: null,
+      }).arenaEvaluation,
+    ).toEqual(validEvaluation);
   });
 
   it('rejects hash-valid Arena evaluations with duplicated fixed case IDs', () => {
@@ -270,53 +392,65 @@ describe('multimodal Arena and publish release', () => {
       ...withoutHash,
       resultHash: computeMultimodalArenaResultHash(withoutHash),
     };
-    expect(() => readMultimodalReleaseStatus({
-      validationResult: {
-        schemaVersion: 1,
-        action: 'skill.media.test.start',
-        idempotencyKey: 'arena-duplicate-cases',
-        requestHash: 'a'.repeat(64),
-        baseRevisionNo: 10,
-        resultRevisionNo: 11,
-        recordedAt: '2026-08-23T12:00:00.000Z',
-        evaluation: corrupted,
-      },
-      confirmation: null,
-    })).toThrowError(expect.objectContaining({ code: 'MULTIMODAL_SESSION_FAILED' }));
+    expect(() =>
+      readMultimodalReleaseStatus({
+        validationResult: {
+          schemaVersion: 1,
+          action: 'skill.media.test.start',
+          idempotencyKey: 'arena-duplicate-cases',
+          requestHash: 'a'.repeat(64),
+          baseRevisionNo: 10,
+          resultRevisionNo: 11,
+          recordedAt: '2026-08-23T12:00:00.000Z',
+          evaluation: corrupted,
+        },
+        confirmation: null,
+      }),
+    ).toThrowError(
+      expect.objectContaining({ code: 'MULTIMODAL_SESSION_FAILED' }),
+    );
   });
 
   it('rejects persisted Arena receipts with a non-successor revision', () => {
-    expect(() => readMultimodalReleaseStatus({
-      validationResult: {
-        schemaVersion: 1,
-        action: 'skill.media.test.start',
-        idempotencyKey: 'arena-bad-revision',
-        requestHash: 'a'.repeat(64),
-        baseRevisionNo: 10,
-        resultRevisionNo: 12,
-        recordedAt: '2026-08-23T12:00:00.000Z',
-        evaluation: evaluation(10, 'c'.repeat(64)),
-      },
-      confirmation: null,
-    })).toThrowError(expect.objectContaining({ code: 'MULTIMODAL_SESSION_FAILED' }));
+    expect(() =>
+      readMultimodalReleaseStatus({
+        validationResult: {
+          schemaVersion: 1,
+          action: 'skill.media.test.start',
+          idempotencyKey: 'arena-bad-revision',
+          requestHash: 'a'.repeat(64),
+          baseRevisionNo: 10,
+          resultRevisionNo: 12,
+          recordedAt: '2026-08-23T12:00:00.000Z',
+          evaluation: evaluation(10, 'c'.repeat(64)),
+        },
+        confirmation: null,
+      }),
+    ).toThrowError(
+      expect.objectContaining({ code: 'MULTIMODAL_SESSION_FAILED' }),
+    );
   });
 
   it('rejects malformed published skill version mappings before exposing them', () => {
-    expect(() => readMultimodalReleaseStatus({
-      validationResult: null,
-      confirmation: {
-        schemaVersion: 1,
-        action: 'skill.media.publish',
-        idempotencyKey: 'publish-corrupt',
-        requestHash: 'b'.repeat(64),
-        baseRevisionNo: 11,
-        resultRevisionNo: 12,
-        packageId: '51',
-        packageVersionId: '61',
-        packageVersionNumber: 1,
-        skillVersionIds: { 'skill-1': 71 },
-        publishedAt: '2026-08-23T12:00:00.000Z',
-      },
-    })).toThrowError(expect.objectContaining({ code: 'MULTIMODAL_SESSION_FAILED' }));
+    expect(() =>
+      readMultimodalReleaseStatus({
+        validationResult: null,
+        confirmation: {
+          schemaVersion: 1,
+          action: 'skill.media.publish',
+          idempotencyKey: 'publish-corrupt',
+          requestHash: 'b'.repeat(64),
+          baseRevisionNo: 11,
+          resultRevisionNo: 12,
+          packageId: '51',
+          packageVersionId: '61',
+          packageVersionNumber: 1,
+          skillVersionIds: { 'skill-1': 71 },
+          publishedAt: '2026-08-23T12:00:00.000Z',
+        },
+      }),
+    ).toThrowError(
+      expect.objectContaining({ code: 'MULTIMODAL_SESSION_FAILED' }),
+    );
   });
 });

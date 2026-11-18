@@ -30,7 +30,10 @@ export function createSkillArenaState(): SkillArenaState {
   };
 }
 
-export function skillArenaReducer(state: SkillArenaState, event: SkillArenaEvent): SkillArenaState {
+export function skillArenaReducer(
+  state: SkillArenaState,
+  event: SkillArenaEvent,
+): SkillArenaState {
   if (event.type === 'reset') return createSkillArenaState();
   if (event.type === 'draft') return { ...state, draft: event.value };
   if (event.type === 'submit') {
@@ -45,7 +48,8 @@ export function skillArenaReducer(state: SkillArenaState, event: SkillArenaEvent
   }
   if (event.type === 'side_done') {
     const doneKey = event.side === 'baseline' ? 'baselineDone' : 'enhancedDone';
-    const otherDone = event.side === 'baseline' ? state.enhancedDone : state.baselineDone;
+    const otherDone =
+      event.side === 'baseline' ? state.enhancedDone : state.baselineDone;
     return {
       ...state,
       [event.side]: event.content,

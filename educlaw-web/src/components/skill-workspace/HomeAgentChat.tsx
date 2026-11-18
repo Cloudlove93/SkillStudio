@@ -65,10 +65,7 @@ export function HomeAgentChat({
         </div>
       ) : !thread ? (
         <div className="home-agent-chat-state" role="status" aria-live="polite">
-          <span
-            className="home-agent-chat-spinner"
-            aria-hidden="true"
-          />
+          <span className="home-agent-chat-spinner" aria-hidden="true" />
           <p>{creating ? '正在创建新对话…' : '正在准备对话…'}</p>
         </div>
       ) : (

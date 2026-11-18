@@ -43,8 +43,7 @@ export function SkillVersionContentDialog({
   const dirty = editing && draft !== original;
   const title = version.skill.name || version.skill.dirName;
   const canLeave = useCallback(
-    () =>
-      !dirty || window.confirm('尚未保存的修改会丢失，确定离开吗？'),
+    () => !dirty || window.confirm('尚未保存的修改会丢失，确定离开吗？'),
     [dirty],
   );
   const requestClose = useCallback(() => {
@@ -118,7 +117,9 @@ export function SkillVersionContentDialog({
         <header className="skill-content-head">
           <div>
             <span className="skill-eyebrow">Skill 内容</span>
-            <h3>{title} · v{version.versionNumber}</h3>
+            <h3>
+              {title} · v{version.versionNumber}
+            </h3>
             <p>当前只展示此固定版本真实保存的 SKILL.md。</p>
           </div>
           <div className="skill-content-head-actions">
@@ -138,7 +139,11 @@ export function SkillVersionContentDialog({
                   onClick={() => void save()}
                   disabled={saving || !dirty}
                 >
-                  {saving ? <Loader2 className="spin" size={15} /> : <Save size={15} />}
+                  {saving ? (
+                    <Loader2 className="spin" size={15} />
+                  ) : (
+                    <Save size={15} />
+                  )}
                   保存为新版本
                 </button>
               </>
@@ -165,11 +170,17 @@ export function SkillVersionContentDialog({
           </div>
         </header>
 
-        {error ? <div className="skill-content-error" role="alert">{error}</div> : null}
+        {error ? (
+          <div className="skill-content-error" role="alert">
+            {error}
+          </div>
+        ) : null}
 
         <div className={`skill-content-layout ${editing ? 'is-editing' : ''}`}>
           <aside className="skill-content-tree" aria-label="Skill 文件">
-            <div><FolderOpen size={15} /> {version.skill.dirName}</div>
+            <div>
+              <FolderOpen size={15} /> {version.skill.dirName}
+            </div>
             <button type="button" className="is-selected" aria-current="page">
               <FileText size={14} />
               SKILL.md
@@ -199,7 +210,9 @@ export function SkillVersionContentDialog({
                   />
                 </label>
                 <section aria-label="SKILL.md 实时预览">
-                  <h4><Eye size={14} /> 实时预览</h4>
+                  <h4>
+                    <Eye size={14} /> 实时预览
+                  </h4>
                   <div className="skill-content-rendered">
                     <SkillMarkdownContent content={draft} />
                   </div>

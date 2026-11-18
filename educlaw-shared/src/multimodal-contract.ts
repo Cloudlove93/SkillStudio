@@ -984,13 +984,29 @@ function parseEvidenceProvenance(
   };
 }
 
-export function parseVisualObservation(value: unknown, path = 'visualObservation'): MultimodalVisualObservation {
+export function parseVisualObservation(
+  value: unknown,
+  path = 'visualObservation',
+): MultimodalVisualObservation {
   const record = readRecord(value, path);
   ensureExactKeys(record, path, ['visibleText', 'uncertainties']);
-  const visibleText = readDenseArray(record.visibleText, `${path}.visibleText`, {maxLength:4}).map((item,index)=>readString(item,`${path}.visibleText[${index}]`,200));
-  const uncertainties = readDenseArray(record.uncertainties, `${path}.uncertainties`, {maxLength:2}).map((item,index)=>readString(item,`${path}.uncertainties[${index}]`,120));
-  if (!visibleText.length && !uncertainties.length) fail(`${path} must report visible content or uncertainty`);
-  return {visibleText,uncertainties};
+  const visibleText = readDenseArray(
+    record.visibleText,
+    `${path}.visibleText`,
+    { maxLength: 4 },
+  ).map((item, index) =>
+    readString(item, `${path}.visibleText[${index}]`, 200),
+  );
+  const uncertainties = readDenseArray(
+    record.uncertainties,
+    `${path}.uncertainties`,
+    { maxLength: 2 },
+  ).map((item, index) =>
+    readString(item, `${path}.uncertainties[${index}]`, 120),
+  );
+  if (!visibleText.length && !uncertainties.length)
+    fail(`${path} must report visible content or uncertainty`);
+  return { visibleText, uncertainties };
 }
 
 export function parseEvidenceCard(value: unknown): MultimodalEvidence {
@@ -1013,7 +1029,8 @@ export function parseEvidenceCard(value: unknown): MultimodalEvidence {
     `${path}.kind`,
     MULTIMODAL_EVIDENCE_KINDS,
   );
-  if (record.visualObservation !== undefined && kind !== 'frame') fail(`${path}.visualObservation requires a frame`);
+  if (record.visualObservation !== undefined && kind !== 'frame')
+    fail(`${path}.visualObservation requires a frame`);
   const assetRef =
     record.assetRef === undefined || record.assetRef === null
       ? (record.assetRef ?? undefined)
@@ -1027,7 +1044,14 @@ export function parseEvidenceCard(value: unknown): MultimodalEvidence {
   return {
     evidenceId: readSafeId(record.evidenceId, `${path}.evidenceId`),
     kind,
-    ...(record.visualObservation !== undefined ? {visualObservation:parseVisualObservation(record.visualObservation,`${path}.visualObservation`)} : {}),
+    ...(record.visualObservation !== undefined
+      ? {
+          visualObservation: parseVisualObservation(
+            record.visualObservation,
+            `${path}.visualObservation`,
+          ),
+        }
+      : {}),
     source: parseEvidenceSource(record.source, `${path}.source`),
     timeRange: parseTimeRange(record.timeRange, `${path}.timeRange`),
     text: readString(record.text, `${path}.text`, MAX_TEXT_LENGTH),
@@ -1951,7 +1975,9 @@ export function parseRiaSkillDrafts(
               `${factPath}.evidenceId`,
             );
             if (!sourceEvidenceIds.includes(evidenceId)) {
-              fail(`${factPath}.evidenceId must belong to ria.sourceEvidenceIds`);
+              fail(
+                `${factPath}.evidenceId must belong to ria.sourceEvidenceIds`,
+              );
             }
             return {
               evidenceId,

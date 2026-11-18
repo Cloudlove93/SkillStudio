@@ -194,8 +194,8 @@ export function DocumentSkillCreationPanel({
           <span className="skill-eyebrow">从描述文档生成</span>
           <h1>上传文档，生成教育 Agent</h1>
           <p>
-            上传需求说明、教学设计或其他描述文档。每份文档会分别生成一个
-            Agent 包，也可以补充统一要求。
+            上传需求说明、教学设计或其他描述文档。每份文档会分别生成一个 Agent
+            包，也可以补充统一要求。
           </p>
         </header>
 
@@ -237,7 +237,9 @@ export function DocumentSkillCreationPanel({
                 onRemixPreset(preset);
                 return;
               }
-              setInstruction(`基于「${preset.name}」改造：\n${presetToPrompt(preset)}`);
+              setInstruction(
+                `基于「${preset.name}」改造：\n${presetToPrompt(preset)}`,
+              );
             }}
             onDismiss={() => setDismissedPresetKey(presetRecommendationKey)}
           />

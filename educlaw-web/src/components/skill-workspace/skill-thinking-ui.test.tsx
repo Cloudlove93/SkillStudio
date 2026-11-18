@@ -28,12 +28,7 @@ describe('Skill thinking controls', () => {
     const onChange = vi.fn();
     await act(async () => {
       root.render(
-        <SkillThinkingToggle
-          enabled
-          disabled
-          supported
-          onChange={onChange}
-        />,
+        <SkillThinkingToggle enabled disabled supported onChange={onChange} />,
       );
     });
 

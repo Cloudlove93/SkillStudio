@@ -42,7 +42,12 @@ describe('password registration', () => {
       );
 
     await expect(
-      register('teacher@example.test', 'strong-password', 'invite-code', 'teacher'),
+      register(
+        'teacher@example.test',
+        'strong-password',
+        'invite-code',
+        'teacher',
+      ),
     ).resolves.toEqual({
       access_token: 'real-access-token',
       refresh_token: 'real-refresh-token',

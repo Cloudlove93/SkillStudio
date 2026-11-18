@@ -69,7 +69,9 @@ export function SkillPinnedUpdate({ update, onAction, onDismiss }: Props) {
       onFocus={pauseDismiss}
       onBlur={resumeDismiss}
     >
-      <span className="skill-transient-notification-icon"><Sparkles size={14} /></span>
+      <span className="skill-transient-notification-icon">
+        <Sparkles size={14} />
+      </span>
       <div className="skill-transient-notification-copy">
         <strong>{update.title}</strong>
         <span>{update.message}</span>
@@ -77,7 +79,11 @@ export function SkillPinnedUpdate({ update, onAction, onDismiss }: Props) {
       {update.actionLabel && (
         <button onClick={runAction}>{update.actionLabel}</button>
       )}
-      <button className="skill-transient-notification-dismiss" onClick={onDismiss} aria-label="关闭提示">
+      <button
+        className="skill-transient-notification-dismiss"
+        onClick={onDismiss}
+        aria-label="关闭提示"
+      >
         <X size={14} />
       </button>
     </div>

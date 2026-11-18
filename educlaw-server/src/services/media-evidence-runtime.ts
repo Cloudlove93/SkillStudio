@@ -30,7 +30,9 @@ type CreateSignedGetGrant = (input: {
   objectKey: string;
 }) => Promise<ObjectStorageGrant>;
 type ReadFrameDataUrl = (assetRef: MultimodalAssetRef) => Promise<string>;
-type OpenReadStream = ReturnType<typeof createObjectStorageService>['openReadStream'];
+type OpenReadStream = ReturnType<
+  typeof createObjectStorageService
+>['openReadStream'];
 
 const PROMPT_VERSION = 'semantic-moments-v5-bounded-zh';
 const DEFAULT_SEMANTIC_CHUNK_CHAR_BUDGET = 48_000;
@@ -49,11 +51,15 @@ export function createVerifiedInlineFrameReader(
   openReadStream: OpenReadStream,
 ): ReadFrameDataUrl {
   return async (assetRef) => {
-    if (assetRef.mimeType !== 'image/png' || assetRef.sizeBytes > MAX_INLINE_FRAME_BYTES) {
+    if (
+      assetRef.mimeType !== 'image/png' ||
+      assetRef.sizeBytes > MAX_INLINE_FRAME_BYTES
+    ) {
       throw new Error('FRAME_INLINE_ASSET_INVALID');
     }
     const opened = await openReadStream({ objectKey: assetRef.objectKey });
-    const storedMimeType = opened.object.metadataMimeType ?? opened.object.contentType;
+    const storedMimeType =
+      opened.object.metadataMimeType ?? opened.object.contentType;
     if (
       opened.object.objectKey !== assetRef.objectKey ||
       opened.object.sizeBytes !== assetRef.sizeBytes ||
@@ -68,14 +74,20 @@ export function createVerifiedInlineFrameReader(
     for await (const chunk of opened.body) {
       const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
       totalBytes += buffer.length;
-      if (totalBytes > assetRef.sizeBytes || totalBytes > MAX_INLINE_FRAME_BYTES) {
+      if (
+        totalBytes > assetRef.sizeBytes ||
+        totalBytes > MAX_INLINE_FRAME_BYTES
+      ) {
         opened.body.destroy();
         throw new Error('FRAME_INLINE_ASSET_SIZE_INVALID');
       }
       digest.update(buffer);
       chunks.push(buffer);
     }
-    if (totalBytes !== assetRef.sizeBytes || digest.digest('hex') !== assetRef.sha256) {
+    if (
+      totalBytes !== assetRef.sizeBytes ||
+      digest.digest('hex') !== assetRef.sha256
+    ) {
       throw new Error('FRAME_INLINE_ASSET_INTEGRITY_INVALID');
     }
     return `data:${assetRef.mimeType};base64,${Buffer.concat(chunks).toString('base64')}`;
@@ -86,7 +98,10 @@ function fallbackMoments(durationMs: number): SemanticMomentDraft[] {
   const count = Math.max(1, Math.min(8, Math.ceil(durationMs / 300_000)));
   return Array.from({ length: count }, (_, index) => {
     const startMs = Math.floor((durationMs * index) / count);
-    const endMs = Math.max(startMs + 1, Math.floor((durationMs * (index + 1)) / count));
+    const endMs = Math.max(
+      startMs + 1,
+      Math.floor((durationMs * (index + 1)) / count),
+    );
     return {
       startMs,
       endMs: Math.min(durationMs, endMs),
@@ -108,7 +123,9 @@ type TranscriptPromptSegment = {
   confidence: number | null;
 };
 
-function transcriptPrompt(transcript: MultimodalTranscript): TranscriptPromptSegment[] {
+function transcriptPrompt(
+  transcript: MultimodalTranscript,
+): TranscriptPromptSegment[] {
   return transcript.segments.slice(0, 10_000).map((segment) => ({
     startMs: segment.startMs,
     endMs: segment.endMs,
@@ -222,7 +239,10 @@ export function createProductionVisionRankingAdapter(options: {
           candidateId: string;
           score: number;
           reason: string;
-          visualObservation?: {visibleText:string[];uncertainties:string[]};
+          visualObservation?: {
+            visibleText: string[];
+            uncertainties: string[];
+          };
         }>;
       }>({
         systemPrompt: [
@@ -259,7 +279,13 @@ export function createProductionVisionRankingAdapter(options: {
         maxTokens: options.maxTokens,
       });
       return {
-        rankings: response.rankings.map(ranking=>({...ranking,visualObservation:ranking.visualObservation ?? {visibleText:[],uncertainties:['模型未提供可见内容摘录，待人工核对。']}})),
+        rankings: response.rankings.map((ranking) => ({
+          ...ranking,
+          visualObservation: ranking.visualObservation ?? {
+            visibleText: [],
+            uncertainties: ['模型未提供可见内容摘录，待人工核对。'],
+          },
+        })),
         model: options.visionModel,
       };
     },

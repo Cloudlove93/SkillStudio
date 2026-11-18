@@ -275,35 +275,38 @@ describe('resumable Skill run lifecycle', () => {
       );
     });
     expect(container.textContent).toContain('第一段真实回答，第二段继续生成');
-    expect(
-      container.querySelector('[data-skill-run-activity]'),
-    ).toBeNull();
+    expect(container.querySelector('[data-skill-run-activity]')).toBeNull();
   });
   it.each([
     ['cancelled', null],
     ['failed', 'model failed'],
-  ] as const)('removes activity status when a run becomes %s', async (status, error) => {
-    api.startArenaRun.mockResolvedValue(
-      run({ content: '', reasoningContent: '' }),
-    );
-    await render();
-    await send();
-    expect(container.querySelector('[data-skill-run-activity]')).not.toBeNull();
-
-    await act(async () => {
-      receive(
-        run({
-          revision: 2,
-          status,
-          content: '已收到的部分回答',
-          reasoningContent: '',
-          error,
-        }),
+  ] as const)(
+    'removes activity status when a run becomes %s',
+    async (status, error) => {
+      api.startArenaRun.mockResolvedValue(
+        run({ content: '', reasoningContent: '' }),
       );
-    });
-    expect(container.textContent).toContain('已收到的部分回答');
-    expect(container.querySelector('[data-skill-run-activity]')).toBeNull();
-  });
+      await render();
+      await send();
+      expect(
+        container.querySelector('[data-skill-run-activity]'),
+      ).not.toBeNull();
+
+      await act(async () => {
+        receive(
+          run({
+            revision: 2,
+            status,
+            content: '已收到的部分回答',
+            reasoningContent: '',
+            error,
+          }),
+        );
+      });
+      expect(container.textContent).toContain('已收到的部分回答');
+      expect(container.querySelector('[data-skill-run-activity]')).toBeNull();
+    },
+  );
   it('uses the real reasoning block without duplicating the thinking status', async () => {
     api.startArenaRun.mockResolvedValue(
       run({ content: '', reasoningContent: '' }),
@@ -322,9 +325,9 @@ describe('resumable Skill run lifecycle', () => {
     });
     expect(container.textContent).toContain('真实 reasoning 事件');
     expect(container.querySelector('[data-skill-run-activity]')).toBeNull();
-    expect(
-      container.querySelectorAll('[aria-label="正在思考"]'),
-    ).toHaveLength(1);
+    expect(container.querySelectorAll('[aria-label="正在思考"]')).toHaveLength(
+      1,
+    );
   });
   it('does not show activity status for completed history', async () => {
     api.recoverArenaRun.mockResolvedValue({
@@ -360,7 +363,10 @@ describe('resumable Skill run lifecycle', () => {
     await render();
     expect(container.textContent).toContain('partial-answer');
     expect(container.textContent).toContain('partial-reason');
-    expect(api.subscribeArenaRun.mock.calls.map(call => call[2])).toEqual(['r1', 'r1']);
+    expect(api.subscribeArenaRun.mock.calls.map((call) => call[2])).toEqual([
+      'r1',
+      'r1',
+    ]);
     expect(api.startArenaRun).not.toHaveBeenCalled();
     expect(api.stopArenaRun).not.toHaveBeenCalled();
   });

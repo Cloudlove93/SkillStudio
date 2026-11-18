@@ -8,13 +8,38 @@ import CodeBlock from './CodeBlock';
 import { useT } from '../../i18n';
 
 const EXT_LANG: Record<string, string> = {
-  ts: 'TypeScript', tsx: 'TSX', js: 'JavaScript', jsx: 'JSX',
-  json: 'JSON', md: 'Markdown', css: 'CSS', html: 'HTML',
-  py: 'Python', go: 'Go', rs: 'Rust', sh: 'Shell', bash: 'Shell',
-  yml: 'YAML', yaml: 'YAML', toml: 'TOML', sql: 'SQL',
-  xml: 'XML', svg: 'SVG', java: 'Java', c: 'C', cpp: 'C++',
-  h: 'C', hpp: 'C++', rb: 'Ruby', php: 'PHP', swift: 'Swift',
-  kt: 'Kotlin', lua: 'Lua', r: 'R', zig: 'Zig', txt: 'Text',
+  ts: 'TypeScript',
+  tsx: 'TSX',
+  js: 'JavaScript',
+  jsx: 'JSX',
+  json: 'JSON',
+  md: 'Markdown',
+  css: 'CSS',
+  html: 'HTML',
+  py: 'Python',
+  go: 'Go',
+  rs: 'Rust',
+  sh: 'Shell',
+  bash: 'Shell',
+  yml: 'YAML',
+  yaml: 'YAML',
+  toml: 'TOML',
+  sql: 'SQL',
+  xml: 'XML',
+  svg: 'SVG',
+  java: 'Java',
+  c: 'C',
+  cpp: 'C++',
+  h: 'C',
+  hpp: 'C++',
+  rb: 'Ruby',
+  php: 'PHP',
+  swift: 'Swift',
+  kt: 'Kotlin',
+  lua: 'Lua',
+  r: 'R',
+  zig: 'Zig',
+  txt: 'Text',
 };
 
 function detectLanguageLabel(filePath: string): string {
@@ -36,7 +61,16 @@ function isPreviewable(filePath: string): boolean {
   return isHtmlFile(filePath) || isMarkdownFile(filePath);
 }
 
-const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'ico', 'bmp']);
+const IMAGE_EXTS = new Set([
+  'png',
+  'jpg',
+  'jpeg',
+  'gif',
+  'svg',
+  'webp',
+  'ico',
+  'bmp',
+]);
 
 function isImageFile(filePath: string): boolean {
   const ext = filePath.split('.').pop()?.toLowerCase() ?? '';
@@ -126,25 +160,29 @@ export default function FileViewer({
     }
   }, []);
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === 's') {
-      e.preventDefault();
-      handleSave();
-      return;
-    }
-    if (e.key === 'Tab') {
-      e.preventDefault();
-      const ta = e.currentTarget;
-      const start = ta.selectionStart;
-      const end = ta.selectionEnd;
-      const value = ta.value;
-      const newValue = value.substring(0, start) + '  ' + value.substring(end);
-      setDraft(newValue);
-      requestAnimationFrame(() => {
-        ta.selectionStart = ta.selectionEnd = start + 2;
-      });
-    }
-  }, [handleSave]);
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault();
+        handleSave();
+        return;
+      }
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        const ta = e.currentTarget;
+        const start = ta.selectionStart;
+        const end = ta.selectionEnd;
+        const value = ta.value;
+        const newValue =
+          value.substring(0, start) + '  ' + value.substring(end);
+        setDraft(newValue);
+        requestAnimationFrame(() => {
+          ta.selectionStart = ta.selectionEnd = start + 2;
+        });
+      }
+    },
+    [handleSave],
+  );
 
   // Build blob URL for HTML preview 閳?uses draft so preview updates after save
   const previewUrl = useMemo(() => {
@@ -157,7 +195,9 @@ export default function FileViewer({
 
   // Cleanup blob URL
   useEffect(() => {
-    return () => { if (previewUrl) URL.revokeObjectURL(previewUrl); };
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
   }, [previewUrl]);
 
   const imageUrl = useMemo(() => {
@@ -179,9 +219,16 @@ export default function FileViewer({
         <div className="flex items-center gap-1.5 rounded-md bg-muted/40 px-2 py-0.5 text-xs">
           <Code className="size-3 text-muted-foreground/50" />
           <span className="font-medium text-foreground">{fileName}</span>
-          {dirty && <span className="size-1.5 rounded-full bg-orange-400 shadow-sm shadow-orange-400/50" title={t('viewer.unsavedTitle')} />}
+          {dirty && (
+            <span
+              className="size-1.5 rounded-full bg-orange-400 shadow-sm shadow-orange-400/50"
+              title={t('viewer.unsavedTitle')}
+            />
+          )}
         </div>
-        <span className="text-[10px] text-muted-foreground/50 truncate font-mono">{filePath}</span>
+        <span className="text-[10px] text-muted-foreground/50 truncate font-mono">
+          {filePath}
+        </span>
 
         <div className="flex-1" />
 
@@ -191,7 +238,9 @@ export default function FileViewer({
           </span>
         )}
         {saving && (
-          <span className="text-[10px] text-muted-foreground/60">{t('viewer.saving')}</span>
+          <span className="text-[10px] text-muted-foreground/60">
+            {t('viewer.saving')}
+          </span>
         )}
 
         {/* Preview / Source toggle for HTML & Markdown */}
@@ -250,7 +299,13 @@ export default function FileViewer({
           <RotateCw className={`size-3.5 ${loading ? 'animate-spin' : ''}`} />
         </Button>
         <div className="mx-0.5 h-3 w-px bg-border/40" />
-        <Button variant="ghost" size="icon-xs" onClick={handleClose} title={t('viewer.close')} className="rounded-full">
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          onClick={handleClose}
+          title={t('viewer.close')}
+          className="rounded-full"
+        >
           <X className="size-3.5" />
         </Button>
       </div>
@@ -265,7 +320,8 @@ export default function FileViewer({
       {/* Loading */}
       {!image && loading && content === null && (
         <div className="flex flex-1 items-center justify-center text-xs text-muted-foreground">
-          <RotateCw className="mr-1.5 size-3 animate-spin" /> {t('viewer.loading')}
+          <RotateCw className="mr-1.5 size-3 animate-spin" />{' '}
+          {t('viewer.loading')}
         </div>
       )}
 
@@ -305,14 +361,19 @@ export default function FileViewer({
                     return (
                       <div className="not-prose my-3 rounded-lg border border-border overflow-hidden max-w-full">
                         <div className="flex items-center justify-between bg-muted/60 px-3 py-1.5">
-                          <span className="text-[10px] font-mono font-medium text-muted-foreground uppercase tracking-wide">{match[1]}</span>
+                          <span className="text-[10px] font-mono font-medium text-muted-foreground uppercase tracking-wide">
+                            {match[1]}
+                          </span>
                         </div>
                         <CodeBlock code={code} language={match[1]} />
                       </div>
                     );
                   }
                   return (
-                    <code className="rounded-md bg-muted/70 px-1.5 py-0.5 text-xs font-mono text-foreground/90 before:content-none after:content-none" {...props}>
+                    <code
+                      className="rounded-md bg-muted/70 px-1.5 py-0.5 text-xs font-mono text-foreground/90 before:content-none after:content-none"
+                      {...props}
+                    >
                       {children}
                     </code>
                   );
@@ -323,7 +384,9 @@ export default function FileViewer({
                 table({ children }) {
                   return (
                     <div className="not-prose my-3 overflow-x-auto rounded-lg border border-border shadow-sm">
-                      <table className="w-full text-xs border-collapse">{children}</table>
+                      <table className="w-full text-xs border-collapse">
+                        {children}
+                      </table>
                     </div>
                   );
                 },
@@ -350,7 +413,12 @@ export default function FileViewer({
                 },
                 a({ href, children }) {
                   return (
-                    <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary/80 underline underline-offset-2 decoration-primary/30">
+                    <a
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:text-primary/80 underline underline-offset-2 decoration-primary/30"
+                    >
                       {children}
                     </a>
                   );
@@ -372,13 +440,17 @@ export default function FileViewer({
             aria-hidden
           >
             {Array.from({ length: lineCount }, (_, i) => (
-              <div key={i} className="px-3">{i + 1}</div>
+              <div key={i} className="px-3">
+                {i + 1}
+              </div>
             ))}
           </div>
           <textarea
             ref={textareaRef}
             value={draft}
-            onChange={(e) => { if (!readonly) setDraft(e.target.value); }}
+            onChange={(e) => {
+              if (!readonly) setDraft(e.target.value);
+            }}
             onScroll={syncScroll}
             onKeyDown={readonly ? undefined : handleKeyDown}
             readOnly={readonly}
@@ -399,13 +471,29 @@ export default function FileViewer({
             </>
           ) : showPreview ? (
             <>
-              <span className="font-medium">{html ? t('viewer.htmlPreview') : t('viewer.mdPreview')}</span>
-              {dirty && <span className="text-orange-500">{t('viewer.previewUnsaved')}</span>}
+              <span className="font-medium">
+                {html ? t('viewer.htmlPreview') : t('viewer.mdPreview')}
+              </span>
+              {dirty && (
+                <span className="text-orange-500">
+                  {t('viewer.previewUnsaved')}
+                </span>
+              )}
             </>
           ) : (
             <>
-              <span>{t('viewer.lines')} <span className="font-medium text-foreground/60">{lineCount}</span></span>
-              <span>{t('viewer.chars')} <span className="font-medium text-foreground/60">{draft.length}</span></span>
+              <span>
+                {t('viewer.lines')}{' '}
+                <span className="font-medium text-foreground/60">
+                  {lineCount}
+                </span>
+              </span>
+              <span>
+                {t('viewer.chars')}{' '}
+                <span className="font-medium text-foreground/60">
+                  {draft.length}
+                </span>
+              </span>
             </>
           )}
           <div className="flex-1" />

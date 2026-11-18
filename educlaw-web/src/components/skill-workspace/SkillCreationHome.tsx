@@ -10,10 +10,7 @@ import {
   Plus,
   X,
 } from 'lucide-react';
-import {
-  recommendPresets,
-  type StudioPreset,
-} from '../../lib/studio-presets';
+import { recommendPresets, type StudioPreset } from '../../lib/studio-presets';
 import { PresetRecommendation } from './PresetRecommendation';
 
 type PromptSeed = { id: string; text: string };
@@ -201,7 +198,11 @@ export function SkillCreationHome({
                 </strong>
                 <small>教案、课例、反思文档拖入上传区，生成 Agent 包</small>
               </span>
-              <ArrowRight className="skill-home-way-arrow" size={15} aria-hidden="true" />
+              <ArrowRight
+                className="skill-home-way-arrow"
+                size={15}
+                aria-hidden="true"
+              />
             </button>
 
             <button type="button" className="is-manual" onClick={onOpenManual}>
@@ -214,10 +215,18 @@ export function SkillCreationHome({
                 </strong>
                 <small>方法已成型时，跳过对话直接定义草案字段</small>
               </span>
-              <ArrowRight className="skill-home-way-arrow" size={15} aria-hidden="true" />
+              <ArrowRight
+                className="skill-home-way-arrow"
+                size={15}
+                aria-hidden="true"
+              />
             </button>
 
-            <button type="button" className="is-workflow" onClick={onOpenWorkflow}>
+            <button
+              type="button"
+              className="is-workflow"
+              onClick={onOpenWorkflow}
+            >
               <span className="skill-home-way-icon is-workflow">
                 <GitBranch size={19} aria-hidden="true" />
               </span>
@@ -227,7 +236,11 @@ export function SkillCreationHome({
                 </strong>
                 <small>先创建流程，再按需要添加并绑定 Skill 节点</small>
               </span>
-              <ArrowRight className="skill-home-way-arrow" size={15} aria-hidden="true" />
+              <ArrowRight
+                className="skill-home-way-arrow"
+                size={15}
+                aria-hidden="true"
+              />
             </button>
           </div>
         </section>

@@ -29,7 +29,11 @@ function CopyMessageButton({ message }: { message: Message }) {
       title={t('message.copy')}
     >
       <span className="inline-flex items-center gap-1">
-        {copied ? <Check className="size-3 text-green-500" /> : <Copy className="size-3" />}
+        {copied ? (
+          <Check className="size-3 text-green-500" />
+        ) : (
+          <Copy className="size-3" />
+        )}
         {copied ? t('message.copied') : t('shared.copy')}
       </span>
     </button>
@@ -80,7 +84,7 @@ export default function MessageItem({
   const displayParts = hasTextPart
     ? message.parts.filter((p) => p.type !== 'reasoning')
     : message.parts.map((p) =>
-        p.type === 'reasoning' ? { ...p, type: 'text' as const } : p
+        p.type === 'reasoning' ? { ...p, type: 'text' as const } : p,
       );
 
   // Find the last "content" part — the one actively being written to
@@ -93,9 +97,13 @@ export default function MessageItem({
       </div>
       <div className="flex-1 min-w-0 space-y-2">
         <div className="flex items-center gap-2">
-          <span className="text-[11px] font-medium tracking-[0.16em] text-muted-foreground/60 uppercase">Assistant</span>
+          <span className="text-[11px] font-medium tracking-[0.16em] text-muted-foreground/60 uppercase">
+            Assistant
+          </span>
           {isStreaming ? (
-            <PremiumPill accent="emerald" icon={Sparkles}>{t('message.streaming')}</PremiumPill>
+            <PremiumPill accent="emerald" icon={Sparkles}>
+              {t('message.streaming')}
+            </PremiumPill>
           ) : null}
           <CopyMessageButton message={message} />
         </div>
@@ -113,7 +121,9 @@ export default function MessageItem({
               <span className="size-2 rounded-full bg-primary/60 animate-bounce [animation-delay:0ms]" />
               <span className="size-2 rounded-full bg-primary/60 animate-bounce [animation-delay:150ms]" />
               <span className="size-2 rounded-full bg-primary/60 animate-bounce [animation-delay:300ms]" />
-              <span className="text-xs text-muted-foreground">{t('message.thinking')}</span>
+              <span className="text-xs text-muted-foreground">
+                {t('message.thinking')}
+              </span>
             </div>
           )}
         </div>

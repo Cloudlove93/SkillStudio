@@ -46,7 +46,9 @@ describe('db schema initialization', () => {
       'create table if not exists agent_package_versions',
     );
     expect(schemaSql).toContain('create table if not exists arena_threads');
-    expect(schemaSql).toContain('create table if not exists arena_thread_variants');
+    expect(schemaSql).toContain(
+      'create table if not exists arena_thread_variants',
+    );
     expect(schemaSql).toContain('create table if not exists arena_messages');
     expect(schemaSql).toContain('create table if not exists arena_runs');
     expect(schemaSql).toContain('create table if not exists optimization_runs');
@@ -101,18 +103,32 @@ describe('db schema initialization', () => {
 
   it('installs legacy composite keys before tables that reference them', async () => {
     const { schemaStatements } = await import('./db-schema.js');
-    const normalized = schemaStatements.map((statement) => statement.toLowerCase());
+    const normalized = schemaStatements.map((statement) =>
+      statement.toLowerCase(),
+    );
     const statementIndex = (needle: string) =>
       normalized.findIndex((statement) => statement.includes(needle));
 
-    expect(statementIndex("conname = 'uq_agent_package_versions_id_package'"))
-      .toBeLessThan(statementIndex('create table if not exists agent_skill_versions'));
-    expect(statementIndex("conname = 'uq_agent_package_skills_id_package'"))
-      .toBeLessThan(statementIndex('create table if not exists agent_package_version_skills'));
-    expect(statementIndex("conname = 'uq_agent_skill_versions_id_skill_package'"))
-      .toBeLessThan(statementIndex('create table if not exists agent_package_version_skills'));
-    expect(statementIndex("conname = 'uq_arena_threads_id_package'"))
-      .toBeLessThan(statementIndex('create table if not exists arena_thread_variants'));
+    expect(
+      statementIndex("conname = 'uq_agent_package_versions_id_package'"),
+    ).toBeLessThan(
+      statementIndex('create table if not exists agent_skill_versions'),
+    );
+    expect(
+      statementIndex("conname = 'uq_agent_package_skills_id_package'"),
+    ).toBeLessThan(
+      statementIndex('create table if not exists agent_package_version_skills'),
+    );
+    expect(
+      statementIndex("conname = 'uq_agent_skill_versions_id_skill_package'"),
+    ).toBeLessThan(
+      statementIndex('create table if not exists agent_package_version_skills'),
+    );
+    expect(
+      statementIndex("conname = 'uq_arena_threads_id_package'"),
+    ).toBeLessThan(
+      statementIndex('create table if not exists arena_thread_variants'),
+    );
   });
 
   it('defines API idempotency storage for action based writes', async () => {
@@ -150,8 +166,12 @@ describe('db schema initialization', () => {
     expect(schemaSql).toContain("'completed'");
     expect(schemaSql).toContain("'failed'");
     expect(schemaSql).toContain("'cancelled'");
-    expect(schemaSql).toContain("documents_json jsonb not null default '[]'::jsonb");
-    expect(schemaSql).toContain("draft_json jsonb not null default '{}'::jsonb");
+    expect(schemaSql).toContain(
+      "documents_json jsonb not null default '[]'::jsonb",
+    );
+    expect(schemaSql).toContain(
+      "draft_json jsonb not null default '{}'::jsonb",
+    );
     expect(schemaSql).toContain(
       "field_states_json jsonb not null default '{}'::jsonb",
     );
@@ -194,7 +214,7 @@ describe('db schema initialization', () => {
     const schemaSql = multimodalSchemaStatements.join('\n').toLowerCase();
 
     expect(schemaSql).toContain(
-      'add column if not exists creation_mode text not null default \'guided\'',
+      "add column if not exists creation_mode text not null default 'guided'",
     );
     expect(schemaSql).toContain(
       'add column if not exists start_request_hash text',
@@ -209,9 +229,7 @@ describe('db schema initialization', () => {
     expect(schemaSql).toContain(
       'add column if not exists finalize_request_hash text',
     );
-    expect(schemaSql).toContain(
-      'create table if not exists skill_media_jobs',
-    );
+    expect(schemaSql).toContain('create table if not exists skill_media_jobs');
     expect(schemaSql).toContain(
       'create unique index if not exists uq_skill_media_jobs_idempotency',
     );
@@ -313,8 +331,12 @@ describe('db schema initialization', () => {
     );
     expect(schemaSql).toContain('base_package_version_id bigint');
     expect(schemaSql).toContain('arena_config_jsonb jsonb not null');
-    expect(schemaSql).toContain('create table if not exists arena_thread_variants');
-    expect(schemaSql).toContain("side text not null check (side in ('left', 'right'))");
+    expect(schemaSql).toContain(
+      'create table if not exists arena_thread_variants',
+    );
+    expect(schemaSql).toContain(
+      "side text not null check (side in ('left', 'right'))",
+    );
     expect(schemaSql).toContain('foreign key (thread_id, package_id)');
     expect(schemaSql).toContain(
       'references arena_threads(id, package_id) on delete cascade',

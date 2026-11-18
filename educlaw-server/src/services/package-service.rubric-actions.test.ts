@@ -143,7 +143,9 @@ async function loadService(state: SeedState) {
           sql.startsWith('select * from agent_package_versions where id = $1')
         ) {
           const version =
-            state.versions.find((item) => String(item.id) === String(args[0])) || null;
+            state.versions.find(
+              (item) => String(item.id) === String(args[0]),
+            ) || null;
           return { rows: version ? [version] : [], rowCount: version ? 1 : 0 };
         }
 

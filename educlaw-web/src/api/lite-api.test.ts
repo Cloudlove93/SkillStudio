@@ -5,11 +5,28 @@ import { LiteApiError, liteApi } from './lite-api';
 const encoder = new TextEncoder();
 
 describe('resumable Arena run API', () => {
-  it('sends the captured manual-edit version and preserves a conflict without retry',async()=>{
-    const fetchMock=vi.spyOn(globalThis,'fetch').mockResolvedValue(createJsonResponse({code:'PACKAGE_VERSION_CONFLICT',error:'版本已变化'},409));
-    await expect(liteApi.saveManualMarkdownEdit('token','7',{target:'agent',content:'# User draft',expectedPackageVersionId:'12'})).rejects.toMatchObject({status:409,code:'PACKAGE_VERSION_CONFLICT'});
+  it('sends the captured manual-edit version and preserves a conflict without retry', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        createJsonResponse(
+          { code: 'PACKAGE_VERSION_CONFLICT', error: '版本已变化' },
+          409,
+        ),
+      );
+    await expect(
+      liteApi.saveManualMarkdownEdit('token', '7', {
+        target: 'agent',
+        content: '# User draft',
+        expectedPackageVersionId: '12',
+      }),
+    ).rejects.toMatchObject({ status: 409, code: 'PACKAGE_VERSION_CONFLICT' });
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({target:'agent',content:'# User draft',expectedPackageVersionId:'12'});
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({
+      target: 'agent',
+      content: '# User draft',
+      expectedPackageVersionId: '12',
+    });
   });
   afterEach(() => vi.restoreAllMocks());
   it('starts and recovers a run with authenticated, scoped paths', async () => {
@@ -170,18 +187,32 @@ describe('liteApi multimodal media progress helpers', () => {
         }),
       );
 
-    const detail = await liteApi.getMediaSessionDetail('token-1', { sessionId: '101' });
-    const progress = await liteApi.getMediaProgress('token-1', { sessionId: '101' });
+    const detail = await liteApi.getMediaSessionDetail('token-1', {
+      sessionId: '101',
+    });
+    const progress = await liteApi.getMediaProgress('token-1', {
+      sessionId: '101',
+    });
 
     expect(detail.sessionId).toBe('101');
     expect(progress.currentJob?.percent).toBe(42);
-    const [detailUrl, detailInit] = fetchMock.mock.calls[0] as [string, RequestInit];
-    const [progressUrl, progressInit] = fetchMock.mock.calls[1] as [string, RequestInit];
+    const [detailUrl, detailInit] = fetchMock.mock.calls[0] as [
+      string,
+      RequestInit,
+    ];
+    const [progressUrl, progressInit] = fetchMock.mock.calls[1] as [
+      string,
+      RequestInit,
+    ];
 
     expect(detailUrl).toBe('/api');
     expect(detailInit.method).toBe('POST');
-    expect(new Headers(detailInit.headers).get('Authorization')).toBe('Bearer token-1');
-    expect(new Headers(detailInit.headers).get('Content-Type')).toBe('application/json');
+    expect(new Headers(detailInit.headers).get('Authorization')).toBe(
+      'Bearer token-1',
+    );
+    expect(new Headers(detailInit.headers).get('Content-Type')).toBe(
+      'application/json',
+    );
     expect(detailInit.body).toBe(
       JSON.stringify({
         action: 'skill.media.session.detail',
@@ -193,8 +224,12 @@ describe('liteApi multimodal media progress helpers', () => {
 
     expect(progressUrl).toBe('/api');
     expect(progressInit.method).toBe('POST');
-    expect(new Headers(progressInit.headers).get('Authorization')).toBe('Bearer token-1');
-    expect(new Headers(progressInit.headers).get('Content-Type')).toBe('application/json');
+    expect(new Headers(progressInit.headers).get('Authorization')).toBe(
+      'Bearer token-1',
+    );
+    expect(new Headers(progressInit.headers).get('Content-Type')).toBe(
+      'application/json',
+    );
     expect(progressInit.body).toBe(
       JSON.stringify({
         action: 'skill.media.progress',
@@ -215,18 +250,24 @@ describe('liteApi multimodal media progress helpers', () => {
     );
 
     const events: Array<{ event: string; data: unknown }> = [];
-    await liteApi.streamMediaProgress('token-2', { sessionId: '101' }, (event) => {
-      events.push(event as { event: string; data: unknown });
-    });
+    await liteApi.streamMediaProgress(
+      'token-2',
+      { sessionId: '101' },
+      (event) => {
+        events.push(event as { event: string; data: unknown });
+      },
+    );
 
-    const [url, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [
-      string,
-      RequestInit,
-    ];
+    const [url, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock
+      .calls[0] as [string, RequestInit];
     expect(url).toBe('/api');
     expect(init.method).toBe('POST');
-    expect(new Headers(init.headers).get('Authorization')).toBe('Bearer token-2');
-    expect(new Headers(init.headers).get('Content-Type')).toBe('application/json');
+    expect(new Headers(init.headers).get('Authorization')).toBe(
+      'Bearer token-2',
+    );
+    expect(new Headers(init.headers).get('Content-Type')).toBe(
+      'application/json',
+    );
     expect(init.body).toBe(
       JSON.stringify({
         action: 'skill.media.progress.stream',
@@ -283,9 +324,13 @@ describe('liteApi multimodal media progress helpers', () => {
     );
 
     const events: Array<{ event: string; data: unknown }> = [];
-    await liteApi.streamMediaProgress('token-2', { sessionId: '101' }, (event) => {
-      events.push(event as { event: string; data: unknown });
-    });
+    await liteApi.streamMediaProgress(
+      'token-2',
+      { sessionId: '101' },
+      (event) => {
+        events.push(event as { event: string; data: unknown });
+      },
+    );
 
     expect(events).toEqual([
       {
@@ -335,9 +380,13 @@ describe('liteApi multimodal media progress helpers', () => {
     );
 
     const mediaEvents: string[] = [];
-    await liteApi.streamMediaProgress('token-media', { sessionId: '101' }, (event) => {
-      mediaEvents.push(event.event);
-    });
+    await liteApi.streamMediaProgress(
+      'token-media',
+      { sessionId: '101' },
+      (event) => {
+        mediaEvents.push(event.event);
+      },
+    );
 
     expect(guidedEvents).toEqual(['phase', 'stream_end']);
     expect(mediaEvents).toEqual(['progress', 'stream_end']);
@@ -353,9 +402,13 @@ describe('liteApi multimodal media progress helpers', () => {
     );
 
     const events: Array<{ event: string; data: unknown }> = [];
-    await liteApi.streamMediaProgress('token-3', { sessionId: '101' }, (event) => {
-      events.push(event as { event: string; data: unknown });
-    });
+    await liteApi.streamMediaProgress(
+      'token-3',
+      { sessionId: '101' },
+      (event) => {
+        events.push(event as { event: string; data: unknown });
+      },
+    );
 
     expect(events).toEqual([
       {
@@ -391,14 +444,16 @@ describe('liteApi multimodal media progress helpers', () => {
   });
 
   it('sends the thinking preference and parses reasoning stream events', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      createSseResponse([
-        'event: thinking_status\ndata: {"requested":true,"enabled":true,"supported":true}\n\n',
-        'event: reasoning_delta\ndata: {"side":"enhanced","delta":"分析"}\n\n',
-        'event: delta\ndata: {"side":"enhanced","delta":"答案"}\n\n',
-        'event: stream_end\ndata: {"ok":true}\n\n',
-      ]),
-    );
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        createSseResponse([
+          'event: thinking_status\ndata: {"requested":true,"enabled":true,"supported":true}\n\n',
+          'event: reasoning_delta\ndata: {"side":"enhanced","delta":"分析"}\n\n',
+          'event: delta\ndata: {"side":"enhanced","delta":"答案"}\n\n',
+          'event: stream_end\ndata: {"ok":true}\n\n',
+        ]),
+      );
     const controller = new AbortController();
     const events: ArenaMessageStreamEvent[] = [];
 
@@ -414,8 +469,12 @@ describe('liteApi multimodal media progress helpers', () => {
     );
 
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('/api/arena/threads/thread%2F91%3Fpart%3D1%26x%3D2/messages/stream');
-    expect(new Headers(init.headers).get('Authorization')).toBe('Bearer token-arena');
+    expect(url).toBe(
+      '/api/arena/threads/thread%2F91%3Fpart%3D1%26x%3D2/messages/stream',
+    );
+    expect(new Headers(init.headers).get('Authorization')).toBe(
+      'Bearer token-arena',
+    );
     expect(JSON.parse(String(init.body))).toMatchObject({
       content: '问题',
       mode: 'agent',
@@ -435,7 +494,12 @@ describe('liteApi multimodal media progress helpers', () => {
           sessionId: '101',
           revisionNo: 3,
           mediaStage: 'preparing_media',
-          job: { jobId: '9', jobType: 'media_prepare', status: 'queued', attemptNo: 1 },
+          job: {
+            jobId: '9',
+            jobType: 'media_prepare',
+            status: 'queued',
+            attemptNo: 1,
+          },
           pipelinePlan: {
             transcribe: true,
             frameMaterialize: true,
@@ -536,19 +600,67 @@ describe('liteApi multimodal media progress helpers', () => {
   });
 
   it('posts strict Arena and publish actions with revision and package CAS fields', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch')
-      .mockResolvedValueOnce(createJsonResponse({ data: { sessionId: '101', revisionNo: 11, mediaStage: 'ready_to_publish', passed: true, evaluation: {}, replayed: false } }))
-      .mockResolvedValueOnce(createJsonResponse({ data: { sessionId: '101', revisionNo: 12, mediaStage: 'published', packageId: '51', packageVersionId: '61', packageVersionNumber: 1, skillVersionIds: { 'skill-1': '71' }, replayed: false } }));
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        createJsonResponse({
+          data: {
+            sessionId: '101',
+            revisionNo: 11,
+            mediaStage: 'ready_to_publish',
+            passed: true,
+            evaluation: {},
+            replayed: false,
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        createJsonResponse({
+          data: {
+            sessionId: '101',
+            revisionNo: 12,
+            mediaStage: 'published',
+            packageId: '51',
+            packageVersionId: '61',
+            packageVersionNumber: 1,
+            skillVersionIds: { 'skill-1': '71' },
+            replayed: false,
+          },
+        }),
+      );
 
-    await liteApi.startMediaArenaTest('token-7', { sessionId: '101', idempotencyKey: 'arena-test-001', expectedRevisionNo: 10 });
-    await liteApi.publishMediaSkillPack('token-7', { sessionId: '101', idempotencyKey: 'media-publish-001', expectedRevisionNo: 11, targetPackageId: null, expectedPackageVersionId: null });
-
-    expect(JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body))).toEqual({
-      action: 'skill.media.test.start', sessionId: '101', idempotencyKey: 'arena-test-001', payload: { expectedRevisionNo: 10 },
+    await liteApi.startMediaArenaTest('token-7', {
+      sessionId: '101',
+      idempotencyKey: 'arena-test-001',
+      expectedRevisionNo: 10,
     });
-    expect(JSON.parse(String((fetchMock.mock.calls[1]?.[1] as RequestInit).body))).toEqual({
-      action: 'skill.media.publish', sessionId: '101', idempotencyKey: 'media-publish-001',
-      payload: { expectedRevisionNo: 11, targetPackageId: null, expectedPackageVersionId: null },
+    await liteApi.publishMediaSkillPack('token-7', {
+      sessionId: '101',
+      idempotencyKey: 'media-publish-001',
+      expectedRevisionNo: 11,
+      targetPackageId: null,
+      expectedPackageVersionId: null,
+    });
+
+    expect(
+      JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body)),
+    ).toEqual({
+      action: 'skill.media.test.start',
+      sessionId: '101',
+      idempotencyKey: 'arena-test-001',
+      payload: { expectedRevisionNo: 10 },
+    });
+    expect(
+      JSON.parse(String((fetchMock.mock.calls[1]?.[1] as RequestInit).body)),
+    ).toEqual({
+      action: 'skill.media.publish',
+      sessionId: '101',
+      idempotencyKey: 'media-publish-001',
+      payload: {
+        expectedRevisionNo: 11,
+        targetPackageId: null,
+        expectedPackageVersionId: null,
+      },
     });
   });
 
@@ -576,7 +688,9 @@ describe('liteApi multimodal media progress helpers', () => {
       expectedPackageVersionId: null,
     });
 
-    expect(JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body))).toEqual({
+    expect(
+      JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body)),
+    ).toEqual({
       action: 'skill.media.generate.confirm',
       sessionId: '101',
       idempotencyKey: 'generate-confirm-001',
@@ -626,17 +740,19 @@ describe('liteApi Skill repository pagination', () => {
   it('requests one authenticated repository page instead of enumerating packages', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
       createJsonResponse({
-        items: [{
-          id: '11',
-          packageId: '7',
-          skillUid: 'function-teaching',
-          dirName: 'function-teaching',
-          name: '函数教学',
-          description: '函数概念课',
-          updatedAt: '2026-08-29T08:00:00.000Z',
-          packageName: '高等数学',
-          packageDescription: '课程技能',
-        }],
+        items: [
+          {
+            id: '11',
+            packageId: '7',
+            skillUid: 'function-teaching',
+            dirName: 'function-teaching',
+            name: '函数教学',
+            description: '函数概念课',
+            updatedAt: '2026-08-29T08:00:00.000Z',
+            packageName: '高等数学',
+            packageDescription: '课程技能',
+          },
+        ],
         nextCursor: 'next-page',
       }),
     );
@@ -650,7 +766,9 @@ describe('liteApi Skill repository pagination', () => {
     expect(page.items[0]?.name).toBe('函数教学');
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe('/api/skills/repository?cursor=current-page&limit=25');
-    expect(new Headers(init.headers).get('Authorization')).toBe('Bearer token-3');
+    expect(new Headers(init.headers).get('Authorization')).toBe(
+      'Bearer token-3',
+    );
   });
 });
 
@@ -679,6 +797,8 @@ describe('liteApi Skill conversation pagination', () => {
     expect(url).toBe(
       '/api/arena/threads/page?packageId=7&skillId=42&cursor=current-page&limit=25',
     );
-    expect(new Headers(init.headers).get('Authorization')).toBe('Bearer token-4');
+    expect(new Headers(init.headers).get('Authorization')).toBe(
+      'Bearer token-4',
+    );
   });
 });

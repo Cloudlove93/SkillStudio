@@ -40,7 +40,9 @@ export default function DeepStudyMatchDialog({
   const t = useT();
   const setMainView = useUIStore((s) => s.setMainView);
   const setDeepStudyTab = useUIStore((s) => s.setDeepStudyTab);
-  const setPendingProfileFileName = useUIStore((s) => s.setPendingProfileFileName);
+  const setPendingProfileFileName = useUIStore(
+    (s) => s.setPendingProfileFileName,
+  );
   const setPendingBuildScenario = useUIStore((s) => s.setPendingBuildScenario);
   const createAgent = useAgentStore((s) => s.createAgent);
   const startAgent = useAgentStore((s) => s.startAgent);
@@ -58,7 +60,9 @@ export default function DeepStudyMatchDialog({
       setMainView(null);
       onOpenChange(false);
     } catch (err) {
-      toast.error('Failed to launch agent', { description: err instanceof Error ? err.message : undefined });
+      toast.error('Failed to launch agent', {
+        description: err instanceof Error ? err.message : undefined,
+      });
     } finally {
       setLaunching(false);
     }
@@ -107,7 +111,9 @@ export default function DeepStudyMatchDialog({
                 return (
                   <button
                     key={p.fileName}
-                    onClick={() => setSelectedFileName(selected ? null : p.fileName)}
+                    onClick={() =>
+                      setSelectedFileName(selected ? null : p.fileName)
+                    }
                     className={`w-full text-left rounded-xl border p-3 transition-all duration-150 ${
                       selected
                         ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
@@ -140,7 +146,11 @@ export default function DeepStudyMatchDialog({
             onClick={handleQuickLaunch}
             className="gap-1.5"
           >
-            {launching ? <Loader2 className="size-3.5 animate-spin" /> : <Play className="size-3.5" />}
+            {launching ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <Play className="size-3.5" />
+            )}
             {t('home.deepStudyLaunch')}
           </Button>
           <Button

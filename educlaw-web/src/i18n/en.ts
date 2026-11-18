@@ -7,7 +7,8 @@ const en: Record<keyof typeof zh, string> = {
   'sidebar.buildAgent': 'Generate Agent / Skill',
   'sidebar.skillRepo': 'Skill Library',
   'sidebar.searchProject': 'Search chats & projects...',
-  'sidebar.noProjects': 'No projects yet. Click "Agent Gallery" above to create one.',
+  'sidebar.noProjects':
+    'No projects yet. Click "Agent Gallery" above to create one.',
   'sidebar.noMatch': 'No matching projects',
   'sidebar.publicProjects': 'Public Projects',
   'sidebar.settings': 'Settings',
@@ -20,8 +21,10 @@ const en: Record<keyof typeof zh, string> = {
   'sidebar.statsLive': 'Live',
   'sidebar.workspaceConsole': 'Workspace Console',
   'sidebar.workspaceConsoleReadonly': 'Read-Only Workspace',
-  'sidebar.workspaceConsoleLiveDesc': 'Session history and workspace files are available in real time.',
-  'sidebar.workspaceConsoleIdleDesc': 'Start the agent to unlock the session and file workspace.',
+  'sidebar.workspaceConsoleLiveDesc':
+    'Session history and workspace files are available in real time.',
+  'sidebar.workspaceConsoleIdleDesc':
+    'Start the agent to unlock the session and file workspace.',
   'sidebar.liveData': 'Live Data',
   'sidebar.standby': 'Standby',
   'sidebar.settingsHint': 'Language, workflow, and platform preferences.',
@@ -36,8 +39,10 @@ const en: Record<keyof typeof zh, string> = {
   'session.share': 'Share',
   'session.unshare': 'Unshare',
   'session.share.title': 'Share Session',
-  'session.share.descShared': 'This session is public on the web. Anyone with the link can view it.',
-  'session.share.descUnshared': 'Share this session publicly on the web. Anyone with the link will be able to view it.',
+  'session.share.descShared':
+    'This session is public on the web. Anyone with the link can view it.',
+  'session.share.descUnshared':
+    'Share this session publicly on the web. Anyone with the link will be able to view it.',
   'session.share.publish': 'Publish',
   'session.share.publishing': 'Publishing...',
   'session.share.unpublish': 'Unpublish',
@@ -53,7 +58,8 @@ const en: Record<keyof typeof zh, string> = {
   'session.share.unshareSuccess': 'Session unshared',
   'session.share.unshareSuccessDesc': 'Session unshared successfully!',
   'session.share.unshareFailed': 'Failed to unshare session',
-  'session.share.unshareFailedDesc': 'An error occurred while unsharing the session',
+  'session.share.unshareFailedDesc':
+    'An error occurred while unsharing the session',
   'session.archive': 'Archive',
   'session.compact': 'Compact Context',
   'session.compacting': 'Compacting...',
@@ -101,14 +107,17 @@ const en: Record<keyof typeof zh, string> = {
   // 鈹€鈹€鈹€ AgentSettings 鈹€鈹€鈹€
   'agentSettings.title': 'Project Settings',
   'agentSettings.public': 'Public Project',
-  'agentSettings.publicDesc': 'When enabled, all users on this server can browse files and chat history (read-only)',
+  'agentSettings.publicDesc':
+    'When enabled, all users on this server can browse files and chat history (read-only)',
 
   // 鈹€鈹€鈹€ BuildAgentDialog 鈹€鈹€鈹€
   'build.title': 'Generate Agent / Skill',
-  'build.description': 'Describe your request. AI will first decide whether it should generate a standalone skill or a full agent.',
+  'build.description':
+    'Describe your request. AI will first decide whether it should generate a standalone skill or a full agent.',
   'build.model': 'Model',
   'build.scenarioLabel': 'Task / Requirement',
-  'build.scenarioPlaceholder': 'e.g. A middle-school physics experiment guide on buoyancy and Archimedes\' principle...',
+  'build.scenarioPlaceholder':
+    "e.g. A middle-school physics experiment guide on buoyancy and Archimedes' principle...",
   'build.waitingLLM': 'Waiting for model response...',
   'build.selectingSkills': 'AI is selecting skills...',
   'build.generatingProfile': 'AI is generating the result...',
@@ -120,7 +129,8 @@ const en: Record<keyof typeof zh, string> = {
   'build.back': 'Back',
   'build.confirm': 'Confirm',
   'build.done': 'Build completed!',
-  'build.networkError': 'Cannot connect to the server. Please check your network or ensure the backend is running.',
+  'build.networkError':
+    'Cannot connect to the server. Please check your network or ensure the backend is running.',
   'build.unknownError': 'An unknown error occurred. Please try again.',
   'build.nameLabel': 'Name',
   'build.descLabel': 'Description',
@@ -140,7 +150,8 @@ const en: Record<keyof typeof zh, string> = {
   'build.viewDetails': 'View technical details',
   'build.modeQuick': 'One-line',
   'build.modeDetailed': 'File',
-  'build.detailedHint': 'Upload a task description file. AI will first decide whether this should become a standalone skill or a full agent, then continue building.',
+  'build.detailedHint':
+    'Upload a task description file. AI will first decide whether this should become a standalone skill or a full agent, then continue building.',
   'build.dropFile': 'Drop or click to upload task description file',
   'build.acceptedFormats': 'Supports .txt, .md files',
   'build.fileSelected': 'File selected',
@@ -149,7 +160,8 @@ const en: Record<keyof typeof zh, string> = {
   'build.generatingSkill': 'Generating skill',
   'build.skillGenerated': 'Skill generated',
   'build.skillExists': 'Skill exists, skipped',
-  'build.invalidFileType': 'Unsupported file format. Please upload .txt or .md files',
+  'build.invalidFileType':
+    'Unsupported file format. Please upload .txt or .md files',
   'build.batchProgress': 'Completed {done}/{total}',
   'build.batchAllDone': 'All builds completed',
   'build.batchBuilding': 'Building...',
@@ -157,13 +169,14 @@ const en: Record<keyof typeof zh, string> = {
   'build.batchSelectFile': 'Select a file on the left to view details',
   'build.batchCreateProject': 'Create Project',
   'build.autoDecisionTitle': 'Automatic artifact decision',
-  'build.autoDecisionHint': 'The system first analyzes your input, then decides whether to generate a standalone skill or a full agent with multiple skills.',
+  'build.autoDecisionHint':
+    'The system first analyzes your input, then decides whether to generate a standalone skill or a full agent with multiple skills.',
   'build.openSkill': 'Open Skill',
-
 
   // 鈹€鈹€鈹€ ProfileGallery 鈹€鈹€鈹€
   'gallery.title': 'Agent Gallery',
-  'gallery.subtitle': 'Choose a template to quickly create an AI teaching agent',
+  'gallery.subtitle':
+    'Choose a template to quickly create an AI teaching agent',
   'gallery.search': 'Search agents...',
   'gallery.all': 'All',
   'gallery.noMatch': 'No matching agents',
@@ -192,7 +205,8 @@ const en: Record<keyof typeof zh, string> = {
   'gallery.new': 'New Agent',
   'gallery.newName': 'New Agent',
   'gallery.newDesc': 'Enter agent description',
-  'gallery.skillsRemoved': 'The following skills no longer exist and have been removed: {skills}',
+  'gallery.skillsRemoved':
+    'The following skills no longer exist and have been removed: {skills}',
   'gallery.manage': 'Manage',
   'gallery.batchDelete': 'Delete Selected',
   'gallery.selectAll': 'Select All',
@@ -221,12 +235,14 @@ const en: Record<keyof typeof zh, string> = {
   'chat.notRunningHint': 'Start to begin chatting',
   'chat.startAgent': 'Start Agent',
   'chat.errorTitle': 'Agent failed to start',
-  'chat.errorHint': 'Please check the configuration and try again, or contact your admin.',
+  'chat.errorHint':
+    'Please check the configuration and try again, or contact your admin.',
   'chat.readonlyBanner': 'You are viewing a public project in read-only mode',
   'chat.publicNotRunning': 'This public project is not running',
 
   // 鈹€鈹€鈹€ PromptInput 鈹€鈹€鈹€
-  'prompt.placeholder': 'Type a message... (Enter to send, Shift+Enter for newline)',
+  'prompt.placeholder':
+    'Type a message... (Enter to send, Shift+Enter for newline)',
   'prompt.stop': 'Stop',
   'prompt.send': 'Send',
   'prompt.disclaimer': 'AI-generated content is for reference only',
@@ -274,7 +290,8 @@ const en: Record<keyof typeof zh, string> = {
   'settings.description': 'Manage platform preferences',
   'settings.preferencesEyebrow': 'Platform Preferences',
   'settings.publicSkills': 'Public Skill Pool',
-  'settings.publicSkillsDesc': 'Load selected public skills when creating projects',
+  'settings.publicSkillsDesc':
+    'Load selected public skills when creating projects',
   'settings.deselectAll': 'Deselect All',
   'settings.selectAll': 'Select All',
   'settings.availableSkills': 'Available Public Skills ({enabled}/{total})',
@@ -382,7 +399,8 @@ const en: Record<keyof typeof zh, string> = {
   'skill.usedBy': 'Used by',
 
   // 鈹€鈹€鈹€ ToolLibraryPanel 鈹€鈹€鈹€
-  'toolLib.emptyHint': 'No tools available. Ask your admin to deploy tools to the library_tool directory.',
+  'toolLib.emptyHint':
+    'No tools available. Ask your admin to deploy tools to the library_tool directory.',
   'toolLib.preset': 'Preset',
   'toolLib.public': 'Public',
   'toolLib.user': 'User',
@@ -431,7 +449,8 @@ const en: Record<keyof typeof zh, string> = {
   'home.slogan': 'Your intelligent learning system.',
   'home.heroBadge': 'IAIE workspace home',
   'home.focusTitle': 'Workspace focus',
-  'home.focusDesc': 'Open the learning workspace, manage existing agents, and keep core actions within one calm workspace.',
+  'home.focusDesc':
+    'Open the learning workspace, manage existing agents, and keep core actions within one calm workspace.',
   'home.startChat': 'Start Chat',
   'home.moduleEntry': 'Modules',
   'home.frequentWorkbench': 'Workbench',
@@ -449,12 +468,14 @@ const en: Record<keyof typeof zh, string> = {
   'home.moduleDiaryLabel': 'Notes',
   'home.tagline': 'Describe your learning scenario in one sentence, powered by',
   'home.taglineEnd': 'to auto-build agents',
-  'home.hint': 'Click "Agent Gallery" on the left to choose a template, or "Build Agent" to start from scratch',
+  'home.hint':
+    'Click "Agent Gallery" on the left to choose a template, or "Build Agent" to start from scratch',
   'home.learnWorkflow': 'Learn about AgentProfile Workflow \u2192',
   'home.chatTitle': 'Chat with AI',
   'home.chatPlaceholder': 'Ask me anything...',
   'home.chatEmptyLead': 'Say what is on your mind.',
-  'home.chatEmptyHint': 'Start with a question, an idea, or the task you want to move forward today.',
+  'home.chatEmptyHint':
+    'Start with a question, an idea, or the task you want to move forward today.',
   'home.selectModel': 'Select model',
   'home.newChat': 'New Chat',
   'home.noHistory': 'No chat history yet',
@@ -462,7 +483,8 @@ const en: Record<keyof typeof zh, string> = {
   'home.chatHistory': 'History',
   'home.deepStudy': 'Deep Study',
   'home.deepStudyTitle': 'Deep Study 鈥?Agent Recommendations',
-  'home.deepStudyDesc': 'Match the most relevant agents based on your conversation',
+  'home.deepStudyDesc':
+    'Match the most relevant agents based on your conversation',
   'home.deepStudyLaunch': 'Quick Launch',
   'home.deepStudyDetails': 'View Details',
   'home.deepStudyGenerate': 'Generate from Chat',
@@ -470,34 +492,42 @@ const en: Record<keyof typeof zh, string> = {
   'home.deepStudyLoading': 'Matching agents...',
   'home.deepStudyScore': 'Score',
   'home.saveToDiary': 'Save to Diary',
-  'home.saveToDiaryDesc': 'Summarize key points to today\'s diary',
-  'home.saveToDiarySuccess': 'Saved to today\'s diary',
+  'home.saveToDiaryDesc': "Summarize key points to today's diary",
+  'home.saveToDiarySuccess': "Saved to today's diary",
   'home.saveToDiaryFail': 'Failed to save, please retry',
   'home.savingToDiary': 'Summarizing...',
   'home.suggestionsLoading': 'Generating follow-up questions',
-  'home.suggestionsLoadingHint': 'The AI is preparing the most useful next questions for this conversation.',
+  'home.suggestionsLoadingHint':
+    'The AI is preparing the most useful next questions for this conversation.',
 
   // 鈹€鈹€鈹€ AgentProfileWorkflow page 鈹€鈹€鈹€
   'workflow.header': 'AgentProfile Workflow',
   'workflow.heroTitle': 'Create an Agent in One Sentence',
-  'workflow.heroSubtitle': 'Describe your teaching scenario and the Agent Constructor will automatically generate a complete, structured AgentProfile, match teaching tools and skills, ready for use.',
+  'workflow.heroSubtitle':
+    'Describe your teaching scenario and the Agent Constructor will automatically generate a complete, structured AgentProfile, match teaching tools and skills, ready for use.',
   'workflow.viewSpec': 'View AgentProfile Open Spec',
   'workflow.step1Title': 'One-Line Instruction',
   'workflow.step1Subtitle': 'Describe the agent you need in natural language',
-  'workflow.step1Example': '"A high school math tutor specializing in functions, derivatives, and probability with adaptive difficulty."',
+  'workflow.step1Example':
+    '"A high school math tutor specializing in functions, derivatives, and probability with adaptive difficulty."',
   'workflow.step2Title': 'Agent Constructor',
-  'workflow.step2Subtitle': 'Analyze the instruction, auto-generate Profile and match resources',
+  'workflow.step2Subtitle':
+    'Analyze the instruction, auto-generate Profile and match resources',
   'workflow.step2a': 'Generate Identity',
   'workflow.step2aDesc': 'Name, description, and detailed behavior spec',
   'workflow.step2b': 'Match Tools',
-  'workflow.step2bDesc': 'Scan the tool repository for compatible callable tools',
+  'workflow.step2bDesc':
+    'Scan the tool repository for compatible callable tools',
   'workflow.step2c': 'Match Skills',
-  'workflow.step2cDesc': 'Scan the skill repository for compatible knowledge modules',
+  'workflow.step2cDesc':
+    'Scan the skill repository for compatible knowledge modules',
   'workflow.toolRepo': 'Tool Repository',
   'workflow.skillRepo': 'Skill Repository',
   'workflow.step3Title': 'AgentProfile',
-  'workflow.step3Subtitle': 'A structured JSON document that fully describes the Agent',
-  'workflow.detailsHint': 'Recommended sections for the details field (Markdown):',
+  'workflow.step3Subtitle':
+    'A structured JSON document that fully describes the Agent',
+  'workflow.detailsHint':
+    'Recommended sections for the details field (Markdown):',
   'workflow.roleTitle': 'Role Definition',
   'workflow.roleDesc': 'Identity, tone, teaching philosophy',
   'workflow.coreTitle': 'Core Dimensions',
@@ -507,10 +537,13 @@ const en: Record<keyof typeof zh, string> = {
   'workflow.outputTitle': 'Output Format',
   'workflow.outputDesc': 'Explanation steps, feedback structure',
   'workflow.step4Title': 'Multi-Agent Collaboration',
-  'workflow.step4Subtitle': 'Split complex workflows into specialized sub-agents via the subagents field',
-  'workflow.step4Desc': 'Sub-agents are also complete AgentProfile documents with their own tools, skills, and behavior specs. The main agent delegates based on task type.',
+  'workflow.step4Subtitle':
+    'Split complex workflows into specialized sub-agents via the subagents field',
+  'workflow.step4Desc':
+    'Sub-agents are also complete AgentProfile documents with their own tools, skills, and behavior specs. The main agent delegates based on task type.',
   'workflow.mainAgent': 'Tutoring Agent',
-  'workflow.mainAgentDesc': 'Main Agent \u00b7 Receives and dispatches student questions',
+  'workflow.mainAgentDesc':
+    'Main Agent \u00b7 Receives and dispatches student questions',
   'workflow.subQuiz': 'Quiz Sub-Agent',
   'workflow.subQuizDesc': 'Generate personalized exercises',
   'workflow.subGrade': 'Grading Sub-Agent',
@@ -524,8 +557,10 @@ const en: Record<keyof typeof zh, string> = {
 
   // 鈹€鈹€鈹€ JSON preview in workflow (demo content) 鈹€鈹€鈹€
   'workflow.jsonName': 'High School Math Tutor',
-  'workflow.jsonDesc': 'An AI assistant specializing in high school math tutoring, covering functions, derivatives, probability and statistics, with adaptive difficulty.',
-  'workflow.jsonDetails': '## Role Definition\\n\\nAs a high school math tutoring expert, patiently guide students...',
+  'workflow.jsonDesc':
+    'An AI assistant specializing in high school math tutoring, covering functions, derivatives, probability and statistics, with adaptive difficulty.',
+  'workflow.jsonDetails':
+    '## Role Definition\\n\\nAs a high school math tutoring expert, patiently guide students...',
 
   // 鈹€鈹€鈹€ Auth 鈹€鈹€鈹€
   'auth.loginSubtitle': 'Sign in to EduClaw',
@@ -533,8 +568,10 @@ const en: Record<keyof typeof zh, string> = {
   'auth.pageDescription': 'Workspace for agents, chats, and learning materials',
   'auth.loginHint': 'Sign in to continue to your workspace.',
   'auth.registerHint': 'Create an account and enter the workspace directly.',
-  'auth.infoWorkspace': 'After signing in, you can continue with your existing agents, chats, and study materials.',
-  'auth.infoAccount': 'Registration only requires a username and password, and you will enter the workspace immediately.',
+  'auth.infoWorkspace':
+    'After signing in, you can continue with your existing agents, chats, and study materials.',
+  'auth.infoAccount':
+    'Registration only requires a username and password, and you will enter the workspace immediately.',
   'auth.accountAccess': 'Account Access',
   'auth.usernamePlaceholder': 'Username',
   'auth.passwordPlaceholder': 'Password',
@@ -612,16 +649,20 @@ const en: Record<keyof typeof zh, string> = {
   'sidebar.arena': 'Arena',
   'sidebar.optimize': 'Optimize',
   'optimize.action': 'AI Suggestions',
-  'optimize.agentHint': 'Analyze the current agent configuration and propose confirmable changes.',
+  'optimize.agentHint':
+    'Analyze the current agent configuration and propose confirmable changes.',
   'optimize.title': 'AI Optimization Suggestions',
-  'optimize.subtitle': 'Review each run, then apply or reject every suggestion manually.',
+  'optimize.subtitle':
+    'Review each run, then apply or reject every suggestion manually.',
   'optimize.history': 'History',
   'optimize.refresh': 'Refresh',
   'optimize.empty': 'No optimization runs yet',
-  'optimize.emptyHint': 'Start from a profile, skill, or agent detail page, or use /optimize-* in chat.',
+  'optimize.emptyHint':
+    'Start from a profile, skill, or agent detail page, or use /optimize-* in chat.',
   'optimize.generating': 'Generating suggestions, please wait...',
   'optimize.noSelection': 'Select a run on the left to inspect it.',
-  'optimize.noSuggestions': 'This run did not produce any applicable suggestions.',
+  'optimize.noSuggestions':
+    'This run did not produce any applicable suggestions.',
   'optimize.target': 'Target',
   'optimize.scope': 'Scope',
   'optimize.trigger': 'Triggered from',
@@ -648,12 +689,13 @@ const en: Record<keyof typeof zh, string> = {
 
   // ??? Slash optimize ???
   'slash.optimizeAgent': 'Optimize current agent',
-  'slash.optimizeAgentDesc': 'Generate agent configuration suggestions from the current chat',
+  'slash.optimizeAgentDesc':
+    'Generate agent configuration suggestions from the current chat',
   'slash.optimizeProfile': 'Optimize current profile',
-  'slash.optimizeProfileDesc': 'Generate profile suggestions from the current chat',
+  'slash.optimizeProfileDesc':
+    'Generate profile suggestions from the current chat',
   'slash.optimizeSkill': 'Optimize a skill',
   'slash.optimizeSkillDesc': 'Type a skill name to generate skill suggestions',
 } as const;
 
 export default en;
-

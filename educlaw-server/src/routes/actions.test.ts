@@ -252,7 +252,8 @@ describe('POST /api action dispatcher', () => {
       skillVersionNumber: 5,
     });
     const { server, url } = await listen(await createApp());
-    const skillMd = '---\nname: lesson-skill\ndescription: 用于课堂任务\n---\n# Lesson';
+    const skillMd =
+      '---\nname: lesson-skill\ndescription: 用于课堂任务\n---\n# Lesson';
     try {
       const response = await fetch(`${url}/api`, {
         method: 'POST',
@@ -683,13 +684,19 @@ describe('POST /api action dispatcher', () => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'X-User-Id': 'owner' },
           body: JSON.stringify({
-            action: 'arena.thread.create', pkgId: '7',
-            payload: { surface, idempotencyKey: 'old-entry', basePackageVersionId: '33' },
+            action: 'arena.thread.create',
+            pkgId: '7',
+            payload: {
+              surface,
+              idempotencyKey: 'old-entry',
+              basePackageVersionId: '33',
+            },
           }),
         });
         expect(response.status).toBe(422);
         expect(await response.json()).toMatchObject({
-          code: 'AGENT_REQUIRED', message: expect.stringContaining('我的 Agent'),
+          code: 'AGENT_REQUIRED',
+          message: expect.stringContaining('我的 Agent'),
         });
         expect(createArenaThreadMock).not.toHaveBeenCalled();
       } finally {

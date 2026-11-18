@@ -290,7 +290,9 @@ function assertNonNegativeInteger(value: unknown, fieldName: string): number {
     value < 0 ||
     !Number.isSafeInteger(value)
   ) {
-    throw createDataIntegrityError(`${fieldName} must be a non-negative integer`);
+    throw createDataIntegrityError(
+      `${fieldName} must be a non-negative integer`,
+    );
   }
   return value;
 }
@@ -431,7 +433,12 @@ function sanitizeHeartbeatProgress(
 function sanitizeFailureDetails(
   value: Record<string, unknown>,
 ): Record<string, unknown> {
-  const allowedKeys = new Set(['phase', 'reason', 'statusCode', 'retryAfterMs']);
+  const allowedKeys = new Set([
+    'phase',
+    'reason',
+    'statusCode',
+    'retryAfterMs',
+  ]);
   const sanitized: Record<string, unknown> = {};
   for (const key of Object.keys(value)) {
     if (!allowedKeys.has(key)) {
@@ -443,7 +450,11 @@ function sanitizeFailureDetails(
     }
   }
   if (value.phase !== undefined) {
-    sanitized.phase = assertSafeWorkerText(value.phase, 'error.details.phase', 64);
+    sanitized.phase = assertSafeWorkerText(
+      value.phase,
+      'error.details.phase',
+      64,
+    );
   }
   if (value.reason !== undefined) {
     sanitized.reason = assertSafeWorkerText(
@@ -518,7 +529,9 @@ function readManifestObjectKey(
   }
   const objectKey = value.objectKey;
   if (typeof objectKey !== 'string' || objectKey.trim().length === 0) {
-    throw createDataIntegrityError(`Claimed job ${fieldName}.objectKey is invalid`);
+    throw createDataIntegrityError(
+      `Claimed job ${fieldName}.objectKey is invalid`,
+    );
   }
   return objectKey;
 }
@@ -544,7 +557,10 @@ function buildTranscriptionChunkPlan(
     chunks.push({
       chunkIndex,
       startMs,
-      endMs: Math.min(durationMs, startMs + config.multimodalAsrChunkDurationMs),
+      endMs: Math.min(
+        durationMs,
+        startMs + config.multimodalAsrChunkDurationMs,
+      ),
     });
   }
   return chunks;
@@ -637,13 +653,18 @@ function manifestInteger(
 }
 
 function assertMediaStage(value: unknown): MediaStage {
-  if (typeof value !== 'string' || !MEDIA_STAGES.includes(value as MediaStage)) {
+  if (
+    typeof value !== 'string' ||
+    !MEDIA_STAGES.includes(value as MediaStage)
+  ) {
     throw createDataIntegrityError('Stored media stage is invalid');
   }
   return value as MediaStage;
 }
 
-function assertSessionStatus(value: unknown): (typeof SESSION_STATUSES)[number] {
+function assertSessionStatus(
+  value: unknown,
+): (typeof SESSION_STATUSES)[number] {
   if (
     typeof value !== 'string' ||
     !SESSION_STATUSES.includes(value as (typeof SESSION_STATUSES)[number])
@@ -664,22 +685,31 @@ function parseMediaSessionMutationRow(
   mediaState: MultimodalSessionState;
 } {
   if (!row) {
-    throw createLeaseConflict('Upload verification session is no longer available');
+    throw createLeaseConflict(
+      'Upload verification session is no longer available',
+    );
   }
   const sessionId = assertPositiveId(row.id, 'session.id');
   if (sessionId !== expectedSessionId) {
-    throw createDataIntegrityError('Stored session row does not match job session');
+    throw createDataIntegrityError(
+      'Stored session row does not match job session',
+    );
   }
   const mediaStage = assertMediaStage(row.media_stage);
   const status = assertSessionStatus(row.status);
   if (status !== getGuidedCreationStatusForMediaStage(mediaStage)) {
-    throw createDataIntegrityError('Stored session status drifted from media stage');
+    throw createDataIntegrityError(
+      'Stored session status drifted from media stage',
+    );
   }
   return {
     sessionId,
     mediaStage,
     status,
-    revisionNo: assertNonNegativeInteger(row.revision_no, 'session.revision_no'),
+    revisionNo: assertNonNegativeInteger(
+      row.revision_no,
+      'session.revision_no',
+    ),
     mediaState: parseMultimodalSessionState(row.media_state_json),
   };
 }
@@ -899,7 +929,9 @@ export function createMultimodalJobService(
     job: NormalizedCreateMediaJobInput;
   }) {
     const { db, now, job } = input;
-    validateSessionForCreate(await deps.store.loadSessionForCreate({ db, sessionId: job.sessionId }));
+    validateSessionForCreate(
+      await deps.store.loadSessionForCreate({ db, sessionId: job.sessionId }),
+    );
     const inserted = await deps.store.tryInsertJob({
       db,
       sessionId: job.sessionId,
@@ -956,7 +988,10 @@ export function createMultimodalJobService(
       };
 
       if (job.jobType === 'media_prepare') {
-        const objectKey = readManifestObjectKey(job.inputManifest, 'sourceAsset');
+        const objectKey = readManifestObjectKey(
+          job.inputManifest,
+          'sourceAsset',
+        );
         const pipelinePlan = job.inputManifest.pipelinePlan;
         if (
           !isPlainObject(pipelinePlan) ||
@@ -1054,7 +1089,10 @@ export function createMultimodalJobService(
       }
 
       if (job.jobType === 'frame_materialize') {
-        const objectKey = readManifestObjectKey(job.inputManifest, 'sourceAsset');
+        const objectKey = readManifestObjectKey(
+          job.inputManifest,
+          'sourceAsset',
+        );
         const requests = job.inputManifest.frameRequests;
         if (
           !Array.isArray(requests) ||
@@ -1154,7 +1192,9 @@ export function createMultimodalJobService(
       });
     },
 
-    async createMediaJobInTransaction(input: CreateMediaJobInput & { db: Queryable }) {
+    async createMediaJobInTransaction(
+      input: CreateMediaJobInput & { db: Queryable },
+    ) {
       const job = normalizeCreateMediaJobInput(input);
       const requestNow = deps.now();
       return createMediaJobCore({
@@ -1274,11 +1314,12 @@ export function createMultimodalJobService(
         input.outputManifest,
         'outputManifest',
       );
-      let parsedQualityOutput:
-        | ReturnType<typeof parseMediaQualityCheckOutputManifest>
-        | null = null;
+      let parsedQualityOutput: ReturnType<
+        typeof parseMediaQualityCheckOutputManifest
+      > | null = null;
       try {
-        parsedQualityOutput = parseMediaQualityCheckOutputManifest(outputManifest);
+        parsedQualityOutput =
+          parseMediaQualityCheckOutputManifest(outputManifest);
       } catch {
         parsedQualityOutput = null;
       }
@@ -1381,8 +1422,10 @@ export function createMultimodalJobService(
             parsedQualityInput.uploadMode !== pendingUpload.uploadMode ||
             parsedQualityOutput.sourceId !== pendingUpload.sourceId ||
             parsedQualityOutput.sourceKind !== pendingUpload.mediaKind ||
-            parsedQualityOutput.sourceAsset.objectKey !== pendingUpload.objectKey ||
-            parsedQualityOutput.sourceAsset.sizeBytes !== pendingUpload.sizeBytes ||
+            parsedQualityOutput.sourceAsset.objectKey !==
+              pendingUpload.objectKey ||
+            parsedQualityOutput.sourceAsset.sizeBytes !==
+              pendingUpload.sizeBytes ||
             parsedQualityOutput.sourceAsset.sizeBytes !==
               pendingUpload.verification.observedSizeBytes ||
             parsedQualityOutput.sourceAsset.sizeBytes !==
@@ -1484,7 +1527,9 @@ export function createMultimodalJobService(
             typeof sourceProbe.hasVideo !== 'boolean' ||
             typeof pipelinePlan.transcribe !== 'boolean'
           ) {
-            throw createDataIntegrityError('media_prepare input manifest is invalid');
+            throw createDataIntegrityError(
+              'media_prepare input manifest is invalid',
+            );
           }
           const durationMs = manifestInteger(sourceProbe, 'durationMs');
           const expectedAttempt = {

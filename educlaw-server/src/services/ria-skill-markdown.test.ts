@@ -63,19 +63,25 @@ function skill(overrides: Partial<RiaSkillDraft['ria']> = {}): Skill {
   } as Skill;
 }
 
-const grounded = () => [evidence(['连续 3 次全对才撤架；否则再做 5 道复核题。'])];
+const grounded = () => [
+  evidence(['连续 3 次全对才撤架；否则再做 5 道复核题。']),
+];
 
 describe('ria skill markdown assembly', () => {
   it('emits YAML frontmatter with the directory name and a sanitized description', () => {
     const body = assembleRiaSkillMarkdown(skill(), grounded());
-    expect(body.startsWith('---\nname: adaptive-scaffold\ndescription: ')).toBe(true);
+    expect(body.startsWith('---\nname: adaptive-scaffold\ndescription: ')).toBe(
+      true,
+    );
     expect(body).toContain('\n---\n\n# 自适应支架');
     expect(body.slice(0, body.indexOf('---\n\n'))).not.toContain('<');
   });
 
   it('accepts parameter placeholders and leaves source numbers in the case section', () => {
     const body = assembleRiaSkillMarkdown(skill(), grounded());
-    expect(body).toContain('- “连续 3 次全对才撤架；否则再做 5 道复核题。”（来源 [ev-frame]）');
+    expect(body).toContain(
+      '- “连续 3 次全对才撤架；否则再做 5 道复核题。”（来源 [ev-frame]）',
+    );
     expect(body).toContain('{连续成功次数}');
   });
 
@@ -144,7 +150,9 @@ describe('ria skill markdown assembly', () => {
   it('ignores bare counters such as "加 1" even when the case counts 1', () => {
     const body = assembleRiaSkillMarkdown(
       skill({
-        sourceFacts: [{ evidenceId: 'ev-frame', quote: '每完成 1 次任务后计数器归零。' }],
+        sourceFacts: [
+          { evidenceId: 'ev-frame', quote: '每完成 1 次任务后计数器归零。' },
+        ],
         execution: {
           input: '需确认{连续成功次数}与{复核题数量}',
           steps: ['学生完成一题后计数器加 1。'],
@@ -162,7 +170,9 @@ describe('ria skill markdown assembly', () => {
     expect(() =>
       assembleRiaSkillMarkdown(
         skill({
-          sourceFacts: [{ evidenceId: 'ev-frame', quote: '再完成 18 道练习。' }],
+          sourceFacts: [
+            { evidenceId: 'ev-frame', quote: '再完成 18 道练习。' },
+          ],
           execution: {
             input: '需确认{练习数量}',
             steps: ['学生完成 18 练习题。'],

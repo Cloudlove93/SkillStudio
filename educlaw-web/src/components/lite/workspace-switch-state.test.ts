@@ -1,8 +1,8 @@
-import { strict as assert } from "node:assert";
-import test from "node:test";
-import { getPackageSwitchDecision } from "./workspace-switch-state.ts";
+import { strict as assert } from 'node:assert';
+import test from 'node:test';
+import { getPackageSwitchDecision } from './workspace-switch-state.ts';
 
-test("package switching preserves transient progress UI while an operation is active", () => {
+test('package switching preserves transient progress UI while an operation is active', () => {
   const decision = getPackageSwitchDecision({
     hasActiveProgress: true,
     preserveGenerateProgress: false,
@@ -17,7 +17,7 @@ test("package switching preserves transient progress UI while an operation is ac
   });
 });
 
-test("package switching still preserves transient progress during generated-package auto-open", () => {
+test('package switching still preserves transient progress during generated-package auto-open', () => {
   const decision = getPackageSwitchDecision({
     hasActiveProgress: false,
     preserveGenerateProgress: true,
@@ -32,7 +32,7 @@ test("package switching still preserves transient progress during generated-pack
   });
 });
 
-test("idle package switching clears transient UI state", () => {
+test('idle package switching clears transient UI state', () => {
   const decision = getPackageSwitchDecision({
     hasActiveProgress: false,
     preserveGenerateProgress: false,

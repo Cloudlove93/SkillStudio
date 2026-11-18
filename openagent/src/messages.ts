@@ -7,11 +7,15 @@ function getTextPartText(part: unknown): string {
   return typeof candidate.text === 'string' ? candidate.text : '';
 }
 
-export function getOpenAgentMessageText(message: Pick<OpenAgentMessage, 'parts'>): string {
+export function getOpenAgentMessageText(
+  message: Pick<OpenAgentMessage, 'parts'>,
+): string {
   return message.parts.map(getTextPartText).join('');
 }
 
-export function createOpenAgentTextMessage(message: OpenAgentLegacyMessage): OpenAgentMessage {
+export function createOpenAgentTextMessage(
+  message: OpenAgentLegacyMessage,
+): OpenAgentMessage {
   return {
     id: message.id,
     role: message.role,
@@ -19,14 +23,19 @@ export function createOpenAgentTextMessage(message: OpenAgentLegacyMessage): Ope
   };
 }
 
-export function fromLegacyOpenAgentMessages(messages: OpenAgentLegacyMessage[]): OpenAgentMessage[] {
+export function fromLegacyOpenAgentMessages(
+  messages: OpenAgentLegacyMessage[],
+): OpenAgentMessage[] {
   return messages.map(createOpenAgentTextMessage);
 }
 
-export function toLegacyOpenAgentMessages(messages: OpenAgentMessage[]): OpenAgentLegacyMessage[] {
+export function toLegacyOpenAgentMessages(
+  messages: OpenAgentMessage[],
+): OpenAgentLegacyMessage[] {
   return messages
-    .filter((message): message is OpenAgentMessage & { role: 'user' | 'assistant' } =>
-      message.role === 'user' || message.role === 'assistant',
+    .filter(
+      (message): message is OpenAgentMessage & { role: 'user' | 'assistant' } =>
+        message.role === 'user' || message.role === 'assistant',
     )
     .map((message) => ({
       id: message.id,

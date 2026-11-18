@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type {
-  GuidedCreationStep,
-  GuidedEducationDraft,
-} from '@educlaw/shared';
+import type { GuidedCreationStep, GuidedEducationDraft } from '@educlaw/shared';
 import {
   applyEducationOperations,
   buildEducationConfirmationCard,
@@ -21,7 +18,7 @@ const ALL_STEPS: GuidedCreationStep[] = [
 ];
 
 it('requires a complete explicit withdrawal quote before deleting user evidence', () => {
-    const draft = completeDraft();
+  const draft = completeDraft();
   expect(
     sanitizeEducationOperations(
       draft,
@@ -174,20 +171,24 @@ describe('guided education policy', () => {
   });
   it('allows one user answer to update several educational dimensions', () => {
     const message = '给初二学生做浮力分组实验，希望他们能用数据解释浮沉';
-    const operations = sanitizeEducationOperations({}, [
-      {
-        dimension: 'audience_context',
-        content: '面向初二学生开展浮力分组实验',
-        source: 'user_explicit',
-        quote: '初二学生',
-      },
-      {
-        dimension: 'educational_goal',
-        content: '学生能用数据解释浮沉',
-        source: 'user_explicit',
-        quote: '用数据解释浮沉',
-      },
-    ], message);
+    const operations = sanitizeEducationOperations(
+      {},
+      [
+        {
+          dimension: 'audience_context',
+          content: '面向初二学生开展浮力分组实验',
+          source: 'user_explicit',
+          quote: '初二学生',
+        },
+        {
+          dimension: 'educational_goal',
+          content: '学生能用数据解释浮沉',
+          source: 'user_explicit',
+          quote: '用数据解释浮沉',
+        },
+      ],
+      message,
+    );
 
     const draft = applyEducationOperations({}, operations);
 
@@ -202,19 +203,23 @@ describe('guided education policy', () => {
         evidence: [{ source: 'user_explicit', quote: '先预测' }],
       },
     };
-    const operations = sanitizeEducationOperations(current, [
-      {
-        dimension: 'educational_goal',
-        content: '培养科学推理',
-        source: 'user_explicit',
-        quote: '培养科学推理',
-      },
-      {
-        dimension: 'teaching_strategy',
-        content: '教师直接讲解结论',
-        source: 'inferred',
-      },
-    ], '我想做一个浮力实验');
+    const operations = sanitizeEducationOperations(
+      current,
+      [
+        {
+          dimension: 'educational_goal',
+          content: '培养科学推理',
+          source: 'user_explicit',
+          quote: '培养科学推理',
+        },
+        {
+          dimension: 'teaching_strategy',
+          content: '教师直接讲解结论',
+          source: 'inferred',
+        },
+      ],
+      '我想做一个浮力实验',
+    );
 
     expect(operations).toEqual([
       expect.objectContaining({
@@ -282,12 +287,15 @@ describe('guided education policy', () => {
   });
 
   it('does not finish after choosing only a role or scenario', () => {
-    const evaluation = evaluateEducationFlow({
-      audience_context: {
-        content: '由耐心的实验老师面向初二学生指导',
-        evidence: [{ source: 'user_explicit', quote: '实验老师' }],
+    const evaluation = evaluateEducationFlow(
+      {
+        audience_context: {
+          content: '由耐心的实验老师面向初二学生指导',
+          evidence: [{ source: 'user_explicit', quote: '实验老师' }],
+        },
       },
-    }, ['intent_context']);
+      ['intent_context'],
+    );
 
     expect(evaluation.ready_for_confirmation).toBe(false);
     expect(evaluation.current_step).toBe('intent_context');

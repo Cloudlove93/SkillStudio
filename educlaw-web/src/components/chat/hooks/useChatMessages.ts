@@ -1,20 +1,36 @@
 import { useState, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
-import { useChatStore, convertRuntimeMessage, parseSessionInfo } from '../../../stores/chat';
+import {
+  useChatStore,
+  convertRuntimeMessage,
+  parseSessionInfo,
+} from '../../../stores/chat';
 import { useAgentStore } from '../../../stores/agent';
 import { useOptimizeStore } from '../../../stores/optimize';
 import { useLibraryStore } from '../../../stores/library';
 import type { Message } from '@educlaw/shared';
 import { agentRuntimeApi } from '../../../api/runtime';
-import type { ImageAttachment, PromptMode, CustomCommand } from '../PromptInput';
+import type {
+  ImageAttachment,
+  PromptMode,
+  CustomCommand,
+} from '../PromptInput';
 
-function buildChatContext(agentId: string): Array<{ role: 'user' | 'assistant'; content: string }> {
+function buildChatContext(
+  agentId: string,
+): Array<{ role: 'user' | 'assistant'; content: string }> {
   const messages = useChatStore.getState().tabs.get(agentId)?.messages ?? [];
   return messages
-    .filter((message) => message.role === 'user' || message.role === 'assistant')
+    .filter(
+      (message) => message.role === 'user' || message.role === 'assistant',
+    )
     .map((message) => ({
       role: message.role,
-      content: message.parts.filter((part) => part.type === 'text').map((part) => part.text ?? '').join('\n').trim(),
+      content: message.parts
+        .filter((part) => part.type === 'text')
+        .map((part) => part.text ?? '')
+        .join('\n')
+        .trim(),
     }))
     .filter((message) => message.content.length > 0);
 }
@@ -31,65 +47,81 @@ export function useChatMessages(
   const setStreaming = useChatStore((s) => s.setStreaming);
   const api = agentRuntimeApi(agentId);
   const [promptMode, setPromptMode] = useState<PromptMode>('normal');
-  const refreshTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const refreshTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
 
-  const startMessageRefresh = useCallback((sid: string) => {
-    let attempts = 0;
-    let idleTailPolls = 0;
-    const maxAttempts = 120;
-    const maxIdleTailPolls = 12;
+  const startMessageRefresh = useCallback(
+    (sid: string) => {
+      let attempts = 0;
+      let idleTailPolls = 0;
+      const maxAttempts = 120;
+      const maxIdleTailPolls = 12;
 
-    function tick(delayMs = 2000) {
-      if (attempts >= maxAttempts) return;
-      attempts++;
-      refreshTimer.current = setTimeout(async () => {
-        try {
-          const tab = useChatStore.getState().tabs.get(agentId);
-          if (!tab || tab.sessionId !== sid) return;
+      function tick(delayMs = 2000) {
+        if (attempts >= maxAttempts) return;
+        attempts++;
+        refreshTimer.current = setTimeout(async () => {
+          try {
+            const tab = useChatStore.getState().tabs.get(agentId);
+            if (!tab || tab.sessionId !== sid) return;
 
-          let converted: Message[] = [];
-          const raw = await api.listMessages(sid) as unknown;
-          if (Array.isArray(raw) && raw.length > 0) {
-            converted = raw.map((message) => convertRuntimeMessage(message as Record<string, unknown>));
-            setMessages(agentId, converted);
-          }
+            let converted: Message[] = [];
+            const raw = (await api.listMessages(sid)) as unknown;
+            if (Array.isArray(raw) && raw.length > 0) {
+              converted = raw.map((message) =>
+                convertRuntimeMessage(message as Record<string, unknown>),
+              );
+              setMessages(agentId, converted);
+            }
 
-          const session = await api.getSession(sid) as Record<string, unknown> | null;
-          const status = session
-            ? ((session.status as { type?: string } | undefined)
-              ?? ((session.info as { status?: { type?: string } } | undefined)?.status))
-            : undefined;
+            const session = (await api.getSession(sid)) as Record<
+              string,
+              unknown
+            > | null;
+            const status = session
+              ? ((session.status as { type?: string } | undefined) ??
+                (session.info as { status?: { type?: string } } | undefined)
+                  ?.status)
+              : undefined;
 
-          if (!status) {
+            if (!status) {
+              tick();
+              return;
+            }
+
+            const isBusy = status.type === 'busy' || status.type === 'running';
+            useChatStore.getState().setStreaming(agentId, isBusy);
+
+            if (isBusy) {
+              idleTailPolls = 0;
+              tick();
+              return;
+            }
+
+            const lastMessage = converted.at(-1);
+            const awaitingVisibleResult =
+              converted.length === 0 || lastMessage?.role !== 'assistant';
+            if (awaitingVisibleResult && idleTailPolls < maxIdleTailPolls) {
+              idleTailPolls++;
+              tick(1000);
+            }
+          } catch {
             tick();
-            return;
           }
+        }, delayMs);
+      }
 
-          const isBusy = status.type === 'busy' || status.type === 'running';
-          useChatStore.getState().setStreaming(agentId, isBusy);
+      tick();
+    },
+    [agentId, api, setMessages],
+  );
 
-          if (isBusy) {
-            idleTailPolls = 0;
-            tick();
-            return;
-          }
-
-          const lastMessage = converted.at(-1);
-          const awaitingVisibleResult = converted.length === 0 || lastMessage?.role !== 'assistant';
-          if (awaitingVisibleResult && idleTailPolls < maxIdleTailPolls) {
-            idleTailPolls++;
-            tick(1000);
-          }
-        } catch {
-          tick();
-        }
-      }, delayMs);
-    }
-
-    tick();
-  }, [agentId, api, setMessages]);
-
-  async function handleSend(content: string, images?: ImageAttachment[], agentName?: string) {
+  async function handleSend(
+    content: string,
+    images?: ImageAttachment[],
+    agentName?: string,
+  ) {
     const isShell = promptMode === 'shell';
     const userMsg: Message = {
       id: `temp-user-${Date.now()}`,
@@ -99,24 +131,35 @@ export function useChatMessages(
 
     invalidatePendingLoads();
 
-    const currentMessages = useChatStore.getState().tabs.get(agentId)?.messages ?? [];
+    const currentMessages =
+      useChatStore.getState().tabs.get(agentId)?.messages ?? [];
     setMessages(agentId, [...currentMessages, userMsg]);
     setStreaming(agentId, true);
     if (isShell) setPromptMode('normal');
 
     if (!(await ensureRunning())) {
       const latest = useChatStore.getState().tabs.get(agentId)?.messages ?? [];
-      setMessages(agentId, latest.filter((m) => m.id !== userMsg.id));
+      setMessages(
+        agentId,
+        latest.filter((m) => m.id !== userMsg.id),
+      );
       setStreaming(agentId, false);
       return;
     }
     const latestTab = useChatStore.getState().tabs.get(agentId);
-    const preferredAgentName = agentName || latestTab?.sessions.find((s) => s.id === (latestTab?.sessionId || sessionId))?.agentName;
+    const preferredAgentName =
+      agentName ||
+      latestTab?.sessions.find(
+        (s) => s.id === (latestTab?.sessionId || sessionId),
+      )?.agentName;
     let targetSessionId = latestTab?.sessionId || sessionId;
     if (!targetSessionId) {
-      const rawSession = await api.createSession(preferredAgentName ? { agentName: preferredAgentName } : undefined) as Record<string, unknown>;
+      const rawSession = (await api.createSession(
+        preferredAgentName ? { agentName: preferredAgentName } : undefined,
+      )) as Record<string, unknown>;
       const session = parseSessionInfo(rawSession);
-      const currentSessions = useChatStore.getState().tabs.get(agentId)?.sessions ?? [];
+      const currentSessions =
+        useChatStore.getState().tabs.get(agentId)?.sessions ?? [];
       setSessions(agentId, [...currentSessions, session]);
       invalidatePendingLoads();
       setSessionId(agentId, session.id);
@@ -124,47 +167,59 @@ export function useChatMessages(
     }
 
     if (isShell) {
-      api.sendShell(targetSessionId!, content, agentName).then((result) => {
+      api
+        .sendShell(targetSessionId!, content, agentName)
+        .then((result) => {
+          const store = useChatStore.getState();
+          const tab = store.tabs.get(agentId);
+          if (!tab) return;
+          const assistantMsg = convertRuntimeMessage(result);
+          if (assistantMsg.id) {
+            store.setMessages(agentId, [...tab.messages, assistantMsg]);
+          }
+          store.setStreaming(agentId, false);
+        })
+        .catch(() => {
+          useChatStore.getState().setStreaming(agentId, false);
+        });
+      return;
+    }
+
+    api
+      .sendMessage(targetSessionId!, content, images, preferredAgentName)
+      .then((result) => {
         const store = useChatStore.getState();
         const tab = store.tabs.get(agentId);
         if (!tab) return;
         const assistantMsg = convertRuntimeMessage(result);
         if (assistantMsg.id) {
-          store.setMessages(agentId, [...tab.messages, assistantMsg]);
+          const messages = [...tab.messages];
+          const existIdx = messages.findIndex((m) => m.id === assistantMsg.id);
+
+          if (existIdx >= 0) {
+            const existing = messages[existIdx];
+            const existingTextLen = existing.parts.reduce(
+              (n, p) => n + (p.text?.length ?? 0),
+              0,
+            );
+            const postTextLen = assistantMsg.parts.reduce(
+              (n, p) => n + (p.text?.length ?? 0),
+              0,
+            );
+            if (postTextLen > existingTextLen) {
+              messages[existIdx] = assistantMsg;
+              store.setMessages(agentId, messages);
+            }
+          } else {
+            store.setMessages(agentId, [...tab.messages, assistantMsg]);
+          }
         }
-        store.setStreaming(agentId, false);
-      }).catch(() => {
+
+        startMessageRefresh(targetSessionId!);
+      })
+      .catch(() => {
         useChatStore.getState().setStreaming(agentId, false);
       });
-      return;
-    }
-
-    api.sendMessage(targetSessionId!, content, images, preferredAgentName).then((result) => {
-      const store = useChatStore.getState();
-      const tab = store.tabs.get(agentId);
-      if (!tab) return;
-      const assistantMsg = convertRuntimeMessage(result);
-      if (assistantMsg.id) {
-        const messages = [...tab.messages];
-        const existIdx = messages.findIndex((m) => m.id === assistantMsg.id);
-
-        if (existIdx >= 0) {
-          const existing = messages[existIdx];
-          const existingTextLen = existing.parts.reduce((n, p) => n + (p.text?.length ?? 0), 0);
-          const postTextLen = assistantMsg.parts.reduce((n, p) => n + (p.text?.length ?? 0), 0);
-          if (postTextLen > existingTextLen) {
-            messages[existIdx] = assistantMsg;
-            store.setMessages(agentId, messages);
-          }
-        } else {
-          store.setMessages(agentId, [...tab.messages, assistantMsg]);
-        }
-      }
-
-      startMessageRefresh(targetSessionId!);
-    }).catch(() => {
-      useChatStore.getState().setStreaming(agentId, false);
-    });
   }
 
   function handleSendWithCommand(
@@ -180,17 +235,23 @@ export function useChatMessages(
       const chatContext = buildChatContext(agentId);
 
       if (commandName === 'optimize-agent') {
-        void useOptimizeStore.getState().createAgentRun(agentId, { chatContext });
+        void useOptimizeStore
+          .getState()
+          .createAgentRun(agentId, { chatContext });
         return;
       }
 
       if (commandName === 'optimize-profile') {
-        const agent = useAgentStore.getState().agents.find((item) => item.id === agentId);
+        const agent = useAgentStore
+          .getState()
+          .agents.find((item) => item.id === agentId);
         if (!agent?.profileFileName) {
           toast.error('This agent does not have an attached profile');
           return;
         }
-        void useOptimizeStore.getState().createProfileRun(agent.profileFileName, { chatContext });
+        void useOptimizeStore
+          .getState()
+          .createProfileRun(agent.profileFileName, { chatContext });
         return;
       }
 
@@ -208,26 +269,42 @@ export function useChatMessages(
           }
           const skills = useLibraryStore.getState().skills;
           const query = skillQuery.toLowerCase();
-          const exactMatches = skills.filter((skill) =>
-            skill.dirName.toLowerCase() === query || skill.name.toLowerCase() === query,
+          const exactMatches = skills.filter(
+            (skill) =>
+              skill.dirName.toLowerCase() === query ||
+              skill.name.toLowerCase() === query,
           );
-          const partialMatches = exactMatches.length > 0
-            ? exactMatches
-            : skills.filter((skill) =>
-                skill.dirName.toLowerCase().includes(query) || skill.name.toLowerCase().includes(query),
-              );
-          const matches = Array.from(new Map(partialMatches.map((skill) => [skill.dirName, skill])).values());
+          const partialMatches =
+            exactMatches.length > 0
+              ? exactMatches
+              : skills.filter(
+                  (skill) =>
+                    skill.dirName.toLowerCase().includes(query) ||
+                    skill.name.toLowerCase().includes(query),
+                );
+          const matches = Array.from(
+            new Map(
+              partialMatches.map((skill) => [skill.dirName, skill]),
+            ).values(),
+          );
 
           if (matches.length === 0) {
             toast.error(`No matching skill found: ${skillQuery}`);
             return;
           }
           if (matches.length > 1) {
-            toast.error(`Multiple matching skills found. Please be more specific: ${matches.slice(0, 5).map((skill) => skill.dirName).join(', ')}`);
+            toast.error(
+              `Multiple matching skills found. Please be more specific: ${matches
+                .slice(0, 5)
+                .map((skill) => skill.dirName)
+                .join(', ')}`,
+            );
             return;
           }
 
-          void useOptimizeStore.getState().createSkillRun(matches[0].dirName, { chatContext });
+          void useOptimizeStore
+            .getState()
+            .createSkillRun(matches[0].dirName, { chatContext });
         })();
         return;
       }
@@ -245,21 +322,30 @@ export function useChatMessages(
             role: 'user',
             parts: [{ type: 'text', text: trimmed }],
           };
-          const currentMessages = useChatStore.getState().tabs.get(agentId)?.messages ?? [];
+          const currentMessages =
+            useChatStore.getState().tabs.get(agentId)?.messages ?? [];
           setMessages(agentId, [...currentMessages, userMsg]);
           setStreaming(agentId, true);
-          api.sendCommand(targetSessionId, commandName, args.join(' '), agentName).then((result) => {
-            const store = useChatStore.getState();
-            const tab = store.tabs.get(agentId);
-            if (!tab) return;
-            const assistantMsg = convertRuntimeMessage(result);
-            if (assistantMsg.id) {
-              store.setMessages(agentId, [...tab.messages, assistantMsg]);
-            }
-            store.setStreaming(agentId, false);
-          }).catch(() => {
-            useChatStore.getState().setStreaming(agentId, false);
-          });
+          api
+            .sendCommand(
+              targetSessionId,
+              commandName,
+              args.join(' '),
+              agentName,
+            )
+            .then((result) => {
+              const store = useChatStore.getState();
+              const tab = store.tabs.get(agentId);
+              if (!tab) return;
+              const assistantMsg = convertRuntimeMessage(result);
+              if (assistantMsg.id) {
+                store.setMessages(agentId, [...tab.messages, assistantMsg]);
+              }
+              store.setStreaming(agentId, false);
+            })
+            .catch(() => {
+              useChatStore.getState().setStreaming(agentId, false);
+            });
         })();
         return;
       }
@@ -271,7 +357,9 @@ export function useChatMessages(
     if (!sessionId) return;
     await api.deleteMessage(sessionId, messageId);
     const latestTab = useChatStore.getState().tabs.get(agentId);
-    const updated = (latestTab?.messages ?? []).filter((m) => m.id !== messageId);
+    const updated = (latestTab?.messages ?? []).filter(
+      (m) => m.id !== messageId,
+    );
     setMessages(agentId, updated);
   }
 
@@ -293,4 +381,3 @@ export function useChatMessages(
     handleAbort,
   };
 }
-

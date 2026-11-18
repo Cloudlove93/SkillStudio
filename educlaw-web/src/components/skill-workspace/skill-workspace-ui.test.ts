@@ -20,15 +20,17 @@ describe('Skill-first workspace UI contract', () => {
   it('uses the Skill workspace as the authenticated default and retires legacy screens', () => {
     const source = read('../../App.tsx');
 
-    expect(source).toContain(
-      'path="/" element={<RequireAuth><WorkspaceEntry /></RequireAuth>}',
+    expect(source).toMatch(
+      /path="\/"\s+element=\{\s*<RequireAuth>\s*<WorkspaceEntry\s*\/>\s*<\/RequireAuth>\s*\}/,
     );
-    expect(source).toContain(
-      'path="/legacy" element={<Navigate to="/" replace />}',
+    expect(source).toMatch(
+      /path="\/legacy"\s+element=\{\s*<Navigate\s+to="\/"\s+replace\s*\/>\s*\}/,
     );
     expect(source).not.toContain("import('./pages/Workspace')");
     expect(source).toContain('return <SkillFirstWorkspace />');
-    expect(source).toContain('path="/skills" element={<RequireAuth><LegacySkillsRedirect /></RequireAuth>}');
+    expect(source).toMatch(
+      /path="\/skills"\s+element=\{\s*<RequireAuth>\s*<LegacySkillsRedirect\s*\/>\s*<\/RequireAuth>\s*\}/,
+    );
   });
 
   it('provides one compact entry to the shared right inspector', () => {
@@ -129,7 +131,7 @@ describe('Skill-first workspace UI contract', () => {
     const scenarios = read('./education-scenarios.ts');
 
     expect(source).toContain('从一个教学目标开始');
-    expect(source).toContain(
+    expect(source.replace(/\s+/g, ' ')).toContain(
       '描述你的教学目标，我会协助梳理需求并生成可运行的 Agent 与 Skill。',
     );
     expect(source).toContain('精选教学场景');
@@ -214,7 +216,7 @@ describe('Skill-first workspace UI contract', () => {
     const optimize = read('./SkillOptimizeWorkspace.tsx');
     const css = workspaceCss();
 
-    expect(run).toContain(
+    expect(run.replace(/\s+/g, ' ')).toContain(
       "purpose === 'test' ? '试一试当前 Skill' : '开始使用这个 Skill'",
     );
     expect(run).toContain('用真实任务检查回答是否符合你的预期。');
@@ -468,8 +470,12 @@ describe('Skill-first workspace UI contract', () => {
     expect(panel).toContain('feedbackDraft');
     expect(api).toContain('suggestions(');
     expect(api).toContain('ANSWER_SKILL_OPTIMIZATION_ROUTES.SUGGESTIONS');
-    expect(panel).toContain('answerSkillOptimizationApi.suggestions');
-    expect(panel).toContain('answerSkillOptimizationApi.resolve');
+    expect(panel.replace(/\s+/g, '')).toContain(
+      'answerSkillOptimizationApi.suggestions',
+    );
+    expect(panel.replace(/\s+/g, '')).toContain(
+      'answerSkillOptimizationApi.resolve',
+    );
     expect(panel).toContain('existingOptimizationId');
     expect(panel).not.toContain(
       "setError(cause instanceof Error ? cause.message : '暂时无法生成改进建议')",

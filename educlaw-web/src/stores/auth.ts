@@ -40,8 +40,18 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     });
   },
 
-  async register(email: string, password: string, inviteCode: string, username: string) {
-    const tokens = await authApi.register(email, password, inviteCode, username);
+  async register(
+    email: string,
+    password: string,
+    inviteCode: string,
+    username: string,
+  ) {
+    const tokens = await authApi.register(
+      email,
+      password,
+      inviteCode,
+      username,
+    );
     const me = await authApi.getMe(tokens.access_token);
     set({
       token: tokens.access_token,

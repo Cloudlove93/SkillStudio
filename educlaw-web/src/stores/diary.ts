@@ -37,11 +37,14 @@ export const useDiaryStore = create<DiaryStore>((set, get) => ({
     // Only flush if content was actually edited (dirty)
     const { content, selectedDate: prevDate, saving, dirty } = get();
     if (dirty && content.trim() && !saving) {
-      diaryApi.saveDiary(prevDate, content).then(() => {
-        const dates = new Set(get().diaryDates);
-        dates.add(prevDate);
-        set({ diaryDates: dates });
-      }).catch(() => {});
+      diaryApi
+        .saveDiary(prevDate, content)
+        .then(() => {
+          const dates = new Set(get().diaryDates);
+          dates.add(prevDate);
+          set({ diaryDates: dates });
+        })
+        .catch(() => {});
     }
     set({ selectedDate: date, autoSaveStatus: 'idle', dirty: false });
     get().loadDiary(date);
@@ -53,7 +56,12 @@ export const useDiaryStore = create<DiaryStore>((set, get) => ({
       const res = await diaryApi.fetchDiary(date);
       // Only update if still on the same date
       if (get().selectedDate === date) {
-        set({ content: res.content, loading: false, autoSaveStatus: 'idle', dirty: false });
+        set({
+          content: res.content,
+          loading: false,
+          autoSaveStatus: 'idle',
+          dirty: false,
+        });
       }
     } catch {
       if (get().selectedDate === date) {

@@ -1,6 +1,6 @@
-import { AsyncLocalStorage } from "node:async_hooks";
-import type { Logger } from "pino";
-import { logger } from "./logger.js";
+import { AsyncLocalStorage } from 'node:async_hooks';
+import type { Logger } from 'pino';
+import { logger } from './logger.js';
 
 interface RequestContextValue {
   requestId: string;
@@ -9,7 +9,10 @@ interface RequestContextValue {
 
 const storage = new AsyncLocalStorage<RequestContextValue>();
 
-export function runWithRequestContext<T>(context: RequestContextValue, callback: () => T): T {
+export function runWithRequestContext<T>(
+  context: RequestContextValue,
+  callback: () => T,
+): T {
   return storage.run(context, callback);
 }
 

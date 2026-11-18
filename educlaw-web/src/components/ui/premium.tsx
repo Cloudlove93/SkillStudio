@@ -4,11 +4,14 @@ import { cn } from '@/lib/utils';
 
 type Accent = 'blue' | 'emerald' | 'amber' | 'violet' | 'rose' | 'slate';
 
-const accentStyles: Record<Accent, {
-  iconWrap: string;
-  iconColor: string;
-  pill: string;
-}> = {
+const accentStyles: Record<
+  Accent,
+  {
+    iconWrap: string;
+    iconColor: string;
+    pill: string;
+  }
+> = {
   blue: {
     iconWrap: 'bg-[rgba(55,130,255,0.10)]',
     iconColor: 'text-[color:var(--info)]',
@@ -106,7 +109,12 @@ export function PremiumHeader({
   return (
     <DetailSurface className={cn('px-4 py-4 sm:px-5', className)}>
       <div className="relative flex items-start gap-3">
-        <div className={cn('flex size-11 shrink-0 items-center justify-center rounded-[12px] border border-border', tone.iconWrap)}>
+        <div
+          className={cn(
+            'flex size-11 shrink-0 items-center justify-center rounded-[12px] border border-border',
+            tone.iconWrap,
+          )}
+        >
           <Icon className={cn('size-5', tone.iconColor)} />
         </div>
         <div className="min-w-0 flex-1">
@@ -126,7 +134,9 @@ export function PremiumHeader({
                 </p>
               ) : null}
             </div>
-            {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
+            {actions ? (
+              <div className="flex shrink-0 items-center gap-2">{actions}</div>
+            ) : null}
           </div>
         </div>
       </div>

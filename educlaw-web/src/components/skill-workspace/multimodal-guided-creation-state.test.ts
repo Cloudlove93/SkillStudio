@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { MediaPublishResult, MediaSessionDetail } from '../../api/lite-api';
+import type {
+  MediaPublishResult,
+  MediaSessionDetail,
+} from '../../api/lite-api';
 import * as workbenchState from './multimodal-guided-creation-state';
 import {
   applyMultimodalEvent,
@@ -16,7 +19,9 @@ import {
   toggleMultimodalCandidateSelection,
 } from './multimodal-guided-creation-state';
 
-function detail(overrides: Partial<MediaSessionDetail> = {}): MediaSessionDetail {
+function detail(
+  overrides: Partial<MediaSessionDetail> = {},
+): MediaSessionDetail {
   return {
     sessionId: '101',
     displayName: '课堂视频提炼',
@@ -197,13 +202,15 @@ describe('multimodal guided creation workbench state', () => {
   });
 
   it('provides a stable generation idempotency key for the same session revision', () => {
-    const helper = (workbenchState as unknown as {
-      mediaOperationIdempotencyKey?: (
-        operation: string,
-        sessionId: string,
-        revisionNo: number,
-      ) => string;
-    }).mediaOperationIdempotencyKey;
+    const helper = (
+      workbenchState as unknown as {
+        mediaOperationIdempotencyKey?: (
+          operation: string,
+          sessionId: string,
+          revisionNo: number,
+        ) => string;
+      }
+    ).mediaOperationIdempotencyKey;
 
     expect(typeof helper).toBe('function');
     if (!helper) return;
@@ -216,9 +223,11 @@ describe('multimodal guided creation workbench state', () => {
   });
 
   it('only reconciles confirmation as successful when a published receipt exists', () => {
-    const helper = (workbenchState as unknown as {
-      isMediaGenerationPublished?: (value: MediaSessionDetail) => boolean;
-    }).isMediaGenerationPublished;
+    const helper = (
+      workbenchState as unknown as {
+        isMediaGenerationPublished?: (value: MediaSessionDetail) => boolean;
+      }
+    ).isMediaGenerationPublished;
     const published = detail({
       status: 'completed',
       mediaStage: 'published',
@@ -238,26 +247,31 @@ describe('multimodal guided creation workbench state', () => {
   });
 
   it('hydrates the published session directly from a successful generation response', () => {
-    const helper = (workbenchState as unknown as {
-      applyMediaGenerationResult?: (
-        current: MediaSessionDetail,
-        result: MediaPublishResult,
-      ) => MediaSessionDetail;
-    }).applyMediaGenerationResult;
+    const helper = (
+      workbenchState as unknown as {
+        applyMediaGenerationResult?: (
+          current: MediaSessionDetail,
+          result: MediaPublishResult,
+        ) => MediaSessionDetail;
+      }
+    ).applyMediaGenerationResult;
 
     expect(typeof helper).toBe('function');
     if (!helper) return;
-    const next = helper(detail({ mediaStage: 'arena_testing', revisionNo: 14 }), {
-      sessionId: '101',
-      revisionNo: 15,
-      mediaStage: 'published',
-      packageId: '14',
-      packageVersionId: '40',
-      packageVersionNumber: 1,
-      skillVersionIds: { 'skill-1': '81' },
-      publishedAt: '2026-08-27T09:12:37.052Z',
-      replayed: false,
-    });
+    const next = helper(
+      detail({ mediaStage: 'arena_testing', revisionNo: 14 }),
+      {
+        sessionId: '101',
+        revisionNo: 15,
+        mediaStage: 'published',
+        packageId: '14',
+        packageVersionId: '40',
+        packageVersionNumber: 1,
+        skillVersionIds: { 'skill-1': '81' },
+        publishedAt: '2026-08-27T09:12:37.052Z',
+        replayed: false,
+      },
+    );
 
     expect(next.status).toBe('completed');
     expect(next.mediaStage).toBe('published');
@@ -266,14 +280,16 @@ describe('multimodal guided creation workbench state', () => {
   });
 
   it('replays an ambiguous generation request with the same operation until it succeeds', async () => {
-    const helper = (workbenchState as unknown as {
-      confirmMediaGenerationReliably?: (input: {
-        confirm: () => Promise<MediaPublishResult>;
-        getDetail: () => Promise<MediaSessionDetail>;
-        wait: (delayMs: number) => Promise<void>;
-        retryDelaysMs: number[];
-      }) => Promise<{ kind: string; result?: MediaPublishResult }>;
-    }).confirmMediaGenerationReliably;
+    const helper = (
+      workbenchState as unknown as {
+        confirmMediaGenerationReliably?: (input: {
+          confirm: () => Promise<MediaPublishResult>;
+          getDetail: () => Promise<MediaSessionDetail>;
+          wait: (delayMs: number) => Promise<void>;
+          retryDelaysMs: number[];
+        }) => Promise<{ kind: string; result?: MediaPublishResult }>;
+      }
+    ).confirmMediaGenerationReliably;
     const result: MediaPublishResult = {
       sessionId: '101',
       revisionNo: 15,
@@ -296,7 +312,8 @@ describe('multimodal guided creation workbench state', () => {
         if (confirmCalls === 1) throw new Error('response lost');
         return result;
       },
-      getDetail: async () => detail({ mediaStage: 'arena_testing', revisionNo: 14 }),
+      getDetail: async () =>
+        detail({ mediaStage: 'arena_testing', revisionNo: 14 }),
       wait: async (delayMs) => {
         waits.push(delayMs);
       },
@@ -309,14 +326,16 @@ describe('multimodal guided creation workbench state', () => {
   });
 
   it('accepts a publication that becomes visible during bounded reconciliation', async () => {
-    const helper = (workbenchState as unknown as {
-      confirmMediaGenerationReliably?: (input: {
-        confirm: () => Promise<MediaPublishResult>;
-        getDetail: () => Promise<MediaSessionDetail>;
-        wait: (delayMs: number) => Promise<void>;
-        retryDelaysMs: number[];
-      }) => Promise<{ kind: string; detail?: MediaSessionDetail }>;
-    }).confirmMediaGenerationReliably;
+    const helper = (
+      workbenchState as unknown as {
+        confirmMediaGenerationReliably?: (input: {
+          confirm: () => Promise<MediaPublishResult>;
+          getDetail: () => Promise<MediaSessionDetail>;
+          wait: (delayMs: number) => Promise<void>;
+          retryDelaysMs: number[];
+        }) => Promise<{ kind: string; detail?: MediaSessionDetail }>;
+      }
+    ).confirmMediaGenerationReliably;
     const published = detail({
       status: 'completed',
       mediaStage: 'published',
@@ -351,14 +370,16 @@ describe('multimodal guided creation workbench state', () => {
   });
 
   it('does not replay a definitive generation conflict after reconciliation', async () => {
-    const helper = (workbenchState as unknown as {
-      confirmMediaGenerationReliably?: (input: {
-        confirm: () => Promise<MediaPublishResult>;
-        getDetail: () => Promise<MediaSessionDetail>;
-        wait: (delayMs: number) => Promise<void>;
-        retryDelaysMs: number[];
-      }) => Promise<unknown>;
-    }).confirmMediaGenerationReliably;
+    const helper = (
+      workbenchState as unknown as {
+        confirmMediaGenerationReliably?: (input: {
+          confirm: () => Promise<MediaPublishResult>;
+          getDetail: () => Promise<MediaSessionDetail>;
+          wait: (delayMs: number) => Promise<void>;
+          retryDelaysMs: number[];
+        }) => Promise<unknown>;
+      }
+    ).confirmMediaGenerationReliably;
     const conflict = Object.assign(new Error('revision changed'), {
       status: 409,
       code: 'SESSION_REVISION_CONFLICT',
@@ -373,7 +394,8 @@ describe('multimodal guided creation workbench state', () => {
           confirmCalls += 1;
           throw conflict;
         },
-        getDetail: async () => detail({ mediaStage: 'arena_testing', revisionNo: 15 }),
+        getDetail: async () =>
+          detail({ mediaStage: 'arena_testing', revisionNo: 15 }),
         wait: async () => undefined,
         retryDelaysMs: [0, 250, 750],
       }),
@@ -408,11 +430,15 @@ describe('multimodal guided creation workbench state', () => {
   });
 
   it('keeps reconciling a settled stage while generation recovery is pending', () => {
-    expect(shouldReconcileMediaDetail('arena_testing', 'polling', true)).toBe(true);
+    expect(shouldReconcileMediaDetail('arena_testing', 'polling', true)).toBe(
+      true,
+    );
   });
 
   it('maps state-machine stages to the three explicit confirmation points', () => {
-    expect(pendingConfirmationStage('awaiting_adler_overview')).toBe('adler_overview');
+    expect(pendingConfirmationStage('awaiting_adler_overview')).toBe(
+      'adler_overview',
+    );
     expect(pendingConfirmationStage('awaiting_candidates')).toBe(
       'evidence_and_candidates',
     );
@@ -459,9 +485,9 @@ describe('multimodal guided creation workbench state', () => {
       },
     ];
 
-    expect(evidenceAtTime(current, 2_000).map((item) => item.evidenceId)).toEqual([
-      'ev-1',
-    ]);
+    expect(
+      evidenceAtTime(current, 2_000).map((item) => item.evidenceId),
+    ).toEqual(['ev-1']);
     const serialized = serializeMultimodalResumeState({
       sessionId: '101',
       signedUrl: 'https://storage.example/signed',
@@ -533,22 +559,34 @@ describe('multimodal guided creation workbench state', () => {
     const alignment = evidenceAlignmentAtTime(current, 1_000);
 
     expect(alignment.relation).toBe('upcoming');
-    expect(alignment.items.map((item) => item.evidenceId)).toEqual(['ev-upcoming']);
+    expect(alignment.items.map((item) => item.evidenceId)).toEqual([
+      'ev-upcoming',
+    ]);
   });
 
   it('selects multimodal mode only for a stored non-empty session id', () => {
     expect(hasMultimodalResumeState('{"sessionId":"101"}')).toBe(true);
     expect(hasMultimodalResumeState('{"sessionId":""}')).toBe(false);
-    expect(hasMultimodalResumeState('{"signedUrl":"https://storage.example"}')).toBe(false);
+    expect(
+      hasMultimodalResumeState('{"signedUrl":"https://storage.example"}'),
+    ).toBe(false);
     expect(hasMultimodalResumeState('not-json')).toBe(false);
     expect(hasMultimodalResumeState(null)).toBe(false);
   });
 
   it('keeps database reconciliation active even while SSE is connected', () => {
-    expect(shouldReconcileMediaDetail('validating_candidates', 'sse')).toBe(true);
-    expect(shouldReconcileMediaDetail('validating_candidates', 'polling')).toBe(true);
-    expect(shouldReconcileMediaDetail('validating_candidates', 'offline')).toBe(true);
-    expect(shouldReconcileMediaDetail('awaiting_candidates', 'settled')).toBe(false);
+    expect(shouldReconcileMediaDetail('validating_candidates', 'sse')).toBe(
+      true,
+    );
+    expect(shouldReconcileMediaDetail('validating_candidates', 'polling')).toBe(
+      true,
+    );
+    expect(shouldReconcileMediaDetail('validating_candidates', 'offline')).toBe(
+      true,
+    );
+    expect(shouldReconcileMediaDetail('awaiting_candidates', 'settled')).toBe(
+      false,
+    );
   });
 
   it('reconciles slowly during healthy SSE and backs off while offline', () => {
@@ -559,12 +597,19 @@ describe('multimodal guided creation workbench state', () => {
   });
 
   it('keeps candidate selection within the shared 16-skill pack limit', () => {
-    const candidateIds = Array.from({ length: 20 }, (_, index) => `candidate-${index}`);
+    const candidateIds = Array.from(
+      { length: 20 },
+      (_, index) => `candidate-${index}`,
+    );
     const limited = limitMultimodalCandidateSelection(candidateIds);
 
     expect(limited).toEqual(candidateIds.slice(0, 16));
-    expect(toggleMultimodalCandidateSelection(limited, 'candidate-17', true)).toEqual(limited);
-    expect(toggleMultimodalCandidateSelection(limited, 'candidate-0', false)).toHaveLength(15);
+    expect(
+      toggleMultimodalCandidateSelection(limited, 'candidate-17', true),
+    ).toEqual(limited);
+    expect(
+      toggleMultimodalCandidateSelection(limited, 'candidate-0', false),
+    ).toHaveLength(15);
     expect(
       toggleMultimodalCandidateSelection(
         toggleMultimodalCandidateSelection(limited, 'candidate-0', false),

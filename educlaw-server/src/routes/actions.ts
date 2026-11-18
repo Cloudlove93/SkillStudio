@@ -238,7 +238,11 @@ const actionMap = new Map<string, ApiHandler>([
       }
       const surface = optionalArenaSurface(parsed.payload.surface);
       if (surface !== 'optimize')
-        throw new SkillVersionError('AGENT_REQUIRED', AGENT_REQUIRED_MESSAGE, 422);
+        throw new SkillVersionError(
+          'AGENT_REQUIRED',
+          AGENT_REQUIRED_MESSAGE,
+          422,
+        );
       return createArenaThread({
         authUserId,
         packageId: parsed.packageId,
@@ -368,7 +372,11 @@ const actionMap = new Map<string, ApiHandler>([
         'skillMd',
         'note',
       ]);
-      const skillMd = optionalString(parsed.payload.skillMd, 'skillMd', 250_000);
+      const skillMd = optionalString(
+        parsed.payload.skillMd,
+        'skillMd',
+        250_000,
+      );
       if (skillMd === undefined) {
         throw new SkillVersionError(
           'INVALID_ARGUMENT',

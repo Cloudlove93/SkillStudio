@@ -10,7 +10,12 @@ import { useChatSessions } from './hooks/useChatSessions';
 import { useSlashCommands } from './hooks/useSlashCommands';
 import MessageList from './MessageList';
 import PromptInput from './PromptInput';
-import type { ImageAttachment, AgentOption, CustomCommand, PromptMode } from './PromptInput';
+import type {
+  ImageAttachment,
+  AgentOption,
+  CustomCommand,
+  PromptMode,
+} from './PromptInput';
 import QuestionDock from './QuestionDock';
 import TodoDock from './TodoDock';
 import FileViewer from '../editor/FileViewer';
@@ -36,7 +41,11 @@ export default function ChatPanel({ tab }: { tab: TabState }) {
   const setOpenFilePath = useUIStore((s) => s.setOpenFilePath);
 
   const sessions = useChatSessions(agentId, canLoadData);
-  const chatMessages = useChatMessages(agentId, sessions.ensureRunning, sessions.invalidatePendingLoads);
+  const chatMessages = useChatMessages(
+    agentId,
+    sessions.ensureRunning,
+    sessions.invalidatePendingLoads,
+  );
   const slashCommands = useSlashCommands(agentId, isRunning, sessionId);
 
   async function handleSlashCommand(commandId: string) {
@@ -51,26 +60,55 @@ export default function ChatPanel({ tab }: { tab: TabState }) {
 
   if (!isRunning && !isOwner) {
     return openFilePath ? (
-      <FileViewer agentId={agentId} filePath={openFilePath} onClose={() => setOpenFilePath(null)} readonly />
+      <FileViewer
+        agentId={agentId}
+        filePath={openFilePath}
+        onClose={() => setOpenFilePath(null)}
+        readonly
+      />
     ) : (
-      <ChatArea agentId={agentId} sessionId={sessionId} messages={messages} isStreaming={false} readonly onSend={() => {}} onAbort={() => {}} />
+      <ChatArea
+        agentId={agentId}
+        sessionId={sessionId}
+        messages={messages}
+        isStreaming={false}
+        readonly
+        onSend={() => {}}
+        onAbort={() => {}}
+      />
     );
   }
 
   if (!isRunning) {
     return openFilePath ? (
-      <FileViewer agentId={agentId} filePath={openFilePath} onClose={() => setOpenFilePath(null)} readonly={readonly} />
+      <FileViewer
+        agentId={agentId}
+        filePath={openFilePath}
+        onClose={() => setOpenFilePath(null)}
+        readonly={readonly}
+      />
     ) : (
       <div className="flex h-full flex-1 items-center justify-center px-6 py-8">
         <div className="card-premium rounded-[20px] px-8 py-8 text-center">
-          <AgentControls status={agent?.status} isStartingForSend={sessions.isStartingForSend} isOwner={isOwner && !!agent} onStart={() => startAgent(agentId)} onStop={() => stopAgent(agentId)} />
+          <AgentControls
+            status={agent?.status}
+            isStartingForSend={sessions.isStartingForSend}
+            isOwner={isOwner && !!agent}
+            onStart={() => startAgent(agentId)}
+            onStop={() => stopAgent(agentId)}
+          />
         </div>
       </div>
     );
   }
 
   return openFilePath ? (
-    <FileViewer agentId={agentId} filePath={openFilePath} onClose={() => setOpenFilePath(null)} readonly={readonly} />
+    <FileViewer
+      agentId={agentId}
+      filePath={openFilePath}
+      onClose={() => setOpenFilePath(null)}
+      readonly={readonly}
+    />
   ) : (
     <ChatArea
       agentId={agentId}
@@ -78,7 +116,14 @@ export default function ChatPanel({ tab }: { tab: TabState }) {
       messages={messages}
       isStreaming={isStreaming}
       readonly={readonly}
-      onSend={(content, images, agent) => chatMessages.handleSend(content, slashCommands.customCommands, images, agent)}
+      onSend={(content, images, agent) =>
+        chatMessages.handleSend(
+          content,
+          slashCommands.customCommands,
+          images,
+          agent,
+        )
+      }
       onAbort={chatMessages.handleAbort}
       onDeleteMessage={chatMessages.handleDeleteMessage}
       onSlashCommand={handleSlashCommand}
@@ -92,12 +137,18 @@ export default function ChatPanel({ tab }: { tab: TabState }) {
   );
 }
 
-function messagesToPlainList(messages: Message[]): { role: string; content: string }[] {
+function messagesToPlainList(
+  messages: Message[],
+): { role: string; content: string }[] {
   return messages
     .filter((m) => m.role === 'user' || m.role === 'assistant')
     .map((m) => ({
       role: m.role,
-      content: m.parts.filter((p) => p.type === 'text').map((p) => p.text ?? '').join('\n').trim(),
+      content: m.parts
+        .filter((p) => p.type === 'text')
+        .map((p) => p.text ?? '')
+        .join('\n')
+        .trim(),
     }))
     .filter((m) => m.content.length > 0);
 }
@@ -136,20 +187,36 @@ function ChatArea({
   onModeChange?: (mode: PromptMode) => void;
 }) {
   const t = useT();
-  const questionRequest = useInteractionQueueStore((s) => s.pendingQuestions.find((q) => q.agentId === agentId && (!sessionId || q.sessionID === sessionId)));
-  const todos = useTodoStore((s) => s.todos.get(agentId)?.get(sessionId ?? '') ?? emptyTodos);
-  const diaryStatus = useChatStore((s) => s.tabs.get(agentId)?.diaryStatus.get(sessionId ?? '') ?? 'idle');
+  const questionRequest = useInteractionQueueStore((s) =>
+    s.pendingQuestions.find(
+      (q) => q.agentId === agentId && (!sessionId || q.sessionID === sessionId),
+    ),
+  );
+  const todos = useTodoStore(
+    (s) => s.todos.get(agentId)?.get(sessionId ?? '') ?? emptyTodos,
+  );
+  const diaryStatus = useChatStore(
+    (s) => s.tabs.get(agentId)?.diaryStatus.get(sessionId ?? '') ?? 'idle',
+  );
   const setDiaryStatus = useChatStore((s) => s.setDiaryStatus);
 
   async function handleSaveToDiary() {
-    if (!sessionId || diaryStatus === 'loading' || messages.length === 0) return;
+    if (!sessionId || diaryStatus === 'loading' || messages.length === 0)
+      return;
     const plainMessages = messagesToPlainList(messages);
     if (plainMessages.length === 0) return;
     setDiaryStatus(agentId, sessionId, 'loading');
     try {
-      const res = await apiPost<{ ok: boolean; date: string }>(`${API_BASE}/api/chat/summarize-to-diary`, { messages: plainMessages, sessionId });
+      const res = await apiPost<{ ok: boolean; date: string }>(
+        `${API_BASE}/api/chat/summarize-to-diary`,
+        { messages: plainMessages, sessionId },
+      );
       const diaryStore = useDiaryStore.getState();
-      if (diaryStore.selectedDate !== res.date) useDiaryStore.setState({ selectedDate: res.date, autoSaveStatus: 'idle' });
+      if (diaryStore.selectedDate !== res.date)
+        useDiaryStore.setState({
+          selectedDate: res.date,
+          autoSaveStatus: 'idle',
+        });
       diaryStore.loadDiary(res.date);
       setDiaryStatus(agentId, sessionId, 'success');
     } catch {
@@ -166,7 +233,11 @@ function ChatArea({
         </div>
       )}
 
-      <MessageList messages={messages} isStreaming={isStreaming} onDeleteMessage={readonly ? undefined : onDeleteMessage} />
+      <MessageList
+        messages={messages}
+        isStreaming={isStreaming}
+        onDeleteMessage={readonly ? undefined : onDeleteMessage}
+      />
 
       {!readonly && questionRequest && (
         <div className="absolute bottom-20 right-4 z-20 max-h-[60%] w-80 overflow-y-auto animate-fade-in">

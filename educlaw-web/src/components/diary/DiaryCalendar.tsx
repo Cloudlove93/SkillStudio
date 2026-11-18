@@ -18,7 +18,12 @@ function formatDate(y: number, m: number, d: number): string {
   return `${y}-${pad(m)}-${pad(d)}`;
 }
 
-export default function DiaryCalendar({ selectedDate, diaryDates, onSelectDate, onMonthChange }: DiaryCalendarProps) {
+export default function DiaryCalendar({
+  selectedDate,
+  diaryDates,
+  onSelectDate,
+  onMonthChange,
+}: DiaryCalendarProps) {
   const t = useT();
   const today = useMemo(() => {
     const d = new Date();
@@ -47,7 +52,10 @@ export default function DiaryCalendar({ selectedDate, diaryDates, onSelectDate, 
   function goPrev() {
     let y = displayYear;
     let m = displayMonth - 1;
-    if (m < 1) { m = 12; y--; }
+    if (m < 1) {
+      m = 12;
+      y--;
+    }
     setDisplayYear(y);
     setDisplayMonth(m);
     onMonthChange(y, m);
@@ -56,7 +64,10 @@ export default function DiaryCalendar({ selectedDate, diaryDates, onSelectDate, 
   function goNext() {
     let y = displayYear;
     let m = displayMonth + 1;
-    if (m > 12) { m = 1; y++; }
+    if (m > 12) {
+      m = 1;
+      y++;
+    }
     setDisplayYear(y);
     setDisplayMonth(m);
     onMonthChange(y, m);
@@ -97,7 +108,10 @@ export default function DiaryCalendar({ selectedDate, diaryDates, onSelectDate, 
       {/* Weekday headers */}
       <div className="grid grid-cols-7 gap-0.5 text-center">
         {weekDays.map((d) => (
-          <div key={d} className="text-[10px] font-medium text-muted-foreground/50 py-0.5">
+          <div
+            key={d}
+            className="text-[10px] font-medium text-muted-foreground/50 py-0.5"
+          >
             {d}
           </div>
         ))}
@@ -118,13 +132,14 @@ export default function DiaryCalendar({ selectedDate, diaryDates, onSelectDate, 
               onClick={() => onSelectDate(dateStr)}
               className={`
                 relative flex flex-col items-center justify-center rounded-md aspect-square text-xs transition-all
-                ${isSelected
-                  ? 'bg-primary text-primary-foreground font-semibold shadow-sm'
-                  : isToday
-                    ? 'bg-primary/10 text-primary font-medium ring-1 ring-primary/30'
-                    : hasDiary
-                      ? 'hover:bg-muted/60 text-foreground font-medium'
-                      : 'hover:bg-muted/60 text-foreground/60'
+                ${
+                  isSelected
+                    ? 'bg-primary text-primary-foreground font-semibold shadow-sm'
+                    : isToday
+                      ? 'bg-primary/10 text-primary font-medium ring-1 ring-primary/30'
+                      : hasDiary
+                        ? 'hover:bg-muted/60 text-foreground font-medium'
+                        : 'hover:bg-muted/60 text-foreground/60'
                 }
               `}
             >

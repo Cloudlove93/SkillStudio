@@ -1,117 +1,173 @@
-import { BrowserRouter, Routes, Route, Navigate, Link, useLocation } from 'react-router'
-import { lazy, Suspense, useEffect, useState } from 'react'
-import { createPortal } from 'react-dom'
-import { ThemeProvider } from '@/components/theme-provider'
-import { TooltipProvider } from '@/components/ui/tooltip'
-import { Toaster } from 'sonner'
-import { BASE } from '@/api/client'
-import { PRODUCT_NAME, PRODUCT_WORKSPACE_NAME } from '@/lib/brand'
-import { useAuthStore } from './stores/auth'
-import { legacySkillsDestination } from './components/asset-center/asset-center-state'
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  Link,
+  useLocation,
+} from 'react-router';
+import { lazy, Suspense, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { ThemeProvider } from '@/components/theme-provider';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { Toaster } from 'sonner';
+import { BASE } from '@/api/client';
+import { PRODUCT_NAME, PRODUCT_WORKSPACE_NAME } from '@/lib/brand';
+import { useAuthStore } from './stores/auth';
+import { legacySkillsDestination } from './components/asset-center/asset-center-state';
 
-const LoginPage = lazy(() => import('./pages/LoginPage'))
-const AgentWorkspacePage = lazy(() => import('./pages/AgentWorkspacePage'))
-const SkillFirstWorkspace = lazy(() => import('./pages/SkillFirstWorkspace'))
-const WorkflowDemo = lazy(() => import('./pages/WorkflowDemo'))
+const LoginPage = lazy(() => import('./pages/LoginPage'));
+const AgentWorkspacePage = lazy(() => import('./pages/AgentWorkspacePage'));
+const SkillFirstWorkspace = lazy(() => import('./pages/SkillFirstWorkspace'));
+const WorkflowDemo = lazy(() => import('./pages/WorkflowDemo'));
 
 function RouteFallback() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background text-sm text-muted-foreground">
       正在加载…
     </div>
-  )
+  );
 }
 
 function LegacySkillsRedirect() {
-  const location = useLocation()
-  return <Navigate to={legacySkillsDestination(location.search, location.hash)} replace />
+  const location = useLocation();
+  return (
+    <Navigate
+      to={legacySkillsDestination(location.search, location.hash)}
+      replace
+    />
+  );
 }
 
 function WorkspaceEntry() {
   // ?view=my-skills / repository 只作为历史深链保留，导航入口统一走仓库。
-  return <SkillFirstWorkspace />
+  return <SkillFirstWorkspace />;
 }
 
 function NotFoundPage() {
   return (
-    <main id="main-content" className="flex min-h-screen items-center justify-center bg-background px-5 text-foreground">
+    <main
+      id="main-content"
+      className="flex min-h-screen items-center justify-center bg-background px-5 text-foreground"
+    >
       <section className="card-premium w-full max-w-md rounded-[20px] p-7 text-center">
-        <p className="text-[12px] font-semibold tracking-[0.16em] text-muted-foreground">404</p>
+        <p className="text-[12px] font-semibold tracking-[0.16em] text-muted-foreground">
+          404
+        </p>
         <h1 className="mt-2 text-xl font-semibold">页面不存在</h1>
-        <p className="mt-2 text-sm text-muted-foreground">这个地址可能已经变更，返回工作区可以继续使用 Skill。</p>
-        <Link className="mt-5 inline-flex rounded-[10px] bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground" to="/">
+        <p className="mt-2 text-sm text-muted-foreground">
+          这个地址可能已经变更，返回工作区可以继续使用 Skill。
+        </p>
+        <Link
+          className="mt-5 inline-flex rounded-[10px] bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+          to="/"
+        >
           返回工作区
         </Link>
       </section>
     </main>
-  )
+  );
 }
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
-  const location = useLocation()
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const location = useLocation();
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" state={{ from: location }} replace />
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   return (
     <>
-      <a className="skip-link" href="#main-content">跳到主要内容</a>
+      <a className="skip-link" href="#main-content">
+        跳到主要内容
+      </a>
       {children}
     </>
-  )
+  );
 }
 
 function AppRoutes() {
-  const checkAuth = useAuthStore((s) => s.checkAuth)
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
-  const [checking, setChecking] = useState(true)
+  const checkAuth = useAuthStore((s) => s.checkAuth);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    checkAuth().finally(() => setChecking(false))
-  }, [checkAuth])
+    checkAuth().finally(() => setChecking(false));
+  }, [checkAuth]);
 
   if (checking) {
     return (
       <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4">
         <div className="pointer-events-none absolute inset-0 bg-mesh-gradient opacity-80" />
         <div className="card-premium relative z-10 flex w-full max-w-md items-center gap-4 rounded-[20px] px-6 py-5">
-          <img src={`${BASE}/logo.png`} alt={PRODUCT_NAME} className="size-12 rounded-[14px]" />
+          <img
+            src={`${BASE}/logo.png`}
+            alt={PRODUCT_NAME}
+            className="size-12 rounded-[14px]"
+          />
           <div>
             <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
               {PRODUCT_WORKSPACE_NAME}
             </div>
-            <div className="mt-1 text-base font-semibold text-foreground">Loading your workspace...</div>
+            <div className="mt-1 text-base font-semibold text-foreground">
+              Loading your workspace...
+            </div>
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   return (
     <Suspense fallback={<RouteFallback />}>
       <Routes>
-        <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />} />
-        <Route path="/" element={<RequireAuth><WorkspaceEntry /></RequireAuth>} />
-        <Route path="/agents" element={<RequireAuth><AgentWorkspacePage /></RequireAuth>} />
-        <Route path="/skills" element={<RequireAuth><LegacySkillsRedirect /></RequireAuth>} />
+        <Route
+          path="/login"
+          element={
+            isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />
+          }
+        />
+        <Route
+          path="/"
+          element={
+            <RequireAuth>
+              <WorkspaceEntry />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/agents"
+          element={
+            <RequireAuth>
+              <AgentWorkspacePage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/skills"
+          element={
+            <RequireAuth>
+              <LegacySkillsRedirect />
+            </RequireAuth>
+          }
+        />
         <Route path="/legacy" element={<Navigate to="/" replace />} />
         <Route path="/workflow" element={<WorkflowDemo />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </Suspense>
-  )
+  );
 }
 
 function AppToaster() {
-  const [mounted, setMounted] = useState(false)
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true)
-  }, [])
+    setMounted(true);
+  }, []);
 
-  if (!mounted) return null
+  if (!mounted) return null;
 
   return createPortal(
     <Toaster
@@ -122,7 +178,7 @@ function AppToaster() {
       toastOptions={{ style: { zIndex: 2147483647 } }}
     />,
     document.body,
-  )
+  );
 }
 
 function App() {
@@ -135,7 +191,7 @@ function App() {
         <AppToaster />
       </TooltipProvider>
     </ThemeProvider>
-  )
+  );
 }
 
-export default App
+export default App;

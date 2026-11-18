@@ -30,7 +30,9 @@ afterEach(async () => {
 
 describe('legacy compatibility routes', () => {
   it.each([
-    '/arena/chat/profile/7', '/arena/chat/skill/lesson', '/arena/chat/agent/7',
+    '/arena/chat/profile/7',
+    '/arena/chat/skill/lesson',
+    '/arena/chat/agent/7',
   ])('directs new conversations from %s to Agents', async (path) => {
     const running = await listen();
     activeServer = running.server;
@@ -41,7 +43,8 @@ describe('legacy compatibility routes', () => {
     });
     expect(response.status).toBe(422);
     expect(await response.json()).toMatchObject({
-      code: 'AGENT_REQUIRED', nextUrl: '/agents',
+      code: 'AGENT_REQUIRED',
+      nextUrl: '/agents',
     });
   });
 

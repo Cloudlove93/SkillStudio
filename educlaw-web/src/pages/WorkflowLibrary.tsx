@@ -70,14 +70,23 @@ export default function WorkflowLibrary({ token, onCreate, onOpen }: Props) {
         <div>
           <span className="skill-eyebrow">WORKFLOW · 工作流库</span>
           <h1>工作流库</h1>
-          <p>把多个 Skill 和模型步骤连成一条流程，保存后随时继续编排或试运行。</p>
+          <p>
+            把多个 Skill 和模型步骤连成一条流程，保存后随时继续编排或试运行。
+          </p>
         </div>
         <div className="workflow-library-actions">
           <button type="button" onClick={() => void load()} disabled={loading}>
-            <RefreshCw size={15} className={loading ? 'is-spinning' : undefined} />
+            <RefreshCw
+              size={15}
+              className={loading ? 'is-spinning' : undefined}
+            />
             刷新
           </button>
-          <button type="button" className="skill-primary-button" onClick={onCreate}>
+          <button
+            type="button"
+            className="skill-primary-button"
+            onClick={onCreate}
+          >
             <Plus size={15} />
             新建工作流
           </button>
@@ -171,7 +180,9 @@ export default function WorkflowLibrary({ token, onCreate, onOpen }: Props) {
                   <div className="workflow-card-body">
                     <header>
                       <h2>{item.name}</h2>
-                      <span className="workflow-version">v{item.versionNumber}</span>
+                      <span className="workflow-version">
+                        v{item.versionNumber}
+                      </span>
                     </header>
                     <p>{item.description || '工作流草稿'}</p>
                     <span className="workflow-card-updated">

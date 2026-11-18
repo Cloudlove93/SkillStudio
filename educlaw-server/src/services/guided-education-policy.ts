@@ -25,15 +25,16 @@ export const GUIDED_CREATION_STEPS = [
   'evidence_review',
 ] as const satisfies readonly GuidedCreationStep[];
 
-export const GUIDED_EDUCATION_LABELS: Record<GuidedEducationDimension, string> = {
-  educational_goal: '教育目标',
-  audience_context: '对象与情境',
-  input_evidence: '输入与依据',
-  teaching_strategy: '教育策略',
-  action_adaptation: '行动与调整',
-  boundaries_responsibility: '边界与责任',
-  completion_evidence: '完成与证据',
-};
+export const GUIDED_EDUCATION_LABELS: Record<GuidedEducationDimension, string> =
+  {
+    educational_goal: '教育目标',
+    audience_context: '对象与情境',
+    input_evidence: '输入与依据',
+    teaching_strategy: '教育策略',
+    action_adaptation: '行动与调整',
+    boundaries_responsibility: '边界与责任',
+    completion_evidence: '完成与证据',
+  };
 
 const DIMENSION_SET = new Set<string>(GUIDED_EDUCATION_DIMENSIONS);
 const USER_OWNED_SOURCES = new Set<GuidedEducationEvidenceSource>([
@@ -48,15 +49,16 @@ const EDUCATION_OP_SET = new Set<GuidedEducationDraftOp>([
 // Every education dimension must be expressed or explicitly adopted by the
 // teacher. Technical completeness alone must never trigger generation.
 const CRITICAL_USER_DIMENSIONS = GUIDED_EDUCATION_DIMENSIONS;
-const DIMENSION_TO_STEP: Record<GuidedEducationDimension, GuidedCreationStep> = {
-  educational_goal: 'intent_context',
-  audience_context: 'intent_context',
-  input_evidence: 'teacher_experience',
-  teaching_strategy: 'strategy_co_creation',
-  action_adaptation: 'action_adjustment',
-  boundaries_responsibility: 'action_adjustment',
-  completion_evidence: 'evidence_review',
-};
+const DIMENSION_TO_STEP: Record<GuidedEducationDimension, GuidedCreationStep> =
+  {
+    educational_goal: 'intent_context',
+    audience_context: 'intent_context',
+    input_evidence: 'teacher_experience',
+    teaching_strategy: 'strategy_co_creation',
+    action_adaptation: 'action_adjustment',
+    boundaries_responsibility: 'action_adjustment',
+    completion_evidence: 'evidence_review',
+  };
 
 export interface EducationDraftOperation {
   dimension: GuidedEducationDimension;
@@ -116,7 +118,9 @@ function hasUserEvidence(
   dimension: GuidedEducationDimension,
 ): boolean {
   return Boolean(
-    draft[dimension]?.evidence.some((item) => USER_OWNED_SOURCES.has(item.source)),
+    draft[dimension]?.evidence.some((item) =>
+      USER_OWNED_SOURCES.has(item.source),
+    ),
   );
 }
 
@@ -130,9 +134,7 @@ export function sanitizeEducationOperations(
   for (const operation of operations) {
     assertDimension(operation.dimension);
     const op: GuidedEducationDraftOp =
-      operation.op && EDUCATION_OP_SET.has(operation.op)
-        ? operation.op
-        : 'set';
+      operation.op && EDUCATION_OP_SET.has(operation.op) ? operation.op : 'set';
 
     // A model cannot withdraw user-owned evidence without a verified request.
     if (op === 'remove') {
@@ -211,9 +213,7 @@ export function applyEducationOperations(
   for (const operation of operations) {
     assertDimension(operation.dimension);
     const op: GuidedEducationDraftOp =
-      operation.op && EDUCATION_OP_SET.has(operation.op)
-        ? operation.op
-        : 'set';
+      operation.op && EDUCATION_OP_SET.has(operation.op) ? operation.op : 'set';
 
     if (op === 'remove') {
       delete next[operation.dimension];
@@ -318,10 +318,11 @@ export function evaluateEducationFlow(
   const missing_user_decisions = CRITICAL_USER_DIMENSIONS.filter(
     (dimension) => !hasUserEvidence(normalized_draft, dimension),
   );
-  const conflicted_dimensions = GUIDED_EDUCATION_DIMENSIONS.filter((dimension) =>
-    normalized_draft[dimension]?.evidence.some(
-      (evidence) => evidence.source === 'conflicted',
-    ),
+  const conflicted_dimensions = GUIDED_EDUCATION_DIMENSIONS.filter(
+    (dimension) =>
+      normalized_draft[dimension]?.evidence.some(
+        (evidence) => evidence.source === 'conflicted',
+      ),
   );
   // 冲突维度也需要引导用户澄清，否则会出现「无下一步但无法确认」的死锁。
   const pendingDimension = [

@@ -431,10 +431,7 @@ test('deduplicates failed quality evidence for the user-facing explanation', () 
   ]);
   const groups = getAnswerOptimizationFailureReasonGroups(detail);
   assert.ok(groups.visible.length > 0);
-  assert.equal(
-    groups.visible.flatMap((group) => group.reasons).length,
-    5,
-  );
+  assert.equal(groups.visible.flatMap((group) => group.reasons).length, 5);
   assert.equal(groups.hidden.length, 0);
 });
 

@@ -63,9 +63,8 @@ it('previews the saved Agent and dispatches separate Agent and Skill actions', a
   expect(onOpenSkill).not.toHaveBeenCalled();
   await act(async () => buttons[1]?.click());
   expect(onOpenSkill).toHaveBeenCalledOnce();
-  const skillCard = container.querySelector<HTMLButtonElement>(
-    '.asset-skill-link',
-  );
+  const skillCard =
+    container.querySelector<HTMLButtonElement>('.asset-skill-link');
   await act(async () => skillCard?.click());
   expect(onOpenSkill).toHaveBeenLastCalledWith('lesson');
 });

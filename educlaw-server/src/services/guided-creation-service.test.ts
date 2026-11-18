@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type {
-  GuidedCreationStep,
-  GuidedEducationDraft,
-} from '@educlaw/shared';
+import type { GuidedCreationStep, GuidedEducationDraft } from '@educlaw/shared';
 import {
   buildEducationSummarizeTurn,
   buildGuidedAssistantTurnV3,
@@ -46,7 +43,10 @@ describe('guided creation conversation service', () => {
       phrasing: null,
     });
     expect(turn.status).toBe('collecting');
-    expect(turn.completed_steps).toEqual(['intent_context', 'teacher_experience']);
+    expect(turn.completed_steps).toEqual([
+      'intent_context',
+      'teacher_experience',
+    ]);
     expect(turn.current_step).toBe('strategy_co_creation');
     expect(turn.content).toContain('教学策略');
   });
@@ -107,12 +107,14 @@ describe('guided creation conversation service', () => {
 
   it('parses bounded seven-dimension extraction without trusting invented quotes', () => {
     const result = parseEducationExtractionResult({
-      operations: [{
-        dimension: 'educational_goal',
-        content: '学生能解释物体浮沉',
-        source: 'user_explicit',
-        quote: '解释物体浮沉',
-      }],
+      operations: [
+        {
+          dimension: 'educational_goal',
+          content: '学生能解释物体浮沉',
+          source: 'user_explicit',
+          quote: '解释物体浮沉',
+        },
+      ],
       step_complete: true,
       acknowledgement: '我理解你关注的是学生能否解释现象。',
     });
@@ -307,21 +309,40 @@ describe('guided creation conversation service', () => {
   it('keeps materials and teacher responsibility open until the teacher confirms them', () => {
     const turn = buildGuidedAssistantTurnV3({
       current_draft: {
-        educational_goal: { content: '学生能解释浮沉', evidence: [{ source: 'user_explicit', quote: '解释浮沉' }] },
-        audience_context: { content: '初二实验课', evidence: [{ source: 'user_explicit', quote: '初二' }] },
-        teaching_strategy: { content: '先预测再实验', evidence: [{ source: 'user_explicit', quote: '先预测' }] },
-        action_adaptation: { content: '错误时增加对照', evidence: [{ source: 'user_explicit', quote: '增加对照' }] },
+        educational_goal: {
+          content: '学生能解释浮沉',
+          evidence: [{ source: 'user_explicit', quote: '解释浮沉' }],
+        },
+        audience_context: {
+          content: '初二实验课',
+          evidence: [{ source: 'user_explicit', quote: '初二' }],
+        },
+        teaching_strategy: {
+          content: '先预测再实验',
+          evidence: [{ source: 'user_explicit', quote: '先预测' }],
+        },
+        action_adaptation: {
+          content: '错误时增加对照',
+          evidence: [{ source: 'user_explicit', quote: '增加对照' }],
+        },
       },
-      completed_steps: ['intent_context', 'teacher_experience', 'strategy_co_creation', 'action_adjustment'],
+      completed_steps: [
+        'intent_context',
+        'teacher_experience',
+        'strategy_co_creation',
+        'action_adjustment',
+      ],
       current_step: 'evidence_review',
       user_message: '学生能依据记录的数据解释浮沉，就算达到了效果',
       extraction: {
-        operations: [{
-          dimension: 'completion_evidence',
-          content: '学生能依据记录的数据解释浮沉',
-          source: 'user_explicit',
-          quote: '依据记录的数据解释浮沉',
-        }],
+        operations: [
+          {
+            dimension: 'completion_evidence',
+            content: '学生能依据记录的数据解释浮沉',
+            source: 'user_explicit',
+            quote: '依据记录的数据解释浮沉',
+          },
+        ],
         step_complete: true,
         acknowledgement: '效果证据已经明确。',
       },
@@ -491,40 +512,43 @@ describe('guided creation conversation service', () => {
     '没有要补充的了，确认，准确',
     '无需补充',
     '确定，继续',
-  ])('advances the experience step for the confirmation phrase: %s', (userMessage) => {
-    const turn = buildGuidedAssistantTurnV3({
-      current_draft: {
-        educational_goal: {
-          content: '学生能解释浮沉',
-          evidence: [{ source: 'user_explicit' }],
+  ])(
+    'advances the experience step for the confirmation phrase: %s',
+    (userMessage) => {
+      const turn = buildGuidedAssistantTurnV3({
+        current_draft: {
+          educational_goal: {
+            content: '学生能解释浮沉',
+            evidence: [{ source: 'user_explicit' }],
+          },
+          audience_context: {
+            content: '初二实验课',
+            evidence: [{ source: 'user_explicit' }],
+          },
+          input_evidence: {
+            content: '教材要求和学生已有作业',
+            evidence: [{ source: 'inferred' }],
+          },
         },
-        audience_context: {
-          content: '初二实验课',
-          evidence: [{ source: 'user_explicit' }],
+        completed_steps: ['intent_context'],
+        current_step: 'teacher_experience',
+        user_message: userMessage,
+        extraction: {
+          operations: [],
+          step_complete: false,
+          acknowledgement: '好的，我记下了。',
         },
-        input_evidence: {
-          content: '教材要求和学生已有作业',
-          evidence: [{ source: 'inferred' }],
-        },
-      },
-      completed_steps: ['intent_context'],
-      current_step: 'teacher_experience',
-      user_message: userMessage,
-      extraction: {
-        operations: [],
-        step_complete: false,
-        acknowledgement: '好的，我记下了。',
-      },
-      phrasing: null,
-    });
+        phrasing: null,
+      });
 
-    expect(turn.completed_steps).toEqual([
-      'intent_context',
-      'teacher_experience',
-    ]);
-    expect(turn.current_step).toBe('strategy_co_creation');
-    expect(turn.content).not.toContain('这些材料和已有做法');
-  });
+      expect(turn.completed_steps).toEqual([
+        'intent_context',
+        'teacher_experience',
+      ]);
+      expect(turn.current_step).toBe('strategy_co_creation');
+      expect(turn.content).not.toContain('这些材料和已有做法');
+    },
+  );
 
   it.each(['我想补充', '还需要补充一些经验', '需要调整', '不准确，需要调整'])(
     'keeps the experience step open for a non-confirmation: %s',
@@ -562,13 +586,34 @@ describe('guided creation conversation service', () => {
 
   it('advances through all five education steps without re-confirming a completed step', () => {
     let draft: GuidedEducationDraft = {
-      educational_goal: { content: '学生能完成任务', evidence: [{ source: 'inferred' }] },
-      audience_context: { content: '融合教育课堂', evidence: [{ source: 'inferred' }] },
-      input_evidence: { content: '教材、学情和课堂观察', evidence: [{ source: 'inferred' }] },
-      teaching_strategy: { content: '按学生表现提供分层支持', evidence: [{ source: 'inferred' }] },
-      action_adaptation: { content: '卡住时降低任务难度', evidence: [{ source: 'inferred' }] },
-      boundaries_responsibility: { content: '关键调整由教师确认', evidence: [{ source: 'inferred' }] },
-      completion_evidence: { content: '学生能独立完成并说明理由', evidence: [{ source: 'inferred' }] },
+      educational_goal: {
+        content: '学生能完成任务',
+        evidence: [{ source: 'inferred' }],
+      },
+      audience_context: {
+        content: '融合教育课堂',
+        evidence: [{ source: 'inferred' }],
+      },
+      input_evidence: {
+        content: '教材、学情和课堂观察',
+        evidence: [{ source: 'inferred' }],
+      },
+      teaching_strategy: {
+        content: '按学生表现提供分层支持',
+        evidence: [{ source: 'inferred' }],
+      },
+      action_adaptation: {
+        content: '卡住时降低任务难度',
+        evidence: [{ source: 'inferred' }],
+      },
+      boundaries_responsibility: {
+        content: '关键调整由教师确认',
+        evidence: [{ source: 'inferred' }],
+      },
+      completion_evidence: {
+        content: '学生能独立完成并说明理由',
+        evidence: [{ source: 'inferred' }],
+      },
     };
     let completedSteps: GuidedCreationStep[] = [];
     let currentStep: GuidedCreationStep | null = 'intent_context';
@@ -660,13 +705,34 @@ describe('guided creation conversation service', () => {
 
   it('turns the seven dimensions into executable Skill rules without internal evidence metadata', () => {
     const instruction = buildGuidedEducationGenerationInstruction({
-      educational_goal: { content: '学生能解释浮沉', evidence: [{ source: 'user_explicit' }] },
-      audience_context: { content: '初二实验课', evidence: [{ source: 'user_explicit' }] },
-      input_evidence: { content: '教材与实验记录', evidence: [{ source: 'user_adopted' }] },
-      teaching_strategy: { content: '预测、实验、论证', evidence: [{ source: 'user_explicit' }] },
-      action_adaptation: { content: '观察控制变量，错误时增加对照', evidence: [{ source: 'user_explicit' }] },
-      boundaries_responsibility: { content: '安全由教师确认', evidence: [{ source: 'user_adopted' }] },
-      completion_evidence: { content: '能用数据解释', evidence: [{ source: 'user_explicit' }] },
+      educational_goal: {
+        content: '学生能解释浮沉',
+        evidence: [{ source: 'user_explicit' }],
+      },
+      audience_context: {
+        content: '初二实验课',
+        evidence: [{ source: 'user_explicit' }],
+      },
+      input_evidence: {
+        content: '教材与实验记录',
+        evidence: [{ source: 'user_adopted' }],
+      },
+      teaching_strategy: {
+        content: '预测、实验、论证',
+        evidence: [{ source: 'user_explicit' }],
+      },
+      action_adaptation: {
+        content: '观察控制变量，错误时增加对照',
+        evidence: [{ source: 'user_explicit' }],
+      },
+      boundaries_responsibility: {
+        content: '安全由教师确认',
+        evidence: [{ source: 'user_adopted' }],
+      },
+      completion_evidence: {
+        content: '能用数据解释',
+        evidence: [{ source: 'user_explicit' }],
+      },
     });
 
     expect(instruction).toContain('观察与调整规则');
@@ -694,7 +760,9 @@ describe('guided creation conversation service', () => {
     expect(instruction).toContain('生成 1-');
     expect(instruction).toContain('生成课堂反馈');
     expect(instruction).toContain('不编造课堂事实');
-    expect(instruction).not.toContain('只生成 1 个 Skill，不要拆分成多个 Skill');
+    expect(instruction).not.toContain(
+      '只生成 1 个 Skill，不要拆分成多个 Skill',
+    );
   });
 
   it('accepts only bounded draft operations from model output', () => {

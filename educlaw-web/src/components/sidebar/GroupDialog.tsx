@@ -17,7 +17,12 @@ interface GroupDialogProps {
   initial?: { name: string; icon: string };
 }
 
-export default function GroupDialog({ open, onOpenChange, onSave, initial }: GroupDialogProps) {
+export default function GroupDialog({
+  open,
+  onOpenChange,
+  onSave,
+  initial,
+}: GroupDialogProps) {
   const [name, setName] = useState(initial?.name ?? '');
   const [icon, setIcon] = useState(initial?.icon ?? 'Folder');
 
@@ -39,17 +44,21 @@ export default function GroupDialog({ open, onOpenChange, onSave, initial }: Gro
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{initial ? "Edit Group" : "New Group"}</DialogTitle>
+          <DialogTitle>{initial ? 'Edit Group' : 'New Group'}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div>
-            <label className="mb-1.5 block text-sm font-medium">Group Name</label>
+            <label className="mb-1.5 block text-sm font-medium">
+              Group Name
+            </label>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Enter a group name..."
               autoFocus
-              onKeyDown={(e) => { if (e.key === "Enter") handleSave(); }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleSave();
+              }}
             />
           </div>
           <div>
@@ -58,8 +67,12 @@ export default function GroupDialog({ open, onOpenChange, onSave, initial }: Gro
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleSave} disabled={!name.trim()}>Save</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave} disabled={!name.trim()}>
+            Save
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -27,14 +27,18 @@ export default function SlashPopover({
   // Scroll active item into view
   useEffect(() => {
     if (!activeId || !containerRef.current) return;
-    const el = containerRef.current.querySelector(`[data-slash-id="${activeId}"]`);
+    const el = containerRef.current.querySelector(
+      `[data-slash-id="${activeId}"]`,
+    );
     el?.scrollIntoView({ block: 'nearest' });
   }, [activeId]);
 
   if (commands.length === 0) {
     return (
       <div className="absolute inset-x-0 bottom-full mb-1 rounded-xl border border-border/70 bg-popover p-2 shadow-md">
-        <p className="px-2 py-1 text-xs text-muted-foreground">{t('slash.noResults')}</p>
+        <p className="px-2 py-1 text-xs text-muted-foreground">
+          {t('slash.noResults')}
+        </p>
       </div>
     );
   }
@@ -50,20 +54,30 @@ export default function SlashPopover({
           key={cmd.id}
           data-slash-id={cmd.id}
           className={`flex w-full items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-left transition-colors ${
-            activeId === cmd.id ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/50'
+            activeId === cmd.id
+              ? 'bg-accent text-accent-foreground'
+              : 'hover:bg-accent/50'
           }`}
           onClick={() => onSelect(cmd)}
           onMouseEnter={() => onActiveChange(cmd.id)}
         >
           <div className="flex items-center gap-2 min-w-0">
-            <span className="text-sm font-medium text-foreground whitespace-nowrap">/{cmd.trigger}</span>
+            <span className="text-sm font-medium text-foreground whitespace-nowrap">
+              /{cmd.trigger}
+            </span>
             {cmd.description && (
-              <span className="text-xs text-muted-foreground truncate">{cmd.description}</span>
+              <span className="text-xs text-muted-foreground truncate">
+                {cmd.description}
+              </span>
             )}
           </div>
           {cmd.type === 'custom' && cmd.source && cmd.source !== 'command' && (
             <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-              {cmd.source === 'skill' ? t('slash.badgeSkill') : cmd.source === 'mcp' ? t('slash.badgeMcp') : t('slash.badgeCustom')}
+              {cmd.source === 'skill'
+                ? t('slash.badgeSkill')
+                : cmd.source === 'mcp'
+                  ? t('slash.badgeMcp')
+                  : t('slash.badgeCustom')}
             </span>
           )}
         </button>

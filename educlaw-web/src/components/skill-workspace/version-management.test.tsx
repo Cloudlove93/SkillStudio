@@ -99,7 +99,8 @@ it('lets every version become the fixed comparison base', async () => {
 
   await act(async () => buttonInVersionRow(2, '对比')?.click());
   expect(
-    container.querySelector('.skill-version-compare-picker > strong')?.textContent,
+    container.querySelector('.skill-version-compare-picker > strong')
+      ?.textContent,
   ).toBe('v2');
   expect(container.querySelector('select')?.value).toBe('1');
   expect(container.querySelector('option[value="2"]')).toBeNull();
@@ -129,7 +130,8 @@ it('switches the comparison target without changing the selected base', async ()
   });
 
   expect(
-    container.querySelector('.skill-version-compare-picker > strong')?.textContent,
+    container.querySelector('.skill-version-compare-picker > strong')
+      ?.textContent,
   ).toBe('v2');
   expect(select.value).toBe('3');
   expect(container.textContent).toContain('v3');
@@ -240,7 +242,9 @@ it('opens the fixed SKILL.md snapshot and saves edits as a new version', async (
   expect(dialog?.parentElement).toBe(document.body);
   expect(container.querySelector('[role="dialog"]')).toBeNull();
   expect(dialog?.textContent).toContain('Skill · v2');
-  expect(dialog?.textContent).toContain('当前只展示此固定版本真实保存的 SKILL.md');
+  expect(dialog?.textContent).toContain(
+    '当前只展示此固定版本真实保存的 SKILL.md',
+  );
   await click('编辑 SKILL.md');
   const editor = document.body.querySelector<HTMLTextAreaElement>(
     'textarea[aria-label="SKILL.md 源码"]',

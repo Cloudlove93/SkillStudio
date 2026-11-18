@@ -5,7 +5,12 @@ import type { GenerateProfileEvent } from '../api/manager';
 import { useAgentStore } from './agent';
 import { useLibraryStore } from './library';
 import { useSettingsStore } from './settings';
-import type { BuiltSkillArtifact, LogEntry, ProfilePreview, SkillPreview } from './build';
+import type {
+  BuiltSkillArtifact,
+  LogEntry,
+  ProfilePreview,
+  SkillPreview,
+} from './build';
 
 export type FileBuildStatus = 'pending' | 'building' | 'done' | 'error';
 
@@ -70,14 +75,23 @@ function handleFileBuildEvent(
       updateFileState(set, fileId, (s) => ({
         isStreaming: false,
         isWaitingLLM: false,
-        logs: [...s.logs, { type: 'step', message: evt.data.message as string }],
+        logs: [
+          ...s.logs,
+          { type: 'step', message: evt.data.message as string },
+        ],
       }));
       break;
     case 'llm_waiting':
-      updateFileState(set, fileId, () => ({ isWaitingLLM: true, streamingText: '' }));
+      updateFileState(set, fileId, () => ({
+        isWaitingLLM: true,
+        streamingText: '',
+      }));
       break;
     case 'llm_streaming':
-      updateFileState(set, fileId, () => ({ isWaitingLLM: false, isStreaming: true }));
+      updateFileState(set, fileId, () => ({
+        isWaitingLLM: false,
+        isStreaming: true,
+      }));
       break;
     case 'delta':
       updateFileState(set, fileId, (s) => ({
@@ -90,15 +104,24 @@ function handleFileBuildEvent(
       updateFileState(set, fileId, (s) => ({
         isStreaming: false,
         streamingText: '',
-        logs: [...s.logs, {
-          type: 'decision',
-          decision: {
-            kind: evt.data.kind === 'skill' ? 'skill' : 'agent',
-            reason: String(evt.data.reason || ''),
-            suggestedName: typeof evt.data.suggestedName === 'string' ? evt.data.suggestedName : undefined,
-            suggestedDescription: typeof evt.data.suggestedDescription === 'string' ? evt.data.suggestedDescription : undefined,
+        logs: [
+          ...s.logs,
+          {
+            type: 'decision',
+            decision: {
+              kind: evt.data.kind === 'skill' ? 'skill' : 'agent',
+              reason: String(evt.data.reason || ''),
+              suggestedName:
+                typeof evt.data.suggestedName === 'string'
+                  ? evt.data.suggestedName
+                  : undefined,
+              suggestedDescription:
+                typeof evt.data.suggestedDescription === 'string'
+                  ? evt.data.suggestedDescription
+                  : undefined,
+            },
           },
-        }],
+        ],
       }));
       break;
     case 'profile_preview':
@@ -124,7 +147,10 @@ function handleFileBuildEvent(
         streamingText: '',
         profilePreview: null,
         skillPreview: null,
-        logs: [...s.logs, { type: 'profile', profile: evt.data as LogEntry['profile'] }],
+        logs: [
+          ...s.logs,
+          { type: 'profile', profile: evt.data as LogEntry['profile'] },
+        ],
       }));
       break;
     case 'skill':
@@ -132,15 +158,22 @@ function handleFileBuildEvent(
         isStreaming: false,
         isWaitingLLM: false,
         streamingText: '',
-        logs: [...s.logs, {
-          type: 'skill',
-          skill: {
-            dirName: typeof evt.data.dirName === 'string' ? evt.data.dirName : undefined,
-            name: String(evt.data.name || ''),
-            description: String(evt.data.description || ''),
-            metadata: (evt.data.metadata as Record<string, unknown>) || undefined,
+        logs: [
+          ...s.logs,
+          {
+            type: 'skill',
+            skill: {
+              dirName:
+                typeof evt.data.dirName === 'string'
+                  ? evt.data.dirName
+                  : undefined,
+              name: String(evt.data.name || ''),
+              description: String(evt.data.description || ''),
+              metadata:
+                (evt.data.metadata as Record<string, unknown>) || undefined,
+            },
           },
-        }],
+        ],
       }));
       break;
     case 'done': {
@@ -177,12 +210,15 @@ function handleFileBuildEvent(
         streamingText: '',
         profilePreview: null,
         skillPreview: null,
-        logs: [...s.logs, {
-          type: 'error',
-          message: evt.data.message as string,
-          errorType: (evt.data.errorType as string) || undefined,
-          detail: (evt.data.detail as string) || undefined,
-        }],
+        logs: [
+          ...s.logs,
+          {
+            type: 'error',
+            message: evt.data.message as string,
+            errorType: (evt.data.errorType as string) || undefined,
+            detail: (evt.data.detail as string) || undefined,
+          },
+        ],
       }));
       processNext(set, get);
       break;
@@ -202,35 +238,47 @@ function processNext(
     return;
   }
 
-  set(() => ({ activeFileId: nextId, queue: nextQueue, selectedFileId: nextId }));
+  set(() => ({
+    activeFileId: nextId,
+    queue: nextQueue,
+    selectedFileId: nextId,
+  }));
   updateFileState(set, nextId, () => ({ status: 'building' }));
 
   const item = get().items.get(nextId);
   if (!item) return;
 
   const { enabledPublicSkills } = useSettingsStore.getState();
-  api.generateProfileFromFile(
-    item.file,
-    state.batchModel,
-    (evt) => handleFileBuildEvent(evt, nextId, set, get),
-    enabledPublicSkills ?? undefined,
-  ).catch((err) => {
-    const msg = err.message || '';
-    const msgLower = msg.toLowerCase();
-    const isNetwork = msgLower.includes('fetch') || msgLower.includes('failed') || msgLower.includes('network');
-    updateFileState(set, nextId, (s) => ({
-      status: 'error',
-      isStreaming: false,
-      isWaitingLLM: false,
-      logs: [...s.logs, {
-        type: 'error',
-        message: isNetwork ? 'network_error' : (msg || 'unknown_error'),
-        errorType: isNetwork ? 'network' : 'unexpected',
-        detail: msg || undefined,
-      }],
-    }));
-    processNext(set, get);
-  });
+  api
+    .generateProfileFromFile(
+      item.file,
+      state.batchModel,
+      (evt) => handleFileBuildEvent(evt, nextId, set, get),
+      enabledPublicSkills ?? undefined,
+    )
+    .catch((err) => {
+      const msg = err.message || '';
+      const msgLower = msg.toLowerCase();
+      const isNetwork =
+        msgLower.includes('fetch') ||
+        msgLower.includes('failed') ||
+        msgLower.includes('network');
+      updateFileState(set, nextId, (s) => ({
+        status: 'error',
+        isStreaming: false,
+        isWaitingLLM: false,
+        logs: [
+          ...s.logs,
+          {
+            type: 'error',
+            message: isNetwork ? 'network_error' : msg || 'unknown_error',
+            errorType: isNetwork ? 'network' : 'unexpected',
+            detail: msg || undefined,
+          },
+        ],
+      }));
+      processNext(set, get);
+    });
 }
 
 const initialState = {

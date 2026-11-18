@@ -29,7 +29,9 @@ export default function AgentSelector({
         title={t('prompt.switchAgent')}
       >
         <span>{currentAgent ?? visibleAgents[0]?.name ?? 'agent'}</span>
-        <ChevronUp className={`size-2.5 transition-transform ${showPicker ? '' : 'rotate-180'}`} />
+        <ChevronUp
+          className={`size-2.5 transition-transform ${showPicker ? '' : 'rotate-180'}`}
+        />
       </button>
       {showPicker && (
         <div
@@ -44,10 +46,17 @@ export default function AgentSelector({
                   ? 'bg-accent text-accent-foreground'
                   : 'hover:bg-accent/50'
               }`}
-              onClick={() => { onAgentChange?.(a.name); setShowPicker(false); }}
+              onClick={() => {
+                onAgentChange?.(a.name);
+                setShowPicker(false);
+              }}
             >
               <span className="font-medium">{a.name}</span>
-              {a.description && <span className="text-muted-foreground truncate">{a.description}</span>}
+              {a.description && (
+                <span className="text-muted-foreground truncate">
+                  {a.description}
+                </span>
+              )}
             </button>
           ))}
         </div>

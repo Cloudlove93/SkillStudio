@@ -11,8 +11,17 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useT } from '../../i18n';
-import { DetailSurface, PremiumHeader, PremiumPill } from '@/components/ui/premium';
-import { ShieldAlert, ShieldCheck, TerminalSquare, Workflow } from 'lucide-react';
+import {
+  DetailSurface,
+  PremiumHeader,
+  PremiumPill,
+} from '@/components/ui/premium';
+import {
+  ShieldAlert,
+  ShieldCheck,
+  TerminalSquare,
+  Workflow,
+} from 'lucide-react';
 
 export default function PermissionDialog() {
   const t = useT();
@@ -32,8 +41,16 @@ export default function PermissionDialog() {
   }
 
   return (
-    <Dialog open onOpenChange={(open) => { if (!open) respond('reject'); }}>
-      <DialogContent showCloseButton={false} className="overflow-hidden p-0 sm:max-w-lg">
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) respond('reject');
+      }}
+    >
+      <DialogContent
+        showCloseButton={false}
+        className="overflow-hidden p-0 sm:max-w-lg"
+      >
         <DialogHeader className="sr-only">
           <DialogTitle>{t('perm.title')}</DialogTitle>
           <DialogDescription>
@@ -51,10 +68,16 @@ export default function PermissionDialog() {
             description={
               <>
                 {t('perm.agent')}
-                <span className="font-medium text-foreground">{agent?.name ?? perm.agentId}</span>
+                <span className="font-medium text-foreground">
+                  {agent?.name ?? perm.agentId}
+                </span>
               </>
             }
-            actions={<PremiumPill accent="amber" icon={Workflow}>{perm.toolName}</PremiumPill>}
+            actions={
+              <PremiumPill accent="amber" icon={Workflow}>
+                {perm.toolName}
+              </PremiumPill>
+            }
           />
 
           <DetailSurface className="p-4">
@@ -78,7 +101,9 @@ export default function PermissionDialog() {
                   {t('perm.input')}
                 </div>
                 <pre className="mt-2 max-h-56 overflow-auto rounded-[12px] border border-border bg-muted p-3 text-xs text-foreground whitespace-pre-wrap break-all">
-                  {typeof perm.input === 'string' ? perm.input : JSON.stringify(perm.input, null, 2)}
+                  {typeof perm.input === 'string'
+                    ? perm.input
+                    : JSON.stringify(perm.input, null, 2)}
                 </pre>
               </>
             )}
@@ -90,12 +115,20 @@ export default function PermissionDialog() {
           </DetailSurface>
 
           <DialogFooter className="flex gap-2 sm:justify-between">
-            <Button variant="outline" onClick={() => respond('reject')} className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => respond('reject')}
+              className="gap-2"
+            >
               <ShieldAlert className="size-4" />
               {t('perm.deny')}
             </Button>
             <div className="flex gap-2">
-              <Button variant="secondary" onClick={() => respond('once')} className="gap-2">
+              <Button
+                variant="secondary"
+                onClick={() => respond('once')}
+                className="gap-2"
+              >
                 <ShieldCheck className="size-4" />
                 {t('perm.once')}
               </Button>
@@ -106,7 +139,11 @@ export default function PermissionDialog() {
             </div>
           </DialogFooter>
 
-          {pending.length > 1 && <p className="text-center text-xs text-muted-foreground">{t('perm.pending').replace('{n}', String(pending.length - 1))}</p>}
+          {pending.length > 1 && (
+            <p className="text-center text-xs text-muted-foreground">
+              {t('perm.pending').replace('{n}', String(pending.length - 1))}
+            </p>
+          )}
         </div>
       </DialogContent>
     </Dialog>

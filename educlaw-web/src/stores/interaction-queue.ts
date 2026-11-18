@@ -49,29 +49,35 @@ interface InteractionQueueStore {
   removeQuestion: (requestId: string) => void;
 }
 
-export const useInteractionQueueStore = create<InteractionQueueStore>((set) => ({
-  pendingPermissions: [],
-  pendingQuestions: [],
+export const useInteractionQueueStore = create<InteractionQueueStore>(
+  (set) => ({
+    pendingPermissions: [],
+    pendingQuestions: [],
 
-  addPermission(p) {
-    set((s) => {
-      if (s.pendingPermissions.some((x) => x.id === p.id)) return s;
-      return { pendingPermissions: [...s.pendingPermissions, p] };
-    });
-  },
+    addPermission(p) {
+      set((s) => {
+        if (s.pendingPermissions.some((x) => x.id === p.id)) return s;
+        return { pendingPermissions: [...s.pendingPermissions, p] };
+      });
+    },
 
-  removePermission(id) {
-    set((s) => ({ pendingPermissions: s.pendingPermissions.filter((p) => p.id !== id) }));
-  },
+    removePermission(id) {
+      set((s) => ({
+        pendingPermissions: s.pendingPermissions.filter((p) => p.id !== id),
+      }));
+    },
 
-  addQuestion(req) {
-    set((s) => {
-      if (s.pendingQuestions.some((p) => p.id === req.id)) return s;
-      return { pendingQuestions: [...s.pendingQuestions, req] };
-    });
-  },
+    addQuestion(req) {
+      set((s) => {
+        if (s.pendingQuestions.some((p) => p.id === req.id)) return s;
+        return { pendingQuestions: [...s.pendingQuestions, req] };
+      });
+    },
 
-  removeQuestion(requestId) {
-    set((s) => ({ pendingQuestions: s.pendingQuestions.filter((p) => p.id !== requestId) }));
-  },
-}));
+    removeQuestion(requestId) {
+      set((s) => ({
+        pendingQuestions: s.pendingQuestions.filter((p) => p.id !== requestId),
+      }));
+    },
+  }),
+);

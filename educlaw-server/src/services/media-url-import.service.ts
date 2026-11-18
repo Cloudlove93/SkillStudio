@@ -144,7 +144,10 @@ export function createMediaUrlImportService(
   const resolveHost =
     dependencies.resolveHost ??
     (async (hostname: string): Promise<ResolvedAddress[]> => {
-      const addresses = await dnsLookup(hostname, { all: true, verbatim: true });
+      const addresses = await dnsLookup(hostname, {
+        all: true,
+        verbatim: true,
+      });
       return addresses.map((item) => ({
         address: item.address,
         family: item.family === 6 ? 6 : 4,
@@ -161,7 +164,8 @@ export function createMediaUrlImportService(
       return createObjectStorageService({ config: storageConfig });
     })();
   const guidedCreationService =
-    dependencies.guidedCreationService ?? createMultimodalGuidedCreationService();
+    dependencies.guidedCreationService ??
+    createMultimodalGuidedCreationService();
   const importMaxBytes = normalizeMaxBytes(
     dependencies.maxBytes ?? config.multimodalUploadMaxBytes,
   );
@@ -329,7 +333,9 @@ export function createMediaUrlImportService(
       idempotencyKey: string;
       sourceUrl: string;
     }): Promise<MediaUrlImportResult> {
-      const canonicalSourceUrl = parseAndValidateUrl(input.sourceUrl).toString();
+      const canonicalSourceUrl = parseAndValidateUrl(
+        input.sourceUrl,
+      ).toString();
       const intentIdempotencyKey = derivePhaseIdempotencyKey(
         input.idempotencyKey,
         canonicalSourceUrl,
@@ -389,9 +395,14 @@ export function createMediaUrlImportService(
         if (existingObject) {
           if (
             existingObject.sizeBytes !== opened.sizeBytes ||
-            normalizeMediaType(existingObject.contentType) !== opened.contentType
+            normalizeMediaType(existingObject.contentType) !==
+              opened.contentType
           ) {
-            fail('REMOTE_IMPORT_CONFLICT', '已存储对象与远程媒体声明不一致', 409);
+            fail(
+              'REMOTE_IMPORT_CONFLICT',
+              '已存储对象与远程媒体声明不一致',
+              409,
+            );
           }
           disposeOpenedMedia(opened);
         } else {
@@ -594,7 +605,9 @@ function deriveRemoteFileName(url: URL, contentType: string): string {
   candidate = [...candidate]
     .filter((character) => {
       const code = character.charCodeAt(0);
-      return code > 0x1f && code !== 0x7f && character !== '/' && character !== '\\';
+      return (
+        code > 0x1f && code !== 0x7f && character !== '/' && character !== '\\'
+      );
     })
     .join('')
     .trim();
@@ -657,7 +670,9 @@ async function openPinnedResponse(
     const lookup: LookupFunction = (_hostname, _options, callback) => {
       callback(null, input.address, input.family);
     };
-    const request = (input.url.protocol === 'https:' ? httpsRequest : httpRequest)(
+    const request = (
+      input.url.protocol === 'https:' ? httpsRequest : httpRequest
+    )(
       input.url,
       {
         method: 'GET',

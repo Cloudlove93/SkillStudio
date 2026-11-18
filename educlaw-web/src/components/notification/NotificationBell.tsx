@@ -1,6 +1,13 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Bell, Trash2, AlertTriangle, CheckCircle, Info, XCircle } from 'lucide-react';
+import {
+  Bell,
+  Trash2,
+  AlertTriangle,
+  CheckCircle,
+  Info,
+  XCircle,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNotificationStore } from '../../stores/notification';
 import { useT } from '../../i18n';
@@ -91,60 +98,74 @@ export default function NotificationBell() {
     }
   }
 
-  const panel = open && mounted
-    ? createPortal(
-        <div
-          ref={panelRef}
-          className="fixed z-[2147483647] w-80 overflow-hidden rounded-2xl border border-border/70 bg-background/98 shadow-[var(--shadow-lg)]"
-          style={{ top: panelPosition.top, left: panelPosition.left }}
-        >
-          <div className="flex items-center justify-between border-b border-border/30 px-4 py-3">
-            <span className="text-sm font-semibold text-foreground">{t('notification.title')}</span>
-            {notifications.length > 0 && (
-              <button onClick={clear} className="text-[11px] text-muted-foreground transition-colors hover:text-foreground">
-                {t('notification.clearAll')}
-              </button>
-            )}
-          </div>
+  const panel =
+    open && mounted
+      ? createPortal(
+          <div
+            ref={panelRef}
+            className="fixed z-[2147483647] w-80 overflow-hidden rounded-2xl border border-border/70 bg-background/98 shadow-[var(--shadow-lg)]"
+            style={{ top: panelPosition.top, left: panelPosition.left }}
+          >
+            <div className="flex items-center justify-between border-b border-border/30 px-4 py-3">
+              <span className="text-sm font-semibold text-foreground">
+                {t('notification.title')}
+              </span>
+              {notifications.length > 0 && (
+                <button
+                  onClick={clear}
+                  className="text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  {t('notification.clearAll')}
+                </button>
+              )}
+            </div>
 
-          <div className="max-h-72 overflow-y-auto">
-            {notifications.length === 0 ? (
-              <div className="px-4 py-8 text-center text-sm text-muted-foreground/50">
-                {t('notification.empty')}
-              </div>
-            ) : (
-              notifications.map((n) => {
-                const Icon = typeIcons[n.type];
-                return (
-                  <div
-                    key={n.id}
-                    className={`group flex items-start gap-3 px-4 py-3 transition-colors hover:bg-muted/30 ${
-                      !n.read ? 'bg-primary/3' : ''
-                    }`}
-                  >
-                    <Icon className={`mt-0.5 size-4 shrink-0 ${typeColors[n.type]}`} />
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-medium text-foreground">{n.title}</div>
-                      {n.description && (
-                        <div className="truncate text-xs text-muted-foreground/60">{n.description}</div>
-                      )}
-                      <div className="mt-0.5 text-[10px] text-muted-foreground/40">{timeAgo(n.timestamp)}</div>
-                    </div>
-                    <button
-                      onClick={() => dismiss(n.id)}
-                      className="shrink-0 text-muted-foreground/30 opacity-0 transition-opacity group-hover:opacity-100 hover:text-muted-foreground"
+            <div className="max-h-72 overflow-y-auto">
+              {notifications.length === 0 ? (
+                <div className="px-4 py-8 text-center text-sm text-muted-foreground/50">
+                  {t('notification.empty')}
+                </div>
+              ) : (
+                notifications.map((n) => {
+                  const Icon = typeIcons[n.type];
+                  return (
+                    <div
+                      key={n.id}
+                      className={`group flex items-start gap-3 px-4 py-3 transition-colors hover:bg-muted/30 ${
+                        !n.read ? 'bg-primary/3' : ''
+                      }`}
                     >
-                      <Trash2 className="size-3" />
-                    </button>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>,
-        document.body,
-      )
-    : null;
+                      <Icon
+                        className={`mt-0.5 size-4 shrink-0 ${typeColors[n.type]}`}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-medium text-foreground">
+                          {n.title}
+                        </div>
+                        {n.description && (
+                          <div className="truncate text-xs text-muted-foreground/60">
+                            {n.description}
+                          </div>
+                        )}
+                        <div className="mt-0.5 text-[10px] text-muted-foreground/40">
+                          {timeAgo(n.timestamp)}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => dismiss(n.id)}
+                        className="shrink-0 text-muted-foreground/30 opacity-0 transition-opacity group-hover:opacity-100 hover:text-muted-foreground"
+                      >
+                        <Trash2 className="size-3" />
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>,
+          document.body,
+        )
+      : null;
 
   return (
     <>

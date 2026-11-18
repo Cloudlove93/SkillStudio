@@ -168,24 +168,32 @@ interface ReleaseDependencies {
 
 export class MultimodalReleaseServiceError extends GuidedCreationError {}
 
-function fail(code: string, message: string, statusCode: number, retryable = false): never {
+function fail(
+  code: string,
+  message: string,
+  statusCode: number,
+  retryable = false,
+): never {
   throw new MultimodalReleaseServiceError(code, message, statusCode, retryable);
 }
 
 function positiveId(value: string, field: string) {
   const normalized = String(value ?? '').trim();
-  if (!POSITIVE_ID.test(normalized)) fail('INVALID_ARGUMENT', `${field} 格式不正确`, 422);
+  if (!POSITIVE_ID.test(normalized))
+    fail('INVALID_ARGUMENT', `${field} 格式不正确`, 422);
   return normalized;
 }
 
 function idempotencyKey(value: string) {
   const normalized = String(value ?? '').trim();
-  if (!IDEMPOTENCY_KEY.test(normalized)) fail('INVALID_IDEMPOTENCY_KEY', 'idempotencyKey 格式不正确', 422);
+  if (!IDEMPOTENCY_KEY.test(normalized))
+    fail('INVALID_IDEMPOTENCY_KEY', 'idempotencyKey 格式不正确', 422);
   return normalized;
 }
 
 function revision(value: number) {
-  if (!Number.isSafeInteger(value) || value < 0) fail('INVALID_ARGUMENT', 'expectedRevisionNo 格式不正确', 422);
+  if (!Number.isSafeInteger(value) || value < 0)
+    fail('INVALID_ARGUMENT', 'expectedRevisionNo 格式不正确', 422);
   return value;
 }
 
@@ -202,7 +210,9 @@ function stableValue(value: unknown): unknown {
 }
 
 function hash(value: unknown) {
-  return createHash('sha256').update(JSON.stringify(stableValue(value))).digest('hex');
+  return createHash('sha256')
+    .update(JSON.stringify(stableValue(value)))
+    .digest('hex');
 }
 
 function buildGeneratedSnapshot(
@@ -244,16 +254,24 @@ function buildGeneratedSnapshot(
       candidateRevisionNo,
       source,
       transcriptHash: hash(session.mediaState.transcript),
-      evidenceManifest: session.mediaState.evidenceTimeline.evidenceItems.map((item) => ({
-        evidenceId: item.evidenceId,
-        kind: item.kind,
-        claimType: item.claimType,
-        timeRange: item.timeRange,
-        objectKey: item.assetRef?.objectKey ?? item.source.relatedAssetRef?.objectKey ?? null,
-        sha256: item.assetRef?.sha256 ?? item.source.relatedAssetRef?.sha256 ?? null,
-        processorVersion: item.provenance.processorVersion,
-        model: item.provenance.model ?? null,
-      })),
+      evidenceManifest: session.mediaState.evidenceTimeline.evidenceItems.map(
+        (item) => ({
+          evidenceId: item.evidenceId,
+          kind: item.kind,
+          claimType: item.claimType,
+          timeRange: item.timeRange,
+          objectKey:
+            item.assetRef?.objectKey ??
+            item.source.relatedAssetRef?.objectKey ??
+            null,
+          sha256:
+            item.assetRef?.sha256 ??
+            item.source.relatedAssetRef?.sha256 ??
+            null,
+          processorVersion: item.provenance.processorVersion,
+          model: item.provenance.model ?? null,
+        }),
+      ),
       modelManifest: {
         adler: session.mediaState.adlerOverview?.meta ?? null,
         candidatePasses: session.mediaState.candidatePassMeta,
@@ -262,7 +280,10 @@ function buildGeneratedSnapshot(
   };
 }
 
-function arenaRequestHash(input: { sessionId: string; expectedRevisionNo: number }) {
+function arenaRequestHash(input: {
+  sessionId: string;
+  expectedRevisionNo: number;
+}) {
   return hash({
     action: 'skill.media.test.start',
     sessionId: input.sessionId,
@@ -311,7 +332,11 @@ function assertGeneratedSnapshotBoundToSession(
     snapshot.metadata.transcriptHash !== hash(session.mediaState.transcript) ||
     hash(snapshot.skills) !== hash(expectedSkills)
   ) {
-    fail('GENERATED_SNAPSHOT_STALE', '已生成的 Skill 快照与当前确认内容不匹配', 409);
+    fail(
+      'GENERATED_SNAPSHOT_STALE',
+      '已生成的 Skill 快照与当前确认内容不匹配',
+      409,
+    );
   }
 }
 
@@ -322,8 +347,10 @@ function assertArenaEvaluation(
   const { resultHash, ...withoutHash } = evaluation;
   const passedCaseCount = evaluation.cases.filter((item) => item.passed).length;
   const failures: string[] = [];
-  if (evaluation.cases.some((item) => !item.safetyPassed)) failures.push('SAFETY_GATE_FAILED');
-  if (evaluation.cases.some((item) => !item.groundedPassed)) failures.push('GROUNDING_GATE_FAILED');
+  if (evaluation.cases.some((item) => !item.safetyPassed))
+    failures.push('SAFETY_GATE_FAILED');
+  if (evaluation.cases.some((item) => !item.groundedPassed))
+    failures.push('GROUNDING_GATE_FAILED');
   if (passedCaseCount < 2) failures.push('INSUFFICIENT_CASES_PASSED');
   if (
     evaluation.configVersion !== MULTIMODAL_ARENA_CONFIG_VERSION ||
@@ -331,7 +358,8 @@ function assertArenaEvaluation(
     evaluation.snapshotHash !== input.snapshotHash ||
     evaluation.passedCaseCount !== passedCaseCount ||
     evaluation.passed !== (failures.length === 0) ||
-    JSON.stringify(evaluation.deterministicFailures) !== JSON.stringify(failures) ||
+    JSON.stringify(evaluation.deterministicFailures) !==
+      JSON.stringify(failures) ||
     computeMultimodalArenaResultHash(withoutHash) !== resultHash
   ) {
     fail('ARENA_RESULT_INVALID', 'Arena 结果绑定或哈希校验失败', 502, true);
@@ -341,7 +369,11 @@ function assertArenaEvaluation(
 function jsonObject(value: unknown): Record<string, unknown> | null {
   if (value == null) return null;
   if (typeof value === 'string') {
-    try { return jsonObject(JSON.parse(value)); } catch { return null; }
+    try {
+      return jsonObject(JSON.parse(value));
+    } catch {
+      return null;
+    }
   }
   return typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -356,33 +388,43 @@ function positiveIdString(value: unknown): value is string {
   return typeof value === 'string' && /^[1-9]\d*$/.test(value);
 }
 
-function parseArenaEvaluation(value: unknown): MultimodalArenaEvaluation | null {
+function parseArenaEvaluation(
+  value: unknown,
+): MultimodalArenaEvaluation | null {
   const record = jsonObject(value);
   const models = jsonObject(record?.models);
   const cases = record?.cases;
   if (
-    !record || record.schemaVersion !== 1 ||
+    !record ||
+    record.schemaVersion !== 1 ||
     record.configVersion !== MULTIMODAL_ARENA_CONFIG_VERSION ||
     record.caseVersion !== MULTIMODAL_ARENA_CASE_VERSION ||
     !Number.isSafeInteger(record.candidateRevisionNo) ||
-    !nonEmptyString(record.snapshotHash) || !models ||
-    !nonEmptyString(models.baseline) || !nonEmptyString(models.enhanced) ||
-    !Array.isArray(cases) || cases.length !== 3 ||
+    !nonEmptyString(record.snapshotHash) ||
+    !models ||
+    !nonEmptyString(models.baseline) ||
+    !nonEmptyString(models.enhanced) ||
+    !Array.isArray(cases) ||
+    cases.length !== 3 ||
     !Number.isSafeInteger(record.passedCaseCount) ||
     typeof record.passed !== 'boolean' ||
     !Array.isArray(record.deterministicFailures) ||
     !record.deterministicFailures.every(nonEmptyString) ||
     !nonEmptyString(record.resultHash)
-  ) return null;
+  )
+    return null;
   const validCases = cases.every((item) => {
     const candidate = jsonObject(item);
     return Boolean(
       candidate &&
-      nonEmptyString(candidate.caseId) && nonEmptyString(candidate.input) &&
+      nonEmptyString(candidate.caseId) &&
+      nonEmptyString(candidate.input) &&
       typeof candidate.baselineOutput === 'string' &&
       typeof candidate.enhancedOutput === 'string' &&
-      typeof candidate.baselineScore === 'number' && Number.isFinite(candidate.baselineScore) &&
-      typeof candidate.enhancedScore === 'number' && Number.isFinite(candidate.enhancedScore) &&
+      typeof candidate.baselineScore === 'number' &&
+      Number.isFinite(candidate.baselineScore) &&
+      typeof candidate.enhancedScore === 'number' &&
+      Number.isFinite(candidate.enhancedScore) &&
       typeof candidate.safetyPassed === 'boolean' &&
       typeof candidate.groundedPassed === 'boolean' &&
       typeof candidate.passed === 'boolean' &&
@@ -394,7 +436,8 @@ function parseArenaEvaluation(value: unknown): MultimodalArenaEvaluation | null 
     !validCases ||
     new Set(caseIds).size !== MULTIMODAL_ARENA_CASE_IDS.length ||
     !MULTIMODAL_ARENA_CASE_IDS.every((caseId) => caseIds.includes(caseId))
-  ) return null;
+  )
+    return null;
   const evaluation = record as unknown as MultimodalArenaEvaluation;
   try {
     assertArenaEvaluation(evaluation, {
@@ -412,14 +455,22 @@ function parseArenaReceipt(value: unknown): MultimodalArenaReceipt | null {
   if (!record) return null;
   const evaluation = parseArenaEvaluation(record.evaluation);
   if (
-    record.schemaVersion !== 1 || record.action !== 'skill.media.test.start' ||
-    !nonEmptyString(record.idempotencyKey) || !nonEmptyString(record.requestHash) ||
-    !Number.isSafeInteger(record.baseRevisionNo) || !Number.isSafeInteger(record.resultRevisionNo) ||
+    record.schemaVersion !== 1 ||
+    record.action !== 'skill.media.test.start' ||
+    !nonEmptyString(record.idempotencyKey) ||
+    !nonEmptyString(record.requestHash) ||
+    !Number.isSafeInteger(record.baseRevisionNo) ||
+    !Number.isSafeInteger(record.resultRevisionNo) ||
     Number(record.baseRevisionNo) < 0 ||
     record.resultRevisionNo !== Number(record.baseRevisionNo) + 1 ||
-    !nonEmptyString(record.recordedAt) || !evaluation
-  ) fail('MULTIMODAL_SESSION_FAILED', 'Arena 持久化结果损坏', 500);
-  return { ...(record as unknown as Omit<MultimodalArenaReceipt, 'evaluation'>), evaluation };
+    !nonEmptyString(record.recordedAt) ||
+    !evaluation
+  )
+    fail('MULTIMODAL_SESSION_FAILED', 'Arena 持久化结果损坏', 500);
+  return {
+    ...(record as unknown as Omit<MultimodalArenaReceipt, 'evaluation'>),
+    evaluation,
+  };
 }
 
 function parsePublishReceipt(value: unknown): MultimodalPublishReceipt | null {
@@ -428,18 +479,27 @@ function parsePublishReceipt(value: unknown): MultimodalPublishReceipt | null {
   const skillVersionIds = jsonObject(record.skillVersionIds);
   if (
     record.schemaVersion !== 1 ||
-    !['skill.media.publish', 'skill.media.generate.confirm'].includes(String(record.action)) ||
-    !nonEmptyString(record.idempotencyKey) || !nonEmptyString(record.requestHash) ||
-    !Number.isSafeInteger(record.baseRevisionNo) || !Number.isSafeInteger(record.resultRevisionNo) ||
+    !['skill.media.publish', 'skill.media.generate.confirm'].includes(
+      String(record.action),
+    ) ||
+    !nonEmptyString(record.idempotencyKey) ||
+    !nonEmptyString(record.requestHash) ||
+    !Number.isSafeInteger(record.baseRevisionNo) ||
+    !Number.isSafeInteger(record.resultRevisionNo) ||
     record.resultRevisionNo !== Number(record.baseRevisionNo) + 1 ||
-    !positiveIdString(record.packageId) || !positiveIdString(record.packageVersionId) ||
-    !Number.isSafeInteger(record.packageVersionNumber) || Number(record.packageVersionNumber) <= 0 ||
-    !skillVersionIds || Object.keys(skillVersionIds).length === 0 ||
+    !positiveIdString(record.packageId) ||
+    !positiveIdString(record.packageVersionId) ||
+    !Number.isSafeInteger(record.packageVersionNumber) ||
+    Number(record.packageVersionNumber) <= 0 ||
+    !skillVersionIds ||
+    Object.keys(skillVersionIds).length === 0 ||
     !Object.entries(skillVersionIds).every(
-      ([skillId, versionId]) => nonEmptyString(skillId) && positiveIdString(versionId),
+      ([skillId, versionId]) =>
+        nonEmptyString(skillId) && positiveIdString(versionId),
     ) ||
     !nonEmptyString(record.publishedAt)
-  ) fail('MULTIMODAL_SESSION_FAILED', '发布回执损坏', 500);
+  )
+    fail('MULTIMODAL_SESSION_FAILED', '发布回执损坏', 500);
   return record as unknown as MultimodalPublishReceipt;
 }
 
@@ -483,7 +543,9 @@ const defaultRepository: ReleaseRepository = {
       : typeof row.confirmed_stages_json === 'string'
         ? JSON.parse(row.confirmed_stages_json)
         : [];
-    const generated = jsonObject(row.generated_snapshot_json) as MultimodalGeneratedSnapshot | null;
+    const generated = jsonObject(
+      row.generated_snapshot_json,
+    ) as MultimodalGeneratedSnapshot | null;
     return {
       sessionId: String(row.id),
       displayName: String(row.display_name || '多模态 Skill Pack'),
@@ -491,7 +553,9 @@ const defaultRepository: ReleaseRepository = {
       revisionNo,
       confirmedStages: confirmed as MediaConfirmationStage[],
       mediaState: parseMultimodalSessionState(
-        typeof row.media_state_json === 'string' ? JSON.parse(row.media_state_json) : row.media_state_json,
+        typeof row.media_state_json === 'string'
+          ? JSON.parse(row.media_state_json)
+          : row.media_state_json,
       ),
       generatedSnapshot: generated,
       arenaReceipt: parseArenaReceipt(row.validation_result_json),
@@ -521,7 +585,8 @@ const defaultRepository: ReleaseRepository = {
         input.expectedStage,
       ],
     );
-    if (result.rowCount !== 1) fail('SESSION_REVISION_CONFLICT', '会话版本已变化，请刷新后重试', 409);
+    if (result.rowCount !== 1)
+      fail('SESSION_REVISION_CONFLICT', '会话版本已变化，请刷新后重试', 409);
   },
 
   async savePublished(db, input) {
@@ -550,7 +615,8 @@ const defaultRepository: ReleaseRepository = {
         input.expectedStage,
       ],
     );
-    if (result.rowCount !== 1) fail('SESSION_REVISION_CONFLICT', '会话版本已变化，请刷新后重试', 409);
+    if (result.rowCount !== 1)
+      fail('SESSION_REVISION_CONFLICT', '会话版本已变化，请刷新后重试', 409);
   },
 };
 
@@ -561,7 +627,12 @@ const defaultDependencies: ReleaseDependencies = {
     evaluateMultimodalSkillPackDraft({ snapshot, candidateRevisionNo }),
   publishPackageTx: async (db, input) =>
     input.targetPackageId == null
-      ? createPackageWithSnapshotTx(db, input.authUserId, input.snapshot, 'generated')
+      ? createPackageWithSnapshotTx(
+          db,
+          input.authUserId,
+          input.snapshot,
+          'generated',
+        )
       : createPackageVersionWithSnapshotTx(db, {
           userId: input.authUserId,
           packageId: input.targetPackageId,
@@ -589,14 +660,34 @@ export function createMultimodalReleaseService(
       const expectedRevisionNo = revision(input.expectedRevisionNo);
       const requestHash = arenaRequestHash({ sessionId, expectedRevisionNo });
       const preflight = await deps.withTransaction(async (db) => {
-        const session = await deps.repository.loadForUpdate(db, { authUserId: input.authUserId, sessionId });
+        const session = await deps.repository.loadForUpdate(db, {
+          authUserId: input.authUserId,
+          sessionId,
+        });
         if (session.arenaReceipt?.idempotencyKey === key) {
-          if (session.arenaReceipt.requestHash !== requestHash) fail('IDEMPOTENCY_KEY_REUSED', '相同 idempotencyKey 不能复用于不同测试', 409);
-          return { replay: session.arenaReceipt, snapshot: session.generatedSnapshot };
+          if (session.arenaReceipt.requestHash !== requestHash)
+            fail(
+              'IDEMPOTENCY_KEY_REUSED',
+              '相同 idempotencyKey 不能复用于不同测试',
+              409,
+            );
+          return {
+            replay: session.arenaReceipt,
+            snapshot: session.generatedSnapshot,
+          };
         }
-        if (session.revisionNo !== expectedRevisionNo) fail('SESSION_REVISION_CONFLICT', '会话版本已变化，请刷新后重试', 409);
-        if (session.mediaStage !== 'arena_testing') fail('INVALID_MEDIA_STAGE', '当前阶段不能启动 Arena 测试', 409);
-        assertMediaStageGate({ targetStage: 'arena_testing', confirmedStages: session.confirmedStages });
+        if (session.revisionNo !== expectedRevisionNo)
+          fail(
+            'SESSION_REVISION_CONFLICT',
+            '会话版本已变化，请刷新后重试',
+            409,
+          );
+        if (session.mediaStage !== 'arena_testing')
+          fail('INVALID_MEDIA_STAGE', '当前阶段不能启动 Arena 测试', 409);
+        assertMediaStageGate({
+          targetStage: 'arena_testing',
+          confirmedStages: session.confirmedStages,
+        });
         const snapshot = buildGeneratedSnapshot(session, expectedRevisionNo);
         return { replay: null, snapshot };
       });
@@ -604,28 +695,51 @@ export function createMultimodalReleaseService(
         return {
           sessionId,
           revisionNo: preflight.replay.resultRevisionNo,
-          mediaStage: preflight.replay.evaluation.passed ? 'ready_to_publish' as const : 'arena_testing' as const,
+          mediaStage: preflight.replay.evaluation.passed
+            ? ('ready_to_publish' as const)
+            : ('arena_testing' as const),
           passed: preflight.replay.evaluation.passed,
           evaluation: preflight.replay.evaluation,
           replayed: true,
         };
       }
-      if (!preflight.snapshot) fail('MULTIMODAL_SESSION_FAILED', 'Arena 测试快照缺失', 500);
-      const snapshotHash = computeMultimodalArenaSnapshotHash(preflight.snapshot);
+      if (!preflight.snapshot)
+        fail('MULTIMODAL_SESSION_FAILED', 'Arena 测试快照缺失', 500);
+      const snapshotHash = computeMultimodalArenaSnapshotHash(
+        preflight.snapshot,
+      );
       const evaluation = await deps.evaluator({
         snapshot: preflight.snapshot,
         snapshotHash,
         candidateRevisionNo: expectedRevisionNo,
       });
-      assertArenaEvaluation(evaluation, { candidateRevisionNo: expectedRevisionNo, snapshotHash });
+      assertArenaEvaluation(evaluation, {
+        candidateRevisionNo: expectedRevisionNo,
+        snapshotHash,
+      });
       const result = await deps.withTransaction(async (db) => {
-        const session = await deps.repository.loadForUpdate(db, { authUserId: input.authUserId, sessionId });
+        const session = await deps.repository.loadForUpdate(db, {
+          authUserId: input.authUserId,
+          sessionId,
+        });
         if (session.arenaReceipt?.idempotencyKey === key) {
-          if (session.arenaReceipt.requestHash !== requestHash) fail('IDEMPOTENCY_KEY_REUSED', '相同 idempotencyKey 不能复用于不同测试', 409);
+          if (session.arenaReceipt.requestHash !== requestHash)
+            fail(
+              'IDEMPOTENCY_KEY_REUSED',
+              '相同 idempotencyKey 不能复用于不同测试',
+              409,
+            );
           return { receipt: session.arenaReceipt, replayed: true };
         }
-        if (session.revisionNo !== expectedRevisionNo || session.mediaStage !== 'arena_testing') {
-          fail('SESSION_REVISION_CONFLICT', '会话版本已变化，请刷新后重试', 409);
+        if (
+          session.revisionNo !== expectedRevisionNo ||
+          session.mediaStage !== 'arena_testing'
+        ) {
+          fail(
+            'SESSION_REVISION_CONFLICT',
+            '会话版本已变化，请刷新后重试',
+            409,
+          );
         }
         const recordedAt = deps.now().toISOString();
         const receipt: MultimodalArenaReceipt = {
@@ -638,8 +752,11 @@ export function createMultimodalReleaseService(
           recordedAt,
           evaluation,
         };
-        const nextStage = evaluation.passed ? 'ready_to_publish' as const : 'arena_testing' as const;
-        if (evaluation.passed) assertMediaStageTransition('arena_testing', nextStage);
+        const nextStage = evaluation.passed
+          ? ('ready_to_publish' as const)
+          : ('arena_testing' as const);
+        if (evaluation.passed)
+          assertMediaStageTransition('arena_testing', nextStage);
         await deps.repository.saveArenaResult(db, {
           authUserId: input.authUserId,
           sessionId,
@@ -656,7 +773,9 @@ export function createMultimodalReleaseService(
       return {
         sessionId,
         revisionNo: result.receipt.resultRevisionNo,
-        mediaStage: result.receipt.evaluation.passed ? 'ready_to_publish' as const : 'arena_testing' as const,
+        mediaStage: result.receipt.evaluation.passed
+          ? ('ready_to_publish' as const)
+          : ('arena_testing' as const),
         passed: result.receipt.evaluation.passed,
         evaluation: result.receipt.evaluation,
         replayed: result.replayed,
@@ -674,14 +793,23 @@ export function createMultimodalReleaseService(
       const sessionId = positiveId(input.sessionId, 'sessionId');
       const key = idempotencyKey(input.idempotencyKey);
       const expectedRevisionNo = revision(input.expectedRevisionNo);
-      const targetPackageId = input.targetPackageId == null
-        ? null
-        : positiveId(input.targetPackageId, 'targetPackageId');
-      const expectedPackageVersionId = input.expectedPackageVersionId == null
-        ? null
-        : positiveId(input.expectedPackageVersionId, 'expectedPackageVersionId');
+      const targetPackageId =
+        input.targetPackageId == null
+          ? null
+          : positiveId(input.targetPackageId, 'targetPackageId');
+      const expectedPackageVersionId =
+        input.expectedPackageVersionId == null
+          ? null
+          : positiveId(
+              input.expectedPackageVersionId,
+              'expectedPackageVersionId',
+            );
       if ((targetPackageId == null) !== (expectedPackageVersionId == null)) {
-        fail('INVALID_ARGUMENT', '更新已有 Package 时必须同时提供目标和预期版本', 422);
+        fail(
+          'INVALID_ARGUMENT',
+          '更新已有 Package 时必须同时提供目标和预期版本',
+          422,
+        );
       }
       const requestHash = confirmGenerationRequestHash({
         sessionId,
@@ -699,7 +827,11 @@ export function createMultimodalReleaseService(
             session.publishReceipt.action !== 'skill.media.generate.confirm' ||
             session.publishReceipt.requestHash !== requestHash
           ) {
-            fail('IDEMPOTENCY_KEY_REUSED', '相同 idempotencyKey 不能复用于不同生成请求', 409);
+            fail(
+              'IDEMPOTENCY_KEY_REUSED',
+              '相同 idempotencyKey 不能复用于不同生成请求',
+              409,
+            );
           }
           return {
             ...session.publishReceipt,
@@ -709,9 +841,14 @@ export function createMultimodalReleaseService(
             replayed: true,
           };
         }
-        if (session.publishReceipt) fail('ALREADY_PUBLISHED', '这些 Skill 已经生成', 409);
+        if (session.publishReceipt)
+          fail('ALREADY_PUBLISHED', '这些 Skill 已经生成', 409);
         if (session.revisionNo !== expectedRevisionNo) {
-          fail('SESSION_REVISION_CONFLICT', '会话版本已变化，请刷新后重试', 409);
+          fail(
+            'SESSION_REVISION_CONFLICT',
+            '会话版本已变化，请刷新后重试',
+            409,
+          );
         }
         if (
           session.mediaStage !== 'arena_testing' &&
@@ -720,19 +857,27 @@ export function createMultimodalReleaseService(
           fail('INVALID_MEDIA_STAGE', '当前阶段不能确认生成', 409);
         }
         const expectedStage = session.mediaStage;
-        const snapshot = expectedStage === 'arena_testing'
-          ? buildGeneratedSnapshot(session, expectedRevisionNo)
-          : session.generatedSnapshot;
-        if (!snapshot) fail('MULTIMODAL_SESSION_FAILED', '已确认的 Skill 快照缺失', 500);
+        const snapshot =
+          expectedStage === 'arena_testing'
+            ? buildGeneratedSnapshot(session, expectedRevisionNo)
+            : session.generatedSnapshot;
+        if (!snapshot)
+          fail('MULTIMODAL_SESSION_FAILED', '已确认的 Skill 快照缺失', 500);
         assertGeneratedSnapshotBoundToSession(session, snapshot);
 
         const nextConfirmedStages = session.confirmedStages.includes('publish')
           ? session.confirmedStages
           : [...session.confirmedStages, 'publish' as const];
         assertMediaStageTransition(expectedStage, 'publishing');
-        assertMediaStageGate({ targetStage: 'publishing', confirmedStages: nextConfirmedStages });
+        assertMediaStageGate({
+          targetStage: 'publishing',
+          confirmedStages: nextConfirmedStages,
+        });
         assertMediaStageTransition('publishing', 'published');
-        assertMediaStageGate({ targetStage: 'published', confirmedStages: nextConfirmedStages });
+        assertMediaStageGate({
+          targetStage: 'published',
+          confirmedStages: nextConfirmedStages,
+        });
 
         let packageIds: CreatedPackageSnapshotIds;
         try {
@@ -743,8 +888,15 @@ export function createMultimodalReleaseService(
             expectedPackageVersionId,
           });
         } catch (error) {
-          if (error instanceof Error && error.message === 'PACKAGE_VERSION_CONFLICT') {
-            fail('PACKAGE_VERSION_CONFLICT', '目标 Package 版本已变化，请刷新后重试', 409);
+          if (
+            error instanceof Error &&
+            error.message === 'PACKAGE_VERSION_CONFLICT'
+          ) {
+            fail(
+              'PACKAGE_VERSION_CONFLICT',
+              '目标 Package 版本已变化，请刷新后重试',
+              409,
+            );
           }
           throw error;
         }
@@ -792,37 +944,95 @@ export function createMultimodalReleaseService(
       const sessionId = positiveId(input.sessionId, 'sessionId');
       const key = idempotencyKey(input.idempotencyKey);
       const expectedRevisionNo = revision(input.expectedRevisionNo);
-      const targetPackageId = input.targetPackageId == null ? null : positiveId(input.targetPackageId, 'targetPackageId');
-      const expectedPackageVersionId = input.expectedPackageVersionId == null ? null : positiveId(input.expectedPackageVersionId, 'expectedPackageVersionId');
+      const targetPackageId =
+        input.targetPackageId == null
+          ? null
+          : positiveId(input.targetPackageId, 'targetPackageId');
+      const expectedPackageVersionId =
+        input.expectedPackageVersionId == null
+          ? null
+          : positiveId(
+              input.expectedPackageVersionId,
+              'expectedPackageVersionId',
+            );
       if ((targetPackageId == null) !== (expectedPackageVersionId == null)) {
-        fail('INVALID_ARGUMENT', '更新已有 Package 时必须同时提供目标和预期版本', 422);
+        fail(
+          'INVALID_ARGUMENT',
+          '更新已有 Package 时必须同时提供目标和预期版本',
+          422,
+        );
       }
-      const requestHash = publishRequestHash({ sessionId, expectedRevisionNo, targetPackageId, expectedPackageVersionId });
+      const requestHash = publishRequestHash({
+        sessionId,
+        expectedRevisionNo,
+        targetPackageId,
+        expectedPackageVersionId,
+      });
       return deps.withTransaction(async (db) => {
-        const session = await deps.repository.loadForUpdate(db, { authUserId: input.authUserId, sessionId });
+        const session = await deps.repository.loadForUpdate(db, {
+          authUserId: input.authUserId,
+          sessionId,
+        });
         if (session.publishReceipt?.idempotencyKey === key) {
-          if (session.publishReceipt.requestHash !== requestHash) fail('IDEMPOTENCY_KEY_REUSED', '相同 idempotencyKey 不能复用于不同发布请求', 409);
-          return { ...session.publishReceipt, sessionId, mediaStage: 'published' as const, replayed: true };
+          if (session.publishReceipt.requestHash !== requestHash)
+            fail(
+              'IDEMPOTENCY_KEY_REUSED',
+              '相同 idempotencyKey 不能复用于不同发布请求',
+              409,
+            );
+          return {
+            ...session.publishReceipt,
+            sessionId,
+            mediaStage: 'published' as const,
+            replayed: true,
+          };
         }
-        if (session.publishReceipt) fail('ALREADY_PUBLISHED', '该工作区已经发布', 409);
-        if (!session.arenaReceipt?.evaluation.passed) fail('QUALITY_GATE_FAILED', 'Arena 确定性门禁未通过，禁止发布', 422);
-        if (session.revisionNo !== expectedRevisionNo) fail('SESSION_REVISION_CONFLICT', '会话版本已变化，请刷新后重试', 409);
-        if (session.mediaStage !== 'ready_to_publish') fail('INVALID_MEDIA_STAGE', '当前阶段不能发布', 409);
-        if (!session.generatedSnapshot) fail('MULTIMODAL_SESSION_FAILED', '已测试发布快照缺失', 500);
-        const snapshotHash = computeMultimodalArenaSnapshotHash(session.generatedSnapshot);
+        if (session.publishReceipt)
+          fail('ALREADY_PUBLISHED', '该工作区已经发布', 409);
+        if (!session.arenaReceipt?.evaluation.passed)
+          fail('QUALITY_GATE_FAILED', 'Arena 确定性门禁未通过，禁止发布', 422);
+        if (session.revisionNo !== expectedRevisionNo)
+          fail(
+            'SESSION_REVISION_CONFLICT',
+            '会话版本已变化，请刷新后重试',
+            409,
+          );
+        if (session.mediaStage !== 'ready_to_publish')
+          fail('INVALID_MEDIA_STAGE', '当前阶段不能发布', 409);
+        if (!session.generatedSnapshot)
+          fail('MULTIMODAL_SESSION_FAILED', '已测试发布快照缺失', 500);
+        const snapshotHash = computeMultimodalArenaSnapshotHash(
+          session.generatedSnapshot,
+        );
         if (
-          session.arenaReceipt.evaluation.candidateRevisionNo !== session.generatedSnapshot.metadata.candidateRevisionNo ||
+          session.arenaReceipt.evaluation.candidateRevisionNo !==
+            session.generatedSnapshot.metadata.candidateRevisionNo ||
           session.arenaReceipt.evaluation.snapshotHash !== snapshotHash
-        ) fail('QUALITY_GATE_STALE', 'Arena 结果与当前 Skill 草稿不匹配，请重新测试', 409);
+        )
+          fail(
+            'QUALITY_GATE_STALE',
+            'Arena 结果与当前 Skill 草稿不匹配，请重新测试',
+            409,
+          );
         assertArenaEvaluation(session.arenaReceipt.evaluation, {
-          candidateRevisionNo: session.generatedSnapshot.metadata.candidateRevisionNo,
+          candidateRevisionNo:
+            session.generatedSnapshot.metadata.candidateRevisionNo,
           snapshotHash,
         });
-        const nextConfirmedStages = [...session.confirmedStages, 'publish' as const];
+        const nextConfirmedStages = [
+          ...session.confirmedStages,
+          'publish' as const,
+        ];
         assertMediaStageTransition('ready_to_publish', 'publishing');
-        assertMediaStageGate({ targetStage: 'publishing', confirmedStages: nextConfirmedStages });
+        assertMediaStageGate({
+          targetStage: 'publishing',
+          confirmedStages: nextConfirmedStages,
+        });
         assertMediaStageTransition('publishing', 'published');
-        assertMediaStageGate({ targetStage: 'published', confirmedStages: nextConfirmedStages });
+        assertMediaStageGate({
+          targetStage: 'published',
+          confirmedStages: nextConfirmedStages,
+        });
         let packageIds: CreatedPackageSnapshotIds;
         try {
           packageIds = await deps.publishPackageTx(db, {
@@ -832,8 +1042,15 @@ export function createMultimodalReleaseService(
             expectedPackageVersionId,
           });
         } catch (error) {
-          if (error instanceof Error && error.message === 'PACKAGE_VERSION_CONFLICT') {
-            fail('PACKAGE_VERSION_CONFLICT', '目标 Package 版本已变化，请刷新后重试', 409);
+          if (
+            error instanceof Error &&
+            error.message === 'PACKAGE_VERSION_CONFLICT'
+          ) {
+            fail(
+              'PACKAGE_VERSION_CONFLICT',
+              '目标 Package 版本已变化，请刷新后重试',
+              409,
+            );
           }
           throw error;
         }
@@ -860,7 +1077,12 @@ export function createMultimodalReleaseService(
           receipt,
           confirmedStages: nextConfirmedStages,
         });
-        return { ...receipt, sessionId, mediaStage: 'published' as const, replayed: false };
+        return {
+          ...receipt,
+          sessionId,
+          mediaStage: 'published' as const,
+          replayed: false,
+        };
       });
     },
   };

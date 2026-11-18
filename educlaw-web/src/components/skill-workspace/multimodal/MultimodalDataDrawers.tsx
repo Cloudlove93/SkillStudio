@@ -371,9 +371,7 @@ export function MultimodalInspectorContent(props: Props) {
                   aria-valuemax={100}
                   aria-valuenow={currentProgressPercent}
                 >
-                  <span
-                    style={{ width: `${currentProgressPercent}%` }}
-                  />
+                  <span style={{ width: `${currentProgressPercent}%` }} />
                 </div>
               )}
             </section>

@@ -72,7 +72,8 @@ const REQUIRED_FIELD_SET = new Set<GuidedDraftField>(GUIDED_REQUIRED_FIELDS);
 const SAFE_DEFAULTS: Partial<Record<GuidedDraftField, string>> = {
   knowledge_evidence: '以用户提供的材料和当前对话中的明确信息为依据。',
   boundaries_permissions: '不编造事实，不执行超出用户授权范围的操作。',
-  exception_recovery: '信息不足时说明缺口并请求补充；处理失败时保留已完成内容并给出重试建议。',
+  exception_recovery:
+    '信息不足时说明缺口并请求补充；处理失败时保留已完成内容并给出重试建议。',
   completion_evidence: '输出符合约定格式，关键步骤和结果可检查。',
 };
 
@@ -330,7 +331,9 @@ export function buildConfirmationCard(
       {
         key: 'positioning',
         title: '定位与目标',
-        content: [pair('角色', draft.roles), pair('目标', draft.goal)].join('\n'),
+        content: [pair('角色', draft.roles), pair('目标', draft.goal)].join(
+          '\n',
+        ),
       },
       {
         key: 'scenario',

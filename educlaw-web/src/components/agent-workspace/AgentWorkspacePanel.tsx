@@ -1,13 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import type { AgentWorkspace, AgentWorkspaceInput } from '@educlaw/shared';
-import {
-  BookOpen,
-  Bot,
-  MessageSquare,
-  Plus,
-  Settings2,
-} from 'lucide-react';
+import { BookOpen, Bot, MessageSquare, Plus, Settings2 } from 'lucide-react';
 import { agentsApi, AgentWorkspaceApiError } from '../../api/agents';
 import { routes } from '../../lib/routes';
 import { AgentSkillPicker, type OpenAgentSkill } from './AgentSkillPicker';
@@ -410,7 +404,9 @@ function AgentWorkspaceSession({
               </p>
               <div className="agent-hero-stats" aria-label="Agent 概览">
                 <span className="agent-stat is-primary">
-                  <strong>{draft.skills.filter((s) => s.enabled).length}</strong>
+                  <strong>
+                    {draft.skills.filter((s) => s.enabled).length}
+                  </strong>
                   启用模块
                 </span>
                 <span className="agent-stat">
@@ -469,176 +465,174 @@ function AgentWorkspaceSession({
         ) : selectionReady ? (
           <>
             <div className="agent-tabs" role="tablist" aria-label="Agent 面板">
-                {agent && (
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={tab === 'overview'}
-                    id="agent-overview-tab"
-                    aria-controls="agent-overview"
-                    onClick={() => setTab('overview')}
-                  >
-                    <BookOpen size={15} />
-                    概览
-                  </button>
-                )}
+              {agent && (
                 <button
                   type="button"
                   role="tab"
-                  aria-selected={tab === 'settings'}
-                  id="agent-settings-tab"
-                  aria-controls="agent-settings"
-                  onClick={() => setTab('settings')}
+                  aria-selected={tab === 'overview'}
+                  id="agent-overview-tab"
+                  aria-controls="agent-overview"
+                  onClick={() => setTab('overview')}
                 >
-                  <Settings2 size={15} />
-                  编辑配置{dirty ? ' · 未保存' : ''}
+                  <BookOpen size={15} />
+                  概览
                 </button>
+              )}
+              <button
+                type="button"
+                role="tab"
+                aria-selected={tab === 'settings'}
+                id="agent-settings-tab"
+                aria-controls="agent-settings"
+                onClick={() => setTab('settings')}
+              >
+                <Settings2 size={15} />
+                编辑配置{dirty ? ' · 未保存' : ''}
+              </button>
+            </div>
+            {tab === 'overview' && agent ? (
+              <div
+                id="agent-overview"
+                role="tabpanel"
+                aria-labelledby="agent-overview-tab"
+              >
+                <AgentOverview
+                  key={agent.updatedAt}
+                  token={token}
+                  agent={agent}
+                  onEdit={() => setTab('settings')}
+                  onOpenSkill={openSkill}
+                />
               </div>
-              {tab === 'overview' && agent ? (
-                <div
-                  id="agent-overview"
-                  role="tabpanel"
-                  aria-labelledby="agent-overview-tab"
-                >
-                  <AgentOverview
-                    key={agent.updatedAt}
-                    token={token}
-                    agent={agent}
-                    onEdit={() => setTab('settings')}
-                    onOpenSkill={openSkill}
-                  />
-                </div>
-              ) : tab === 'settings' ? (
-                <form
-                  id="agent-settings"
-                  role="tabpanel"
-                  aria-labelledby="agent-settings-tab"
-                  className="agent-editor"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    void save();
-                  }}
-                >
-                  <fieldset disabled={saving}>
-                    <div className="agent-editor-layout">
-                      <section className="agent-panel agent-core-panel">
-                        <header className="agent-panel-head">
-                          <span className="agent-panel-index">01</span>
-                          <div>
-                            <h2>Agent 核心</h2>
-                            <p>身份、模型与工作方式</p>
-                          </div>
-                        </header>
-                        <div className="agent-form-grid">
-                          <label className="agent-field">
-                            Agent 名称
-                            <input
-                              required
-                              maxLength={100}
-                              value={draft.name}
-                              placeholder="例如：课程设计助手"
-                              onChange={(e) =>
-                                setDraft({ ...draft, name: e.target.value })
-                              }
-                            />
-                          </label>
-                          <label className="agent-field">
-                            模型
-                            <input
-                              maxLength={256}
-                              value={draft.model}
-                              placeholder="留空使用服务端默认模型"
-                              onChange={(e) =>
-                                setDraft({ ...draft, model: e.target.value })
-                              }
-                            />
-                          </label>
+            ) : tab === 'settings' ? (
+              <form
+                id="agent-settings"
+                role="tabpanel"
+                aria-labelledby="agent-settings-tab"
+                className="agent-editor"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void save();
+                }}
+              >
+                <fieldset disabled={saving}>
+                  <div className="agent-editor-layout">
+                    <section className="agent-panel agent-core-panel">
+                      <header className="agent-panel-head">
+                        <span className="agent-panel-index">01</span>
+                        <div>
+                          <h2>Agent 核心</h2>
+                          <p>身份、模型与工作方式</p>
                         </div>
+                      </header>
+                      <div className="agent-form-grid">
                         <label className="agent-field">
-                          描述
-                          <textarea
-                            maxLength={2000}
-                            rows={2}
-                            value={draft.description}
-                            placeholder="这个助手适合完成什么任务？"
+                          Agent 名称
+                          <input
+                            required
+                            maxLength={100}
+                            value={draft.name}
+                            placeholder="例如：课程设计助手"
                             onChange={(e) =>
-                              setDraft({
-                                ...draft,
-                                description: e.target.value,
-                              })
+                              setDraft({ ...draft, name: e.target.value })
                             }
                           />
                         </label>
                         <label className="agent-field">
-                          Agent 指令
-                          <textarea
-                            maxLength={16000}
-                            rows={5}
-                            value={draft.instructions}
-                            placeholder="定义角色、工作方式和多个 Skill 的协作规则…"
+                          模型
+                          <input
+                            maxLength={256}
+                            value={draft.model}
+                            placeholder="留空使用服务端默认模型"
                             onChange={(e) =>
-                              setDraft({
-                                ...draft,
-                                instructions: e.target.value,
-                              })
+                              setDraft({ ...draft, model: e.target.value })
                             }
                           />
                         </label>
-                      </section>
-                      <section className="agent-panel agent-module-panel">
-                        <header className="agent-panel-head">
-                          <span className="agent-panel-index is-module">02</span>
-                          <div>
-                            <h2>Skill 模块</h2>
-                            <p>从仓库挑选能力，自由组合到当前 Agent</p>
-                          </div>
-                        </header>
-                        <AgentSkillPicker
-                          token={token}
-                          skills={draft.skills}
-                          resolvedSkills={agent?.skills ?? []}
-                          onOpenSkill={openSkill}
-                          onChange={(skills) => setDraft({ ...draft, skills })}
+                      </div>
+                      <label className="agent-field">
+                        描述
+                        <textarea
+                          maxLength={2000}
+                          rows={2}
+                          value={draft.description}
+                          placeholder="这个助手适合完成什么任务？"
+                          onChange={(e) =>
+                            setDraft({
+                              ...draft,
+                              description: e.target.value,
+                            })
+                          }
                         />
-                      </section>
-                    </div>
-                  </fieldset>
-                  <footer className="agent-editor-footer">
-                    <p className="agent-muted">
-                      {dirty
-                        ? '保存并开始对话会把当前配置绑定到新对话。'
-                        : !draft.skills.some((s) => s.enabled)
-                          ? '可以保存；开始对话前需启用至少一个 Skill。'
-                          : '新对话固定当前指令、模型与 Skill 版本。'}
-                    </p>
-                    <div className="agent-actions">
-                      <button
-                        type="submit"
-                        disabled={
-                          saving ||
-                          !draft.name.trim() ||
-                          (!!agent && !dirty)
-                        }
-                      >
-                        {saving ? '正在保存…' : agent ? '保存配置' : '创建 Agent'}
-                      </button>
-                      <button
-                        type="button"
-                        className="agent-primary"
-                        disabled={
-                          saving ||
-                          !draft.name.trim() ||
-                          !draft.skills.some((s) => s.enabled)
-                        }
-                        onClick={() => void save(true)}
-                      >
-                        {agent ? '保存并开始对话' : '创建并开始对话'}
-                      </button>
-                    </div>
-                  </footer>
-                </form>
-              ) : null}
-            </>
+                      </label>
+                      <label className="agent-field">
+                        Agent 指令
+                        <textarea
+                          maxLength={16000}
+                          rows={5}
+                          value={draft.instructions}
+                          placeholder="定义角色、工作方式和多个 Skill 的协作规则…"
+                          onChange={(e) =>
+                            setDraft({
+                              ...draft,
+                              instructions: e.target.value,
+                            })
+                          }
+                        />
+                      </label>
+                    </section>
+                    <section className="agent-panel agent-module-panel">
+                      <header className="agent-panel-head">
+                        <span className="agent-panel-index is-module">02</span>
+                        <div>
+                          <h2>Skill 模块</h2>
+                          <p>从仓库挑选能力，自由组合到当前 Agent</p>
+                        </div>
+                      </header>
+                      <AgentSkillPicker
+                        token={token}
+                        skills={draft.skills}
+                        resolvedSkills={agent?.skills ?? []}
+                        onOpenSkill={openSkill}
+                        onChange={(skills) => setDraft({ ...draft, skills })}
+                      />
+                    </section>
+                  </div>
+                </fieldset>
+                <footer className="agent-editor-footer">
+                  <p className="agent-muted">
+                    {dirty
+                      ? '保存并开始对话会把当前配置绑定到新对话。'
+                      : !draft.skills.some((s) => s.enabled)
+                        ? '可以保存；开始对话前需启用至少一个 Skill。'
+                        : '新对话固定当前指令、模型与 Skill 版本。'}
+                  </p>
+                  <div className="agent-actions">
+                    <button
+                      type="submit"
+                      disabled={
+                        saving || !draft.name.trim() || (!!agent && !dirty)
+                      }
+                    >
+                      {saving ? '正在保存…' : agent ? '保存配置' : '创建 Agent'}
+                    </button>
+                    <button
+                      type="button"
+                      className="agent-primary"
+                      disabled={
+                        saving ||
+                        !draft.name.trim() ||
+                        !draft.skills.some((s) => s.enabled)
+                      }
+                      onClick={() => void save(true)}
+                    >
+                      {agent ? '保存并开始对话' : '创建并开始对话'}
+                    </button>
+                  </div>
+                </footer>
+              </form>
+            ) : null}
+          </>
         ) : null}
       </main>
       {discardTarget && (

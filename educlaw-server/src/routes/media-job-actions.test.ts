@@ -434,7 +434,8 @@ describe('internal media job actions', () => {
         primaryVideoStreamIndex: null,
       },
       resultManifestRef: {
-        objectKey: 'skill-sessions/5/manifest/media-quality-check/job-9-attempt-1.json',
+        objectKey:
+          'skill-sessions/5/manifest/media-quality-check/job-9-attempt-1.json',
         mimeType: 'application/json',
         sizeBytes: 256,
         sha256: 'd'.repeat(64),

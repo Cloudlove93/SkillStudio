@@ -4,13 +4,7 @@ import type {
   ArenaThread,
   SkillVersionDetail,
 } from '@educlaw/shared';
-import {
-  ArrowUp,
-  Play,
-  Sparkles,
-  Square,
-  WandSparkles,
-} from 'lucide-react';
+import { ArrowUp, Play, Sparkles, Square, WandSparkles } from 'lucide-react';
 import { useSkillRun } from './use-skill-run';
 import type {
   AnswerOptimizationRerunRequest,
@@ -199,7 +193,11 @@ export function SkillRunWorkspace({
             <div className="skill-flat-empty">
               <Play size={24} />
               <h2>
-                {agentName ? `${purpose === 'test' ? '测试' : '开始使用'} ${agentName}` : purpose === 'test' ? '试一试当前 Skill' : '开始使用这个 Skill'}
+                {agentName
+                  ? `${purpose === 'test' ? '测试' : '开始使用'} ${agentName}`
+                  : purpose === 'test'
+                    ? '试一试当前 Skill'
+                    : '开始使用这个 Skill'}
               </h2>
               <p>
                 {purpose === 'test'
@@ -333,7 +331,9 @@ export function SkillRunWorkspace({
             aria-label={
               purpose === 'test'
                 ? '输入测试任务'
-                : agentName ? '输入教学任务' : '输入 Skill 使用任务'
+                : agentName
+                  ? '输入教学任务'
+                  : '输入 Skill 使用任务'
             }
             value={state.draft}
             onChange={(event) =>
@@ -354,7 +354,9 @@ export function SkillRunWorkspace({
             placeholder={
               purpose === 'test'
                 ? '输入测试任务…'
-                : agentName ? '输入教学任务…' : '输入任务，立即使用这个 Skill…'
+                : agentName
+                  ? '输入教学任务…'
+                  : '输入任务，立即使用这个 Skill…'
             }
             disabled={historyLoading}
           />

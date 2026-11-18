@@ -1,19 +1,19 @@
-import { config } from "../config.js";
-import { supportsModelExplicitThinking } from "../lib/llm-model-capabilities.js";
-import { safeError, truncateForLog } from "../lib/logger.js";
-import { getLogger } from "../lib/request-context.js";
-import { parseJsonObject } from "../utils/json.js";
+import { config } from '../config.js';
+import { supportsModelExplicitThinking } from '../lib/llm-model-capabilities.js';
+import { safeError, truncateForLog } from '../lib/logger.js';
+import { getLogger } from '../lib/request-context.js';
+import { parseJsonObject } from '../utils/json.js';
 
 export interface ChatMessage {
-  role: "system" | "user" | "assistant";
+  role: 'system' | 'user' | 'assistant';
   content: string;
 }
 
-export type ThinkingMode = "enabled" | "disabled";
+export type ThinkingMode = 'enabled' | 'disabled';
 
 export type LlmStreamPart =
-  | { type: "reasoning"; delta: string }
-  | { type: "content"; delta: string };
+  | { type: 'reasoning'; delta: string }
+  | { type: 'content'; delta: string };
 
 interface ChatRequestInput {
   signal?: AbortSignal;
@@ -31,14 +31,15 @@ export interface MultimodalJsonRequestInput {
   userPrompt: string;
   images: Array<{
     imageUrl: string;
-    detail?: "low" | "high" | "auto";
+    detail?: 'low' | 'high' | 'auto';
   }>;
   model?: string;
   maxTokens?: number;
 }
 
 const MAX_INLINE_IMAGE_BYTES = 8 * 1024 * 1024;
-const INLINE_IMAGE_PATTERN = /^data:image\/(?:png|jpeg|webp);base64,([A-Za-z0-9+/]+={0,2})$/;
+const INLINE_IMAGE_PATTERN =
+  /^data:image\/(?:png|jpeg|webp);base64,([A-Za-z0-9+/]+={0,2})$/;
 
 function isValidMultimodalImageUrl(value: string): boolean {
   const inlineMatch = INLINE_IMAGE_PATTERN.exec(value);
@@ -76,37 +77,37 @@ export class LlmOutputTruncatedError extends Error {
 }
 
 const STRICT_JSON_CONTRACT = [
-  "Strict JSON output contract:",
-  "1. Return exactly one JSON object and nothing else.",
-  "2. Do not wrap the JSON in Markdown fences.",
-  "3. Do not include comments, explanatory text, or trailing commas.",
-  "4. Use double quotes for every key and string value.",
-  "5. Inside string values, escape newlines as \\n, quotes as \\\", and backslashes as \\\\.",
-  "6. Never place raw multi-line Markdown directly inside JSON strings.",
-].join("\n");
+  'Strict JSON output contract:',
+  '1. Return exactly one JSON object and nothing else.',
+  '2. Do not wrap the JSON in Markdown fences.',
+  '3. Do not include comments, explanatory text, or trailing commas.',
+  '4. Use double quotes for every key and string value.',
+  '5. Inside string values, escape newlines as \\n, quotes as \\", and backslashes as \\\\.',
+  '6. Never place raw multi-line Markdown directly inside JSON strings.',
+].join('\n');
 
 function buildMessages(input: ChatRequestInput): ChatMessage[] {
   return [
-    { role: "system", content: input.systemPrompt },
-    { role: "user", content: input.userPrompt },
+    { role: 'system', content: input.systemPrompt },
+    { role: 'user', content: input.userPrompt },
   ];
 }
 
 function withStrictJsonContract(input: ChatRequestInput): ChatRequestInput {
   return {
     ...input,
-    systemPrompt: [STRICT_JSON_CONTRACT, input.systemPrompt].join("\n\n"),
+    systemPrompt: [STRICT_JSON_CONTRACT, input.systemPrompt].join('\n\n'),
     userPrompt: [
       input.userPrompt,
-      "",
-      "Before sending the final answer, validate mentally that it is accepted by JSON.parse.",
+      '',
+      'Before sending the final answer, validate mentally that it is accepted by JSON.parse.',
       STRICT_JSON_CONTRACT,
-    ].join("\n"),
+    ].join('\n'),
   };
 }
 
 function llmLogger(bindings?: Record<string, unknown>) {
-  return getLogger({ component: "llm", ...(bindings || {}) });
+  return getLogger({ component: 'llm', ...(bindings || {}) });
 }
 
 function logLlmRequestStart(
@@ -118,26 +119,31 @@ function logLlmRequestStart(
   hidePromptContentInLogs = false,
 ) {
   llmLogger().info({
-    event: "llm.request.start",
+    event: 'llm.request.start',
     kind,
     model,
     stream,
     maxTokens,
     timeoutMs: config.llmTimeoutMs,
     messageCount: messages.length,
-    totalChars: messages.reduce((sum, message) => sum + message.content.length, 0),
+    totalChars: messages.reduce(
+      (sum, message) => sum + message.content.length,
+      0,
+    ),
     baseUrl: config.llmBaseUrl,
     messages: messages.map((message, index) => ({
       index,
       role: message.role,
-      content: hidePromptContentInLogs ? "[redacted]" : truncateForLog(message.content, 400),
+      content: hidePromptContentInLogs
+        ? '[redacted]'
+        : truncateForLog(message.content, 400),
     })),
   });
 }
 
 function logLlmResponseMeta(kind: string, model: string, response: Response) {
   llmLogger().info({
-    event: "llm.response.meta",
+    event: 'llm.response.meta',
     kind,
     model,
     status: response.status,
@@ -152,11 +158,13 @@ function logLlmTextResult(
   hidePromptContentInLogs = false,
 ) {
   llmLogger().info({
-    event: "llm.response.text",
+    event: 'llm.response.text',
     kind,
     model,
     outputChars: content.length,
-    outputPreview: hidePromptContentInLogs ? "[redacted]" : truncateForLog(content, 500),
+    outputPreview: hidePromptContentInLogs
+      ? '[redacted]'
+      : truncateForLog(content, 500),
   });
 }
 
@@ -164,7 +172,7 @@ function createAbortSignal(timeoutMs: number): AbortSignal {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   const signal = controller.signal;
-  signal.addEventListener("abort", () => clearTimeout(timer), { once: true });
+  signal.addEventListener('abort', () => clearTimeout(timer), { once: true });
   return signal;
 }
 
@@ -174,11 +182,11 @@ function sleep(ms: number): Promise<void> {
 
 function getErrorCause(error: unknown): { message?: string; code?: string } {
   const cause = error instanceof Error ? error.cause : undefined;
-  if (cause && typeof cause === "object") {
+  if (cause && typeof cause === 'object') {
     const record = cause as { message?: unknown; code?: unknown };
     return {
-      message: typeof record.message === "string" ? record.message : undefined,
-      code: typeof record.code === "string" ? record.code : undefined,
+      message: typeof record.message === 'string' ? record.message : undefined,
+      code: typeof record.code === 'string' ? record.code : undefined,
     };
   }
   return {};
@@ -187,19 +195,30 @@ function getErrorCause(error: unknown): { message?: string; code?: string } {
 function describeFetchFailure(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   const cause = getErrorCause(error);
-  const detail = [cause.code, cause.message].filter(Boolean).join(" ");
+  const detail = [cause.code, cause.message].filter(Boolean).join(' ');
   return detail ? `${message} (${detail})` : message;
 }
 
 function shouldRetryFetchFailure(error: unknown): boolean {
-  if (error instanceof Error && error.name === "AbortError") return false;
-  const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  if (error instanceof Error && error.name === 'AbortError') return false;
+  const message =
+    error instanceof Error
+      ? error.message.toLowerCase()
+      : String(error).toLowerCase();
   const cause = getErrorCause(error);
-  const code = cause.code || "";
+  const code = cause.code || '';
   return (
-    message.includes("fetch failed") ||
-    message.includes("network") ||
-    ["ECONNRESET", "ETIMEDOUT", "ECONNREFUSED", "EAI_AGAIN", "ENOTFOUND", "UND_ERR_CONNECT_TIMEOUT", "UND_ERR_SOCKET"].includes(code)
+    message.includes('fetch failed') ||
+    message.includes('network') ||
+    [
+      'ECONNRESET',
+      'ETIMEDOUT',
+      'ECONNREFUSED',
+      'EAI_AGAIN',
+      'ENOTFOUND',
+      'UND_ERR_CONNECT_TIMEOUT',
+      'UND_ERR_SOCKET',
+    ].includes(code)
   );
 }
 
@@ -381,7 +400,10 @@ async function createChatResponseMessages(
   return response;
 }
 
-async function readChatParts(response: Response, model = config.llmModel): Promise<{
+async function readChatParts(
+  response: Response,
+  model = config.llmModel,
+): Promise<{
   content: string;
   reasoningContent: string;
   finishReason?: string;
@@ -401,7 +423,8 @@ async function readChatParts(response: Response, model = config.llmModel): Promi
   const choice = json.choices?.[0];
   const tokenCount = (value: unknown) =>
     typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
-      ? value : undefined;
+      ? value
+      : undefined;
   llmLogger().info({
     event: 'llm.response.completion',
     model,
@@ -411,7 +434,9 @@ async function readChatParts(response: Response, model = config.llmModel): Promi
       promptTokens: tokenCount(json.usage?.prompt_tokens),
       completionTokens: tokenCount(json.usage?.completion_tokens),
       totalTokens: tokenCount(json.usage?.total_tokens),
-      reasoningTokens: tokenCount(json.usage?.completion_tokens_details?.reasoning_tokens),
+      reasoningTokens: tokenCount(
+        json.usage?.completion_tokens_details?.reasoning_tokens,
+      ),
     },
   });
   return {
@@ -421,10 +446,14 @@ async function readChatParts(response: Response, model = config.llmModel): Promi
   };
 }
 
-async function readChatText(response: Response, model: string, requireComplete = false): Promise<string> {
+async function readChatText(
+  response: Response,
+  model: string,
+  requireComplete = false,
+): Promise<string> {
   const result = await readChatParts(response, model);
   const content = result.content;
-  if ((!content || requireComplete) && result.finishReason === "length") {
+  if ((!content || requireComplete) && result.finishReason === 'length') {
     throw new LlmOutputTruncatedError();
   }
   return content;
@@ -434,10 +463,22 @@ export async function generateText(input: ChatRequestInput) {
   return generateTextResult(input);
 }
 
-async function generateTextResult(input: ChatRequestInput, requireComplete = false) {
+async function generateTextResult(
+  input: ChatRequestInput,
+  requireComplete = false,
+) {
   const response = await createChatResponse(input, false);
-  const text = await readChatText(response, input.model || config.llmModel, requireComplete);
-  logLlmTextResult("prompt", input.model || config.llmModel, text, input.hidePromptContentInLogs);
+  const text = await readChatText(
+    response,
+    input.model || config.llmModel,
+    requireComplete,
+  );
+  logLlmTextResult(
+    'prompt',
+    input.model || config.llmModel,
+    text,
+    input.hidePromptContentInLogs,
+  );
   return text;
 }
 
@@ -445,25 +486,28 @@ export async function* streamTextParts(
   input: ChatRequestInput,
 ): AsyncGenerator<LlmStreamPart> {
   const response = await createChatResponse(input, true);
-  const contentType = response.headers.get("content-type") || "";
+  const contentType = response.headers.get('content-type') || '';
   const output: string[] = [];
 
-  if (!contentType.includes("text/event-stream") || !response.body) {
-    const result = await readChatParts(response, input.model || config.llmModel);
-    if (!result.content && result.finishReason === "length") {
+  if (!contentType.includes('text/event-stream') || !response.body) {
+    const result = await readChatParts(
+      response,
+      input.model || config.llmModel,
+    );
+    if (!result.content && result.finishReason === 'length') {
       throw new LlmOutputTruncatedError();
     }
     if (result.reasoningContent) {
-      yield { type: "reasoning", delta: result.reasoningContent };
+      yield { type: 'reasoning', delta: result.reasoningContent };
     }
     if (result.content) {
       output.push(result.content);
-      yield { type: "content", delta: result.content };
+      yield { type: 'content', delta: result.content };
     }
     logLlmTextResult(
-      "prompt-stream-fallback",
+      'prompt-stream-fallback',
       input.model || config.llmModel,
-      output.join(""),
+      output.join(''),
       input.hidePromptContentInLogs,
     );
     return;
@@ -471,21 +515,21 @@ export async function* streamTextParts(
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
-  let buffer = "";
+  let buffer = '';
 
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
 
-    const parts = buffer.split("\n\n");
-    buffer = parts.pop() || "";
+    const parts = buffer.split('\n\n');
+    buffer = parts.pop() || '';
 
     for (const part of parts) {
-      for (const line of part.split("\n")) {
-        if (!line.startsWith("data: ")) continue;
+      for (const line of part.split('\n')) {
+        if (!line.startsWith('data: ')) continue;
         const payload = line.slice(6).trim();
-        if (!payload || payload === "[DONE]") continue;
+        if (!payload || payload === '[DONE]') continue;
         try {
           const parsed = JSON.parse(payload) as {
             choices?: Array<{
@@ -497,14 +541,14 @@ export async function* streamTextParts(
           };
           const delta = parsed.choices?.[0]?.delta;
           if (
-            typeof delta?.reasoning_content === "string"
-            && delta.reasoning_content.length > 0
+            typeof delta?.reasoning_content === 'string' &&
+            delta.reasoning_content.length > 0
           ) {
-            yield { type: "reasoning", delta: delta.reasoning_content };
+            yield { type: 'reasoning', delta: delta.reasoning_content };
           }
-          if (typeof delta?.content === "string" && delta.content.length > 0) {
+          if (typeof delta?.content === 'string' && delta.content.length > 0) {
             output.push(delta.content);
-            yield { type: "content", delta: delta.content };
+            yield { type: 'content', delta: delta.content };
           }
         } catch {
           // ignore malformed chunks
@@ -514,64 +558,88 @@ export async function* streamTextParts(
   }
 
   logLlmTextResult(
-    "prompt-stream",
+    'prompt-stream',
     input.model || config.llmModel,
-    output.join(""),
+    output.join(''),
     input.hidePromptContentInLogs,
   );
 }
 
-export async function* streamText(input: ChatRequestInput): AsyncGenerator<string> {
+export async function* streamText(
+  input: ChatRequestInput,
+): AsyncGenerator<string> {
   for await (const part of streamTextParts(input)) {
-    if (part.type === "content") yield part.delta;
+    if (part.type === 'content') yield part.delta;
   }
 }
 
-export async function generateChat(messages: ChatMessage[], model?: string, temperature?: number): Promise<string> {
-  const response = await createChatResponseMessages(messages, model, temperature, false);
+export async function generateChat(
+  messages: ChatMessage[],
+  model?: string,
+  temperature?: number,
+): Promise<string> {
+  const response = await createChatResponseMessages(
+    messages,
+    model,
+    temperature,
+    false,
+  );
   const text = await readChatText(response, model || config.llmModel);
-  logLlmTextResult("messages", model || config.llmModel, text);
+  logLlmTextResult('messages', model || config.llmModel, text);
   return text;
 }
 
-export async function* streamChat(messages: ChatMessage[], model?: string, temperature?: number): AsyncGenerator<string> {
-  const response = await createChatResponseMessages(messages, model, temperature, true);
-  const contentType = response.headers.get("content-type") || "";
+export async function* streamChat(
+  messages: ChatMessage[],
+  model?: string,
+  temperature?: number,
+): AsyncGenerator<string> {
+  const response = await createChatResponseMessages(
+    messages,
+    model,
+    temperature,
+    true,
+  );
+  const contentType = response.headers.get('content-type') || '';
   const output: string[] = [];
 
-  if (!contentType.includes("text/event-stream") || !response.body) {
+  if (!contentType.includes('text/event-stream') || !response.body) {
     const text = await readChatText(response, model || config.llmModel);
     if (text) {
       output.push(text);
       yield text;
     }
-    logLlmTextResult("messages-stream-fallback", model || config.llmModel, output.join(""));
+    logLlmTextResult(
+      'messages-stream-fallback',
+      model || config.llmModel,
+      output.join(''),
+    );
     return;
   }
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
-  let buffer = "";
+  let buffer = '';
 
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
 
-    const parts = buffer.split("\n\n");
-    buffer = parts.pop() || "";
+    const parts = buffer.split('\n\n');
+    buffer = parts.pop() || '';
 
     for (const part of parts) {
-      for (const line of part.split("\n")) {
-        if (!line.startsWith("data: ")) continue;
+      for (const line of part.split('\n')) {
+        if (!line.startsWith('data: ')) continue;
         const payload = line.slice(6).trim();
-        if (!payload || payload === "[DONE]") continue;
+        if (!payload || payload === '[DONE]') continue;
         try {
           const parsed = JSON.parse(payload) as {
             choices?: Array<{ delta?: { content?: string } }>;
           };
           const delta = parsed.choices?.[0]?.delta?.content;
-          if (typeof delta === "string" && delta.length > 0) {
+          if (typeof delta === 'string' && delta.length > 0) {
             output.push(delta);
             yield delta;
           }
@@ -582,7 +650,11 @@ export async function* streamChat(messages: ChatMessage[], model?: string, tempe
     }
   }
 
-  logLlmTextResult("messages-stream", model || config.llmModel, output.join(""));
+  logLlmTextResult(
+    'messages-stream',
+    model || config.llmModel,
+    output.join(''),
+  );
 }
 
 export async function generateJson<T>(
@@ -651,24 +723,24 @@ export async function generateMultimodalJson<T>(
   const model = input.model || config.llmModel;
   const userText = [
     input.userPrompt,
-    "",
-    "Before sending the final answer, validate mentally that it is accepted by JSON.parse.",
+    '',
+    'Before sending the final answer, validate mentally that it is accepted by JSON.parse.',
     STRICT_JSON_CONTRACT,
-  ].join("\n");
+  ].join('\n');
   const messages = [
     {
-      role: "system",
-      content: [STRICT_JSON_CONTRACT, input.systemPrompt].join("\n\n"),
+      role: 'system',
+      content: [STRICT_JSON_CONTRACT, input.systemPrompt].join('\n\n'),
     },
     {
-      role: "user",
+      role: 'user',
       content: [
-        { type: "text", text: userText },
+        { type: 'text', text: userText },
         ...input.images.map((image) => ({
-          type: "image_url",
+          type: 'image_url',
           image_url: {
             url: image.imageUrl,
-            detail: image.detail ?? "high",
+            detail: image.detail ?? 'high',
           },
         })),
       ],
@@ -745,27 +817,30 @@ async function repairJsonOutput<T>(
   raw: string,
   parseError: unknown,
 ): Promise<T> {
-  const repaired = await generateTextResult({
-    model: input.model,
-    temperature: 0,
-    maxTokens: input.maxTokens,
-    systemPrompt: [
-      'You repair invalid JSON.',
-      'Return one strict JSON object only.',
-      'Do not add Markdown fences, comments, or explanation.',
-      'Preserve the original keys and content.',
-      'Escape all newlines, quotes, and backslashes inside string values.',
-      STRICT_JSON_CONTRACT,
-    ].join('\n'),
-    userPrompt: [
-      'The following model output was expected to be JSON, but JSON.parse failed.',
-      `Parse error: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
-      '',
-      'Repair it into strict JSON:',
-      raw,
-    ].join('\n'),
-    hidePromptContentInLogs: input.hidePromptContentInLogs,
-  }, true);
+  const repaired = await generateTextResult(
+    {
+      model: input.model,
+      temperature: 0,
+      maxTokens: input.maxTokens,
+      systemPrompt: [
+        'You repair invalid JSON.',
+        'Return one strict JSON object only.',
+        'Do not add Markdown fences, comments, or explanation.',
+        'Preserve the original keys and content.',
+        'Escape all newlines, quotes, and backslashes inside string values.',
+        STRICT_JSON_CONTRACT,
+      ].join('\n'),
+      userPrompt: [
+        'The following model output was expected to be JSON, but JSON.parse failed.',
+        `Parse error: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
+        '',
+        'Repair it into strict JSON:',
+        raw,
+      ].join('\n'),
+      hidePromptContentInLogs: input.hidePromptContentInLogs,
+    },
+    true,
+  );
 
   try {
     return parseJsonObject<T>(repaired);

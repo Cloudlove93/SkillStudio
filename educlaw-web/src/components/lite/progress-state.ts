@@ -28,7 +28,8 @@ export function pushProgressStep(
   label: string,
   now = Date.now(),
 ): ProgressState {
-  if (!progress) return startProgressState('\u5f53\u524d\u8fdb\u5ea6', label, now);
+  if (!progress)
+    return startProgressState('\u5f53\u524d\u8fdb\u5ea6', label, now);
   return {
     ...progress,
     phase: label,

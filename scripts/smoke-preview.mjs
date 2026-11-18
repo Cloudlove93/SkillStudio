@@ -12,8 +12,12 @@
  * 预期数量与当前预置资产基线一致；调整课例包或 Agent 数量时同步更新。
  */
 
-const webBase = (process.env.EDUCLAW_WEB_BASE || 'http://127.0.0.1:8081').replace(/\/$/, '');
-const apiBase = (process.env.EDUCLAW_API_BASE || 'http://127.0.0.1:18081').replace(/\/$/, '');
+const webBase = (
+  process.env.EDUCLAW_WEB_BASE || 'http://127.0.0.1:8081'
+).replace(/\/$/, '');
+const apiBase = (
+  process.env.EDUCLAW_API_BASE || 'http://127.0.0.1:18081'
+).replace(/\/$/, '');
 const userId = process.env.EDUCLAW_SEED_USER_ID || '395513060934025505';
 const userHeaders = { 'x-user-id': userId };
 
@@ -41,7 +45,10 @@ async function listRepositorySkills() {
   let cursor = null;
   do {
     const suffix = cursor ? `&cursor=${encodeURIComponent(cursor)}` : '';
-    const page = await getJson(`${apiBase}/api/skills/repository?limit=100${suffix}`, userHeaders);
+    const page = await getJson(
+      `${apiBase}/api/skills/repository?limit=100${suffix}`,
+      userHeaders,
+    );
     items.push(...page.items);
     cursor = page.nextCursor;
   } while (cursor);
@@ -59,16 +66,27 @@ async function main() {
   assert(ready.ok === true, '服务 readyz 正常');
 
   const lessons = await getJson(`${webBase}/lessons/index.json`);
-  assert(lessons.length === 1404, `课例索引为 1404 节（实际 ${lessons.length}）`);
+  assert(
+    lessons.length === 1404,
+    `课例索引为 1404 节（实际 ${lessons.length}）`,
+  );
 
   const skills = await listRepositorySkills();
   assert(skills.length === 52, `仓库 Skill 为 52 个（实际 ${skills.length}）`);
-  const lessonPacks = skills.filter((skill) => skill.dirName.startsWith('lesson-pack-'));
-  assert(lessonPacks.length === 36, `课例包 Skill 为 36 个（实际 ${lessonPacks.length}）`);
+  const lessonPacks = skills.filter((skill) =>
+    skill.dirName.startsWith('lesson-pack-'),
+  );
+  assert(
+    lessonPacks.length === 36,
+    `课例包 Skill 为 36 个（实际 ${lessonPacks.length}）`,
+  );
   const analysisSkills = skills.filter(
     (skill) => skill.packageName === '课堂分析方法集（预置）',
   );
-  assert(analysisSkills.length === 14, `分析 Skill 为 14 个（实际 ${analysisSkills.length}）`);
+  assert(
+    analysisSkills.length === 14,
+    `分析 Skill 为 14 个（实际 ${analysisSkills.length}）`,
+  );
   assert(
     lessonPacks.every((skill) => skill.currentVersionNumber >= 2),
     '所有课例包 Skill 均指向当前版本 v2',
@@ -98,9 +116,14 @@ async function main() {
     '高中语数英课例包（预置）',
     '课堂分析方法集（预置）',
   ]) {
-    assert(packages.some((pkg) => pkg.name === name), `预置包存在：${name}`);
+    assert(
+      packages.some((pkg) => pkg.name === name),
+      `预置包存在：${name}`,
+    );
   }
-  const primaryPack = packages.find((pkg) => pkg.name === '小学语数英课例包（预置）');
+  const primaryPack = packages.find(
+    (pkg) => pkg.name === '小学语数英课例包（预置）',
+  );
   assert(
     primaryPack && primaryPack.versionNumber >= 2,
     `课例容器版本已递增（实际 v${primaryPack?.versionNumber ?? '?'}）`,
@@ -110,6 +133,8 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(`SMOKE FAILED: ${error instanceof Error ? error.message : String(error)}`);
+  console.error(
+    `SMOKE FAILED: ${error instanceof Error ? error.message : String(error)}`,
+  );
   process.exitCode = 1;
 });

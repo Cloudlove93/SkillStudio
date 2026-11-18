@@ -22,7 +22,9 @@ export function connectSSE() {
   if (eventSource) return;
 
   const token = getToken();
-  eventSource = new EventSource(`${API_BASE}/events${token ? `?token=${encodeURIComponent(token)}` : ''}`);
+  eventSource = new EventSource(
+    `${API_BASE}/events${token ? `?token=${encodeURIComponent(token)}` : ''}`,
+  );
 
   // Only criterion: if readyState is not OPEN after grace period, fall back.
   // This avoids false positives from transient onerror events during connection.
@@ -64,7 +66,11 @@ export function disconnectSSE() {
   stopPolling();
 }
 
-function dispatch(payload: { agentId: string; event: string; data: Record<string, unknown> }) {
+function dispatch(payload: {
+  agentId: string;
+  event: string;
+  data: Record<string, unknown>;
+}) {
   const { agentId, event, data } = payload;
   // Log non-delta events to help diagnose SSE connectivity
   if (event !== 'message.part.delta') {
@@ -81,9 +87,13 @@ function dispatch(payload: { agentId: string; event: string; data: Record<string
       break;
     case 'message.part.updated': {
       chat.handleMessagePartUpdate(agentId, data);
-      const part = ((data.part as Record<string, unknown> | undefined) ?? data) as Record<string, unknown>;
+      const part = ((data.part as Record<string, unknown> | undefined) ??
+        data) as Record<string, unknown>;
       const state = part.state as { status?: string } | undefined;
-      if (part.type === 'tool' && (state?.status === 'completed' || state?.status === 'error')) {
+      if (
+        part.type === 'tool' &&
+        (state?.status === 'completed' || state?.status === 'error')
+      ) {
         useUIStore.getState().triggerFileRefresh(agentId);
       }
       break;
@@ -112,20 +122,31 @@ function dispatch(payload: { agentId: string; event: string; data: Record<string
         ...(data as Record<string, unknown>),
         id: permissionId,
         agentId,
-        toolName: typeof data.permission === 'string' ? data.permission : typeof data.toolName === 'string' ? data.toolName : 'unknown',
+        toolName:
+          typeof data.permission === 'string'
+            ? data.permission
+            : typeof data.toolName === 'string'
+              ? data.toolName
+              : 'unknown',
       });
       break;
     }
     case 'permission.replied':
     case 'permission.completed':
-      useInteractionQueueStore.getState().removePermission(String(data.requestID ?? data.id ?? ''));
+      useInteractionQueueStore
+        .getState()
+        .removePermission(String(data.requestID ?? data.id ?? ''));
       break;
     case 'question.asked':
-      useInteractionQueueStore.getState().addQuestion({ ...(data as unknown as QuestionRequest), agentId });
+      useInteractionQueueStore
+        .getState()
+        .addQuestion({ ...(data as unknown as QuestionRequest), agentId });
       break;
     case 'question.replied':
     case 'question.rejected':
-      useInteractionQueueStore.getState().removeQuestion(String(data.requestID ?? data.id ?? ''));
+      useInteractionQueueStore
+        .getState()
+        .removeQuestion(String(data.requestID ?? data.id ?? ''));
       break;
     case 'todo.updated':
       useTodoStore.getState().handleTodoUpdate(agentId, data);

@@ -130,11 +130,7 @@ export interface ParsedGuidedCreationRequest {
 }
 
 function invalid(message: string): never {
-  throw new GuidedCreationError(
-    'INVALID_GUIDED_REQUEST',
-    message,
-    422,
-  );
+  throw new GuidedCreationError('INVALID_GUIDED_REQUEST', message, 422);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -167,11 +163,7 @@ function revision(value: unknown): number {
 }
 
 function requiredText(value: unknown, name: string, max: number): string {
-  if (
-    typeof value !== 'string' ||
-    !value.trim() ||
-    value.length > max
-  ) {
+  if (typeof value !== 'string' || !value.trim() || value.length > max) {
     invalid(`${name} 格式不正确`);
   }
   return value.trim();
@@ -684,7 +676,10 @@ export function parseGuidedCreationRequest(
       const expectedPackageVersionId =
         payload.expectedPackageVersionId === null
           ? null
-          : positiveId(payload.expectedPackageVersionId, 'expectedPackageVersionId');
+          : positiveId(
+              payload.expectedPackageVersionId,
+              'expectedPackageVersionId',
+            );
       if ((targetPackageId === null) !== (expectedPackageVersionId === null)) {
         invalid(
           'targetPackageId 与 expectedPackageVersionId 必须同时提供或同时为 null',
@@ -1082,7 +1077,9 @@ export async function handleGuidedCreationJsonAction(input: {
 function lastAssistantMessage(
   detail: Awaited<ReturnType<typeof getGuidedCreationDetail>>,
 ) {
-  return [...detail.messages].reverse().find((message) => message.role === 'assistant');
+  return [...detail.messages]
+    .reverse()
+    .find((message) => message.role === 'assistant');
 }
 
 export async function handleGuidedCreationStreamAction(input: {
@@ -1201,9 +1198,7 @@ export async function handleGuidedCreationStreamAction(input: {
             true,
           );
     const guidedError =
-      error instanceof GuidedCreationError
-        ? error
-        : fallbackError;
+      error instanceof GuidedCreationError ? error : fallbackError;
     if (!closed && !responseState.writableEnded && !responseState.destroyed) {
       await emitSse('error', {
         code: guidedError.code,

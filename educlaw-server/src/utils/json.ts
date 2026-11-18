@@ -1,7 +1,7 @@
-import { jsonrepair } from "jsonrepair";
+import { jsonrepair } from 'jsonrepair';
 
 export function extractFirstJsonObject(raw: string): string | null {
-  const start = raw.indexOf("{");
+  const start = raw.indexOf('{');
   if (start < 0) return null;
   let depth = 0;
   let inString = false;
@@ -11,13 +11,19 @@ export function extractFirstJsonObject(raw: string): string | null {
     const char = raw[index]!;
     if (inString) {
       if (escaped) escaped = false;
-      else if (char === "\\") escaped = true;
+      else if (char === '\\') escaped = true;
       else if (char === '"') inString = false;
       continue;
     }
-    if (char === '"') { inString = true; continue; }
-    if (char === "{") { depth += 1; continue; }
-    if (char === "}") {
+    if (char === '"') {
+      inString = true;
+      continue;
+    }
+    if (char === '{') {
+      depth += 1;
+      continue;
+    }
+    if (char === '}') {
       depth -= 1;
       if (depth === 0) return raw.slice(start, index + 1);
     }
@@ -36,7 +42,7 @@ export function parseJsonObject<T>(raw: string): T {
 
 export function parseDbJson<T>(value: unknown, fallback: T): T {
   if (value == null) return fallback;
-  if (typeof value !== "string") return value as T;
+  if (typeof value !== 'string') return value as T;
 
   try {
     return JSON.parse(value) as T;

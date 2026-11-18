@@ -14,7 +14,12 @@ function parseUnifiedDiff(diff: string): DiffRow[] {
     if (line.startsWith('@@')) {
       inHunk = true;
       rows.push({ kind: 'hunk', text: line });
-    } else if (line.startsWith('+++') || line.startsWith('---') || line.startsWith('Index:') || line.startsWith('===')) {
+    } else if (
+      line.startsWith('+++') ||
+      line.startsWith('---') ||
+      line.startsWith('Index:') ||
+      line.startsWith('===')
+    ) {
       rows.push({ kind: 'meta', text: line });
     } else if (line.startsWith('+')) {
       rows.push({ kind: 'added', text: line.slice(1) });
@@ -79,10 +84,7 @@ export default function DiffView({ diff }: { diff: string }) {
         }
 
         return (
-          <div
-            key={i}
-            className="px-3 py-1"
-          >
+          <div key={i} className="px-3 py-1">
             <span className="whitespace-pre-wrap break-all text-[13px] leading-[1.65] text-muted-foreground/60">
               {row.text || ' '}
             </span>

@@ -71,10 +71,12 @@ describe('workspace inspector mount stability', () => {
       );
     });
 
-    const inspector = container.querySelector<HTMLElement>('.workspace-inspector');
-    expect(inspector?.style.getPropertyValue('--workspace-inspector-width')).toBe(
-      '384px',
+    const inspector = container.querySelector<HTMLElement>(
+      '.workspace-inspector',
     );
+    expect(
+      inspector?.style.getPropertyValue('--workspace-inspector-width'),
+    ).toBe('384px');
   });
 
   it('keeps multimodal form state mounted while inspector views change', async () => {
@@ -163,9 +165,7 @@ describe('workspace inspector mount stability', () => {
         .querySelector<HTMLButtonElement>('[aria-label="展开右侧栏"]')
         ?.click();
     });
-    expect(
-      container.querySelector('[aria-label="Skill 功能切换"]'),
-    ).toBeNull();
+    expect(container.querySelector('[aria-label="Skill 功能切换"]')).toBeNull();
 
     await act(async () => {
       container
@@ -202,11 +202,14 @@ describe('workspace inspector mount stability', () => {
       );
     });
 
-    expect(container.querySelector('[aria-label="切换到 使用"]')).not.toBeNull();
+    expect(
+      container.querySelector('[aria-label="切换到 使用"]'),
+    ).not.toBeNull();
     expect(container.querySelector('[aria-label="切换到 测试"]')).toBeNull();
     expect(
-      container.querySelector<HTMLButtonElement>('[aria-label="功能切换，当前：使用"]')
-        ?.textContent,
+      container.querySelector<HTMLButtonElement>(
+        '[aria-label="功能切换，当前：使用"]',
+      )?.textContent,
     ).toContain('使用');
 
     await act(async () => {
@@ -307,7 +310,9 @@ describe('workspace inspector mount stability', () => {
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
     });
 
-    expect(localStorage.getItem('eduskill:skill-launcher-pinned:v1')).toBe('true');
+    expect(localStorage.getItem('eduskill:skill-launcher-pinned:v1')).toBe(
+      'true',
+    );
     expect(
       container.querySelector('[aria-label="Skill 功能切换"]'),
     ).not.toBeNull();

@@ -37,7 +37,11 @@ export class RiaContentError extends Error {
     readonly reason: RiaContentFailureReason,
     readonly detail?: string,
   ) {
-    super(detail ? `${FAILURE_MESSAGES[reason]}${detail}` : FAILURE_MESSAGES[reason]);
+    super(
+      detail
+        ? `${FAILURE_MESSAGES[reason]}${detail}`
+        : FAILURE_MESSAGES[reason],
+    );
     this.name = 'RiaContentError';
   }
 }
@@ -138,7 +142,9 @@ function verifiedSourceFacts(
       );
     }
     if (
-      !normalizeForQuote(groundedText(evidence, [fact.evidenceId])).includes(quote)
+      !normalizeForQuote(groundedText(evidence, [fact.evidenceId])).includes(
+        quote,
+      )
     ) {
       throw new RiaContentError(
         'source_quote_mismatch',
@@ -212,11 +218,7 @@ export function assertRiaSemanticGrounding(
 
 /** YAML frontmatter must stay single-line and free of XML angle brackets. */
 function frontmatterDescription(value: string): string {
-  return value
-    .replace(/[<>]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 200);
+  return value.replace(/[<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 200);
 }
 
 /** Local assembly guarantees field coverage, not the semantic correctness of model output. */
@@ -259,9 +261,7 @@ export function assembleRiaSkillMarkdown(
     return `### ${reference}\n${origin}\n可见摘录（机器转写，需核对）：\n${quote(bullets(observation.visibleText))}${observation.uncertainties.length ? `\n不确定：\n${quote(bullets(observation.uncertainties))}` : ''}`;
   });
   const frontmatter = `---\nname: ${skill.dirName}\ndescription: ${frontmatterDescription(skill.description)}\n---`;
-  const sourceRefs = skill.sourceEvidenceIds
-    .map((id) => `[${id}]`)
-    .join('、');
+  const sourceRefs = skill.sourceEvidenceIds.map((id) => `[${id}]`).join('、');
   const sourceCases = facts
     .map(
       (fact) =>

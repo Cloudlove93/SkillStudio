@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  MEDIA_CONFIRMATION_STAGES,
-  MEDIA_STAGES,
-} from '@educlaw/shared';
+import { MEDIA_CONFIRMATION_STAGES, MEDIA_STAGES } from '@educlaw/shared';
 import {
   assertMediaStageGate,
   assertMediaStageTransition,
@@ -30,7 +27,10 @@ describe('media session state machine', () => {
 
   it('allows the explicit visual-only downgrade path', () => {
     expect(() =>
-      assertMediaStageTransition('preparing_media', 'building_semantic_windows'),
+      assertMediaStageTransition(
+        'preparing_media',
+        'building_semantic_windows',
+      ),
     ).not.toThrow();
   });
 
@@ -113,15 +113,11 @@ describe('media session state machine', () => {
     );
     expect(getGuidedCreationStatusForMediaStage('published')).toBe('completed');
     expect(getGuidedCreationStatusForMediaStage('failed')).toBe('failed');
-    expect(getGuidedCreationStatusForMediaStage('cancelled')).toBe(
-      'cancelled',
-    );
+    expect(getGuidedCreationStatusForMediaStage('cancelled')).toBe('cancelled');
   });
 
   it('allows only explicit failed resume targets', () => {
-    expect(() =>
-      assertResumeFromFailed('building_evidence'),
-    ).not.toThrow();
+    expect(() => assertResumeFromFailed('building_evidence')).not.toThrow();
     expect(() => assertResumeFromFailed('awaiting_candidates')).toThrowError(
       'INVALID_MEDIA_STAGE_RESUME',
     );

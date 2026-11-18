@@ -48,7 +48,9 @@ describe('guided creation progress', () => {
     expect(progress.totalStepCount).toBe(5);
     expect(progress.currentStepLabel).toBe('目标与对象');
     expect(
-      progress.steps.flatMap((step) => step.dimensions).map(({ status }) => status),
+      progress.steps
+        .flatMap((step) => step.dimensions)
+        .map(({ status }) => status),
     ).toEqual(new Array(7).fill('pending'));
   });
 
@@ -60,12 +62,17 @@ describe('guided creation progress', () => {
       ]),
     ) as GuidedEducationDraft;
     const progress = deriveGuidedCreationProgress(
-      session(explicitDraft, { completed_steps: [], current_step: 'intent_context' }),
+      session(explicitDraft, {
+        completed_steps: [],
+        current_step: 'intent_context',
+      }),
     );
 
     expect(progress.completedStepCount).toBe(0);
     expect(
-      progress.steps.flatMap((step) => step.dimensions).map(({ status }) => status),
+      progress.steps
+        .flatMap((step) => step.dimensions)
+        .map(({ status }) => status),
     ).toEqual(new Array(7).fill('pending'));
   });
 
@@ -96,10 +103,7 @@ describe('guided creation progress', () => {
         educational_goal: section('理解课文', 'platform_default'),
         audience_context: {
           content: '七年级课堂',
-          evidence: [
-            { source: 'user_explicit' },
-            { source: 'conflicted' },
-          ],
+          evidence: [{ source: 'user_explicit' }, { source: 'conflicted' }],
         },
       }),
     );
@@ -151,7 +155,9 @@ describe('guided creation progress', () => {
 
     expect(progress.completedStepCount).toBe(5);
     expect(progress.currentStepLabel).toBeNull();
-    expect(progress.steps.every((step) => step.status === 'completed')).toBe(true);
+    expect(progress.steps.every((step) => step.status === 'completed')).toBe(
+      true,
+    );
   });
 
   it('safely handles older v3 records without optional progress fields', () => {

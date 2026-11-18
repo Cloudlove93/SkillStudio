@@ -56,23 +56,29 @@ describe('Arena pagination', () => {
       expect.stringContaining('limit $7'),
       ['user-1', '7', '42', null, null, null, 2],
     );
-    expect(queryMock.mock.calls[0]?.[0]).toContain("arena_config_jsonb->'left'->>'skillId'");
-    expect(queryMock.mock.calls[0]?.[0]).toContain('order by updated_at desc, id desc');
+    expect(queryMock.mock.calls[0]?.[0]).toContain(
+      "arena_config_jsonb->'left'->>'skillId'",
+    );
+    expect(queryMock.mock.calls[0]?.[0]).toContain(
+      'order by updated_at desc, id desc',
+    );
   });
 
   it('loads only the latest bounded message window in chronological order', async () => {
     const { getThreadDetail } = await import('./arena-service.js');
     queryMock
       .mockResolvedValueOnce({
-        rows: [{
-          id: 12,
-          user_id: 'user-1',
-          package_id: 7,
-          title: '对话',
-          model: null,
-          created_at: '2026-08-29T07:00:00.000Z',
-          updated_at: '2026-08-29T08:30:00.000Z',
-        }],
+        rows: [
+          {
+            id: 12,
+            user_id: 'user-1',
+            package_id: 7,
+            title: '对话',
+            model: null,
+            created_at: '2026-08-29T07:00:00.000Z',
+            updated_at: '2026-08-29T08:30:00.000Z',
+          },
+        ],
       })
       .mockResolvedValueOnce({ rows: [] });
 
@@ -83,7 +89,11 @@ describe('Arena pagination', () => {
       expect.stringContaining('limit $3'),
       ['12', 'user-1', 200],
     );
-    expect(queryMock.mock.calls[1]?.[0]).toContain('order by created_at desc, id desc');
-    expect(queryMock.mock.calls[1]?.[0]).toContain('order by created_at asc, id asc');
+    expect(queryMock.mock.calls[1]?.[0]).toContain(
+      'order by created_at desc, id desc',
+    );
+    expect(queryMock.mock.calls[1]?.[0]).toContain(
+      'order by created_at asc, id asc',
+    );
   });
 });

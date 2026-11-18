@@ -1,5 +1,8 @@
 import { Loader2, CheckCircle2, XCircle, Clock } from 'lucide-react';
-import { useBatchBuildStore, type FileBuildStatus } from '../../stores/batch-build';
+import {
+  useBatchBuildStore,
+  type FileBuildStatus,
+} from '../../stores/batch-build';
 import { useChatStore } from '../../stores/chat';
 import { useUIStore } from '../../stores/ui';
 import { useT } from '../../i18n';
@@ -49,7 +52,9 @@ export default function BatchFileSidebar() {
           >
             <StatusIcon status={item.status} />
             <div className="flex-1 min-w-0">
-              <div className="text-xs font-medium truncate">{item.fileName}</div>
+              <div className="text-xs font-medium truncate">
+                {item.fileName}
+              </div>
               <div className="text-[10px] text-muted-foreground">
                 {formatFileSize(item.fileSize)}
                 {item.resultAgent && (
@@ -59,29 +64,33 @@ export default function BatchFileSidebar() {
                 )}
               </div>
             </div>
-            {item.status === 'done' && item.resultAgent && !item.projectCreated && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  createProject(item.fileId);
-                }}
-                className="text-[10px] text-blue-500 hover:text-blue-600 shrink-0"
-              >
-                {t('build.batchCreateProject')}
-              </button>
-            )}
-            {item.status === 'done' && item.resultAgent && item.projectCreated && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  openTab(item.resultAgent!.id, item.resultAgent!.name);
-                  setMainView(null);
-                }}
-                className="text-[10px] text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300 shrink-0"
-              >
-                {t('build.openAgent')}
-              </button>
-            )}
+            {item.status === 'done' &&
+              item.resultAgent &&
+              !item.projectCreated && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    createProject(item.fileId);
+                  }}
+                  className="text-[10px] text-blue-500 hover:text-blue-600 shrink-0"
+                >
+                  {t('build.batchCreateProject')}
+                </button>
+              )}
+            {item.status === 'done' &&
+              item.resultAgent &&
+              item.projectCreated && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openTab(item.resultAgent!.id, item.resultAgent!.name);
+                    setMainView(null);
+                  }}
+                  className="text-[10px] text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300 shrink-0"
+                >
+                  {t('build.openAgent')}
+                </button>
+              )}
           </button>
         ))}
       </div>

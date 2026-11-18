@@ -42,33 +42,82 @@ const input = {
 };
 const services: ArenaRunService[] = [];
 it('drains accepted work through producer cleanup and rejects starts after asynchronous admission', async () => {
-  const admitted=barrier(), finish=barrier();
-  const service=new ArenaRunService({getDetail:async()=>{await admitted.promise;return structuredClone(detail);},stream:async function*(){await finish.promise;yield {event:'delta',data:{side:'enhanced',delta:'unused'}};}});
+  const admitted = barrier(),
+    finish = barrier();
+  const service = new ArenaRunService({
+    getDetail: async () => {
+      await admitted.promise;
+      return structuredClone(detail);
+    },
+    stream: async function* () {
+      await finish.promise;
+      yield { event: 'delta', data: { side: 'enhanced', delta: 'unused' } };
+    },
+  });
   services.push(service);
-  const pending=service.start(input);
-  service.beginDrain();admitted.release();
-  await expect(pending).rejects.toMatchObject({status:503,code:'SERVER_DRAINING'});
+  const pending = service.start(input);
+  service.beginDrain();
+  admitted.release();
+  await expect(pending).rejects.toMatchObject({
+    status: 503,
+    code: 'SERVER_DRAINING',
+  });
   await service.waitForIdle();
-  await expect(service.start(input)).rejects.toMatchObject({code:'SERVER_DRAINING'});
+  await expect(service.start(input)).rejects.toMatchObject({
+    code: 'SERVER_DRAINING',
+  });
 });
 it('waits for the real producer after abort while recovery and explicit stop remain available', async () => {
-  const finish=barrier();let signal:AbortSignal|undefined;
-  const service=new ArenaRunService({getDetail:async()=>structuredClone(detail),stream:async function*(_input,s){signal=s;yield {event:'delta',data:{side:'enhanced',delta:'partial'}};await finish.promise;}});
-  services.push(service);const started=await service.start(input);
-  service.beginDrain();let idle=false;const waiting=service.waitForIdle().then(()=>{idle=true;});
-  service.abortActive();await tick();expect(idle).toBe(false);expect(signal?.aborted).toBe(true);
-  expect(()=>reserveArenaThread('owner',91)).toThrow('active operation');
-  expect((await service.recover('owner',91)).run?.runId).toBe(started.runId);
-  await service.stop('owner',91,started.runId);
-  finish.release();await waiting;expect(idle).toBe(true);
-  reserveArenaThread('owner',91)();
+  const finish = barrier();
+  let signal: AbortSignal | undefined;
+  const service = new ArenaRunService({
+    getDetail: async () => structuredClone(detail),
+    stream: async function* (_input, s) {
+      signal = s;
+      yield { event: 'delta', data: { side: 'enhanced', delta: 'partial' } };
+      await finish.promise;
+    },
+  });
+  services.push(service);
+  const started = await service.start(input);
+  service.beginDrain();
+  let idle = false;
+  const waiting = service.waitForIdle().then(() => {
+    idle = true;
+  });
+  service.abortActive();
+  await tick();
+  expect(idle).toBe(false);
+  expect(signal?.aborted).toBe(true);
+  expect(() => reserveArenaThread('owner', 91)).toThrow('active operation');
+  expect((await service.recover('owner', 91)).run?.runId).toBe(started.runId);
+  await service.stop('owner', 91, started.runId);
+  finish.release();
+  await waiting;
+  expect(idle).toBe(true);
+  reserveArenaThread('owner', 91)();
 });
-it('lets accepted work persist completion during drain without aborting it',async()=>{
-  const finish=barrier();let signal:AbortSignal|undefined;
-  const service=new ArenaRunService({getDetail:async()=>structuredClone(detail),stream:async function*(_input,s){signal=s;await finish.promise;yield {event:'done',data:{thread:detail.thread,messages:[]}};}});
-  services.push(service);const started=await service.start(input);service.beginDrain();
-  const idle=service.waitForIdle();expect(signal?.aborted).toBe(false);finish.release();await idle;
-  expect((await service.get('owner',91,started.runId)).status).toBe('succeeded');
+it('lets accepted work persist completion during drain without aborting it', async () => {
+  const finish = barrier();
+  let signal: AbortSignal | undefined;
+  const service = new ArenaRunService({
+    getDetail: async () => structuredClone(detail),
+    stream: async function* (_input, s) {
+      signal = s;
+      await finish.promise;
+      yield { event: 'done', data: { thread: detail.thread, messages: [] } };
+    },
+  });
+  services.push(service);
+  const started = await service.start(input);
+  service.beginDrain();
+  const idle = service.waitForIdle();
+  expect(signal?.aborted).toBe(false);
+  finish.release();
+  await idle;
+  expect((await service.get('owner', 91, started.runId)).status).toBe(
+    'succeeded',
+  );
   expect(signal?.aborted).toBe(false);
 });
 function setup(

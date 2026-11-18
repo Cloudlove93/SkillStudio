@@ -7,8 +7,7 @@ import {
 
 function createStorage(initial?: string) {
   const values = new Map<string, string>();
-  if (initial !== undefined)
-    values.set(SKILL_THINKING_PREFERENCE_KEY, initial);
+  if (initial !== undefined) values.set(SKILL_THINKING_PREFERENCE_KEY, initial);
   return {
     getItem: (key: string) => values.get(key) ?? null,
     setItem: (key: string, value: string) => values.set(key, value),

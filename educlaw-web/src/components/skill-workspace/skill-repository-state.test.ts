@@ -59,9 +59,9 @@ describe('Skill repository state', () => {
   });
 
   it('intersects a selection with the current filtered result', () => {
-    expect(
-      [...intersectSkillSelection(new Set(['1', '9', '99']), skills.slice(0, 9))],
-    ).toEqual(['1', '9']);
+    expect([
+      ...intersectSkillSelection(new Set(['1', '9', '99']), skills.slice(0, 9)),
+    ]).toEqual(['1', '9']);
   });
 
   it('clamps an invalid page after rows disappear', () => {

@@ -72,9 +72,13 @@ export function createSkillRunState(): SkillRunState {
   };
 }
 
-export function skillRunReducer(state: SkillRunState, event: SkillRunEvent): SkillRunState {
+export function skillRunReducer(
+  state: SkillRunState,
+  event: SkillRunEvent,
+): SkillRunState {
   if (event.type === 'restore') return { ...event.state, draft: state.draft };
-  if (event.type === 'connection_error') return { ...state, error: event.message };
+  if (event.type === 'connection_error')
+    return { ...state, error: event.message };
   if (event.type === 'connection_restored') return { ...state, error: null };
   if (event.type === 'reset') return createSkillRunState();
   if (event.type === 'hydrate') {
@@ -149,25 +153,28 @@ export function skillRunReducer(state: SkillRunState, event: SkillRunEvent): Ski
   if (event.type === 'attach-provenance') {
     let userAttached = false;
     let answerAttached = false;
-    const messages = [...state.messages].reverse().map((message) => {
-      if (!answerAttached && message.role === 'assistant') {
-        answerAttached = true;
-        return {
-          ...message,
-          messageId: event.answerMessageId,
-          questionMessageId: event.questionMessageId,
-          threadId: event.threadId,
-          enhancedAnswerMessageId: event.answerMessageId,
-          baselineAnswerMessageId: event.baselineAnswerMessageId,
-          skillVersionNumber: event.skillVersionNumber,
-        };
-      }
-      if (!userAttached && message.role === 'user') {
-        userAttached = true;
-        return { ...message, messageId: event.questionMessageId };
-      }
-      return message;
-    }).reverse();
+    const messages = [...state.messages]
+      .reverse()
+      .map((message) => {
+        if (!answerAttached && message.role === 'assistant') {
+          answerAttached = true;
+          return {
+            ...message,
+            messageId: event.answerMessageId,
+            questionMessageId: event.questionMessageId,
+            threadId: event.threadId,
+            enhancedAnswerMessageId: event.answerMessageId,
+            baselineAnswerMessageId: event.baselineAnswerMessageId,
+            skillVersionNumber: event.skillVersionNumber,
+          };
+        }
+        if (!userAttached && message.role === 'user') {
+          userAttached = true;
+          return { ...message, messageId: event.questionMessageId };
+        }
+        return message;
+      })
+      .reverse();
     return { ...state, messages };
   }
   if (event.type === 'stop') {

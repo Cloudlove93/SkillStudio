@@ -16,17 +16,17 @@
 | 前端单元测试 | 439 项通过 |
 | 前端契约测试 | 117 项通过 |
 | 后端测试 | 1328 项通过，21 项跳过（数据库集成测试默认关闭） |
-| 静态检查 | ESLint（web/server）+ TypeScript 类型检查通过 |
+| 静态检查 | Prettier、ESLint（web/server）、TypeScript 类型检查通过 |
 | 构建 | `educlaw-web`、`educlaw-server` 生产构建通过 |
 | CI | 已新增 `.github/workflows/ci.yml`，覆盖 web/server 与依赖审计 |
 | 依赖审计 | 0 个已知漏洞（2026-11-18 修复） |
 | 覆盖率（web） | Statements 27.34%、Branches 28.06%、Functions 22.45%、Lines 29.06% |
 | 覆盖率（server） | Statements 74.66%、Branches 66.80%、Functions 81.43%、Lines 75.87% |
 | 关键链路冒烟 | 已新增 `pnpm smoke:preview`，覆盖首页、健康检查、课例索引、仓库 Skill、Agent、预置包 |
-| 浏览器 E2E | 尚无稳定套件 |
+| 浏览器 E2E | Playwright 4 条用例通过（登录、首页、推荐、仓库、工作流） |
 | Python Worker 测试 | 268 项通过、3 项跳过，已纳入 CI |
 
-依赖审计已清零，详见第 7.1 节；当前主要质量缺口是前端覆盖率偏低和浏览器 E2E 尚未建立，详见第 5.3、5.4 节。
+依赖审计已清零，详见第 7.1 节；当前主要质量缺口是前端覆盖率偏低，详见第 5.3 节；浏览器 E2E 已建立，详见第 5.4 节。
 
 ## 3. 质量门禁
 
@@ -60,8 +60,9 @@ pnpm build
 
 | Job | 内容 | 是否阻断 |
 | --- | --- | --- |
-| `web` | 类型检查、lint、单测 + 覆盖率、契约测试、生产构建 | 是 |
+| `web` | 格式检查、类型检查、lint、单测 + 覆盖率、契约测试、生产构建 | 是 |
 | `server` | lint、后端测试 + 覆盖率、生产构建 | 是 |
+| `e2e` | Playwright 浏览器流程（需配置 `E2E_ENABLED`） | 条件执行 |
 | `worker` | Python Worker pytest | 是 |
 | `secret-scan` | 已跟踪文件密钥扫描 | 是 |
 | `dependency-audit` | `pnpm audit --prod` | 是 |
@@ -78,10 +79,10 @@ web/server job 会上传 `web-coverage`、`server-coverage` 报告；覆盖率�
 
 ### 4.1 已接入
 
+- **Prettier**：`pnpm run format:check`，CI 中阻断；全仓库代码已统一格式化。
 - **ESLint**：`educlaw-web` 与 `educlaw-server`。
 - **TypeScript**：`tsc` / `pnpm run check:types`。
 - **轻量密钥扫描**：`scripts/check-secrets.mjs`，扫描已跟踪文件中的常见密钥模式。
-- **Prettier**：已有格式化脚本，尚未在 CI 中强制检查格式。
 
 ### 4.2 待接入
 
@@ -92,7 +93,6 @@ web/server job 会上传 `web-coverage`、`server-coverage` 报告；覆盖率�
 | Semgrep / CodeQL | SAST，发现注入、越权、敏感信息等问题 | P1 |
 | Trivy | 容器镜像漏洞 | P1 |
 | gitleaks | 全历史、规则更完整的密钥扫描 | P1 |
-| Prettier `--check` | 格式门禁 | P1（当前全仓库尚未统一格式化，先不阻断） |
 
 ### 4.3 静态分析原则
 
@@ -111,7 +111,7 @@ web/server job 会上传 `web-coverage`、`server-coverage` 报告；覆盖率�
 | 集成测试 | 数据库、对象存储、跨模块协作 | 已有，部分需显式开启 |
 | Worker 测试 | Python 媒体 Worker 契约与适配器 | 268 项通过、3 项跳过，已纳入 CI |
 | 关键链路冒烟 | 预览环境数据与 API 关键路径 | `smoke:preview`，23 项通过 |
-| 浏览器 E2E | 完整 UI 业务流程 | 待补：Agent 创建→对话、工作流保存→试跑、版本回滚 |
+| 浏览器 E2E | 登录、首页入口、推荐、仓库、工作流 Skill 节点 | Playwright 4 条用例通过，见 `e2e.md` |
 
 ### 5.2 必测场景
 
@@ -159,7 +159,7 @@ pnpm smoke:preview
 
 2026-11-18 预览环境实测：23 项检查全部 PASS。
 
-浏览器级 E2E 仍未建立；当前冒烟覆盖数据与 API 关键路径，UI 交互由单测、契约测试和人工验收覆盖。
+浏览器级 E2E 已建立：Playwright 覆盖登录、首页入口、推荐、仓库和工作流 Skill 节点，4 条用例通过；详见 `docs/software/e2e.md`。
 
 ## 6. 技术债务
 
@@ -206,7 +206,7 @@ No known vulnerabilities found
 ### 7.2 其他风险
 
 - web 覆盖率基线 27.34%，核心模块仍需补测。
-- 浏览器 E2E 尚未建立，当前以 `smoke:preview`、单测和契约测试覆盖。
+- 浏览器 E2E 依赖测试账号与预览环境，CI 中默认跳过；配置 `E2E_ENABLED`、`E2E_BASE_URL` 和账号凭据后启用。
 - 已做常见密钥模式的历史扫描，未发现明显密钥；完整 gitleaks/Semgrep 仍未接入。
 - 大文件重构尚未开始，修改成本会随功能增加而上升。
 

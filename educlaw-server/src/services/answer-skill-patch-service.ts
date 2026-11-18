@@ -1,11 +1,11 @@
-import type { PackageSkill } from "@educlaw/shared";
+import type { PackageSkill } from '@educlaw/shared';
 import type {
   AnswerOptimizationDiff,
   AnswerOptimizationDraft,
   AnswerSkillPatch,
   AnswerSkillPatchSection,
-} from "./answer-skill-optimization-contract.js";
-import { validateSkillMdStandard } from "./package-service.js";
+} from './answer-skill-optimization-contract.js';
+import { validateSkillMdStandard } from './package-service.js';
 
 interface MarkdownHeading {
   lineIndex: number;
@@ -27,30 +27,30 @@ export interface AppliedAnswerSkillPatch {
 export class AnswerSkillPatchApplicationError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = "AnswerSkillPatchApplicationError";
+    this.name = 'AnswerSkillPatchApplicationError';
   }
 }
 
 function normalizeProposedContent(content: string): string {
   const normalized = content
-    .replace(/\r\n?/g, "\n")
-    .split("\n")
-    .map((line) => line.replace(/[ \t]+$/g, ""))
-    .join("\n")
+    .replace(/\r\n?/g, '\n')
+    .split('\n')
+    .map((line) => line.replace(/[ \t]+$/g, ''))
+    .join('\n')
     .trim();
   if (!normalized) {
     throw new AnswerSkillPatchApplicationError(
-      "Patch proposedContent cannot be empty",
+      'Patch proposedContent cannot be empty',
     );
   }
   if (normalized.length > 12000) {
     throw new AnswerSkillPatchApplicationError(
-      "Patch proposedContent is too long",
+      'Patch proposedContent is too long',
     );
   }
   if (/^#{1,2}\s+/m.test(normalized) || /^---\s*$/m.test(normalized)) {
     throw new AnswerSkillPatchApplicationError(
-      "Patch content cannot introduce top-level sections or frontmatter",
+      'Patch content cannot introduce top-level sections or frontmatter',
     );
   }
   return normalized;
@@ -58,10 +58,10 @@ function normalizeProposedContent(content: string): string {
 
 function parseHeadings(lines: string[]): MarkdownHeading[] {
   const headings: MarkdownHeading[] = [];
-  let inFrontmatter = lines[0]?.trim() === "---";
+  let inFrontmatter = lines[0]?.trim() === '---';
   for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index] ?? "";
-    if (index > 0 && inFrontmatter && line.trim() === "---") {
+    const line = lines[index] ?? '';
+    if (index > 0 && inFrontmatter && line.trim() === '---') {
       inFrontmatter = false;
       continue;
     }
@@ -111,10 +111,10 @@ function getFrontmatter(skillMd: string): string {
   const match = skillMd.match(/^---\s*\r?\n[\s\S]*?\r?\n---/);
   if (!match) {
     throw new AnswerSkillPatchApplicationError(
-      "Original Skill must contain YAML frontmatter",
+      'Original Skill must contain YAML frontmatter',
     );
   }
-  return match[0].replace(/\r\n?/g, "\n");
+  return match[0].replace(/\r\n?/g, '\n');
 }
 
 function assertNoDuplicateRequiredSections(lines: string[]): void {
@@ -125,11 +125,11 @@ function assertNoDuplicateRequiredSections(lines: string[]): void {
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
   for (const section of [
-    "Instructions",
-    "Workflow",
-    "Output Format",
-    "Examples",
-    "Common Issues",
+    'Instructions',
+    'Workflow',
+    'Output Format',
+    'Examples',
+    'Common Issues',
   ]) {
     if ((counts.get(section.toLowerCase()) ?? 0) > 1) {
       throw new AnswerSkillPatchApplicationError(
@@ -140,7 +140,10 @@ function assertNoDuplicateRequiredSections(lines: string[]): void {
 }
 
 function joinSkillLines(lines: string[]): string {
-  return lines.join("\n").replace(/[ \t]+$/gm, "").trim();
+  return lines
+    .join('\n')
+    .replace(/[ \t]+$/gm, '')
+    .trim();
 }
 
 export function applyAnswerSkillPatch(
@@ -148,7 +151,7 @@ export function applyAnswerSkillPatch(
   patch: AnswerSkillPatch,
 ): AppliedAnswerSkillPatch {
   const originalFrontmatter = getFrontmatter(skill.skillMd);
-  const lines = skill.skillMd.replace(/\r\n?/g, "\n").split("\n");
+  const lines = skill.skillMd.replace(/\r\n?/g, '\n').split('\n');
   assertNoDuplicateRequiredSections(lines);
   const ranges = findSectionRanges(lines, patch.section);
   if (ranges.length > 1) {
@@ -157,11 +160,11 @@ export function applyAnswerSkillPatch(
     );
   }
   const proposedContent = normalizeProposedContent(patch.proposedContent);
-  const proposedLines = proposedContent.split("\n");
-  let before = "";
+  const proposedLines = proposedContent.split('\n');
+  let before = '';
   let nextLines: string[];
 
-  if (patch.operation === "add_section") {
+  if (patch.operation === 'add_section') {
     if (ranges.length > 0) {
       throw new AnswerSkillPatchApplicationError(
         `Section already exists: ${patch.section}`,
@@ -169,9 +172,9 @@ export function applyAnswerSkillPatch(
     }
     nextLines = [
       ...trimBlankLines(lines),
-      "",
+      '',
       `## ${patch.section}`,
-      "",
+      '',
       ...proposedLines,
     ];
   } else {
@@ -184,16 +187,16 @@ export function applyAnswerSkillPatch(
     const existingLines = trimBlankLines(
       lines.slice(range.contentStart, range.contentEnd),
     );
-    before = existingLines.join("\n");
+    before = existingLines.join('\n');
     const nextContent =
-      patch.operation === "append" && existingLines.length > 0
-        ? [...existingLines, "", ...proposedLines]
+      patch.operation === 'append' && existingLines.length > 0
+        ? [...existingLines, '', ...proposedLines]
         : proposedLines;
     nextLines = [
       ...lines.slice(0, range.contentStart),
-      "",
+      '',
       ...nextContent,
-      "",
+      '',
       ...lines.slice(range.contentEnd),
     ];
   }
@@ -201,10 +204,10 @@ export function applyAnswerSkillPatch(
   const skillMd = joinSkillLines(nextLines);
   if (getFrontmatter(skillMd) !== originalFrontmatter) {
     throw new AnswerSkillPatchApplicationError(
-      "Patch changed protected Skill frontmatter",
+      'Patch changed protected Skill frontmatter',
     );
   }
-  assertNoDuplicateRequiredSections(skillMd.split("\n"));
+  assertNoDuplicateRequiredSections(skillMd.split('\n'));
   const errors = validateSkillMdStandard(skillMd, skill.dirName);
   return {
     draft: {
@@ -215,7 +218,7 @@ export function applyAnswerSkillPatch(
     diff: {
       before,
       after:
-        patch.operation === "append" && before
+        patch.operation === 'append' && before
           ? `${before}\n\n${proposedContent}`
           : proposedContent,
     },

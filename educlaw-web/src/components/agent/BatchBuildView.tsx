@@ -8,7 +8,9 @@ export default function BatchBuildView() {
   const items = useBatchBuildStore((s) => s.items);
   const allDone = useBatchBuildStore((s) => s.allDone);
   const total = items.size;
-  const doneCount = Array.from(items.values()).filter((i) => i.status === 'done' || i.status === 'error').length;
+  const doneCount = Array.from(items.values()).filter(
+    (i) => i.status === 'done' || i.status === 'error',
+  ).length;
 
   return (
     <div className="space-y-4">
@@ -16,7 +18,9 @@ export default function BatchBuildView() {
         <h3 className="text-sm font-medium">
           {allDone
             ? t('build.batchAllDone')
-            : t('build.batchProgress').replace('{done}', String(doneCount)).replace('{total}', String(total))}
+            : t('build.batchProgress')
+                .replace('{done}', String(doneCount))
+                .replace('{total}', String(total))}
         </h3>
       </div>
       <div className="flex gap-4 min-h-[400px]">

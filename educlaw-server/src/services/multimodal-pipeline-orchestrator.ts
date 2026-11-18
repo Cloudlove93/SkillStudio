@@ -220,12 +220,14 @@ function normalizePipelineFailure(
   thrown: MultimodalPipelineOrchestratorError;
 } {
   const retryable = isGuidedCreationError(error) ? error.retryable : true;
-  const message = error instanceof RiaContentError ? error.message :
-    stage === 'extracting_candidates'
-      ? '候选提取未完成'
-      : stage === 'validating_candidates'
-        ? '候选校验未完成'
-        : 'Skill 构建未完成';
+  const message =
+    error instanceof RiaContentError
+      ? error.message
+      : stage === 'extracting_candidates'
+        ? '候选提取未完成'
+        : stage === 'validating_candidates'
+          ? '候选校验未完成'
+          : 'Skill 构建未完成';
   return {
     persisted: {
       code: 'MULTIMODAL_PIPELINE_FAILED',

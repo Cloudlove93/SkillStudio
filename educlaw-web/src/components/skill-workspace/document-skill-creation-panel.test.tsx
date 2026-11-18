@@ -18,8 +18,9 @@ vi.mock('./InspectorPortal', () => ({
 
 import { DocumentSkillCreationPanel } from './DocumentSkillCreationPanel';
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
-  true;
+(
+  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 function textFile(name: string, content: string) {
   return Object.assign(new File([content], name, { type: 'text/markdown' }), {
@@ -72,7 +73,9 @@ it('rejects a meaningless document immediately without starting generation', asy
     'input[name="skill-source-documents"]',
   )!;
 
-  await act(async () => setInputFile(input, textFile('a.md', '68fjjfy4mi夫57')));
+  await act(async () =>
+    setInputFile(input, textFile('a.md', '68fjjfy4mi夫57')),
+  );
 
   expect(container.textContent).toContain(
     'a.md：' + DOCUMENT_CONTENT_QUALITY_ERROR,
@@ -92,7 +95,10 @@ it('keeps meaningful documents eligible for normal generation', async () => {
       _instruction: string,
       _model: undefined,
       _documents: unknown[],
-      onEvent: (event: { event: string; data: Record<string, unknown> }) => void,
+      onEvent: (event: {
+        event: string;
+        data: Record<string, unknown>;
+      }) => void,
     ) => {
       onEvent({
         event: 'done',
@@ -107,7 +113,10 @@ it('keeps meaningful documents eligible for normal generation', async () => {
   )!;
 
   await act(async () =>
-    setInputFile(input, textFile('lesson.md', '设计一份函数作业并说明评价标准')),
+    setInputFile(
+      input,
+      textFile('lesson.md', '设计一份函数作业并说明评价标准'),
+    ),
   );
 
   const generateButton = container.querySelector<HTMLButtonElement>(

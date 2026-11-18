@@ -88,7 +88,12 @@ function integer(
 }
 
 function ratio(value: unknown, path: string): number {
-  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1) {
+  if (
+    typeof value !== 'number' ||
+    !Number.isFinite(value) ||
+    value < 0 ||
+    value > 1
+  ) {
     fail(`${path} must be a ratio`);
   }
   return value;
@@ -149,7 +154,11 @@ function degradations(value: unknown): MediaEvidenceDegradation[] {
   });
 }
 
-function timestampList(value: unknown, path: string, durationMs: number): number[] {
+function timestampList(
+  value: unknown,
+  path: string,
+  durationMs: number,
+): number[] {
   const values = array(value, path, MAX_TIMESTAMPS).map((item, index) =>
     integer(item, `${path}[${index}]`, 0, durationMs - 1),
   );
@@ -209,10 +218,18 @@ export function parseMediaPrepareOutputManifest(
   if (sourceKind !== 'video' && sourceKind !== 'audio') {
     fail('sourceKind is invalid');
   }
-  const durationMs = integer(parsed.durationMs, 'durationMs', 1, MAX_DURATION_MS);
+  const durationMs = integer(
+    parsed.durationMs,
+    'durationMs',
+    1,
+    MAX_DURATION_MS,
+  );
   const hasAudio = bool(parsed.hasAudio, 'hasAudio');
   const hasVideo = bool(parsed.hasVideo, 'hasVideo');
-  if ((sourceKind === 'audio' && (!hasAudio || hasVideo)) || (sourceKind === 'video' && !hasVideo)) {
+  if (
+    (sourceKind === 'audio' && (!hasAudio || hasVideo)) ||
+    (sourceKind === 'video' && !hasVideo)
+  ) {
     fail('media tracks do not match sourceKind');
   }
   const normalizedAudioAssetRef =
@@ -222,7 +239,10 @@ export function parseMediaPrepareOutputManifest(
   if (hasAudio !== (normalizedAudioAssetRef !== null)) {
     fail('normalizedAudioAssetRef does not match hasAudio');
   }
-  if (normalizedAudioAssetRef && normalizedAudioAssetRef.mimeType !== 'audio/wav') {
+  if (
+    normalizedAudioAssetRef &&
+    normalizedAudioAssetRef.mimeType !== 'audio/wav'
+  ) {
     fail('normalizedAudioAssetRef must be WAV');
   }
   let visualSignals: MediaPrepareOutputManifest['visualSignals'] = null;
@@ -267,7 +287,10 @@ export function parseMediaPrepareOutputManifest(
     hasVideo,
     normalizedAudioAssetRef,
     visualSignals,
-    resultManifestRef: jsonManifestRef(parsed.resultManifestRef, 'resultManifestRef'),
+    resultManifestRef: jsonManifestRef(
+      parsed.resultManifestRef,
+      'resultManifestRef',
+    ),
     processorVersion: processorVersion(parsed.processorVersion),
     degradations: degradations(parsed.degradations),
   };
@@ -286,7 +309,9 @@ export interface TranscribeOutputManifest {
   degradations: MediaEvidenceDegradation[];
 }
 
-export function parseTranscribeOutputManifest(value: unknown): TranscribeOutputManifest {
+export function parseTranscribeOutputManifest(
+  value: unknown,
+): TranscribeOutputManifest {
   const parsed = record(value, 'transcribeOutput');
   exact(parsed, 'transcribeOutput', [
     'schemaVersion',
@@ -303,20 +328,34 @@ export function parseTranscribeOutputManifest(value: unknown): TranscribeOutputM
   if (parsed.schemaVersion !== 1 || parsed.jobType !== 'transcribe') {
     fail('transcribeOutput identity is invalid');
   }
-  const durationMs = integer(parsed.durationMs, 'durationMs', 1, MAX_DURATION_MS);
-  const transcript = parseMultimodalTranscript(parsed.transcript, 'transcript', {
-    durationMs,
-    maxSegments: 10_000,
-  });
+  const durationMs = integer(
+    parsed.durationMs,
+    'durationMs',
+    1,
+    MAX_DURATION_MS,
+  );
+  const transcript = parseMultimodalTranscript(
+    parsed.transcript,
+    'transcript',
+    {
+      durationMs,
+      maxSegments: 10_000,
+    },
+  );
   if (transcript.status !== 'ready' && transcript.status !== 'low_confidence') {
     fail('transcript status is invalid');
   }
   for (let index = 1; index < transcript.segments.length; index += 1) {
-    if (transcript.segments[index].startMs < transcript.segments[index - 1].endMs) {
+    if (
+      transcript.segments[index].startMs < transcript.segments[index - 1].endMs
+    ) {
       fail('transcript segments must be ordered and non-overlapping');
     }
   }
-  const transcriptAssetRef = assetRef(parsed.transcriptAssetRef, 'transcriptAssetRef');
+  const transcriptAssetRef = assetRef(
+    parsed.transcriptAssetRef,
+    'transcriptAssetRef',
+  );
   if (transcriptAssetRef.mimeType !== 'application/json') {
     fail('transcriptAssetRef must be JSON');
   }
@@ -328,7 +367,10 @@ export function parseTranscribeOutputManifest(value: unknown): TranscribeOutputM
     durationMs,
     transcript,
     transcriptAssetRef,
-    resultManifestRef: jsonManifestRef(parsed.resultManifestRef, 'resultManifestRef'),
+    resultManifestRef: jsonManifestRef(
+      parsed.resultManifestRef,
+      'resultManifestRef',
+    ),
     processorVersion: processorVersion(parsed.processorVersion),
     degradations: degradations(parsed.degradations),
   };
@@ -395,15 +437,28 @@ function parseMetrics(value: unknown): FrameQualityMetrics {
     fail('frame quality algorithms are invalid');
   }
   return {
-    analysisWidth: integer(parsed.analysisWidth, 'metrics.analysisWidth', 1, 1024),
-    analysisHeight: integer(parsed.analysisHeight, 'metrics.analysisHeight', 1, 1024),
+    analysisWidth: integer(
+      parsed.analysisWidth,
+      'metrics.analysisWidth',
+      1,
+      1024,
+    ),
+    analysisHeight: integer(
+      parsed.analysisHeight,
+      'metrics.analysisHeight',
+      1,
+      1024,
+    ),
     brightnessMeanNormalized: ratio(
       parsed.brightnessMeanNormalized,
       'metrics.brightnessMeanNormalized',
     ),
     blackPixelRatio: ratio(parsed.blackPixelRatio, 'metrics.blackPixelRatio'),
     whitePixelRatio: ratio(parsed.whitePixelRatio, 'metrics.whitePixelRatio'),
-    entropyNormalized: ratio(parsed.entropyNormalized, 'metrics.entropyNormalized'),
+    entropyNormalized: ratio(
+      parsed.entropyNormalized,
+      'metrics.entropyNormalized',
+    ),
     sharpness: {
       algorithm: 'laplacian_variance_4_neighbour_normalized',
       normalized: true,
@@ -411,7 +466,10 @@ function parseMetrics(value: unknown): FrameQualityMetrics {
     },
     duplicateHash: {
       algorithm: 'dhash_64',
-      value: parseFrameDHash64(duplicateHash.value, 'metrics.duplicateHash.value'),
+      value: parseFrameDHash64(
+        duplicateHash.value,
+        'metrics.duplicateHash.value',
+      ),
     },
   };
 }
@@ -451,7 +509,10 @@ export function parseFrameMaterializeOutputManifest(
         'frameExtractorVersion',
         'qualityProcessorVersion',
       ]);
-      const candidateId = safeId(candidate.candidateId, `candidates[${index}].candidateId`);
+      const candidateId = safeId(
+        candidate.candidateId,
+        `candidates[${index}].candidateId`,
+      );
       if (seen.has(candidateId)) fail('candidateId must be unique');
       seen.add(candidateId);
       const sourceSignal = candidate.sourceSignal;
@@ -463,8 +524,12 @@ export function parseFrameMaterializeOutputManifest(
       ) {
         fail('sourceSignal is invalid');
       }
-      const frameAssetRef = assetRef(candidate.assetRef, `candidates[${index}].assetRef`);
-      if (frameAssetRef.mimeType !== 'image/png') fail('frame asset must be PNG');
+      const frameAssetRef = assetRef(
+        candidate.assetRef,
+        `candidates[${index}].assetRef`,
+      );
+      if (frameAssetRef.mimeType !== 'image/png')
+        fail('frame asset must be PNG');
       const hardRejectedReasons = array(
         candidate.hardRejectedReasons,
         `candidates[${index}].hardRejectedReasons`,
@@ -476,19 +541,26 @@ export function parseFrameMaterializeOutputManifest(
       ) {
         fail('hardRejectedReasons are invalid');
       }
-      const suppressed = bool(candidate.suppressed, `candidates[${index}].suppressed`);
+      const suppressed = bool(
+        candidate.suppressed,
+        `candidates[${index}].suppressed`,
+      );
       const duplicateOf =
         candidate.duplicateOf == null
           ? null
           : safeId(candidate.duplicateOf, `candidates[${index}].duplicateOf`);
-      if (suppressed !== (duplicateOf !== null)) fail('duplicate suppression is invalid');
+      if (suppressed !== (duplicateOf !== null))
+        fail('duplicate suppression is invalid');
       return {
         candidateId,
         semanticMomentId: safeId(
           candidate.semanticMomentId,
           `candidates[${index}].semanticMomentId`,
         ),
-        timestampMs: integer(candidate.timestampMs, `candidates[${index}].timestampMs`),
+        timestampMs: integer(
+          candidate.timestampMs,
+          `candidates[${index}].timestampMs`,
+        ),
         sourceSignal: sourceSignal as MultimodalFrameSourceSignal,
         selectionReason: text(
           candidate.selectionReason,
@@ -500,8 +572,12 @@ export function parseFrameMaterializeOutputManifest(
         hardRejectedReasons,
         suppressed,
         duplicateOf,
-        frameExtractorVersion: processorVersion(candidate.frameExtractorVersion),
-        qualityProcessorVersion: processorVersion(candidate.qualityProcessorVersion),
+        frameExtractorVersion: processorVersion(
+          candidate.frameExtractorVersion,
+        ),
+        qualityProcessorVersion: processorVersion(
+          candidate.qualityProcessorVersion,
+        ),
       };
     },
   );
@@ -517,7 +593,10 @@ export function parseFrameMaterializeOutputManifest(
     sessionId: safeId(parsed.sessionId, 'sessionId'),
     sourceId: safeId(parsed.sourceId, 'sourceId'),
     candidates,
-    resultManifestRef: jsonManifestRef(parsed.resultManifestRef, 'resultManifestRef'),
+    resultManifestRef: jsonManifestRef(
+      parsed.resultManifestRef,
+      'resultManifestRef',
+    ),
     processorVersion: processorVersion(parsed.processorVersion),
     degradations: degradations(parsed.degradations),
   };

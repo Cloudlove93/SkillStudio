@@ -14,7 +14,9 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   const agents = useAgentStore((s) => s.agents);
 
   const [isDesktop, setIsDesktop] = useState(() =>
-    typeof window !== 'undefined' ? window.matchMedia(DESKTOP_QUERY).matches : true,
+    typeof window !== 'undefined'
+      ? window.matchMedia(DESKTOP_QUERY).matches
+      : true,
   );
 
   useEffect(() => {
@@ -30,7 +32,9 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     }
   }, [isDesktop, sidebarOpen, setSidebarOpen]);
 
-  const activeAgent = activeTabId ? agents.find((a) => a.id === activeTabId) : undefined;
+  const activeAgent = activeTabId
+    ? agents.find((a) => a.id === activeTabId)
+    : undefined;
   const isRunning = activeAgent?.status === 'running';
   const isOwner = activeAgent ? isOwnedAgent(activeAgent) : true;
   const canLoadData = isRunning || !isOwner;
@@ -55,10 +59,16 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         <div className="relative flex min-h-0 flex-1 overflow-hidden rounded-[24px] border border-border/70 bg-background/95 shadow-[var(--shadow-md)]">
           <aside
             className={`relative hidden h-full min-w-0 flex-shrink-0 border-r border-border bg-card/88 transition-all duration-200 lg:flex ${
-              sidebarOpen && isDesktop ? 'w-[23rem] opacity-100' : 'w-0 opacity-0'
+              sidebarOpen && isDesktop
+                ? 'w-[23rem] opacity-100'
+                : 'w-0 opacity-0'
             }`}
           >
-            {sidebarOpen && isDesktop && <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">{sidebarContent}</div>}
+            {sidebarOpen && isDesktop && (
+              <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
+                {sidebarContent}
+              </div>
+            )}
           </aside>
 
           {sidebarOpen && !isDesktop && (
@@ -68,7 +78,9 @@ export default function AppLayout({ children }: { children: ReactNode }) {
                 onClick={() => setSidebarOpen(false)}
               />
               <aside className="fixed left-3 top-20 bottom-3 z-50 flex w-[22rem] max-w-[calc(100vw-1.5rem)] flex-col overflow-hidden rounded-[20px] border border-border/70 bg-background/98 shadow-[var(--shadow-lg)] animate-slide-in-left">
-                <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">{sidebarContent}</div>
+                <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
+                  {sidebarContent}
+                </div>
               </aside>
             </>
           )}
@@ -76,7 +88,9 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden bg-card/52">
             <div className="pointer-events-none absolute inset-0 bg-dot-pattern opacity-35" />
             <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-white/45 via-white/10 to-transparent dark:from-white/5" />
-            <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden">{children}</main>
+            <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+              {children}
+            </main>
           </div>
         </div>
       </div>

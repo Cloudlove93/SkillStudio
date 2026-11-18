@@ -36,10 +36,12 @@ export default function ShareDialog({
 
   function handleCopy() {
     if (!shareUrl) return;
-    copyToClipboard(shareUrl).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 3000);
-    }).catch(() => {});
+    copyToClipboard(shareUrl)
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 3000);
+      })
+      .catch(() => {});
   }
 
   function handleView() {
@@ -53,7 +55,9 @@ export default function ShareDialog({
         <DialogHeader>
           <DialogTitle>{t('session.share.title')}</DialogTitle>
           <DialogDescription>
-            {shareUrl ? t('session.share.descShared') : t('session.share.descUnshared')}
+            {shareUrl
+              ? t('session.share.descShared')
+              : t('session.share.descUnshared')}
           </DialogDescription>
         </DialogHeader>
 
@@ -73,7 +77,11 @@ export default function ShareDialog({
                 className="shrink-0"
                 onClick={handleCopy}
               >
-                {copied ? <Check className="size-4 text-green-500" /> : <Copy className="size-4" />}
+                {copied ? (
+                  <Check className="size-4 text-green-500" />
+                ) : (
+                  <Copy className="size-4" />
+                )}
               </Button>
             </div>
 
@@ -84,8 +92,12 @@ export default function ShareDialog({
                 onClick={onUnpublish}
                 disabled={isUnpublishing}
               >
-                {isUnpublishing && <Loader2 className="mr-1.5 size-3.5 animate-spin" />}
-                {isUnpublishing ? t('session.share.unpublishing') : t('session.share.unpublish')}
+                {isUnpublishing && (
+                  <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+                )}
+                {isUnpublishing
+                  ? t('session.share.unpublishing')
+                  : t('session.share.unpublish')}
               </Button>
               <Button onClick={handleView} disabled={isUnpublishing}>
                 <ExternalLink className="mr-1.5 size-3.5" />
@@ -100,8 +112,12 @@ export default function ShareDialog({
               disabled={isPublishing}
               className="w-full"
             >
-              {isPublishing && <Loader2 className="mr-1.5 size-3.5 animate-spin" />}
-              {isPublishing ? t('session.share.publishing') : t('session.share.publish')}
+              {isPublishing && (
+                <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+              )}
+              {isPublishing
+                ? t('session.share.publishing')
+                : t('session.share.publish')}
             </Button>
           </div>
         )}

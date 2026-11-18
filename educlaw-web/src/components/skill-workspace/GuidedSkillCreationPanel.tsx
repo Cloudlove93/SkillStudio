@@ -19,10 +19,7 @@ import {
   X,
 } from 'lucide-react';
 import { educationScenarios } from './education-scenarios';
-import {
-  presetToPrompt,
-  recommendPresets,
-} from '../../lib/studio-presets';
+import { presetToPrompt, recommendPresets } from '../../lib/studio-presets';
 import { PresetRecommendation } from './PresetRecommendation';
 import {
   shouldDisplayPendingGuidedMessage,
@@ -191,7 +188,8 @@ export function GuidedSkillCreationPanel(props: Props) {
           <span className="skill-eyebrow">正在创建</span>
           <h1>正在创建你的教学 Agent</h1>
           <p>
-            系统会先生成 Agent 包并保存到仓库，再创建可对话的 Agent；任务在后台继续完成。
+            系统会先生成 Agent 包并保存到仓库，再创建可对话的
+            Agent；任务在后台继续完成。
           </p>
           <div className="skill-phase-list">
             {phaseSteps.map((step, index) => {
@@ -340,7 +338,10 @@ export function GuidedSkillCreationPanel(props: Props) {
                   <Sparkles size={24} aria-hidden="true" />
                 </div>
                 <h2>从一个教学目标开始</h2>
-                <p>描述你的教学目标，我会协助梳理需求并生成可运行的 Agent 与 Skill。</p>
+                <p>
+                  描述你的教学目标，我会协助梳理需求并生成可运行的 Agent 与
+                  Skill。
+                </p>
                 <div className="skill-starter-section">
                   <span>精选教学场景</span>
                   <div className="skill-starter-chips">
@@ -421,7 +422,9 @@ export function GuidedSkillCreationPanel(props: Props) {
               compact
               onUse={(preset) => setInput(presetToPrompt(preset))}
               onRemix={(preset) =>
-                setInput(`基于「${preset.name}」改造：\n${presetToPrompt(preset)}`)
+                setInput(
+                  `基于「${preset.name}」改造：\n${presetToPrompt(preset)}`,
+                )
               }
               onDismiss={() => setDismissedPresetKey(presetRecommendationKey)}
             />

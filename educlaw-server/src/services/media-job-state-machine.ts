@@ -5,7 +5,10 @@ export type MediaJobStatus =
   | 'failed'
   | 'cancelled';
 
-const allowedMediaJobTransitions: Record<MediaJobStatus, readonly MediaJobStatus[]> = {
+const allowedMediaJobTransitions: Record<
+  MediaJobStatus,
+  readonly MediaJobStatus[]
+> = {
   queued: ['leased', 'cancelled'],
   leased: ['queued', 'succeeded', 'failed', 'cancelled'],
   succeeded: [],

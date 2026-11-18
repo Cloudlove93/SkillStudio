@@ -151,7 +151,7 @@ chore: 升级项目依赖
 | 单元测试 | 验证独立函数或模块，速度快、定位准 | 前端 439 项、后端 Vitest、Python Worker 测试 |
 | 集成测试 | 验证模块协作、数据库/缓存/消息交互 | 后端有集成测试；建议补关键链路 |
 | 接口测试 | 验证 API 输入、输出、错误处理、契约稳定 | 前端 117 项契约测试；后端 API 测试 |
-| 端到端测试 | 验证完整业务流程，覆盖关键路径 | 尚未形成稳定 E2E 套件 |
+| 端到端测试 | 验证完整业务流程，覆盖关键路径 | Playwright 4 条浏览器用例，覆盖登录、首页、推荐、仓库与工作流 Skill 节点 |
 
 ### 5.2 常用测试技术
 
@@ -163,7 +163,7 @@ chore: 升级项目依赖
 | --- | --- | --- |
 | TypeScript/JavaScript | Jest、Vitest、Supertest | Vitest、node:test、Supertest 风格契约测试 |
 | API | Postman、REST Assured | 契约测试 + 后端 API 测试 |
-| Web UI | Playwright、Cypress、Selenium | 暂无稳定 E2E |
+| Web UI | Playwright、Cypress、Selenium | Playwright 4 条只读 E2E（需测试账号） |
 | 性能 | JMeter、k6、Gatling、Locust | 暂无 |
 
 > 测试覆盖率是辅助指标，不等于软件质量。关键是测试是否覆盖重要行为、边界条件和失败场景。
@@ -207,15 +207,18 @@ chore: 升级项目依赖
 
 ### 6.4 本项目 CI 现状
 
-已新增 `.github/workflows/ci.yml`，包含 web、server 和依赖审计三个 job。当前执行内容：
+已新增 `.github/workflows/ci.yml`，包含 web、server、worker、secret-scan、dependency-audit 五个 job。当前执行内容：
 
 ```text
 pnpm install --frozen-lockfile
 pnpm run build:shared
+pnpm run format:check
 pnpm run check:types
 pnpm --filter educlaw-web run lint
 pnpm --filter educlaw-web run test:coverage
 pnpm --filter educlaw-web run test:contracts
+# 需要 E2E_BASE_URL / E2E_USERNAME / E2E_PASSWORD
+pnpm --filter educlaw-web run test:e2e
 pnpm --filter educlaw-web run build
 pnpm --filter educlaw-server run lint
 pnpm --filter educlaw-server run test:coverage
@@ -416,9 +419,9 @@ Code Review        APPROVED
 | 架构文档 | `docs/software/architecture.md` 已有 | 评审并确认与本轮开发一致 | 架构评审结论 |
 | 代码质量文档 | 已新增 `code_quality.md` | 按周维护指标、门禁与技术债 | 文档 + 基线数据 |
 | 代码评审文档 | 已新增 `code_review.md` | 按模板执行 PR 评审 | 模板 + 评审流程 |
-| CI | 已新增 `.github/workflows/ci.yml` | 保持 web/server/worker/security 全绿 | 可运行的 CI |
-| 静态分析 | ESLint + TypeScript + 依赖审计 + 密钥扫描已接入 | 补 Prettier 检查、Semgrep/CodeQL/Trivy | 静态检查报告 |
-| 测试覆盖 | 覆盖率基线已记录（web 27.34% / server 74.66%），有 `smoke:preview` 与 Worker 测试 | 补核心模块测试与浏览器 E2E | 覆盖率提升 + E2E 套件 |
+| CI | 已新增 `.github/workflows/ci.yml` | 保持 web/server/e2e/worker/security 全绿 | 可运行的 CI |
+| 静态分析 | Prettier + ESLint + TypeScript + 依赖审计 + 密钥扫描已接入 | 补 Semgrep/CodeQL/Trivy | 静态检查报告 |
+| 测试覆盖 | 覆盖率基线已记录（web 27.34% / server 74.66%），有 `smoke:preview`、Worker 测试与 Playwright E2E 4 条 | 补核心模块测试与更多 UI 流程 | 覆盖率提升 + E2E 扩展 |
 | 密钥管理 | `.preview.env` 已加入 `.gitignore` | 保持忽略，检查历史提交，必要时轮换 | 安全基线 |
 | 分支与提交 | README 有约定 | 每个任务独立分支，PR + Conventional Commits | 提交规范 |
 | 任务拆分 | 以对话/临时记录为主 | 建 GitHub Issues / Milestone，写清完成标准 | 迭代任务板 |

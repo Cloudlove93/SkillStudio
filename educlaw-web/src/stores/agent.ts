@@ -61,13 +61,20 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
     set({ loading: true });
     try {
       const { enabledPublicSkills } = useSettingsStore.getState();
-      const agent = await api.createAgent(profileFileName, enabledPublicSkills ?? undefined);
+      const agent = await api.createAgent(
+        profileFileName,
+        enabledPublicSkills ?? undefined,
+      );
       set((s) => ({ agents: [...s.agents, agent] }));
       toast.success('Agent created');
-      useNotificationStore.getState().add('success', 'Agent created', agent.name);
+      useNotificationStore
+        .getState()
+        .add('success', 'Agent created', agent.name);
       return agent;
     } catch (err) {
-      toast.error('Failed to create agent', { description: err instanceof Error ? err.message : undefined });
+      toast.error('Failed to create agent', {
+        description: err instanceof Error ? err.message : undefined,
+      });
       throw err;
     } finally {
       set({ loading: false });
@@ -80,20 +87,26 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
       set((s) => ({ agents: s.agents.filter((a) => a.id !== id) }));
       toast.success('Agent deleted');
     } catch (err) {
-      toast.error('Failed to delete agent', { description: err instanceof Error ? err.message : undefined });
+      toast.error('Failed to delete agent', {
+        description: err instanceof Error ? err.message : undefined,
+      });
       throw err;
     }
   },
 
   async startAgent(id: string) {
     // Only one agent can run at a time — stop any currently running agent first
-    const running = get().agents.find((a) => a.id !== id && (a.status === 'running' || a.status === 'starting'));
+    const running = get().agents.find(
+      (a) => a.id !== id && (a.status === 'running' || a.status === 'starting'),
+    );
     if (running) {
       await get().stopAgent(running.id);
     }
 
     set((s) => ({
-      agents: s.agents.map((a) => (a.id === id ? { ...a, status: 'starting' as const } : a)),
+      agents: s.agents.map((a) =>
+        a.id === id ? { ...a, status: 'starting' as const } : a,
+      ),
     }));
     try {
       const updated = await api.startAgent(id);
@@ -111,10 +124,20 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
         }
       }
     } catch (err) {
-      toast.error('Failed to start agent', { description: err instanceof Error ? err.message : undefined });
-      useNotificationStore.getState().add('error', 'Agent failed to start', err instanceof Error ? err.message : undefined);
+      toast.error('Failed to start agent', {
+        description: err instanceof Error ? err.message : undefined,
+      });
+      useNotificationStore
+        .getState()
+        .add(
+          'error',
+          'Agent failed to start',
+          err instanceof Error ? err.message : undefined,
+        );
       set((s) => ({
-        agents: s.agents.map((a) => (a.id === id ? { ...a, status: 'error' as const } : a)),
+        agents: s.agents.map((a) =>
+          a.id === id ? { ...a, status: 'error' as const } : a,
+        ),
       }));
       try {
         const agents = await api.listAgents();
@@ -132,21 +155,29 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
         agents: s.agents.map((a) => (a.id === id ? updated : a)),
       }));
     } catch (err) {
-      toast.error('Failed to stop agent', { description: err instanceof Error ? err.message : undefined });
+      toast.error('Failed to stop agent', {
+        description: err instanceof Error ? err.message : undefined,
+      });
       set((s) => ({
-        agents: s.agents.map((a) => (a.id === id ? { ...a, status: 'stopped' as const } : a)),
+        agents: s.agents.map((a) =>
+          a.id === id ? { ...a, status: 'stopped' as const } : a,
+        ),
       }));
       try {
         const agents = await api.listAgents();
         set({ agents });
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     }
   },
 
   async togglePublic(id: string, isPublic: boolean) {
     await api.updateAgentSettings(id, { public: isPublic });
     set((s) => ({
-      agents: s.agents.map((a) => (a.id === id ? { ...a, public: isPublic } : a)),
+      agents: s.agents.map((a) =>
+        a.id === id ? { ...a, public: isPublic } : a,
+      ),
     }));
   },
 }));

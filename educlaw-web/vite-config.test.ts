@@ -8,11 +8,28 @@ describe('Vite public asset paths', () => {
     const proxy = config.server!.proxy!['/agents'];
     assert.equal(typeof proxy, 'object');
     if (typeof proxy === 'string') throw new Error('Expected proxy options');
-    assert.equal(proxy.bypass!({ headers: { accept: 'text/html' } } as never, {} as never, proxy), '/index.html');
-    assert.equal(proxy.bypass!({ headers: { accept: 'application/json' } } as never, {} as never, proxy), undefined);
+    assert.equal(
+      proxy.bypass!(
+        { headers: { accept: 'text/html' } } as never,
+        {} as never,
+        proxy,
+      ),
+      '/index.html',
+    );
+    assert.equal(
+      proxy.bypass!(
+        { headers: { accept: 'application/json' } } as never,
+        {} as never,
+        proxy,
+      ),
+      undefined,
+    );
   });
   it('uses root-relative public assets so the favicon works on nested routes', async () => {
-    const config = await readFile(new URL('./vite.config.ts', import.meta.url), 'utf8');
+    const config = await readFile(
+      new URL('./vite.config.ts', import.meta.url),
+      'utf8',
+    );
 
     assert.match(config, /base:\s*['"]\/['"]/);
     assert.doesNotMatch(config, /base:\s*['"]\.\/['"]/);

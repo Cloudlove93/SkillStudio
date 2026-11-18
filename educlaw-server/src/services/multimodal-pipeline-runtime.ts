@@ -14,8 +14,7 @@ interface ProductionMultimodalPipelineRuntimeOptions {
   concurrency: number;
 }
 
-interface StartProductionMultimodalPipelineRuntimeIfEnabledOptions
-  extends ProductionMultimodalPipelineRuntimeOptions {
+interface StartProductionMultimodalPipelineRuntimeIfEnabledOptions extends ProductionMultimodalPipelineRuntimeOptions {
   enabled: boolean;
   createRuntime?: (
     options: ProductionMultimodalPipelineRuntimeOptions,

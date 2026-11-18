@@ -10,7 +10,12 @@ import { useChatStore } from '../../stores/chat';
 import { useUIStore } from '../../stores/ui';
 import { useLibraryStore } from '../../stores/library';
 import { useT } from '../../i18n';
-import { formatFileSize, LogItem, ProfilePreviewCard, SkillPreviewCard } from './build-components';
+import {
+  formatFileSize,
+  LogItem,
+  ProfilePreviewCard,
+  SkillPreviewCard,
+} from './build-components';
 import BatchBuildView from './BatchBuildView';
 
 export default function BuildAgentPanel() {
@@ -19,9 +24,13 @@ export default function BuildAgentPanel() {
   const buildStoreIsDetailed = useBuildStore((s) => s.isDetailed);
   const buildStoreLogs = useBuildStore((s) => s.logs);
   const [buildMode, setBuildMode] = useState<'quick' | 'detailed'>(
-    batchMode || (buildStoreIsDetailed && buildStoreLogs.length > 0) ? 'detailed' : 'quick',
+    batchMode || (buildStoreIsDetailed && buildStoreLogs.length > 0)
+      ? 'detailed'
+      : 'quick',
   );
-  const [models, setModels] = useState<{ name: string; modelName: string }[]>([]);
+  const [models, setModels] = useState<{ name: string; modelName: string }[]>(
+    [],
+  );
   const [selectedModel, setSelectedModel] = useState('');
   const [instruction, setInstruction] = useState('');
   const logEndRef = useRef<HTMLDivElement>(null);
@@ -96,7 +105,9 @@ export default function BuildAgentPanel() {
     if (uploadedFiles.length === 1) {
       startDetailedBuild(uploadedFiles[0], selectedModel || undefined);
     } else {
-      useBatchBuildStore.getState().startBatch(uploadedFiles, selectedModel || undefined);
+      useBatchBuildStore
+        .getState()
+        .startBatch(uploadedFiles, selectedModel || undefined);
     }
   }
 
@@ -120,11 +131,13 @@ export default function BuildAgentPanel() {
   function handleFileDrop(e: React.DragEvent) {
     e.preventDefault();
     setIsDragOver(false);
-    if (e.dataTransfer.files.length > 0) validateAndAddFiles(e.dataTransfer.files);
+    if (e.dataTransfer.files.length > 0)
+      validateAndAddFiles(e.dataTransfer.files);
   }
 
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    if (e.target.files && e.target.files.length > 0) validateAndAddFiles(e.target.files);
+    if (e.target.files && e.target.files.length > 0)
+      validateAndAddFiles(e.target.files);
     e.target.value = '';
   }
 
@@ -156,7 +169,12 @@ export default function BuildAgentPanel() {
     reset();
   }
 
-  const hasLogs = logs.length > 0 || isStreaming || isWaitingLLM || profilePreview !== null || skillPreview !== null;
+  const hasLogs =
+    logs.length > 0 ||
+    isStreaming ||
+    isWaitingLLM ||
+    profilePreview !== null ||
+    skillPreview !== null;
 
   const modelSelector = (
     <div className="space-y-1.5">
@@ -193,7 +211,9 @@ export default function BuildAgentPanel() {
           <div className="flex items-center gap-2 mb-2">
             <Loader2 className="size-3.5 animate-spin text-blue-500" />
             <span className="text-xs font-medium text-muted-foreground">
-              {profilePreview ? t('build.selectingSkills') : t('build.generatingProfile')}
+              {profilePreview
+                ? t('build.selectingSkills')
+                : t('build.generatingProfile')}
             </span>
           </div>
           <pre className="text-sm text-foreground/80 whitespace-pre-wrap break-words font-mono leading-relaxed max-h-48 overflow-y-auto">
@@ -251,8 +271,12 @@ export default function BuildAgentPanel() {
         <div className="mx-auto max-w-2xl space-y-6">
           {!hasLogs && (
             <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 px-4 py-3">
-              <div className="text-sm font-semibold text-foreground">{t('build.autoDecisionTitle')}</div>
-              <p className="mt-1 text-sm text-muted-foreground">{t('build.autoDecisionHint')}</p>
+              <div className="text-sm font-semibold text-foreground">
+                {t('build.autoDecisionTitle')}
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {t('build.autoDecisionHint')}
+              </p>
             </div>
           )}
           {buildMode === 'quick' && (
@@ -261,7 +285,9 @@ export default function BuildAgentPanel() {
                 <>
                   {modelSelector}
                   <div className="space-y-1.5">
-                    <label className="text-sm font-medium">{t('build.scenarioLabel')}</label>
+                    <label className="text-sm font-medium">
+                      {t('build.scenarioLabel')}
+                    </label>
                     <Textarea
                       placeholder={t('build.scenarioPlaceholder')}
                       value={instruction}
@@ -279,7 +305,9 @@ export default function BuildAgentPanel() {
             <>
               {!hasLogs && (
                 <>
-                  <p className="text-sm text-muted-foreground">{t('build.detailedHint')}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {t('build.detailedHint')}
+                  </p>
                   {modelSelector}
                   <div className="space-y-1.5">
                     <input
@@ -292,7 +320,10 @@ export default function BuildAgentPanel() {
                     />
                     <div
                       onClick={() => fileInputRef.current?.click()}
-                      onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        setIsDragOver(true);
+                      }}
                       onDragLeave={() => setIsDragOver(false)}
                       onDrop={handleFileDrop}
                       className={`flex flex-col items-center justify-center rounded-lg border-2 border-dashed px-6 py-12 cursor-pointer transition-all duration-200 ${
@@ -301,10 +332,18 @@ export default function BuildAgentPanel() {
                           : 'border-border hover:border-blue-500/50 hover:bg-muted/30'
                       }`}
                     >
-                      <FileUp className={`size-10 mb-3 ${isDragOver ? 'text-blue-500' : 'text-muted-foreground/50'}`} />
-                      <p className="text-sm font-medium text-foreground/80">{t('build.dropFile')}</p>
-                      <p className="text-xs text-muted-foreground mt-1">{t('build.acceptedFormats')}</p>
-                      <p className="text-xs text-muted-foreground/50 mt-0.5">{t('build.batchHint')}</p>
+                      <FileUp
+                        className={`size-10 mb-3 ${isDragOver ? 'text-blue-500' : 'text-muted-foreground/50'}`}
+                      />
+                      <p className="text-sm font-medium text-foreground/80">
+                        {t('build.dropFile')}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {t('build.acceptedFormats')}
+                      </p>
+                      <p className="text-xs text-muted-foreground/50 mt-0.5">
+                        {t('build.batchHint')}
+                      </p>
                     </div>
 
                     {uploadedFiles.length > 0 && (
@@ -321,14 +360,24 @@ export default function BuildAgentPanel() {
                           </button>
                         </div>
                         {uploadedFiles.map((file) => (
-                          <div key={file.name} className="flex items-center gap-3 rounded-lg border border-border bg-background px-4 py-2.5">
+                          <div
+                            key={file.name}
+                            className="flex items-center gap-3 rounded-lg border border-border bg-background px-4 py-2.5"
+                          >
                             <FileUp className="size-4 text-blue-500 shrink-0" />
                             <div className="flex-1 min-w-0">
-                              <div className="text-sm font-medium truncate">{file.name}</div>
-                              <div className="text-xs text-muted-foreground">{formatFileSize(file.size)}</div>
+                              <div className="text-sm font-medium truncate">
+                                {file.name}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {formatFileSize(file.size)}
+                              </div>
                             </div>
                             <button
-                              onClick={(e) => { e.stopPropagation(); removeFile(file.name); }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeFile(file.name);
+                              }}
                               className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                             >
                               <X className="size-3.5" />
@@ -357,11 +406,17 @@ export default function BuildAgentPanel() {
                   {t('build.cancel')}
                 </Button>
                 {buildMode === 'quick' ? (
-                  <Button onClick={handleGenerate} disabled={loading || !instruction.trim()}>
+                  <Button
+                    onClick={handleGenerate}
+                    disabled={loading || !instruction.trim()}
+                  >
                     {t('build.generate')}
                   </Button>
                 ) : (
-                  <Button onClick={handleDetailedGenerate} disabled={loading || uploadedFiles.length === 0}>
+                  <Button
+                    onClick={handleDetailedGenerate}
+                    disabled={loading || uploadedFiles.length === 0}
+                  >
                     {t('build.generate')}
                   </Button>
                 )}
@@ -372,9 +427,7 @@ export default function BuildAgentPanel() {
                   <Button variant="outline" onClick={handleOpenAgent}>
                     {t('build.openAgent')}
                   </Button>
-                  <Button onClick={handleReset}>
-                    {t('build.confirm')}
-                  </Button>
+                  <Button onClick={handleReset}>{t('build.confirm')}</Button>
                 </>
               ) : (
                 <>
@@ -392,9 +445,7 @@ export default function BuildAgentPanel() {
                   <Button variant="outline" onClick={handleOpenSkill}>
                     {t('build.openSkill')}
                   </Button>
-                  <Button onClick={handleReset}>
-                    {t('build.confirm')}
-                  </Button>
+                  <Button onClick={handleReset}>{t('build.confirm')}</Button>
                 </>
               ) : (
                 <>
@@ -408,9 +459,7 @@ export default function BuildAgentPanel() {
               )
             ) : finished ? (
               isDetailedBuild ? (
-                <Button onClick={handleReset}>
-                  {t('build.confirm')}
-                </Button>
+                <Button onClick={handleReset}>{t('build.confirm')}</Button>
               ) : (
                 <Button variant="outline" onClick={handleReset}>
                   {t('build.back')}
@@ -421,29 +470,40 @@ export default function BuildAgentPanel() {
         </div>
       )}
 
-      {batchMode && <BatchBuildFooter onReset={handleReset} onClose={handleClose} />}
+      {batchMode && (
+        <BatchBuildFooter onReset={handleReset} onClose={handleClose} />
+      )}
     </div>
   );
 }
 
-function BatchBuildFooter({ onReset }: { onReset: () => void; onClose: () => void }) {
+function BatchBuildFooter({
+  onReset,
+}: {
+  onReset: () => void;
+  onClose: () => void;
+}) {
   const t = useT();
   const allDone = useBatchBuildStore((s) => s.allDone);
   const items = useBatchBuildStore((s) => s.items);
   const total = items.size;
-  const doneCount = Array.from(items.values()).filter((i) => i.status === 'done' || i.status === 'error').length;
+  const doneCount = Array.from(items.values()).filter(
+    (i) => i.status === 'done' || i.status === 'error',
+  ).length;
 
   return (
     <div className="border-t border-border/70 px-6 py-4">
       <div className="mx-auto flex max-w-2xl items-center justify-between gap-3">
         <span className="text-sm text-muted-foreground">
-          {allDone ? t('build.batchAllDone') : t('build.batchProgress').replace('{done}', String(doneCount)).replace('{total}', String(total))}
+          {allDone
+            ? t('build.batchAllDone')
+            : t('build.batchProgress')
+                .replace('{done}', String(doneCount))
+                .replace('{total}', String(total))}
         </span>
         <div className="flex items-center gap-3">
           {allDone ? (
-            <Button onClick={onReset}>
-              {t('build.confirm')}
-            </Button>
+            <Button onClick={onReset}>{t('build.confirm')}</Button>
           ) : (
             <Button variant="outline" onClick={onReset}>
               {t('build.cancel')}
@@ -454,4 +514,3 @@ function BatchBuildFooter({ onReset }: { onReset: () => void; onClose: () => voi
     </div>
   );
 }
-

@@ -167,10 +167,7 @@ describe('package ZIP import security', () => {
     });
     const cumulativeReader = createPackageZipReader([one, two], TEST_LIMITS);
     expect(cumulativeReader.readText(one)).toHaveLength(24);
-    expectZipError(
-      () => cumulativeReader.readText(two),
-      'ARCHIVE_TOO_LARGE',
-    );
+    expectZipError(() => cumulativeReader.readText(two), 'ARCHIVE_TOO_LARGE');
   });
 
   it('reads a small, safe package entry as UTF-8 text', () => {

@@ -3,7 +3,11 @@ import type { OpenAgentMessage } from '@openagent/core/types';
 import { ScrollArea } from '../ui/scroll-area';
 import { useT } from '../../i18n';
 import { BASE } from '../../api/client';
-import { MessageBubble, SuggestionChips, LoadingSuggestions } from './HomeChatMessages';
+import {
+  MessageBubble,
+  SuggestionChips,
+  LoadingSuggestions,
+} from './HomeChatMessages';
 import { HomeChatActionButtons } from './HomeChatActions';
 import type { DiaryStatus } from '../../stores/home-chat';
 
@@ -43,7 +47,11 @@ export default function HomeChatConversation({
           <div className="card-premium mx-auto flex max-w-2xl flex-col items-center justify-center rounded-[30px] px-8 py-14 text-center">
             <div className="relative mb-6">
               <div className="absolute -inset-5 rounded-full bg-gradient-to-br from-primary/15 via-cyan-500/10 to-amber-500/10 blur-2xl" />
-              <img src={`${BASE}/logo.png`} alt="" className="relative size-16 rounded-[24px] drop-shadow-lg" />
+              <img
+                src={`${BASE}/logo.png`}
+                alt=""
+                className="relative size-16 rounded-[24px] drop-shadow-lg"
+              />
             </div>
             <div className="rounded-full border border-border/70 bg-background/95 px-3 py-1 text-[11px] font-medium tracking-[0.16em] text-muted-foreground/70 shadow-sm">
               {t('home.chatTitle')}
@@ -60,13 +68,24 @@ export default function HomeChatConversation({
         <div className="space-y-5">
           {messages.map((message, idx) => (
             <div key={message.id}>
-              <MessageBubble msg={message} isStreaming={(streaming || submitting) && idx === messages.length - 1} />
-              {message.role === 'assistant' && idx === messages.length - 1 && status === 'ready' && (
-                <SuggestionChips suggestions={suggestions} onSelect={onSelectSuggestion} />
-              )}
-              {message.role === 'assistant' && idx === messages.length - 1 && status === 'ready' && loadingSuggestions && (
-                <LoadingSuggestions />
-              )}
+              <MessageBubble
+                msg={message}
+                isStreaming={
+                  (streaming || submitting) && idx === messages.length - 1
+                }
+              />
+              {message.role === 'assistant' &&
+                idx === messages.length - 1 &&
+                status === 'ready' && (
+                  <SuggestionChips
+                    suggestions={suggestions}
+                    onSelect={onSelectSuggestion}
+                  />
+                )}
+              {message.role === 'assistant' &&
+                idx === messages.length - 1 &&
+                status === 'ready' &&
+                loadingSuggestions && <LoadingSuggestions />}
             </div>
           ))}
         </div>

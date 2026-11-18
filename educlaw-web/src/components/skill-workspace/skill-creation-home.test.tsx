@@ -23,7 +23,9 @@ describe('SkillCreationHome', () => {
     container.remove();
   });
 
-  function renderHome(overrides: Partial<Parameters<typeof SkillCreationHome>[0]> = {}) {
+  function renderHome(
+    overrides: Partial<Parameters<typeof SkillCreationHome>[0]> = {},
+  ) {
     const props = {
       documents: [],
       busy: false,
@@ -64,16 +66,22 @@ describe('SkillCreationHome', () => {
     const buttons = [...container.querySelectorAll('button')];
 
     act(() =>
-      buttons.find((button) => button.textContent?.includes('材料提炼'))!.click(),
+      buttons
+        .find((button) => button.textContent?.includes('材料提炼'))!
+        .click(),
     );
     act(() =>
-      buttons.find((button) => button.textContent?.includes('结构视图'))!.click(),
+      buttons
+        .find((button) => button.textContent?.includes('结构视图'))!
+        .click(),
     );
     act(() =>
       buttons.find((button) => button.textContent?.includes('工作流'))!.click(),
     );
 
-    expect(buttons.some((button) => button.textContent?.includes('实录蒸馏'))).toBe(false);
+    expect(
+      buttons.some((button) => button.textContent?.includes('实录蒸馏')),
+    ).toBe(false);
     expect(props.onOpenDocument).toHaveBeenCalledTimes(1);
     expect(props.onOpenManual).toHaveBeenCalledTimes(1);
     expect(props.onOpenWorkflow).toHaveBeenCalledTimes(1);
@@ -88,7 +96,9 @@ describe('SkillCreationHome', () => {
 
     act(() =>
       container
-        .querySelector<HTMLButtonElement>('button[aria-label="移除 课堂反思.md"]')!
+        .querySelector<HTMLButtonElement>(
+          'button[aria-label="移除 课堂反思.md"]',
+        )!
         .click(),
     );
 

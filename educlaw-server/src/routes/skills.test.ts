@@ -41,7 +41,7 @@ async function listen(app: express.Express) {
 
 async function close(server: Server) {
   await new Promise<void>((resolve, reject) => {
-    server.close((error) => error ? reject(error) : resolve());
+    server.close((error) => (error ? reject(error) : resolve()));
   });
 }
 
@@ -293,7 +293,9 @@ describe('POST /api/skills/batch-delete', () => {
           'Content-Type': 'application/json',
           'X-User-Id': 'real-user',
         },
-        body: JSON.stringify({ skillIds: Array.from({ length: 101 }, () => '11') }),
+        body: JSON.stringify({
+          skillIds: Array.from({ length: 101 }, () => '11'),
+        }),
       });
 
       expect(response.status).toBe(200);

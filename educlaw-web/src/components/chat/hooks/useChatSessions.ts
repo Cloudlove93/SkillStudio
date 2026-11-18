@@ -1,5 +1,15 @@
-import { useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
-import { useChatStore, convertRuntimeMessage, parseSessionInfo } from '../../../stores/chat';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MutableRefObject,
+} from 'react';
+import {
+  useChatStore,
+  convertRuntimeMessage,
+  parseSessionInfo,
+} from '../../../stores/chat';
 import { useTodoStore } from '../../../stores/todo';
 import type { SessionInfo } from '@educlaw/shared';
 import { agentRuntimeApi } from '../../../api/runtime';
@@ -35,8 +45,7 @@ async function removeMissingAgentTab(
 
   const agents = useAgentStore
     .getState()
-    .agents
-    .filter((agent) => agent.id !== agentId)
+    .agents.filter((agent) => agent.id !== agentId)
     .map((agent) => ({ id: agent.id, name: agent.name }));
 
   useChatStore.getState().reconcileAgents(agents);
@@ -75,14 +84,20 @@ export function useChatSessions(agentId: string, canLoadData: boolean) {
   useEffect(() => {
     if (!canLoadData) return;
     const ver = ++sessionLoadVer.current;
-    api.listSessions()
+    api
+      .listSessions()
       .then((data: unknown) => {
         if (ver !== sessionLoadVer.current) return;
 
         const sessions = parseSessionList(data);
         setSessions(agentId, sessions);
-        const currentSessionId = useChatStore.getState().tabs.get(agentId)?.sessionId;
-        if (!currentSessionId || !sessions.some((session) => session.id === currentSessionId)) {
+        const currentSessionId = useChatStore
+          .getState()
+          .tabs.get(agentId)?.sessionId;
+        if (
+          !currentSessionId ||
+          !sessions.some((session) => session.id === currentSessionId)
+        ) {
           const active = sessions.filter((session) => !session.archived);
           if (active.length > 0) {
             setSessionId(agentId, active[0].id);
@@ -99,20 +114,38 @@ export function useChatSessions(agentId: string, canLoadData: boolean) {
       })
       .catch((error: unknown) => {
         if (isNotFoundError(error)) {
-          void removeMissingAgentTab(agentId, fetchAgents, missingAgentHandledRef, sessionLoadVer, msgLoadVer);
+          void removeMissingAgentTab(
+            agentId,
+            fetchAgents,
+            missingAgentHandledRef,
+            sessionLoadVer,
+            msgLoadVer,
+          );
         }
       });
-  }, [canLoadData, agentId, api, fetchAgents, setMessages, setSessionId, setSessions]);
+  }, [
+    canLoadData,
+    agentId,
+    api,
+    fetchAgents,
+    setMessages,
+    setSessionId,
+    setSessions,
+  ]);
 
   // Load messages when session changes
   useEffect(() => {
     if (!canLoadData || !sessionId) return;
     const ver = ++msgLoadVer.current;
-    api.listMessages(sessionId)
+    api
+      .listMessages(sessionId)
       .then((data: unknown) => {
         if (ver !== msgLoadVer.current) return;
         const tab = useChatStore.getState().tabs.get(agentId);
-        if (tab?.messages.some((message) => message.id.startsWith('temp-user-'))) return;
+        if (
+          tab?.messages.some((message) => message.id.startsWith('temp-user-'))
+        )
+          return;
         const raw = Array.isArray(data) ? data : [];
         setMessages(agentId, raw.map(convertRuntimeMessage));
       })
@@ -120,11 +153,14 @@ export function useChatSessions(agentId: string, canLoadData: boolean) {
         if (isNotFoundError(error)) return;
       });
 
-    api.listTodos(sessionId)
+    api
+      .listTodos(sessionId)
       .then((data: unknown) => {
         const todos = Array.isArray(data) ? data : [];
         if (todos.length > 0) {
-          useTodoStore.getState().handleTodoUpdate(agentId, { sessionID: sessionId, todos });
+          useTodoStore
+            .getState()
+            .handleTodoUpdate(agentId, { sessionID: sessionId, todos });
         }
       })
       .catch(() => {});
@@ -137,7 +173,13 @@ export function useChatSessions(agentId: string, canLoadData: boolean) {
     const interval = setInterval(() => {
       api.listSessions().catch((error: unknown) => {
         if (isNotFoundError(error)) {
-          void removeMissingAgentTab(agentId, fetchAgents, missingAgentHandledRef, sessionLoadVer, msgLoadVer);
+          void removeMissingAgentTab(
+            agentId,
+            fetchAgents,
+            missingAgentHandledRef,
+            sessionLoadVer,
+            msgLoadVer,
+          );
         }
       });
     }, 30_000); // every 30s (server idle timeout is 60s)
@@ -145,7 +187,9 @@ export function useChatSessions(agentId: string, canLoadData: boolean) {
   }, [canLoadData, agentId, api, fetchAgents]);
 
   async function ensureRunning(): Promise<boolean> {
-    const current = useAgentStore.getState().agents.find((agent) => agent.id === agentId);
+    const current = useAgentStore
+      .getState()
+      .agents.find((agent) => agent.id === agentId);
     if (current?.status === 'running') return true;
 
     setIsStartingForSend(true);
@@ -156,9 +200,17 @@ export function useChatSessions(agentId: string, canLoadData: boolean) {
       setIsStartingForSend(false);
     }
 
-    const latest = useAgentStore.getState().agents.find((agent) => agent.id === agentId);
+    const latest = useAgentStore
+      .getState()
+      .agents.find((agent) => agent.id === agentId);
     if (!latest) {
-      await removeMissingAgentTab(agentId, fetchAgents, missingAgentHandledRef, sessionLoadVer, msgLoadVer);
+      await removeMissingAgentTab(
+        agentId,
+        fetchAgents,
+        missingAgentHandledRef,
+        sessionLoadVer,
+        msgLoadVer,
+      );
       return false;
     }
     if (latest.status !== 'running') return false;
@@ -171,7 +223,13 @@ export function useChatSessions(agentId: string, canLoadData: boolean) {
       return true;
     } catch (error) {
       if (isNotFoundError(error)) {
-        await removeMissingAgentTab(agentId, fetchAgents, missingAgentHandledRef, sessionLoadVer, msgLoadVer);
+        await removeMissingAgentTab(
+          agentId,
+          fetchAgents,
+          missingAgentHandledRef,
+          sessionLoadVer,
+          msgLoadVer,
+        );
         return false;
       }
       throw error;
@@ -180,10 +238,18 @@ export function useChatSessions(agentId: string, canLoadData: boolean) {
 
   async function handleCreateSession(agentName?: string) {
     if (!(await ensureRunning())) return;
-    const rawSession = await api.createSession(agentName ? { agentName } : undefined);
+    const rawSession = await api.createSession(
+      agentName ? { agentName } : undefined,
+    );
     const session = parseSessionInfo(rawSession);
-    console.log('[chat] createSession response:', rawSession, '-> id:', session.id);
-    const currentSessions = useChatStore.getState().tabs.get(agentId)?.sessions ?? [];
+    console.log(
+      '[chat] createSession response:',
+      rawSession,
+      '-> id:',
+      session.id,
+    );
+    const currentSessions =
+      useChatStore.getState().tabs.get(agentId)?.sessions ?? [];
     setSessions(agentId, [...currentSessions, session]);
     invalidatePendingLoads();
     setSessionId(agentId, session.id);
@@ -195,7 +261,9 @@ export function useChatSessions(agentId: string, canLoadData: boolean) {
     useChatStore.getState().markSessionDeleted(agentId, targetId);
     await api.deleteSession(targetId);
     const latestTab = useChatStore.getState().tabs.get(agentId);
-    const remaining = (latestTab?.sessions ?? []).filter((session) => session.id !== targetId);
+    const remaining = (latestTab?.sessions ?? []).filter(
+      (session) => session.id !== targetId,
+    );
     setSessions(agentId, remaining);
     if ((latestTab?.sessionId ?? sessionId) === targetId) {
       if (remaining.length > 0) {
@@ -257,4 +325,3 @@ export function useChatSessions(agentId: string, canLoadData: boolean) {
     handleRenameSession,
   };
 }
-

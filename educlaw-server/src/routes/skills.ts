@@ -23,7 +23,9 @@ function positiveParam(value: unknown, fieldName: string): string {
 }
 
 function attachmentHeader(fileName: string): string {
-  const fallback = fileName.replace(/[^\x20-\x7e]/g, '_').replace(/["\\]/g, '_');
+  const fallback = fileName
+    .replace(/[^\x20-\x7e]/g, '_')
+    .replace(/["\\]/g, '_');
   return `attachment; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(fileName)}`;
 }
 
@@ -45,8 +47,8 @@ function parseSkillIds(body: unknown): string[] {
     );
   }
   if (
-    !Array.isArray(record.skillIds)
-    || record.skillIds.some(
+    !Array.isArray(record.skillIds) ||
+    record.skillIds.some(
       (value) => typeof value !== 'string' || !/^[1-9]\d*$/.test(value),
     )
   ) {
@@ -81,8 +83,8 @@ function parseRepositoryQuery(query: Record<string, unknown>) {
 
   const cursor = query.cursor;
   if (
-    cursor !== undefined
-    && (typeof cursor !== 'string' || cursor.length === 0 || cursor.length > 2048)
+    cursor !== undefined &&
+    (typeof cursor !== 'string' || cursor.length === 0 || cursor.length > 2048)
   ) {
     throw new SkillVersionError(
       'INVALID_ARGUMENT',
@@ -93,8 +95,8 @@ function parseRepositoryQuery(query: Record<string, unknown>) {
 
   const rawLimit = query.limit;
   if (
-    rawLimit !== undefined
-    && (typeof rawLimit !== 'string' || !/^[1-9]\d*$/.test(rawLimit))
+    rawLimit !== undefined &&
+    (typeof rawLimit !== 'string' || !/^[1-9]\d*$/.test(rawLimit))
   ) {
     throw new SkillVersionError(
       'INVALID_ARGUMENT',
@@ -124,9 +126,10 @@ function errorResponse(
       body: { code: error.code, error: error.message },
     };
   }
-  const databaseCode = error instanceof Error
-    ? (error as Error & { code?: unknown }).code
-    : undefined;
+  const databaseCode =
+    error instanceof Error
+      ? (error as Error & { code?: unknown }).code
+      : undefined;
   if (databaseCode === '40P01' || databaseCode === '40001') {
     return {
       status: 409,
@@ -137,9 +140,9 @@ function errorResponse(
     };
   }
   if (
-    error instanceof Error
-    && typeof (error as Error & { code?: unknown }).code === 'string'
-    && typeof (error as Error & { status?: unknown }).status === 'number'
+    error instanceof Error &&
+    typeof (error as Error & { code?: unknown }).code === 'string' &&
+    typeof (error as Error & { status?: unknown }).status === 'number'
   ) {
     const typed = error as Error & { code: string; status: number };
     return {
@@ -156,10 +159,12 @@ function errorResponse(
 router.get('/skills/repository', requireAuth, async (req, res) => {
   try {
     const query = parseRepositoryQuery(req.query as Record<string, unknown>);
-    res.json(await listRepositorySkills({
-      authUserId: (req as AuthedRequest).userId || '',
-      ...query,
-    }));
+    res.json(
+      await listRepositorySkills({
+        authUserId: (req as AuthedRequest).userId || '',
+        ...query,
+      }),
+    );
   } catch (error) {
     const response = errorResponse(error, {
       code: 'SKILL_REPOSITORY_LOAD_FAILED',
@@ -172,10 +177,12 @@ router.get('/skills/repository', requireAuth, async (req, res) => {
 router.post('/skills/batch-delete', requireAuth, async (req, res) => {
   try {
     const skillIds = parseSkillIds(req.body as unknown);
-    res.json(await batchDeleteSkills({
-      authUserId: (req as AuthedRequest).userId || '',
-      skillIds,
-    }));
+    res.json(
+      await batchDeleteSkills({
+        authUserId: (req as AuthedRequest).userId || '',
+        skillIds,
+      }),
+    );
   } catch (error) {
     const response = errorResponse(error);
     res.status(response.status).json(response.body);

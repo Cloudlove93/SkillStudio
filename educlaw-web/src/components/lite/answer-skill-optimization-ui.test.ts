@@ -109,7 +109,10 @@ test('API mutations send IDs and feedback but never a client-owned package snaps
 
 test('revise submits only the selected Skill IDs while resolving target selection', () => {
   assert.match(dialogSource, /const isTargetSelection =/);
-  assert.match(dialogSource, /isTargetSelection && selectedSkillIds\.length === 1/);
+  assert.match(
+    dialogSource,
+    /isTargetSelection && selectedSkillIds\.length === 1/,
+  );
   assert.match(dialogSource, /\{ targetSkillId: selectedSkillIds\[0\] \}/);
   assert.match(dialogSource, /\{ targetSkillIds: selectedSkillIds \}/);
   assert.match(dialogSource, /\.\.\.targetSelectionPayload/);
@@ -134,14 +137,11 @@ test('retesting the current draft remains separate from revising it', () => {
   assert.match(dialogSource, /onClick=\{\(\) => void handleTest\(\)\}/);
   assert.match(
     dialogSource,
-    /handleRefineDraft\(\s*availableActions\.refinementSource,\s*\)/,
+    /handleRefineDraft\(\s*availableActions\.refinementSource\s*,?\s*\)/,
   );
   assert.match(dialogSource, /revisionSource: 'alternative_regeneration'/);
   assert.match(dialogSource, /availableActions\.canRegenerateAlternative/);
-  assert.match(
-    dialogSource,
-    /根据目前所有要求重新生成另一版草稿/,
-  );
+  assert.match(dialogSource, /根据目前所有要求重新生成另一版草稿/);
   assert.match(dialogSource, /不会沿用当前草稿的具体写法/);
 });
 
@@ -150,7 +150,10 @@ test('the final button model separates draft, failed-test, and passed-test actio
   assert.match(dialogSource, /重新试运行当前草稿/);
   assert.match(dialogSource, /根据我的意见继续修改当前草稿/);
   assert.match(dialogSource, /确认保存新版本/);
-  assert.match(dialogSource, /availableActions\.canRegenerateAlternative && \(/);
+  assert.match(
+    dialogSource,
+    /availableActions\.canRegenerateAlternative && \(/,
+  );
   assert.doesNotMatch(
     dialogSource,
     /detail\.testResult\?\.qualityGate\.passed && \(/,
@@ -181,7 +184,10 @@ test('refinement outcomes are explicit and technical failures are localized', ()
     /outcome\?\.kind ===\s*'not_suitable_for_shared_rule'/,
   );
   assert.match(dialogSource, /outcome\?\.kind === 'technical_failure'/);
-  assert.match(dialogSource, /formatRefinementTechnicalFailure\(outcome\.code\)/);
+  assert.match(
+    dialogSource,
+    /formatRefinementTechnicalFailure\(outcome\.code\)/,
+  );
   assert.match(dialogSource, /当前仍为草稿 v\{turn\.fromRevision\}/);
 });
 

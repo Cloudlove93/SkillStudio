@@ -28,10 +28,10 @@ export function mediaOperationIdempotencyKey(
 export function isMediaGenerationPublished(detail: MediaSessionDetail) {
   return Boolean(
     detail.status === 'completed' &&
-      detail.mediaStage === 'published' &&
-      detail.publishedPackage?.packageId &&
-      detail.publishedPackage.packageVersionId &&
-      Object.keys(detail.publishedPackage.skillVersionIds).length > 0,
+    detail.mediaStage === 'published' &&
+    detail.publishedPackage?.packageId &&
+    detail.publishedPackage.packageVersionId &&
+    Object.keys(detail.publishedPackage.skillVersionIds).length > 0,
   );
 }
 
@@ -311,7 +311,8 @@ export function pendingConfirmationStage(
 ): MediaConfirmationStage | null {
   if (stage === 'awaiting_adler_overview') return 'adler_overview';
   if (stage === 'awaiting_candidates') return 'evidence_and_candidates';
-  if (stage === 'arena_testing' || stage === 'ready_to_publish') return 'publish';
+  if (stage === 'arena_testing' || stage === 'ready_to_publish')
+    return 'publish';
   return null;
 }
 
@@ -330,7 +331,10 @@ export function evidenceAlignmentAtTime(
   const evidenceItems = detail.mediaState.evidenceTimeline.evidenceItems;
   const current = evidenceItems.filter((item) => {
     if (item.timeRange.startMs === item.timeRange.endMs) {
-      return item.timeRange.startMs <= timeMs && timeMs <= item.timeRange.startMs + 1_000;
+      return (
+        item.timeRange.startMs <= timeMs &&
+        timeMs <= item.timeRange.startMs + 1_000
+      );
     }
     return item.timeRange.startMs <= timeMs && item.timeRange.endMs >= timeMs;
   });
@@ -351,16 +355,21 @@ export function evidenceAlignmentAtTime(
 
   if (
     futureStart !== null &&
-    (previousEnd === null || futureStart - timeMs <= UPCOMING_EVIDENCE_WINDOW_MS)
+    (previousEnd === null ||
+      futureStart - timeMs <= UPCOMING_EVIDENCE_WINDOW_MS)
   ) {
     return {
-      items: evidenceItems.filter((item) => item.timeRange.startMs === futureStart),
+      items: evidenceItems.filter(
+        (item) => item.timeRange.startMs === futureStart,
+      ),
       relation: 'upcoming',
     };
   }
   if (previousEnd !== null) {
     return {
-      items: evidenceItems.filter((item) => item.timeRange.endMs === previousEnd),
+      items: evidenceItems.filter(
+        (item) => item.timeRange.endMs === previousEnd,
+      ),
       relation: 'recent',
     };
   }
@@ -386,7 +395,10 @@ export function hasMultimodalResumeState(raw: string | null): boolean {
   if (!raw) return false;
   try {
     const parsed = JSON.parse(raw) as { sessionId?: unknown } | null;
-    return typeof parsed?.sessionId === 'string' && parsed.sessionId.trim().length > 0;
+    return (
+      typeof parsed?.sessionId === 'string' &&
+      parsed.sessionId.trim().length > 0
+    );
   } catch {
     return false;
   }
@@ -404,7 +416,10 @@ export function toggleMultimodalCandidateSelection(
   checked: boolean,
 ): string[] {
   if (!checked) return current.filter((id) => id !== candidateId);
-  if (current.includes(candidateId) || current.length >= MULTIMODAL_SELECTION_LIMIT) {
+  if (
+    current.includes(candidateId) ||
+    current.length >= MULTIMODAL_SELECTION_LIMIT
+  ) {
     return [...current];
   }
   return [...current, candidateId];

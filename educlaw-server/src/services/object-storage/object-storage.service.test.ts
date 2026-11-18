@@ -186,7 +186,9 @@ describe('object storage service', () => {
     });
     const presignUrl = vi
       .fn()
-      .mockResolvedValue('http://signed.example/upload-part?X-Amz-Signature=secret');
+      .mockResolvedValue(
+        'http://signed.example/upload-part?X-Amz-Signature=secret',
+      );
     const service = createObjectStorageService({
       config: makeConfig(),
       s3Client: { send },
@@ -246,7 +248,9 @@ describe('object storage service', () => {
     const service = createObjectStorageService({
       config: makeConfig(),
       s3Client: { send },
-      presignUrl: vi.fn().mockResolvedValue('http://signed.example/upload-part'),
+      presignUrl: vi
+        .fn()
+        .mockResolvedValue('http://signed.example/upload-part'),
     });
 
     await service.abortIncompleteMultipartUpload({
@@ -374,7 +378,14 @@ describe('object storage service', () => {
       }),
     ).rejects.toThrowError(/parts/);
 
-    for (const etag of ['', '   ', 'etag"\u0000bad', '"etag', 'etag"', '"bad""etag"']) {
+    for (const etag of [
+      '',
+      '   ',
+      'etag"\u0000bad',
+      '"etag',
+      'etag"',
+      '"bad""etag"',
+    ]) {
       await expect(
         service.completeMultipartUpload({
           objectKey,

@@ -472,7 +472,11 @@ function resolveTtlSeconds(
 }
 
 function requireMultipartUploadId(value: unknown): string {
-  if (typeof value !== 'string' || value.trim() !== value || value.length === 0) {
+  if (
+    typeof value !== 'string' ||
+    value.trim() !== value ||
+    value.length === 0
+  ) {
     throw new Error('multipartUploadId must be a non-empty string');
   }
   return value;

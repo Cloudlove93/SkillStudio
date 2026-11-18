@@ -9,18 +9,23 @@ import {
 describe('interactive Skill optimization state', () => {
   it('keeps the conversation and accumulates adopted changes before save', () => {
     let state = createSkillOptimizeState();
-    state = skillOptimizeReducer(state, { type: 'submit', content: '让输出更具体' });
+    state = skillOptimizeReducer(state, {
+      type: 'submit',
+      content: '让输出更具体',
+    });
     state = skillOptimizeReducer(state, {
       type: 'reply',
       content: '建议增加可检查的成果标准。',
-      adoptions: [{
-        id: 'change-1',
-        target: 'skill',
-        targetId: 'lesson',
-        original: '旧内容',
-        modified: '新内容',
-        reason: '更具体',
-      }],
+      adoptions: [
+        {
+          id: 'change-1',
+          target: 'skill',
+          targetId: 'lesson',
+          original: '旧内容',
+          modified: '新内容',
+          reason: '更具体',
+        },
+      ],
     });
 
     expect(state.messages).toHaveLength(2);

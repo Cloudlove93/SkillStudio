@@ -86,7 +86,9 @@ describe('internal worker auth', () => {
 
   it('classifies only the exact internal media job actions', () => {
     expect(isInternalMediaJobAction('internal.mediaJob.claim')).toBe(true);
-    expect(isInternalMediaJobAction('internal.mediaJob.refreshGrants')).toBe(true);
+    expect(isInternalMediaJobAction('internal.mediaJob.refreshGrants')).toBe(
+      true,
+    );
     expect(isInternalMediaJobAction('internal.mediaJob.heartbeat')).toBe(true);
     expect(isInternalMediaJobAction('internal.mediaJob.complete')).toBe(true);
     expect(isInternalMediaJobAction('internal.mediaJob.fail')).toBe(true);

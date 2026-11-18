@@ -1,4 +1,9 @@
-import { createHash, createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
+import {
+  createHash,
+  createHmac,
+  randomUUID,
+  timingSafeEqual,
+} from 'node:crypto';
 import {
   parseMediaJobRecord,
   parseMultimodalSessionState,
@@ -21,9 +26,7 @@ import type { GuidedCreationStatus } from '@educlaw/shared';
 import { config } from '../config.js';
 import { readObjectStorageConfig } from '../config/object-storage-config.js';
 import { query, withTransaction, type Queryable } from './db.js';
-import {
-  createObjectStorageService,
-} from './object-storage/object-storage.service.js';
+import { createObjectStorageService } from './object-storage/object-storage.service.js';
 import type {
   MediaConfirmationStage,
   MediaStage,
@@ -105,7 +108,9 @@ const CONFIRMED_STAGES = [
   'evidence_and_candidates',
   'publish',
 ] as const satisfies readonly MediaConfirmationStage[];
-type HumanConfirmAction = 'skill.media.overview.confirm' | 'skill.media.candidate.confirm';
+type HumanConfirmAction =
+  | 'skill.media.overview.confirm'
+  | 'skill.media.candidate.confirm';
 type MediaEditAction =
   | 'skill.media.transcript.update'
   | 'skill.media.evidence.update'
@@ -250,7 +255,10 @@ export interface MultimodalSessionMutationResult {
   sessionId: string;
   revisionNo: number;
   mediaStage: MediaStage;
-  invalidatedFrom: 'semantic_moments' | 'adler_overview' | 'candidate_validation';
+  invalidatedFrom:
+    | 'semantic_moments'
+    | 'adler_overview'
+    | 'candidate_validation';
   replayed: boolean;
 }
 
@@ -298,7 +306,12 @@ export interface MultimodalRetryResult {
   revisionNo: number;
   mediaStage: MediaStage;
   retriedJobId: string | null;
-  job: { jobId: string; jobType: string; status: string; attemptNo: number } | null;
+  job: {
+    jobId: string;
+    jobType: string;
+    status: string;
+    attemptNo: number;
+  } | null;
   replayed: boolean;
 }
 
@@ -339,8 +352,16 @@ interface ServiceDependencies {
     requestHash: string;
     inputManifest: unknown;
     maxAttempts?: number;
-  }) => Promise<{ jobId: string; jobType: string; status: string; attemptNo: number }>;
-  pipelineFailureResumer?: Pick<MultimodalPipelineStore, 'resumePipelineFailure'>;
+  }) => Promise<{
+    jobId: string;
+    jobType: string;
+    status: string;
+    attemptNo: number;
+  }>;
+  pipelineFailureResumer?: Pick<
+    MultimodalPipelineStore,
+    'resumePipelineFailure'
+  >;
   multimodalUploadMaxBytes?: number;
   multimodalSinglePutMaxBytes?: number;
   multimodalMultipartPartBytes?: number;
@@ -380,21 +401,36 @@ function normalizeIdempotencyKey(value: string): string {
 
 function normalizeSourceId(value: string): string {
   if (typeof value !== 'string' || !SAFE_CANDIDATE_ID_PATTERN.test(value)) {
-    fail('MULTIMODAL_UPLOAD_UNAVAILABLE', '媒体上传暂时不可用，请稍后重试。', 503, true);
+    fail(
+      'MULTIMODAL_UPLOAD_UNAVAILABLE',
+      '媒体上传暂时不可用，请稍后重试。',
+      503,
+      true,
+    );
   }
   return value;
 }
 
 function normalizeUploadMode(value: unknown): UploadMode {
   if (value !== 'single_put' && value !== 'multipart') {
-    fail('MULTIMODAL_UPLOAD_UNAVAILABLE', '媒体上传暂时不可用，请稍后重试。', 503, true);
+    fail(
+      'MULTIMODAL_UPLOAD_UNAVAILABLE',
+      '媒体上传暂时不可用，请稍后重试。',
+      503,
+      true,
+    );
   }
   return value;
 }
 
 function normalizeUploadTokenSecret(value: string | null | undefined): string {
   if (typeof value !== 'string' || value.length < 32) {
-    fail('MULTIMODAL_UPLOAD_UNAVAILABLE', '媒体上传暂时不可用，请稍后重试。', 503, true);
+    fail(
+      'MULTIMODAL_UPLOAD_UNAVAILABLE',
+      '媒体上传暂时不可用，请稍后重试。',
+      503,
+      true,
+    );
   }
   return value;
 }
@@ -478,7 +514,12 @@ function normalizeMultipartPartBytes(value: number): number {
     value < MIN_MULTIPART_PART_SIZE_BYTES ||
     value > Number.MAX_SAFE_INTEGER
   ) {
-    fail('MULTIMODAL_UPLOAD_UNAVAILABLE', '媒体上传暂时不可用，请稍后重试。', 503, true);
+    fail(
+      'MULTIMODAL_UPLOAD_UNAVAILABLE',
+      '媒体上传暂时不可用，请稍后重试。',
+      503,
+      true,
+    );
   }
   return value;
 }
@@ -489,12 +530,13 @@ function buildMultipartPlan(input: {
 }): { partSizeBytes: number; partCount: number } {
   const partSizeBytes = normalizeMultipartPartBytes(input.partSizeBytes);
   const partCount = Math.ceil(input.sizeBytes / partSizeBytes);
-  if (
-    !Number.isInteger(partCount) ||
-    partCount < 1 ||
-    partCount > 10_000
-  ) {
-    fail('MULTIMODAL_UPLOAD_UNAVAILABLE', '媒体上传暂时不可用，请稍后重试。', 503, true);
+  if (!Number.isInteger(partCount) || partCount < 1 || partCount > 10_000) {
+    fail(
+      'MULTIMODAL_UPLOAD_UNAVAILABLE',
+      '媒体上传暂时不可用，请稍后重试。',
+      503,
+      true,
+    );
   }
   return { partSizeBytes, partCount };
 }
@@ -524,7 +566,9 @@ type UploadIntentTokenBinding = {
   intentRevisionNo: number;
 };
 
-function buildUploadIntentClaimsHash(binding: UploadIntentTokenBinding): string {
+function buildUploadIntentClaimsHash(
+  binding: UploadIntentTokenBinding,
+): string {
   return sha256Hex(
     stableRequestHashJson({
       sessionId: binding.sessionId,
@@ -554,7 +598,9 @@ type UploadIntentTokenPayload = {
   ch: string;
 };
 
-function parseUploadIntentTokenPayload(value: unknown): UploadIntentTokenPayload | null {
+function parseUploadIntentTokenPayload(
+  value: unknown,
+): UploadIntentTokenPayload | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return null;
   }
@@ -614,7 +660,9 @@ function verifyUploadIntentToken(input: {
     return false;
   }
   try {
-    const payloadJson = Buffer.from(encodedPayload, 'base64url').toString('utf8');
+    const payloadJson = Buffer.from(encodedPayload, 'base64url').toString(
+      'utf8',
+    );
     const payload = parseUploadIntentTokenPayload(JSON.parse(payloadJson));
     if (!payload) {
       return false;
@@ -628,7 +676,10 @@ function verifyUploadIntentToken(input: {
     if (payload.ch !== buildUploadIntentClaimsHash(input.binding)) {
       return false;
     }
-    if ((input.now ?? (() => new Date()))().getTime() >= new Date(payload.exp).getTime()) {
+    if (
+      (input.now ?? (() => new Date()))().getTime() >=
+      new Date(payload.exp).getTime()
+    ) {
       return false;
     }
     const expectedSignature = createHmac('sha256', input.secret)
@@ -792,14 +843,18 @@ function normalizeTranscriptSegmentUpdate(value: unknown): {
   };
 }
 
-function normalizeUnderstandingMode(value: unknown): ProcessingUnderstandingMode {
+function normalizeUnderstandingMode(
+  value: unknown,
+): ProcessingUnderstandingMode {
   if (value !== 'auto' && value !== 'nativeVideo' && value !== 'compatible') {
     fail('INVALID_ARGUMENT', 'understandingMode 不正确', 422);
   }
   return value;
 }
 
-function normalizeTranscriptionMode(value: unknown): ProcessingTranscriptionMode {
+function normalizeTranscriptionMode(
+  value: unknown,
+): ProcessingTranscriptionMode {
   if (value !== 'deploymentDefault') {
     fail('INVALID_ARGUMENT', 'transcriptionMode 不正确', 422);
   }
@@ -851,11 +906,7 @@ function normalizeSelectedCandidateIds(value: unknown): string[] {
   }
   for (let index = 0; index < value.length; index += 1) {
     if (!(index in value)) {
-      fail(
-        'INVALID_ARGUMENT',
-        'selectedCandidateIds 必须是稠密数组',
-        422,
-      );
+      fail('INVALID_ARGUMENT', 'selectedCandidateIds 必须是稠密数组', 422);
     }
   }
   const selected = value.map((item, index) => {
@@ -1211,7 +1262,9 @@ function toPublicSessionState(
   };
 }
 
-function collectReferencedAssetKeys(state: PublicMultimodalSessionState): Set<string> {
+function collectReferencedAssetKeys(
+  state: PublicMultimodalSessionState,
+): Set<string> {
   const keys = new Set<string>();
   const add = (objectKey: string | undefined | null) => {
     if (objectKey) keys.add(objectKey);
@@ -1264,7 +1317,9 @@ function parseSessionRowForMutation(row: SessionRow) {
   const detail = mapSessionRowInternal(row);
   const confirmedStages = parseConfirmedStages(row.confirmed_stages_json ?? []);
   const receiptStages = detail.mediaState.operationReceipts
-    .filter((receipt) => (CONFIRMED_STAGES as readonly string[]).includes(receipt.confirmedStage))
+    .filter((receipt) =>
+      (CONFIRMED_STAGES as readonly string[]).includes(receipt.confirmedStage),
+    )
     .map((receipt) => receipt.confirmedStage);
   const expectedReceiptStages = confirmedStages.filter(
     (stage) => stage !== 'publish',
@@ -1299,9 +1354,7 @@ function replayConfirmationResult(receipt: {
   };
 }
 
-function flattenCandidateIds(
-  state: MultimodalSessionState,
-): string[] {
+function flattenCandidateIds(state: MultimodalSessionState): string[] {
   return [
     ...state.candidatePasses.frameworks,
     ...state.candidatePasses.principles,
@@ -1334,11 +1387,10 @@ function getExistingReceipt(
   idempotencyKey: string,
 ): HumanConfirmReceipt | null {
   return (
-    state.operationReceipts.find(
+    (state.operationReceipts.find(
       (receipt) =>
-        receipt.action === action &&
-        receipt.idempotencyKey === idempotencyKey,
-    ) as HumanConfirmReceipt | undefined ?? null
+        receipt.action === action && receipt.idempotencyKey === idempotencyKey,
+    ) as HumanConfirmReceipt | undefined) ?? null
   );
 }
 
@@ -1372,7 +1424,8 @@ function getMediaEditReceipt(
 }
 
 function mediaStageForEditAction(action: MediaEditAction): MediaStage {
-  if (action === 'skill.media.transcript.update') return 'building_semantic_windows';
+  if (action === 'skill.media.transcript.update')
+    return 'building_semantic_windows';
   if (action === 'skill.media.evidence.update') return 'building_adler';
   return 'validating_candidates';
 }
@@ -1412,7 +1465,9 @@ function assertTransition(
   }
 }
 
-function mapSessionRowInternal(row: SessionRow): PersistedMultimodalSessionDetail {
+function mapSessionRowInternal(
+  row: SessionRow,
+): PersistedMultimodalSessionDetail {
   readCreationMode(row.creation_mode);
   const sessionId = persistedPositiveId(String(row.id), 'sessionId');
   const status = readSessionStatus(row.status);
@@ -1549,7 +1604,9 @@ function localizedProgressHint(job: MediaJobRecord, phase: string | null) {
   return (phase && WORKER_PHASE_LABELS[phase]) || labels.active;
 }
 
-function sanitizeProgress(job: MediaJobRecord): MultimodalSessionProgress['currentJob'] {
+function sanitizeProgress(
+  job: MediaJobRecord,
+): MultimodalSessionProgress['currentJob'] {
   const phase =
     typeof job.progress.phase === 'string' && job.progress.phase.trim()
       ? job.progress.phase.trim()
@@ -1596,10 +1653,13 @@ export function createMultimodalGuidedCreationService(
   const queryFn = deps.query ?? query;
   const withTransactionFn = deps.withTransaction ?? withTransaction;
   const now = deps.now ?? (() => new Date());
-  const objectStorageService = deps.objectStorageService ?? getObjectStorageService();
-  const uploadSecurityService = deps.uploadSecurityService ?? getUploadSecurityService();
+  const objectStorageService =
+    deps.objectStorageService ?? getObjectStorageService();
+  const uploadSecurityService =
+    deps.uploadSecurityService ?? getUploadSecurityService();
   const uploadTokenSecret = deps.uploadTokenSecret ?? getUploadTokenSecret();
-  const createSourceId = deps.createSourceId ?? (() => `source-${randomUUID()}`);
+  const createSourceId =
+    deps.createSourceId ?? (() => `source-${randomUUID()}`);
   const multimodalUploadMaxBytes =
     deps.multimodalUploadMaxBytes ?? config.multimodalUploadMaxBytes;
   const multimodalSinglePutMaxBytes =
@@ -1637,7 +1697,8 @@ export function createMultimodalGuidedCreationService(
       const idempotencyKey = normalizeIdempotencyKey(input.idempotencyKey);
       const mediaState = buildInitialMediaState();
       const initialMediaStage: MediaStage = 'draft';
-      const initialStatus = getGuidedCreationStatusForMediaStage(initialMediaStage);
+      const initialStatus =
+        getGuidedCreationStatusForMediaStage(initialMediaStage);
       const requestHash = buildMultimodalSessionCreateRequestHash(displayName);
       const createdAt = now().toISOString();
 
@@ -1759,16 +1820,17 @@ export function createMultimodalGuidedCreationService(
         mediaKind: requestIdentity.mediaKind,
         serverManaged: input.serverManaged,
       });
-      let createdMultipartForAbort:
-        | { objectKey: string; multipartUploadId: string }
-        | null = null;
+      let createdMultipartForAbort: {
+        objectKey: string;
+        multipartUploadId: string;
+      } | null = null;
       let transactionResolved = false;
 
       try {
         const result: MultimodalUploadIntentResult = await withTransactionFn(
           async (db: Queryable): Promise<MultimodalUploadIntentResult> => {
-        const sessionResult = await db.query<SessionRow>(
-          `select id,
+            const sessionResult = await db.query<SessionRow>(
+              `select id,
                   display_name,
                   status,
                   creation_mode,
@@ -1784,332 +1846,363 @@ export function createMultimodalGuidedCreationService(
               and creation_mode = $3
               and deleted_at is null
             for update`,
-          [sessionId, input.authUserId, CREATION_MODE],
-        );
-        const sessionRow = sessionResult.rows[0];
-        if (!sessionRow) {
-          fail('GUIDED_SESSION_NOT_FOUND', '没有找到这个多模态会话', 404);
-        }
-        const signingSecret = normalizeUploadTokenSecret(uploadTokenSecret);
-        if (!signedObjectStorage) {
-          fail('MULTIMODAL_UPLOAD_UNAVAILABLE', '媒体上传暂时不可用，请稍后重试。', 503, true);
-        }
-
-        const { detail, confirmedStages } = parseSessionRowForMutation(sessionRow);
-        const existingPendingUpload = detail.mediaState.pendingUpload;
-        if (
-          existingPendingUpload &&
-          existingPendingUpload.idempotencyKey === idempotencyKey
-        ) {
-          if (detail.mediaStage !== 'uploading') {
-            fail('INVALID_MEDIA_STAGE', '当前阶段不允许申请上传', 409);
-          }
-          if (existingPendingUpload.materialStatus !== 'uploading') {
-            fail('UPLOAD_ALREADY_CONFIRMED', '该上传已进入校验流程，不能重新申请上传', 409);
-          }
-          if (existingPendingUpload.requestHash !== requestHash) {
-            fail(
-              'IDEMPOTENCY_KEY_REUSED',
-              '相同 idempotencyKey 不能复用于不同请求',
-              409,
+              [sessionId, input.authUserId, CREATION_MODE],
             );
-          }
-          const replayBinding = {
-            sessionId: detail.sessionId,
-            authUserId: input.authUserId,
-            sourceId: existingPendingUpload.sourceId,
-            objectKey: String(existingPendingUpload.objectKey),
-            declaredMimeType: existingPendingUpload.declaredMimeType,
-            sizeBytes: existingPendingUpload.sizeBytes,
-            uploadMode: normalizeUploadMode(existingPendingUpload.uploadMode),
-            ...(existingPendingUpload.uploadMode === 'multipart'
-              ? {
-                  multipartUploadId: existingPendingUpload.multipartUploadId,
-                  partSizeBytes: existingPendingUpload.partSizeBytes,
-                  partCount: existingPendingUpload.partCount,
-                }
-              : {}),
-            intentRevisionNo: Number(existingPendingUpload.intentRevisionNo),
-          };
-          if (
-            !safeCompareHexHash(
-              existingPendingUpload.intentClaimsHash,
-              buildUploadIntentClaimsHash(replayBinding),
-            )
-          ) {
-            fail('MULTIMODAL_SESSION_FAILED', '媒体会话状态损坏', 500);
-          }
-          if (existingPendingUpload.uploadMode === 'multipart') {
+            const sessionRow = sessionResult.rows[0];
+            if (!sessionRow) {
+              fail('GUIDED_SESSION_NOT_FOUND', '没有找到这个多模态会话', 404);
+            }
+            const signingSecret = normalizeUploadTokenSecret(uploadTokenSecret);
+            if (!signedObjectStorage) {
+              fail(
+                'MULTIMODAL_UPLOAD_UNAVAILABLE',
+                '媒体上传暂时不可用，请稍后重试。',
+                503,
+                true,
+              );
+            }
+
+            const { detail, confirmedStages } =
+              parseSessionRowForMutation(sessionRow);
+            const existingPendingUpload = detail.mediaState.pendingUpload;
+            if (
+              existingPendingUpload &&
+              existingPendingUpload.idempotencyKey === idempotencyKey
+            ) {
+              if (detail.mediaStage !== 'uploading') {
+                fail('INVALID_MEDIA_STAGE', '当前阶段不允许申请上传', 409);
+              }
+              if (existingPendingUpload.materialStatus !== 'uploading') {
+                fail(
+                  'UPLOAD_ALREADY_CONFIRMED',
+                  '该上传已进入校验流程，不能重新申请上传',
+                  409,
+                );
+              }
+              if (existingPendingUpload.requestHash !== requestHash) {
+                fail(
+                  'IDEMPOTENCY_KEY_REUSED',
+                  '相同 idempotencyKey 不能复用于不同请求',
+                  409,
+                );
+              }
+              const replayBinding = {
+                sessionId: detail.sessionId,
+                authUserId: input.authUserId,
+                sourceId: existingPendingUpload.sourceId,
+                objectKey: String(existingPendingUpload.objectKey),
+                declaredMimeType: existingPendingUpload.declaredMimeType,
+                sizeBytes: existingPendingUpload.sizeBytes,
+                uploadMode: normalizeUploadMode(
+                  existingPendingUpload.uploadMode,
+                ),
+                ...(existingPendingUpload.uploadMode === 'multipart'
+                  ? {
+                      multipartUploadId:
+                        existingPendingUpload.multipartUploadId,
+                      partSizeBytes: existingPendingUpload.partSizeBytes,
+                      partCount: existingPendingUpload.partCount,
+                    }
+                  : {}),
+                intentRevisionNo: Number(
+                  existingPendingUpload.intentRevisionNo,
+                ),
+              };
+              if (
+                !safeCompareHexHash(
+                  existingPendingUpload.intentClaimsHash,
+                  buildUploadIntentClaimsHash(replayBinding),
+                )
+              ) {
+                fail('MULTIMODAL_SESSION_FAILED', '媒体会话状态损坏', 500);
+              }
+              if (existingPendingUpload.uploadMode === 'multipart') {
+                const parts = await Promise.all(
+                  Array.from(
+                    { length: existingPendingUpload.partCount },
+                    async (_, index) =>
+                      signedObjectStorage.createSignedUploadPartGrant({
+                        objectKey: String(existingPendingUpload.objectKey),
+                        multipartUploadId:
+                          existingPendingUpload.multipartUploadId,
+                        partNumber: index + 1,
+                      }),
+                  ),
+                );
+                const expiresAt = parts.reduce(
+                  (earliest, part) =>
+                    earliest < part.expiresAt ? earliest : part.expiresAt,
+                  parts[0]?.expiresAt ?? existingPendingUpload.expiresAt,
+                );
+                const replayToken = issueUploadIntentToken({
+                  secret: signingSecret,
+                  binding: replayBinding,
+                  expiresAt,
+                });
+                return {
+                  sessionId: detail.sessionId,
+                  revisionNo: detail.revisionNo,
+                  mediaStage: 'uploading',
+                  uploadMode: 'multipart',
+                  expiresAt,
+                  uploadToken: replayToken,
+                  multipart: {
+                    partSizeBytes: existingPendingUpload.partSizeBytes,
+                    partCount: existingPendingUpload.partCount,
+                    parts,
+                  },
+                  replayed: true,
+                };
+              }
+              const replayGrant =
+                await signedObjectStorage.createSignedPutGrant({
+                  objectKey: String(existingPendingUpload.objectKey),
+                  contentType: existingPendingUpload.declaredMimeType,
+                });
+              const replayToken = issueUploadIntentToken({
+                secret: signingSecret,
+                binding: replayBinding,
+                expiresAt: replayGrant.expiresAt,
+              });
+              return {
+                sessionId: detail.sessionId,
+                revisionNo: detail.revisionNo,
+                mediaStage: 'uploading',
+                uploadMode: 'single_put',
+                expiresAt: replayGrant.expiresAt,
+                uploadToken: replayToken,
+                upload: {
+                  method: 'PUT',
+                  url: replayGrant.url,
+                  requiredHeaders: replayGrant.requiredHeaders,
+                },
+                replayed: true,
+              };
+            }
+
+            let normalizedIntent: ReturnType<
+              UploadSecurityService['validateUploadIntent']
+            >;
+            try {
+              normalizedIntent = uploadSecurityService.validateUploadIntent({
+                fileName: input.fileName,
+                declaredMimeType: input.declaredMimeType,
+                sizeBytes: input.sizeBytes,
+              });
+            } catch (error) {
+              if (error instanceof UploadSecurityError) {
+                fail(error.code, error.message, error.status, error.retryable);
+              }
+              fail('INVALID_UPLOAD_INTENT', '上传文件参数不合法', 422);
+            }
+
+            if (input.sizeBytes > multimodalUploadMaxBytes) {
+              fail('FILE_TOO_LARGE', 'Uploaded content is too large.', 413);
+            }
+
+            const uploadMode: UploadMode =
+              input.serverManaged === true
+                ? 'single_put'
+                : input.sizeBytes > multimodalSinglePutMaxBytes
+                  ? 'multipart'
+                  : 'single_put';
+            const multipartPlan =
+              uploadMode === 'multipart'
+                ? buildMultipartPlan({
+                    sizeBytes: input.sizeBytes,
+                    partSizeBytes: multimodalMultipartPartBytes,
+                  })
+                : null;
+
+            if (
+              detail.mediaState.primarySource != null ||
+              existingPendingUpload != null
+            ) {
+              fail(
+                'PRIMARY_SOURCE_ALREADY_EXISTS',
+                '当前会话已存在主源或待上传主源',
+                409,
+              );
+            }
+            if (detail.mediaStage !== 'draft') {
+              fail('INVALID_MEDIA_STAGE', '当前阶段不允许申请上传', 409);
+            }
+            assertTransition(detail.mediaStage, 'uploading', confirmedStages);
+
+            const nextRevisionNo = detail.revisionNo + 1;
+            const objectKey = signedObjectStorage.createSessionObjectKey({
+              sessionId: detail.sessionId,
+              category: 'source',
+              extension: normalizedIntent.extension,
+            });
+            const sourceId = normalizeSourceId(createSourceId());
+            const nextStage: MediaStage = 'uploading';
+            const nextStatus = getGuidedCreationStatusForMediaStage(nextStage);
+            const recordedAt = now().toISOString();
+
+            if (uploadMode === 'single_put') {
+              const putGrant = await signedObjectStorage.createSignedPutGrant({
+                objectKey,
+                contentType: normalizedIntent.declaredMimeType,
+              });
+              const binding = {
+                sessionId: detail.sessionId,
+                authUserId: input.authUserId,
+                sourceId,
+                objectKey,
+                declaredMimeType: normalizedIntent.declaredMimeType,
+                sizeBytes: input.sizeBytes,
+                uploadMode: 'single_put' as const,
+                intentRevisionNo: nextRevisionNo,
+              };
+              const nextState = parseMultimodalSessionState({
+                ...detail.mediaState,
+                pendingUpload: {
+                  sourceId,
+                  mediaKind: normalizedIntent.mediaKind,
+                  fileName: normalizedIntent.normalizedFileName,
+                  declaredMimeType: normalizedIntent.declaredMimeType,
+                  sizeBytes: input.sizeBytes,
+                  uploadMode: 'single_put',
+                  materialStatus: 'uploading',
+                  verification: null,
+                  objectKey,
+                  idempotencyKey,
+                  requestHash,
+                  intentClaimsHash: buildUploadIntentClaimsHash(binding),
+                  intentRevisionNo: nextRevisionNo,
+                  expiresAt: putGrant.expiresAt,
+                },
+              });
+              const updateResult = await db.query<SessionRow>(
+                `update skill_guided_creation_sessions
+                set updated_at = $1,
+                    revision_no = $2,
+                    media_state_json = $3::jsonb,
+                    media_stage = $4,
+                    status = $5
+              where id = $6
+                and user_id = $7
+                and creation_mode = $8
+                and deleted_at is null
+                and revision_no = $9
+                and media_stage = $10
+              returning id,
+                        display_name,
+                        status,
+                        creation_mode,
+                        media_stage,
+                        media_state_json,
+                        confirmed_stages_json,
+                        revision_no,
+                        created_at,
+                        updated_at`,
+                [
+                  recordedAt,
+                  nextRevisionNo,
+                  stableRequestHashJson(nextState),
+                  nextStage,
+                  nextStatus,
+                  detail.sessionId,
+                  input.authUserId,
+                  CREATION_MODE,
+                  detail.revisionNo,
+                  detail.mediaStage,
+                ],
+              );
+              const updatedRow = updateResult.rows[0];
+              if (!updateResult.rowCount || !updatedRow) {
+                fail(
+                  'SESSION_REVISION_CONFLICT',
+                  '会话版本已变化，请刷新后重试',
+                  409,
+                );
+              }
+              parseSessionRowForMutation(updatedRow);
+              return {
+                sessionId: detail.sessionId,
+                revisionNo: nextRevisionNo,
+                mediaStage: 'uploading',
+                uploadMode: 'single_put',
+                expiresAt: putGrant.expiresAt,
+                uploadToken: issueUploadIntentToken({
+                  secret: signingSecret,
+                  binding,
+                  expiresAt: putGrant.expiresAt,
+                }),
+                upload: {
+                  method: 'PUT',
+                  url: putGrant.url,
+                  requiredHeaders: putGrant.requiredHeaders,
+                },
+                replayed: false,
+              };
+            }
+
+            const createdMultipart =
+              await signedObjectStorage.createMultipartUpload({
+                objectKey,
+                contentType: normalizedIntent.declaredMimeType,
+              });
+            createdMultipartForAbort = {
+              objectKey,
+              multipartUploadId: createdMultipart.multipartUploadId,
+            };
+            const multipartUploadId = createdMultipart.multipartUploadId;
+            const resolvedMultipartUploadId = multipartUploadId;
+            const partSizeBytes = multipartPlan?.partSizeBytes ?? 0;
+            const partCount = multipartPlan?.partCount ?? 0;
             const parts = await Promise.all(
-              Array.from(
-                { length: existingPendingUpload.partCount },
-                async (_, index) =>
-                  signedObjectStorage.createSignedUploadPartGrant({
-                    objectKey: String(existingPendingUpload.objectKey),
-                    multipartUploadId: existingPendingUpload.multipartUploadId,
-                    partNumber: index + 1,
-                  }),
+              Array.from({ length: partCount }, async (_, index) =>
+                signedObjectStorage.createSignedUploadPartGrant({
+                  objectKey,
+                  multipartUploadId: resolvedMultipartUploadId,
+                  partNumber: index + 1,
+                }),
               ),
             );
             const expiresAt = parts.reduce(
               (earliest, part) =>
                 earliest < part.expiresAt ? earliest : part.expiresAt,
-              parts[0]?.expiresAt ?? existingPendingUpload.expiresAt,
+              parts[0]?.expiresAt ?? recordedAt,
             );
-            const replayToken = issueUploadIntentToken({
-              secret: signingSecret,
-              binding: replayBinding,
-              expiresAt,
-            });
-            return {
+            const binding = {
               sessionId: detail.sessionId,
-              revisionNo: detail.revisionNo,
-              mediaStage: 'uploading',
-              uploadMode: 'multipart',
-              expiresAt,
-              uploadToken: replayToken,
-              multipart: {
-                partSizeBytes: existingPendingUpload.partSizeBytes,
-                partCount: existingPendingUpload.partCount,
-                parts,
-              },
-              replayed: true,
-            };
-          }
-          const replayGrant = await signedObjectStorage.createSignedPutGrant({
-            objectKey: String(existingPendingUpload.objectKey),
-            contentType: existingPendingUpload.declaredMimeType,
-          });
-          const replayToken = issueUploadIntentToken({
-            secret: signingSecret,
-            binding: replayBinding,
-            expiresAt: replayGrant.expiresAt,
-          });
-          return {
-            sessionId: detail.sessionId,
-            revisionNo: detail.revisionNo,
-            mediaStage: 'uploading',
-            uploadMode: 'single_put',
-            expiresAt: replayGrant.expiresAt,
-            uploadToken: replayToken,
-            upload: {
-              method: 'PUT',
-              url: replayGrant.url,
-              requiredHeaders: replayGrant.requiredHeaders,
-            },
-            replayed: true,
-          };
-        }
-
-        let normalizedIntent: ReturnType<UploadSecurityService['validateUploadIntent']>;
-        try {
-          normalizedIntent = uploadSecurityService.validateUploadIntent({
-            fileName: input.fileName,
-            declaredMimeType: input.declaredMimeType,
-            sizeBytes: input.sizeBytes,
-          });
-        } catch (error) {
-          if (error instanceof UploadSecurityError) {
-            fail(error.code, error.message, error.status, error.retryable);
-          }
-          fail('INVALID_UPLOAD_INTENT', '上传文件参数不合法', 422);
-        }
-
-        if (input.sizeBytes > multimodalUploadMaxBytes) {
-          fail('FILE_TOO_LARGE', 'Uploaded content is too large.', 413);
-        }
-
-        const uploadMode: UploadMode =
-          input.serverManaged === true
-            ? 'single_put'
-            : input.sizeBytes > multimodalSinglePutMaxBytes
-              ? 'multipart'
-              : 'single_put';
-        const multipartPlan =
-          uploadMode === 'multipart'
-            ? buildMultipartPlan({
-                sizeBytes: input.sizeBytes,
-                partSizeBytes: multimodalMultipartPartBytes,
-              })
-            : null;
-
-        if (detail.mediaState.primarySource != null || existingPendingUpload != null) {
-          fail('PRIMARY_SOURCE_ALREADY_EXISTS', '当前会话已存在主源或待上传主源', 409);
-        }
-        if (detail.mediaStage !== 'draft') {
-          fail('INVALID_MEDIA_STAGE', '当前阶段不允许申请上传', 409);
-        }
-        assertTransition(detail.mediaStage, 'uploading', confirmedStages);
-
-        const nextRevisionNo = detail.revisionNo + 1;
-        const objectKey = signedObjectStorage.createSessionObjectKey({
-          sessionId: detail.sessionId,
-          category: 'source',
-          extension: normalizedIntent.extension,
-        });
-        const sourceId = normalizeSourceId(createSourceId());
-        const nextStage: MediaStage = 'uploading';
-        const nextStatus = getGuidedCreationStatusForMediaStage(nextStage);
-        const recordedAt = now().toISOString();
-
-        if (uploadMode === 'single_put') {
-          const putGrant = await signedObjectStorage.createSignedPutGrant({
-            objectKey,
-            contentType: normalizedIntent.declaredMimeType,
-          });
-          const binding = {
-            sessionId: detail.sessionId,
-            authUserId: input.authUserId,
-            sourceId,
-            objectKey,
-            declaredMimeType: normalizedIntent.declaredMimeType,
-            sizeBytes: input.sizeBytes,
-            uploadMode: 'single_put' as const,
-            intentRevisionNo: nextRevisionNo,
-          };
-          const nextState = parseMultimodalSessionState({
-            ...detail.mediaState,
-            pendingUpload: {
+              authUserId: input.authUserId,
               sourceId,
-              mediaKind: normalizedIntent.mediaKind,
-              fileName: normalizedIntent.normalizedFileName,
+              objectKey,
               declaredMimeType: normalizedIntent.declaredMimeType,
               sizeBytes: input.sizeBytes,
-              uploadMode: 'single_put',
-              materialStatus: 'uploading',
-              verification: null,
-              objectKey,
-              idempotencyKey,
-              requestHash,
-              intentClaimsHash: buildUploadIntentClaimsHash(binding),
-              intentRevisionNo: nextRevisionNo,
-              expiresAt: putGrant.expiresAt,
-            },
-          });
-          const updateResult = await db.query<SessionRow>(
-            `update skill_guided_creation_sessions
-                set updated_at = $1,
-                    revision_no = $2,
-                    media_state_json = $3::jsonb,
-                    media_stage = $4,
-                    status = $5
-              where id = $6
-                and user_id = $7
-                and creation_mode = $8
-                and deleted_at is null
-                and revision_no = $9
-                and media_stage = $10
-              returning id,
-                        display_name,
-                        status,
-                        creation_mode,
-                        media_stage,
-                        media_state_json,
-                        confirmed_stages_json,
-                        revision_no,
-                        created_at,
-                        updated_at`,
-            [
-              recordedAt,
-              nextRevisionNo,
-              stableRequestHashJson(nextState),
-              nextStage,
-              nextStatus,
-              detail.sessionId,
-              input.authUserId,
-              CREATION_MODE,
-              detail.revisionNo,
-              detail.mediaStage,
-            ],
-          );
-          const updatedRow = updateResult.rows[0];
-          if (!updateResult.rowCount || !updatedRow) {
-            fail('SESSION_REVISION_CONFLICT', '会话版本已变化，请刷新后重试', 409);
-          }
-          parseSessionRowForMutation(updatedRow);
-          return {
-            sessionId: detail.sessionId,
-            revisionNo: nextRevisionNo,
-            mediaStage: 'uploading',
-            uploadMode: 'single_put',
-            expiresAt: putGrant.expiresAt,
-            uploadToken: issueUploadIntentToken({
-              secret: signingSecret,
-              binding,
-              expiresAt: putGrant.expiresAt,
-            }),
-            upload: {
-              method: 'PUT',
-              url: putGrant.url,
-              requiredHeaders: putGrant.requiredHeaders,
-            },
-            replayed: false,
-          };
-        }
-
-          const createdMultipart = await signedObjectStorage.createMultipartUpload({
-            objectKey,
-            contentType: normalizedIntent.declaredMimeType,
-          });
-          createdMultipartForAbort = {
-            objectKey,
-            multipartUploadId: createdMultipart.multipartUploadId,
-          };
-          const multipartUploadId = createdMultipart.multipartUploadId;
-          const resolvedMultipartUploadId = multipartUploadId;
-          const partSizeBytes = multipartPlan?.partSizeBytes ?? 0;
-          const partCount = multipartPlan?.partCount ?? 0;
-          const parts = await Promise.all(
-            Array.from({ length: partCount }, async (_, index) =>
-              signedObjectStorage.createSignedUploadPartGrant({
-                objectKey,
-                multipartUploadId: resolvedMultipartUploadId,
-                partNumber: index + 1,
-              }),
-            ),
-          );
-          const expiresAt = parts.reduce(
-            (earliest, part) =>
-              earliest < part.expiresAt ? earliest : part.expiresAt,
-            parts[0]?.expiresAt ?? recordedAt,
-          );
-          const binding = {
-            sessionId: detail.sessionId,
-            authUserId: input.authUserId,
-            sourceId,
-            objectKey,
-            declaredMimeType: normalizedIntent.declaredMimeType,
-            sizeBytes: input.sizeBytes,
-            uploadMode: 'multipart' as const,
-            multipartUploadId: resolvedMultipartUploadId,
-            partSizeBytes,
-            partCount,
-            intentRevisionNo: nextRevisionNo,
-          };
-          const nextState = parseMultimodalSessionState({
-            ...detail.mediaState,
-            pendingUpload: {
-              sourceId,
-              mediaKind: normalizedIntent.mediaKind,
-              fileName: normalizedIntent.normalizedFileName,
-              declaredMimeType: normalizedIntent.declaredMimeType,
-              sizeBytes: input.sizeBytes,
-              uploadMode: 'multipart',
-              materialStatus: 'uploading',
-              verification: null,
-              objectKey,
-              idempotencyKey,
-              requestHash,
-              intentClaimsHash: buildUploadIntentClaimsHash(binding),
-              intentRevisionNo: nextRevisionNo,
-              expiresAt,
+              uploadMode: 'multipart' as const,
               multipartUploadId: resolvedMultipartUploadId,
               partSizeBytes,
               partCount,
-            },
-          });
-          const updateResult = await db.query<SessionRow>(
-            `update skill_guided_creation_sessions
+              intentRevisionNo: nextRevisionNo,
+            };
+            const nextState = parseMultimodalSessionState({
+              ...detail.mediaState,
+              pendingUpload: {
+                sourceId,
+                mediaKind: normalizedIntent.mediaKind,
+                fileName: normalizedIntent.normalizedFileName,
+                declaredMimeType: normalizedIntent.declaredMimeType,
+                sizeBytes: input.sizeBytes,
+                uploadMode: 'multipart',
+                materialStatus: 'uploading',
+                verification: null,
+                objectKey,
+                idempotencyKey,
+                requestHash,
+                intentClaimsHash: buildUploadIntentClaimsHash(binding),
+                intentRevisionNo: nextRevisionNo,
+                expiresAt,
+                multipartUploadId: resolvedMultipartUploadId,
+                partSizeBytes,
+                partCount,
+              },
+            });
+            const updateResult = await db.query<SessionRow>(
+              `update skill_guided_creation_sessions
                 set updated_at = $1,
                     revision_no = $2,
                     media_state_json = $3::jsonb,
@@ -2131,42 +2224,46 @@ export function createMultimodalGuidedCreationService(
                         revision_no,
                         created_at,
                         updated_at`,
-            [
-              recordedAt,
-              nextRevisionNo,
-              stableRequestHashJson(nextState),
-              nextStage,
-              nextStatus,
-              detail.sessionId,
-              input.authUserId,
-              CREATION_MODE,
-              detail.revisionNo,
-              detail.mediaStage,
-            ],
-          );
-          const updatedRow = updateResult.rows[0];
-          if (!updateResult.rowCount || !updatedRow) {
-            fail('SESSION_REVISION_CONFLICT', '会话版本已变化，请刷新后重试', 409);
-          }
-          parseSessionRowForMutation(updatedRow);
-          return {
-            sessionId: detail.sessionId,
-            revisionNo: nextRevisionNo,
-            mediaStage: 'uploading',
-            uploadMode: 'multipart',
-            expiresAt,
-            uploadToken: issueUploadIntentToken({
-              secret: signingSecret,
-              binding,
+              [
+                recordedAt,
+                nextRevisionNo,
+                stableRequestHashJson(nextState),
+                nextStage,
+                nextStatus,
+                detail.sessionId,
+                input.authUserId,
+                CREATION_MODE,
+                detail.revisionNo,
+                detail.mediaStage,
+              ],
+            );
+            const updatedRow = updateResult.rows[0];
+            if (!updateResult.rowCount || !updatedRow) {
+              fail(
+                'SESSION_REVISION_CONFLICT',
+                '会话版本已变化，请刷新后重试',
+                409,
+              );
+            }
+            parseSessionRowForMutation(updatedRow);
+            return {
+              sessionId: detail.sessionId,
+              revisionNo: nextRevisionNo,
+              mediaStage: 'uploading',
+              uploadMode: 'multipart',
               expiresAt,
-            }),
-            multipart: {
-              partSizeBytes,
-              partCount,
-              parts,
-            },
-            replayed: false,
-          };
+              uploadToken: issueUploadIntentToken({
+                secret: signingSecret,
+                binding,
+                expiresAt,
+              }),
+              multipart: {
+                partSizeBytes,
+                partCount,
+                parts,
+              },
+              replayed: false,
+            };
           },
         );
         transactionResolved = true;
@@ -2185,7 +2282,12 @@ export function createMultimodalGuidedCreationService(
         if (error instanceof MultimodalGuidedCreationServiceError) {
           throw error;
         }
-        fail('MULTIMODAL_UPLOAD_UNAVAILABLE', '媒体上传暂时不可用，请稍后重试。', 503, true);
+        fail(
+          'MULTIMODAL_UPLOAD_UNAVAILABLE',
+          '媒体上传暂时不可用，请稍后重试。',
+          503,
+          true,
+        );
       }
     },
 
@@ -2350,7 +2452,8 @@ export function createMultimodalGuidedCreationService(
         if (!sessionRow) {
           fail('GUIDED_SESSION_NOT_FOUND', '没有找到这个多模态会话', 404);
         }
-        const { detail, confirmedStages } = parseSessionRowForMutation(sessionRow);
+        const { detail, confirmedStages } =
+          parseSessionRowForMutation(sessionRow);
         const existingReceipt = getMediaEditReceipt(
           detail.mediaState,
           action,
@@ -2373,10 +2476,18 @@ export function createMultimodalGuidedCreationService(
           };
         }
         if (detail.revisionNo !== expectedRevisionNo) {
-          fail('SESSION_REVISION_CONFLICT', '会话版本已变化，请刷新后重试', 409);
+          fail(
+            'SESSION_REVISION_CONFLICT',
+            '会话版本已变化，请刷新后重试',
+            409,
+          );
         }
         if (confirmedStages.length > 0) {
-          fail('INVALID_MEDIA_STAGE', 'Overview 确认后不允许回改 transcript', 409);
+          fail(
+            'INVALID_MEDIA_STAGE',
+            'Overview 确认后不允许回改 transcript',
+            409,
+          );
         }
         const nextStage: MediaStage = 'building_semantic_windows';
         try {
@@ -2391,13 +2502,18 @@ export function createMultimodalGuidedCreationService(
         if (detail.mediaState.transcript.status !== 'ready') {
           fail('INVALID_MEDIA_STAGE', 'transcript 尚未准备完成', 409);
         }
-        const currentSegment = detail.mediaState.transcript.segments[mutation.segmentIndex];
+        const currentSegment =
+          detail.mediaState.transcript.segments[mutation.segmentIndex];
         if (!currentSegment) {
           fail('INVALID_ARGUMENT', 'segmentIndex 不存在', 422);
         }
         const currentSegmentRevisionNo = currentSegment.revisionNo ?? 0;
         if (currentSegmentRevisionNo !== mutation.expectedSegmentRevisionNo) {
-          fail('SEGMENT_REVISION_CONFLICT', '转写片段版本已变化，请刷新后重试', 409);
+          fail(
+            'SEGMENT_REVISION_CONFLICT',
+            '转写片段版本已变化，请刷新后重试',
+            409,
+          );
         }
         const nextSegment: MultimodalTranscriptSegment = {
           ...currentSegment,
@@ -2412,8 +2528,9 @@ export function createMultimodalGuidedCreationService(
           ...detail.mediaState,
           transcript: {
             ...detail.mediaState.transcript,
-            segments: detail.mediaState.transcript.segments.map((segment, index) =>
-              index === mutation.segmentIndex ? nextSegment : segment,
+            segments: detail.mediaState.transcript.segments.map(
+              (segment, index) =>
+                index === mutation.segmentIndex ? nextSegment : segment,
             ),
           },
           semanticMoments: [],
@@ -2477,7 +2594,11 @@ export function createMultimodalGuidedCreationService(
         );
         const updatedRow = updateResult.rows[0];
         if (!updateResult.rowCount || !updatedRow) {
-          fail('SESSION_REVISION_CONFLICT', '会话版本已变化，请刷新后重试', 409);
+          fail(
+            'SESSION_REVISION_CONFLICT',
+            '会话版本已变化，请刷新后重试',
+            409,
+          );
         }
         parseSessionRowForMutation(updatedRow);
         return {
@@ -2502,7 +2623,10 @@ export function createMultimodalGuidedCreationService(
       const expectedRevisionNo = normalizeExpectedRevisionNo(
         input.expectedRevisionNo,
       );
-      if (!Array.isArray(input.evidenceItems) || input.evidenceItems.length < 1) {
+      if (
+        !Array.isArray(input.evidenceItems) ||
+        input.evidenceItems.length < 1
+      ) {
         fail('INVALID_ARGUMENT', 'evidenceItems 必须至少保留一条证据', 422);
       }
       const action = 'skill.media.evidence.update' as const;
@@ -2528,7 +2652,8 @@ export function createMultimodalGuidedCreationService(
         if (!sessionRow) {
           fail('GUIDED_SESSION_NOT_FOUND', '没有找到这个多模态会话', 404);
         }
-        const { detail, confirmedStages } = parseSessionRowForMutation(sessionRow);
+        const { detail, confirmedStages } =
+          parseSessionRowForMutation(sessionRow);
         const existingReceipt = getMediaEditReceipt(
           detail.mediaState,
           action,
@@ -2536,7 +2661,11 @@ export function createMultimodalGuidedCreationService(
         );
         if (existingReceipt) {
           if (existingReceipt.requestHash !== requestHash) {
-            fail('IDEMPOTENCY_KEY_REUSED', '相同 idempotencyKey 不能复用于不同请求', 409);
+            fail(
+              'IDEMPOTENCY_KEY_REUSED',
+              '相同 idempotencyKey 不能复用于不同请求',
+              409,
+            );
           }
           return {
             sessionId,
@@ -2547,7 +2676,11 @@ export function createMultimodalGuidedCreationService(
           };
         }
         if (detail.revisionNo !== expectedRevisionNo) {
-          fail('SESSION_REVISION_CONFLICT', '会话版本已变化，请刷新后重试', 409);
+          fail(
+            'SESSION_REVISION_CONFLICT',
+            '会话版本已变化，请刷新后重试',
+            409,
+          );
         }
         if (confirmedStages.length > 0) {
           fail('INVALID_MEDIA_STAGE', 'Overview 确认后不允许回改证据', 409);
@@ -2616,7 +2749,11 @@ export function createMultimodalGuidedCreationService(
         );
         const updatedRow = updateResult.rows[0];
         if (!updateResult.rowCount || !updatedRow) {
-          fail('SESSION_REVISION_CONFLICT', '会话版本已变化，请刷新后重试', 409);
+          fail(
+            'SESSION_REVISION_CONFLICT',
+            '会话版本已变化，请刷新后重试',
+            409,
+          );
         }
         parseSessionRowForMutation(updatedRow);
         return {
@@ -2667,7 +2804,8 @@ export function createMultimodalGuidedCreationService(
         if (!sessionRow) {
           fail('GUIDED_SESSION_NOT_FOUND', '没有找到这个多模态会话', 404);
         }
-        const { detail, confirmedStages } = parseSessionRowForMutation(sessionRow);
+        const { detail, confirmedStages } =
+          parseSessionRowForMutation(sessionRow);
         const existingReceipt = getMediaEditReceipt(
           detail.mediaState,
           action,
@@ -2675,7 +2813,11 @@ export function createMultimodalGuidedCreationService(
         );
         if (existingReceipt) {
           if (existingReceipt.requestHash !== requestHash) {
-            fail('IDEMPOTENCY_KEY_REUSED', '相同 idempotencyKey 不能复用于不同请求', 409);
+            fail(
+              'IDEMPOTENCY_KEY_REUSED',
+              '相同 idempotencyKey 不能复用于不同请求',
+              409,
+            );
           }
           return {
             sessionId,
@@ -2686,7 +2828,11 @@ export function createMultimodalGuidedCreationService(
           };
         }
         if (detail.revisionNo !== expectedRevisionNo) {
-          fail('SESSION_REVISION_CONFLICT', '会话版本已变化，请刷新后重试', 409);
+          fail(
+            'SESSION_REVISION_CONFLICT',
+            '会话版本已变化，请刷新后重试',
+            409,
+          );
         }
         if (
           confirmedStages.length !== 1 ||
@@ -2757,7 +2903,11 @@ export function createMultimodalGuidedCreationService(
         );
         const updatedRow = updateResult.rows[0];
         if (!updateResult.rowCount || !updatedRow) {
-          fail('SESSION_REVISION_CONFLICT', '会话版本已变化，请刷新后重试', 409);
+          fail(
+            'SESSION_REVISION_CONFLICT',
+            '会话版本已变化，请刷新后重试',
+            409,
+          );
         }
         parseSessionRowForMutation(updatedRow);
         return {
@@ -2815,7 +2965,8 @@ export function createMultimodalGuidedCreationService(
           fail('GUIDED_SESSION_NOT_FOUND', '没有找到这个多模态会话', 404);
         }
 
-        const { detail, confirmedStages } = parseSessionRowForMutation(sessionRow);
+        const { detail, confirmedStages } =
+          parseSessionRowForMutation(sessionRow);
         const existingReceipt = getExistingReceipt(
           detail.mediaState,
           action,
@@ -2836,7 +2987,11 @@ export function createMultimodalGuidedCreationService(
         }
 
         if (detail.revisionNo !== expectedRevisionNo) {
-          fail('SESSION_REVISION_CONFLICT', '会话版本已变化，请刷新后重试', 409);
+          fail(
+            'SESSION_REVISION_CONFLICT',
+            '会话版本已变化，请刷新后重试',
+            409,
+          );
         }
         if (detail.mediaStage !== 'awaiting_adler_overview') {
           fail('INVALID_MEDIA_STAGE', '当前阶段不允许执行该确认操作', 409);
@@ -2849,12 +3004,13 @@ export function createMultimodalGuidedCreationService(
           fail('MULTIMODAL_SESSION_FAILED', 'Overview 确认前置状态损坏', 500);
         }
 
-        const nextConfirmedStages = [...confirmedStages, 'adler_overview'] as const;
-        assertTransition(
-          detail.mediaStage,
-          'extracting_candidates',
-          [...nextConfirmedStages],
-        );
+        const nextConfirmedStages = [
+          ...confirmedStages,
+          'adler_overview',
+        ] as const;
+        assertTransition(detail.mediaStage, 'extracting_candidates', [
+          ...nextConfirmedStages,
+        ]);
 
         const recordedAt = now().toISOString();
         const nextRevisionNo = expectedRevisionNo + 1;
@@ -2916,7 +3072,11 @@ export function createMultimodalGuidedCreationService(
         );
         const updatedRow = updateResult.rows[0];
         if (!updateResult.rowCount || !updatedRow) {
-          fail('SESSION_REVISION_CONFLICT', '会话版本已变化，请刷新后重试', 409);
+          fail(
+            'SESSION_REVISION_CONFLICT',
+            '会话版本已变化，请刷新后重试',
+            409,
+          );
         }
         parseSessionRowForMutation(updatedRow);
         return {
@@ -2976,7 +3136,8 @@ export function createMultimodalGuidedCreationService(
           fail('GUIDED_SESSION_NOT_FOUND', '没有找到这个多模态会话', 404);
         }
 
-        const { detail, confirmedStages } = parseSessionRowForMutation(sessionRow);
+        const { detail, confirmedStages } =
+          parseSessionRowForMutation(sessionRow);
         const existingReceipt = getExistingReceipt(
           detail.mediaState,
           action,
@@ -2997,7 +3158,11 @@ export function createMultimodalGuidedCreationService(
         }
 
         if (detail.revisionNo !== expectedRevisionNo) {
-          fail('SESSION_REVISION_CONFLICT', '会话版本已变化，请刷新后重试', 409);
+          fail(
+            'SESSION_REVISION_CONFLICT',
+            '会话版本已变化，请刷新后重试',
+            409,
+          );
         }
         if (detail.mediaStage !== 'awaiting_candidates') {
           fail('INVALID_MEDIA_STAGE', '当前阶段不允许执行该确认操作', 409);
@@ -3039,11 +3204,9 @@ export function createMultimodalGuidedCreationService(
           ...confirmedStages,
           'evidence_and_candidates',
         ] as const;
-        assertTransition(
-          detail.mediaStage,
-          'building_skills',
-          [...nextConfirmedStages],
-        );
+        assertTransition(detail.mediaStage, 'building_skills', [
+          ...nextConfirmedStages,
+        ]);
 
         const recordedAt = now().toISOString();
         const nextRevisionNo = expectedRevisionNo + 1;
@@ -3105,7 +3268,11 @@ export function createMultimodalGuidedCreationService(
         );
         const updatedRow = updateResult.rows[0];
         if (!updateResult.rowCount || !updatedRow) {
-          fail('SESSION_REVISION_CONFLICT', '会话版本已变化，请刷新后重试', 409);
+          fail(
+            'SESSION_REVISION_CONFLICT',
+            '会话版本已变化，请刷新后重试',
+            409,
+          );
         }
         parseSessionRowForMutation(updatedRow);
         return {
@@ -3128,7 +3295,9 @@ export function createMultimodalGuidedCreationService(
     }): Promise<MultimodalUploadConfirmResult> {
       const sessionId = positiveId(input.sessionId, 'sessionId');
       const idempotencyKey = normalizeIdempotencyKey(input.idempotencyKey);
-      const expectedRevisionNo = normalizeExpectedRevisionNo(input.expectedRevisionNo);
+      const expectedRevisionNo = normalizeExpectedRevisionNo(
+        input.expectedRevisionNo,
+      );
       const uploadToken = input.uploadToken;
 
       if (!objectStorageService) {
@@ -3138,9 +3307,10 @@ export function createMultimodalGuidedCreationService(
         fail('UPLOAD_TOKEN_NOT_CONFIGURED', '上传令牌服务尚未配置', 503, true);
       }
 
-      const preflight: UploadConfirmPreflight = await withTransactionFn(async (db) => {
-        const sessionResult = await db.query<SessionRow>(
-          `select id,
+      const preflight: UploadConfirmPreflight = await withTransactionFn(
+        async (db) => {
+          const sessionResult = await db.query<SessionRow>(
+            `select id,
                   display_name,
                   status,
                   creation_mode,
@@ -3156,110 +3326,131 @@ export function createMultimodalGuidedCreationService(
               and creation_mode = $3
               and deleted_at is null
             for update`,
-          [sessionId, input.authUserId, CREATION_MODE],
-        );
-        const sessionRow = sessionResult.rows[0];
-        if (!sessionRow) {
-          fail('GUIDED_SESSION_NOT_FOUND', '没有找到这个多模态会话', 404);
-        }
+            [sessionId, input.authUserId, CREATION_MODE],
+          );
+          const sessionRow = sessionResult.rows[0];
+          if (!sessionRow) {
+            fail('GUIDED_SESSION_NOT_FOUND', '没有找到这个多模态会话', 404);
+          }
 
-        const { detail } = parseSessionRowForMutation(sessionRow);
-        const mediaState = detail.mediaState;
-        const pendingForHash = mediaState.pendingUpload;
-        if (!pendingForHash) {
-          fail('UPLOAD_ALREADY_CONFIRMED', '该上传已经确认或正在验证中', 409);
-        }
-        const requestHash = buildUploadConfirmRequestHash({
-          action: 'skill.media.upload.confirm',
-          sessionId,
-          sourceId: pendingForHash.sourceId,
-          objectKey: pendingForHash.objectKey,
-          declaredMimeType: pendingForHash.declaredMimeType,
-          sizeBytes: pendingForHash.sizeBytes,
-          uploadMode: pendingForHash.uploadMode,
-          intentRevisionNo: pendingForHash.intentRevisionNo,
-          parts: input.parts,
-        });
+          const { detail } = parseSessionRowForMutation(sessionRow);
+          const mediaState = detail.mediaState;
+          const pendingForHash = mediaState.pendingUpload;
+          if (!pendingForHash) {
+            fail('UPLOAD_ALREADY_CONFIRMED', '该上传已经确认或正在验证中', 409);
+          }
+          const requestHash = buildUploadConfirmRequestHash({
+            action: 'skill.media.upload.confirm',
+            sessionId,
+            sourceId: pendingForHash.sourceId,
+            objectKey: pendingForHash.objectKey,
+            declaredMimeType: pendingForHash.declaredMimeType,
+            sizeBytes: pendingForHash.sizeBytes,
+            uploadMode: pendingForHash.uploadMode,
+            intentRevisionNo: pendingForHash.intentRevisionNo,
+            parts: input.parts,
+          });
 
-        const existingReceipt = getUploadConfirmReceipt(mediaState, idempotencyKey);
-        if (existingReceipt) {
-          if (existingReceipt.requestHash !== requestHash) {
+          const existingReceipt = getUploadConfirmReceipt(
+            mediaState,
+            idempotencyKey,
+          );
+          if (existingReceipt) {
+            if (existingReceipt.requestHash !== requestHash) {
+              fail(
+                'IDEMPOTENCY_KEY_REUSED',
+                '相同 idempotencyKey 不能复用于不同请求',
+                409,
+              );
+            }
+            const pending = mediaState.pendingUpload;
+            if (
+              !pending ||
+              pending.materialStatus !== 'verifying' ||
+              !pending.verification ||
+              pending.verification.idempotencyKey !== idempotencyKey ||
+              pending.verification.requestHash !== requestHash
+            ) {
+              fail(
+                'MULTIMODAL_SESSION_FAILED',
+                '上传确认 receipt 与 verification 不一致',
+                500,
+              );
+            }
+            return {
+              kind: 'replay',
+              result: {
+                sessionId,
+                revisionNo: existingReceipt.resultRevisionNo,
+                mediaStage: 'uploading' as const,
+                materialStatus: 'verifying' as const,
+                jobId: pending.verification.jobId,
+                observedSizeBytes: pending.verification.observedSizeBytes,
+                observedContentType: pending.verification.observedContentType,
+                jobType: 'media_quality_check' as const,
+                replayed: true,
+              },
+            } satisfies UploadConfirmPreflight;
+          }
+
+          const pendingUpload = mediaState.pendingUpload;
+          if (!pendingUpload) {
+            fail('UPLOAD_NOT_STARTED', '没有进行中的上传', 422);
+          }
+          if (pendingUpload.materialStatus !== 'uploading') {
+            fail('UPLOAD_ALREADY_CONFIRMED', '该上传已经确认或正在验证中', 409);
+          }
+          if (detail.revisionNo !== expectedRevisionNo) {
             fail(
-              'IDEMPOTENCY_KEY_REUSED',
-              '相同 idempotencyKey 不能复用于不同请求',
+              'SESSION_REVISION_CONFLICT',
+              '会话版本已变化，请刷新后重试',
               409,
             );
           }
-          const pending = mediaState.pendingUpload;
-          if (
-            !pending ||
-            pending.materialStatus !== 'verifying' ||
-            !pending.verification ||
-            pending.verification.idempotencyKey !== idempotencyKey ||
-            pending.verification.requestHash !== requestHash
-          ) {
-            fail('MULTIMODAL_SESSION_FAILED', '上传确认 receipt 与 verification 不一致', 500);
+          if (detail.mediaStage !== 'uploading') {
+            fail('INVALID_MEDIA_STAGE', '当前阶段不允许执行该确认操作', 409);
           }
+
+          if (
+            !verifyUploadIntentToken({
+              token: uploadToken,
+              secret: uploadTokenSecret,
+              binding: {
+                sessionId,
+                authUserId: input.authUserId,
+                sourceId: pendingUpload.sourceId,
+                objectKey: pendingUpload.objectKey,
+                declaredMimeType: pendingUpload.declaredMimeType,
+                sizeBytes: pendingUpload.sizeBytes,
+                uploadMode: pendingUpload.uploadMode,
+                ...(pendingUpload.uploadMode === 'multipart' &&
+                'multipartUploadId' in pendingUpload
+                  ? {
+                      multipartUploadId: (
+                        pendingUpload as PersistedUploadingMultipartPendingUpload
+                      ).multipartUploadId,
+                      partSizeBytes: (
+                        pendingUpload as PersistedUploadingMultipartPendingUpload
+                      ).partSizeBytes,
+                      partCount: (
+                        pendingUpload as PersistedUploadingMultipartPendingUpload
+                      ).partCount,
+                    }
+                  : {}),
+                intentRevisionNo: pendingUpload.intentRevisionNo,
+              },
+              now,
+            })
+          ) {
+            fail('UPLOAD_TOKEN_INVALID', '上传令牌无效', 422);
+          }
+
           return {
-            kind: 'replay',
-            result: {
-              sessionId,
-              revisionNo: existingReceipt.resultRevisionNo,
-              mediaStage: 'uploading' as const,
-              materialStatus: 'verifying' as const,
-              jobId: pending.verification.jobId,
-              observedSizeBytes: pending.verification.observedSizeBytes,
-              observedContentType: pending.verification.observedContentType,
-              jobType: 'media_quality_check' as const,
-              replayed: true,
-            },
+            kind: 'execute',
+            pendingUpload: pendingUpload as UploadingPendingUpload,
           } satisfies UploadConfirmPreflight;
-        }
-
-        const pendingUpload = mediaState.pendingUpload;
-        if (!pendingUpload) {
-          fail('UPLOAD_NOT_STARTED', '没有进行中的上传', 422);
-        }
-        if (pendingUpload.materialStatus !== 'uploading') {
-          fail('UPLOAD_ALREADY_CONFIRMED', '该上传已经确认或正在验证中', 409);
-        }
-        if (detail.revisionNo !== expectedRevisionNo) {
-          fail('SESSION_REVISION_CONFLICT', '会话版本已变化，请刷新后重试', 409);
-        }
-        if (detail.mediaStage !== 'uploading') {
-          fail('INVALID_MEDIA_STAGE', '当前阶段不允许执行该确认操作', 409);
-        }
-
-        if (!verifyUploadIntentToken({
-          token: uploadToken,
-          secret: uploadTokenSecret,
-          binding: {
-            sessionId,
-            authUserId: input.authUserId,
-            sourceId: pendingUpload.sourceId,
-            objectKey: pendingUpload.objectKey,
-            declaredMimeType: pendingUpload.declaredMimeType,
-            sizeBytes: pendingUpload.sizeBytes,
-            uploadMode: pendingUpload.uploadMode,
-            ...(pendingUpload.uploadMode === 'multipart' && 'multipartUploadId' in pendingUpload
-              ? {
-                  multipartUploadId: (pendingUpload as PersistedUploadingMultipartPendingUpload).multipartUploadId,
-                  partSizeBytes: (pendingUpload as PersistedUploadingMultipartPendingUpload).partSizeBytes,
-                  partCount: (pendingUpload as PersistedUploadingMultipartPendingUpload).partCount,
-                }
-              : {}),
-            intentRevisionNo: pendingUpload.intentRevisionNo,
-          },
-          now,
-        })) {
-          fail('UPLOAD_TOKEN_INVALID', '上传令牌无效', 422);
-        }
-
-        return {
-          kind: 'execute',
-          pendingUpload: pendingUpload as UploadingPendingUpload,
-        } satisfies UploadConfirmPreflight;
-      });
+        },
+      );
 
       if (preflight.kind === 'replay') {
         return preflight.result;
@@ -3278,15 +3469,24 @@ export function createMultimodalGuidedCreationService(
       });
 
       if (pendingUpload.uploadMode === 'multipart') {
-        const multipartUpload = pendingUpload as PersistedUploadingMultipartPendingUpload;
+        const multipartUpload =
+          pendingUpload as PersistedUploadingMultipartPendingUpload;
         const partCount = multipartUpload.partCount;
         const parts = input.parts;
         if (!parts || parts.length !== partCount) {
-          fail('UPLOAD_CONFIRM_PARTS', `multipart 需要 ${partCount} 个 part 的 ETag 列表`, 422);
+          fail(
+            'UPLOAD_CONFIRM_PARTS',
+            `multipart 需要 ${partCount} 个 part 的 ETag 列表`,
+            422,
+          );
         }
         for (let i = 0; i < parts.length; i += 1) {
           if (parts[i].partNumber !== i + 1) {
-            fail('UPLOAD_CONFIRM_PARTS', `part 编号必须从 1 开始连续到 ${partCount}`, 422);
+            fail(
+              'UPLOAD_CONFIRM_PARTS',
+              `part 编号必须从 1 开始连续到 ${partCount}`,
+              422,
+            );
           }
           if (typeof parts[i].etag !== 'string' || !parts[i].etag.trim()) {
             fail('UPLOAD_CONFIRM_PARTS', 'ETag 不能为空', 422);
@@ -3303,7 +3503,8 @@ export function createMultimodalGuidedCreationService(
       let observed: { sizeBytes: number; contentType: string } | null = null;
 
       if (pendingUpload.uploadMode === 'multipart') {
-        const multipartUpload = pendingUpload as PersistedUploadingMultipartPendingUpload;
+        const multipartUpload =
+          pendingUpload as PersistedUploadingMultipartPendingUpload;
         try {
           await objectStorageService.completeMultipartUpload({
             objectKey: multipartUpload.objectKey,
@@ -3311,11 +3512,16 @@ export function createMultimodalGuidedCreationService(
             parts: input.parts!,
           });
         } catch (error) {
-          const headInfo = await objectStorageService.headObject({
-            objectKey: multipartUpload.objectKey,
-          }).catch(() => null);
+          const headInfo = await objectStorageService
+            .headObject({
+              objectKey: multipartUpload.objectKey,
+            })
+            .catch(() => null);
           if (headInfo) {
-            observed = { sizeBytes: headInfo.sizeBytes, contentType: headInfo.contentType };
+            observed = {
+              sizeBytes: headInfo.sizeBytes,
+              contentType: headInfo.contentType,
+            };
           } else {
             throw error;
           }
@@ -3325,19 +3531,26 @@ export function createMultimodalGuidedCreationService(
           const headInfo = await objectStorageService.headObject({
             objectKey: multipartUpload.objectKey,
           });
-          observed = { sizeBytes: headInfo.sizeBytes, contentType: headInfo.contentType };
+          observed = {
+            sizeBytes: headInfo.sizeBytes,
+            contentType: headInfo.contentType,
+          };
         }
       } else {
         const headInfo = await objectStorageService.headObject({
           objectKey: pendingUpload.objectKey,
         });
-        observed = { sizeBytes: headInfo.sizeBytes, contentType: headInfo.contentType };
+        observed = {
+          sizeBytes: headInfo.sizeBytes,
+          contentType: headInfo.contentType,
+        };
       }
 
       if (!observed) {
         fail('UPLOAD_NOT_FOUND', '上传对象不存在', 422);
       }
-      const { sizeBytes: observedSizeBytes, contentType: observedContentType } = observed;
+      const { sizeBytes: observedSizeBytes, contentType: observedContentType } =
+        observed;
 
       if (observedSizeBytes !== pendingUpload.sizeBytes) {
         fail('FILE_MISMATCH', '文件大小与预期不符', 422);
@@ -3374,7 +3587,10 @@ export function createMultimodalGuidedCreationService(
         const { detail } = parseSessionRowForMutation(sessionRow);
         const mediaState = detail.mediaState;
 
-        const existingReceipt = getUploadConfirmReceipt(mediaState, idempotencyKey);
+        const existingReceipt = getUploadConfirmReceipt(
+          mediaState,
+          idempotencyKey,
+        );
         if (existingReceipt) {
           if (existingReceipt.requestHash !== requestHash) {
             fail(
@@ -3391,7 +3607,11 @@ export function createMultimodalGuidedCreationService(
             pending.verification.idempotencyKey !== idempotencyKey ||
             pending.verification.requestHash !== requestHash
           ) {
-            fail('MULTIMODAL_SESSION_FAILED', '上传确认 receipt 与 verification 不一致', 500);
+            fail(
+              'MULTIMODAL_SESSION_FAILED',
+              '上传确认 receipt 与 verification 不一致',
+              500,
+            );
           }
           return {
             sessionId,
@@ -3417,7 +3637,11 @@ export function createMultimodalGuidedCreationService(
           fail('INVALID_MEDIA_STAGE', '当前阶段不允许执行该确认操作', 409);
         }
         if (detail.revisionNo !== expectedRevisionNo) {
-          fail('SESSION_REVISION_CONFLICT', '会话版本已变化，请刷新后重试', 409);
+          fail(
+            'SESSION_REVISION_CONFLICT',
+            '会话版本已变化，请刷新后重试',
+            409,
+          );
         }
 
         const recordedAt = now().toISOString();
@@ -3507,7 +3731,11 @@ export function createMultimodalGuidedCreationService(
         );
         const updatedRow = updateResult.rows[0];
         if (!updateResult.rowCount || !updatedRow) {
-          fail('SESSION_REVISION_CONFLICT', '会话版本已变化，请刷新后重试', 409);
+          fail(
+            'SESSION_REVISION_CONFLICT',
+            '会话版本已变化，请刷新后重试',
+            409,
+          );
         }
         parseSessionRowForMutation(updatedRow);
 
@@ -3606,10 +3834,10 @@ export function createMultimodalGuidedCreationService(
               processingConfig !== null &&
               typeof processingConfig === 'object' &&
               !Array.isArray(processingConfig) &&
-              (processingConfig as Record<string, unknown>).understandingMode ===
-                understandingMode &&
-              (processingConfig as Record<string, unknown>).transcriptionMode ===
-                transcriptionMode;
+              (processingConfig as Record<string, unknown>)
+                .understandingMode === understandingMode &&
+              (processingConfig as Record<string, unknown>)
+                .transcriptionMode === transcriptionMode;
             const replayHash = buildProcessStartRequestHash({
               sessionId,
               expectedRevisionNo,
@@ -3630,15 +3858,17 @@ export function createMultimodalGuidedCreationService(
               revisionNo: detail.revisionNo,
               mediaStage: 'preparing_media',
               job: toJobActionResult(replayJob),
-              pipelinePlan: readProcessingPipelinePlan(
-                replayJob.inputManifest,
-              ),
+              pipelinePlan: readProcessingPipelinePlan(replayJob.inputManifest),
               replayed: true,
             };
           }
         }
         if (detail.revisionNo !== expectedRevisionNo) {
-          fail('SESSION_REVISION_CONFLICT', '会话版本已变化，请刷新后重试', 409);
+          fail(
+            'SESSION_REVISION_CONFLICT',
+            '会话版本已变化，请刷新后重试',
+            409,
+          );
         }
         if (detail.mediaStage !== 'ready_to_process') {
           fail('INVALID_STATE_TRANSITION', '当前阶段不能启动媒体处理', 409);
@@ -3695,7 +3925,8 @@ export function createMultimodalGuidedCreationService(
         }
 
         const pipelinePlan = {
-          transcribe: primarySource.kind === 'audio' || qualityOutput.probe.hasAudio,
+          transcribe:
+            primarySource.kind === 'audio' || qualityOutput.probe.hasAudio,
           frameMaterialize: primarySource.kind === 'video',
           visualOnly:
             primarySource.kind === 'video' && !qualityOutput.probe.hasAudio,
@@ -3767,7 +3998,11 @@ export function createMultimodalGuidedCreationService(
         );
         const updatedRow = updated.rows[0];
         if (!updatedRow) {
-          fail('SESSION_REVISION_CONFLICT', '会话版本已变化，请刷新后重试', 409);
+          fail(
+            'SESSION_REVISION_CONFLICT',
+            '会话版本已变化，请刷新后重试',
+            409,
+          );
         }
         const updatedDetail = mapSessionRowInternal(updatedRow);
         return {
@@ -3847,7 +4082,11 @@ export function createMultimodalGuidedCreationService(
           detail.mediaStage !== 'failed';
         if (!isFreshRetry && !isReplayCandidate) {
           if (detail.revisionNo !== expectedRevisionNo) {
-            fail('SESSION_REVISION_CONFLICT', '会话版本已变化，请刷新后重试', 409);
+            fail(
+              'SESSION_REVISION_CONFLICT',
+              '会话版本已变化，请刷新后重试',
+              409,
+            );
           }
           fail('INVALID_STATE_TRANSITION', '当前会话没有可重试的失败阶段', 409);
         }
@@ -3882,11 +4121,13 @@ export function createMultimodalGuidedCreationService(
           RETRYABLE_AFTER_WORKER_UPGRADE.has(
             `${failedJob.jobType}:${failedJob.error?.code ?? ''}`,
           );
-        const resumeFromStage = failedJob.error?.details &&
+        const resumeFromStage =
+          failedJob.error?.details &&
           typeof failedJob.error.details === 'object' &&
           !Array.isArray(failedJob.error.details)
-          ? (failedJob.error.details as Record<string, unknown>).resumeFromStage
-          : undefined;
+            ? (failedJob.error.details as Record<string, unknown>)
+                .resumeFromStage
+            : undefined;
         if (
           failedJob.status !== 'failed' ||
           !retryable ||
@@ -3900,7 +4141,9 @@ export function createMultimodalGuidedCreationService(
           assertResumeFromFailed(resumeStage);
           assertMediaStageGate({
             targetStage: resumeStage,
-            confirmedStages: parseConfirmedStages(row.confirmed_stages_json ?? []),
+            confirmedStages: parseConfirmedStages(
+              row.confirmed_stages_json ?? [],
+            ),
           });
         } catch {
           fail('NOT_RETRYABLE', '失败任务没有合法的恢复阶段', 422);
@@ -3914,7 +4157,11 @@ export function createMultimodalGuidedCreationService(
         });
         if (isReplayCandidate) {
           if (detail.mediaStage !== resumeStage) {
-            fail('SESSION_REVISION_CONFLICT', '会话版本已变化，请刷新后重试', 409);
+            fail(
+              'SESSION_REVISION_CONFLICT',
+              '会话版本已变化，请刷新后重试',
+              409,
+            );
           }
           const replayResult = await db.query<JobRow>(
             `select id,
@@ -3940,7 +4187,11 @@ export function createMultimodalGuidedCreationService(
           );
           const replayRow = replayResult.rows[0];
           if (!replayRow) {
-            fail('SESSION_REVISION_CONFLICT', '会话版本已变化，请刷新后重试', 409);
+            fail(
+              'SESSION_REVISION_CONFLICT',
+              '会话版本已变化，请刷新后重试',
+              409,
+            );
           }
           const replayJob = parseJobRow(replayRow);
           if (!safeCompareHexHash(replayJob.requestHash, requestHash)) {
@@ -4002,7 +4253,11 @@ export function createMultimodalGuidedCreationService(
         );
         const updatedRow = updated.rows[0];
         if (!updatedRow) {
-          fail('SESSION_REVISION_CONFLICT', '会话版本已变化，请刷新后重试', 409);
+          fail(
+            'SESSION_REVISION_CONFLICT',
+            '会话版本已变化，请刷新后重试',
+            409,
+          );
         }
         return {
           sessionId,
@@ -4055,7 +4310,11 @@ export function createMultimodalGuidedCreationService(
         }
         const detail = mapSessionRowInternal(row);
         if (detail.revisionNo !== expectedRevisionNo) {
-          fail('SESSION_REVISION_CONFLICT', '会话版本已变化，请刷新后重试', 409);
+          fail(
+            'SESSION_REVISION_CONFLICT',
+            '会话版本已变化，请刷新后重试',
+            409,
+          );
         }
         if (!canCancelMediaStage(detail.mediaStage)) {
           fail('INVALID_STATE_TRANSITION', '当前阶段不能取消', 409);
@@ -4102,11 +4361,21 @@ export function createMultimodalGuidedCreationService(
                     revision_no,
                     created_at,
                     updated_at`,
-          [sessionId, input.authUserId, CREATION_MODE, timestamp, expectedRevisionNo],
+          [
+            sessionId,
+            input.authUserId,
+            CREATION_MODE,
+            timestamp,
+            expectedRevisionNo,
+          ],
         );
         const updatedRow = updated.rows[0];
         if (!updatedRow) {
-          fail('SESSION_REVISION_CONFLICT', '会话版本已变化，请刷新后重试', 409);
+          fail(
+            'SESSION_REVISION_CONFLICT',
+            '会话版本已变化，请刷新后重试',
+            409,
+          );
         }
         return {
           sessionId,
@@ -4154,12 +4423,17 @@ export function createMultimodalGuidedCreationService(
         }
         const detail = mapSessionRowInternal(row);
         if (detail.revisionNo !== expectedRevisionNo) {
-          fail('SESSION_REVISION_CONFLICT', '会话版本已变化，请刷新后重试', 409);
+          fail(
+            'SESSION_REVISION_CONFLICT',
+            '会话版本已变化，请刷新后重试',
+            409,
+          );
         }
         if (
           detail.mediaStage === 'published' ||
           detail.status === 'completed' ||
-          row.package_version_id !== null && row.package_version_id !== undefined
+          (row.package_version_id !== null &&
+            row.package_version_id !== undefined)
         ) {
           fail('PUBLISHED_ASSET_IN_USE', '已发布资产不能通过工作区删除', 409);
         }
@@ -4194,11 +4468,21 @@ export function createMultimodalGuidedCreationService(
               and deleted_at is null
               and revision_no = $5
           returning id, revision_no, deleted_at`,
-          [sessionId, input.authUserId, CREATION_MODE, timestamp, expectedRevisionNo],
+          [
+            sessionId,
+            input.authUserId,
+            CREATION_MODE,
+            timestamp,
+            expectedRevisionNo,
+          ],
         );
         const deletedRow = deleted.rows[0];
         if (!deletedRow) {
-          fail('SESSION_REVISION_CONFLICT', '会话版本已变化，请刷新后重试', 409);
+          fail(
+            'SESSION_REVISION_CONFLICT',
+            '会话版本已变化，请刷新后重试',
+            409,
+          );
         }
         return {
           sessionId: persistedPositiveId(String(deletedRow.id), 'sessionId'),
@@ -4212,7 +4496,10 @@ export function createMultimodalGuidedCreationService(
       authUserId: string;
       limit?: number;
       cursor?: string;
-    }): Promise<{ items: MultimodalSessionSummary[]; nextCursor: string | null }> {
+    }): Promise<{
+      items: MultimodalSessionSummary[];
+      nextCursor: string | null;
+    }> {
       const limit = normalizeLimit(input.limit);
       const cursor = normalizeCursor(input.cursor);
       const values: unknown[] = [input.authUserId];
@@ -4276,7 +4563,11 @@ export function createMultimodalGuidedCreationService(
             and user_id = $2
             and creation_mode = $3
             and deleted_at is null`,
-        [positiveId(input.sessionId, 'sessionId'), input.authUserId, CREATION_MODE],
+        [
+          positiveId(input.sessionId, 'sessionId'),
+          input.authUserId,
+          CREATION_MODE,
+        ],
       );
       const row = result.rows[0];
       if (!row) {

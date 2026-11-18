@@ -48,8 +48,7 @@ describe('media distillation job contracts', () => {
     });
 
     expect(output.visualSignals.slowVisualChangeTimestampsMs).toEqual([
-      30_000,
-      90_000,
+      30_000, 90_000,
     ]);
     expect(buildDistillationResultHash(output)).toMatch(/^[a-f0-9]{64}$/);
   });
@@ -66,7 +65,12 @@ describe('media distillation job contracts', () => {
         editable: true,
         segments: [
           { startMs: 0, endMs: 8_000, text: '先定义概念', confidence: 0.96 },
-          { startMs: 8_000, endMs: 20_000, text: '再演示步骤', confidence: 0.91 },
+          {
+            startMs: 8_000,
+            endMs: 20_000,
+            text: '再演示步骤',
+            confidence: 0.91,
+          },
         ],
       },
       transcriptAssetRef: {
@@ -204,27 +208,38 @@ describe('media distillation job contracts', () => {
   });
 
   it('derives immutable attempt-scoped artifact keys', () => {
-    expect(buildNormalizedAudioKey({ sessionId: '101', jobId: '701', attemptNo: 2 }))
-      .toBe('skill-sessions/101/jobs/701/attempt-2/normalized-audio.wav');
-    expect(buildTranscriptAssetKey({ sessionId: '101', jobId: '702', attemptNo: 1 }))
-      .toBe('skill-sessions/101/jobs/702/attempt-1/transcript.json');
-    expect(buildTranscriptChunkManifestKey({
-      sessionId: '101',
-      jobId: '702',
-      attemptNo: 2,
-      chunkIndex: 3,
-    })).toBe(
+    expect(
+      buildNormalizedAudioKey({ sessionId: '101', jobId: '701', attemptNo: 2 }),
+    ).toBe('skill-sessions/101/jobs/701/attempt-2/normalized-audio.wav');
+    expect(
+      buildTranscriptAssetKey({ sessionId: '101', jobId: '702', attemptNo: 1 }),
+    ).toBe('skill-sessions/101/jobs/702/attempt-1/transcript.json');
+    expect(
+      buildTranscriptChunkManifestKey({
+        sessionId: '101',
+        jobId: '702',
+        attemptNo: 2,
+        chunkIndex: 3,
+      }),
+    ).toBe(
       'skill-sessions/101/jobs/702/attempt-2/transcript-chunks/chunk-0003.json',
     );
-    expect(buildFrameAssetKey({
-      sessionId: '101',
-      jobId: '703',
-      attemptNo: 1,
-      candidateId: 'frame-candidate-001',
-    })).toBe(
+    expect(
+      buildFrameAssetKey({
+        sessionId: '101',
+        jobId: '703',
+        attemptNo: 1,
+        candidateId: 'frame-candidate-001',
+      }),
+    ).toBe(
       'skill-sessions/101/jobs/703/attempt-1/frames/frame-candidate-001.png',
     );
-    expect(buildJobResultManifestKey({ sessionId: '101', jobId: '703', attemptNo: 1 }))
-      .toBe('skill-sessions/101/jobs/703/attempt-1/result.json');
+    expect(
+      buildJobResultManifestKey({
+        sessionId: '101',
+        jobId: '703',
+        attemptNo: 1,
+      }),
+    ).toBe('skill-sessions/101/jobs/703/attempt-1/result.json');
   });
 });

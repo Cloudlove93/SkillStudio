@@ -2244,7 +2244,7 @@ export async function createPackageWithSnapshotTx(
   const fixedSnapshot = ensureSkillIds(snapshot);
   if (source === 'imported') {
     delete fixedSnapshot.sourceSessionId;
-    fixedSnapshot.skills = fixedSnapshot.skills.map(skill => {
+    fixedSnapshot.skills = fixedSnapshot.skills.map((skill) => {
       const copy = { ...skill };
       delete copy.originPackageId;
       delete copy.originSkillId;
@@ -2672,7 +2672,8 @@ export async function generatePackage(
 ) {
   if (
     requestId !== undefined &&
-    (typeof requestId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/.test(requestId))
+    (typeof requestId !== 'string' ||
+      !/^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/.test(requestId))
   )
     throw new Error('生成请求标识无效，请重新发起生成');
   const requestHash = createHash('sha256')
@@ -2784,7 +2785,7 @@ async function importPackageWithVersions(
       });
       // ZIP 导入产生新资源，不能信任其他实例导出的数据库 ID。
       delete enrichedSnapshot.sourceSessionId;
-      enrichedSnapshot.skills = enrichedSnapshot.skills.map(skill => {
+      enrichedSnapshot.skills = enrichedSnapshot.skills.map((skill) => {
         const copy = { ...skill };
         delete copy.originPackageId;
         delete copy.originSkillId;

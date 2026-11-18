@@ -12,7 +12,9 @@ import { MultimodalProgressStep } from './MultimodalProgressStep';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
-function detail(mediaStage: MediaSessionDetail['mediaStage']): MediaSessionDetail {
+function detail(
+  mediaStage: MediaSessionDetail['mediaStage'],
+): MediaSessionDetail {
   return {
     sessionId: '101',
     displayName: '函数课程蒸馏',
@@ -150,11 +152,11 @@ describe('multimodal progress presentation', () => {
     expect(nodes[0]?.getAttribute('data-status')).toBe('complete');
     expect(nodes[1]?.getAttribute('data-status')).toBe('future');
     expect(nodes[0]?.getAttribute('aria-label')).toBe('安全校验：已完成');
-    expect(nodes[1]?.getAttribute('aria-label')).toBe(
-      '媒体预处理：未开始',
-    );
+    expect(nodes[1]?.getAttribute('aria-label')).toBe('媒体预处理：未开始');
     expect(
-      container.querySelector('[role="progressbar"]')?.getAttribute('aria-valuenow'),
+      container
+        .querySelector('[role="progressbar"]')
+        ?.getAttribute('aria-valuenow'),
     ).toBe('100');
     expect(container.textContent).toContain('素材安全校验已完成');
     expect(container.textContent).toContain('开始蒸馏');
@@ -226,7 +228,9 @@ describe('multimodal progress presentation', () => {
     expect(container.textContent).not.toContain('transcribe');
     expect(container.textContent).not.toContain('开始蒸馏');
     expect(
-      container.querySelector('[role="progressbar"]')?.getAttribute('aria-valuenow'),
+      container
+        .querySelector('[role="progressbar"]')
+        ?.getAttribute('aria-valuenow'),
     ).toBe('15');
   });
 });

@@ -59,8 +59,7 @@ const STATUS_LABELS: Record<ArenaAnswerOptimizationStatus, string> = {
 const FAILURE_LABELS: Readonly<Record<string, string>> = {
   feedback_not_reusable:
     '这条要求更适合只修改当前回答，不建议写入以后所有类似回答的规则',
-  feedback_unclear:
-    '这条意见还不够具体，请说明希望保留、删除或加强哪部分内容',
+  feedback_unclear: '这条意见还不够具体，请说明希望保留、删除或加强哪部分内容',
   operation_interrupted: '上次操作被中断，请重新尝试',
   replay_context_unavailable: '缺少完整上下文记录，无法继续优化',
   replay_model_unavailable: '缺少实际模型记录，无法继续优化',
@@ -339,11 +338,7 @@ export function getConfirmBlockReason(
     return '该历史回答缺少完整生成记录，不能保存优化版本';
   }
   if (detail.status !== 'test_ready') return '请先完成草稿重测';
-  if (
-    !detail.targetSkill ||
-    !detail.patch ||
-    !detail.draft?.validation.valid
-  ) {
+  if (!detail.targetSkill || !detail.patch || !detail.draft?.validation.valid) {
     return '当前规则草稿不完整或未通过格式校验';
   }
   const result = detail.testResult;
@@ -390,8 +385,7 @@ export function getAnswerOptimizationAvailableActions(
     canRegenerateAlternative:
       replayAvailable && hasValidDraft && detail.status === 'draft_ready',
     canConfirm: confirmBlockReason === null,
-    confirmNeedsAdvisory:
-      confirmBlockReason === null && previewHasIssues,
+    confirmNeedsAdvisory: confirmBlockReason === null && previewHasIssues,
   };
 }
 

@@ -11,7 +11,10 @@ const settingsSource = readFileSync(
 test('retired legacy screens are no longer reachable and workflow demo stays routed', () => {
   assert.doesNotMatch(appSource, /import Workspace from/);
   assert.doesNotMatch(appSource, /import AgentProfileWorkflow from/);
-  assert.match(appSource, /path="\/legacy" element=\{<Navigate to="\/" replace \/>\}/);
+  assert.match(
+    appSource,
+    /path="\/legacy" element=\{<Navigate to="\/" replace \/>\}/,
+  );
   assert.match(appSource, /path="\/workflow" element=\{<WorkflowDemo \/>\}/);
   assert.doesNotMatch(settingsSource, /to="\/workflow"/);
 });

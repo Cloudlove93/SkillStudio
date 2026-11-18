@@ -78,96 +78,96 @@ export function WorkspaceInspector({
 
   return (
     <>
-    <aside
-      className={`skill-context workspace-inspector ${skillNavigation ? 'has-skill-navigation' : ''} ${state.open ? 'is-open' : 'is-collapsed'} ${state.fullscreen ? 'is-fullscreen' : ''}`}
-      style={inspectorStyle}
-      aria-label={
-        state.open ? state.descriptor?.title || '详细信息' : '右侧工具栏'
-      }
-    >
-      <div className="workspace-inspector-rail" aria-hidden={state.open}>
-        {!state.open && skillNavigation ? (
-          <SkillFunctionLauncher navigation={skillNavigation} />
-        ) : null}
-        <button
-          className="skill-icon-button"
-          type="button"
-          onClick={() => openInspector(defaultDescriptor)}
-          aria-label="展开右侧栏"
-          title="展开右侧栏"
-          tabIndex={state.open ? -1 : 0}
-        >
-          <PanelRightOpen size={18} aria-hidden="true" />
-        </button>
-      </div>
+      <aside
+        className={`skill-context workspace-inspector ${skillNavigation ? 'has-skill-navigation' : ''} ${state.open ? 'is-open' : 'is-collapsed'} ${state.fullscreen ? 'is-fullscreen' : ''}`}
+        style={inspectorStyle}
+        aria-label={
+          state.open ? state.descriptor?.title || '详细信息' : '右侧工具栏'
+        }
+      >
+        <div className="workspace-inspector-rail" aria-hidden={state.open}>
+          {!state.open && skillNavigation ? (
+            <SkillFunctionLauncher navigation={skillNavigation} />
+          ) : null}
+          <button
+            className="skill-icon-button"
+            type="button"
+            onClick={() => openInspector(defaultDescriptor)}
+            aria-label="展开右侧栏"
+            title="展开右侧栏"
+            tabIndex={state.open ? -1 : 0}
+          >
+            <PanelRightOpen size={18} aria-hidden="true" />
+          </button>
+        </div>
 
-      <div className="workspace-inspector-panel" aria-hidden={!state.open}>
-        {state.open && !state.fullscreen && (
-          <div
-            className="workspace-inspector-resize"
-            role="separator"
-            aria-label="调整右侧栏宽度"
-            aria-orientation="vertical"
-            aria-valuemin={320}
-            aria-valuemax={520}
-            aria-valuenow={width}
-            tabIndex={0}
-            onKeyDown={resizeWithKeyboard}
-            onPointerDown={startResize}
-            onPointerMove={continueResize}
-            onPointerUp={stopResize}
-            onPointerCancel={stopResize}
-          />
-        )}
-        <header className="workspace-inspector-header">
-          <div>
-            <span className="skill-eyebrow">详细信息</span>
-            <h2>{state.descriptor?.title || '当前任务'}</h2>
-            {state.descriptor?.description && (
-              <p>{state.descriptor.description}</p>
-            )}
-          </div>
-          <div className="workspace-inspector-actions">
-            <button
-              className="skill-icon-button"
-              type="button"
-              onClick={toggleInspectorFullscreen}
-              aria-label={state.fullscreen ? '退出全屏' : '全屏查看右侧栏'}
-              title={state.fullscreen ? '退出全屏' : '全屏查看右侧栏'}
-            >
-              {state.fullscreen ? (
-                <Minimize2 size={16} aria-hidden="true" />
-              ) : (
-                <Maximize2 size={16} aria-hidden="true" />
+        <div className="workspace-inspector-panel" aria-hidden={!state.open}>
+          {state.open && !state.fullscreen && (
+            <div
+              className="workspace-inspector-resize"
+              role="separator"
+              aria-label="调整右侧栏宽度"
+              aria-orientation="vertical"
+              aria-valuemin={320}
+              aria-valuemax={520}
+              aria-valuenow={width}
+              tabIndex={0}
+              onKeyDown={resizeWithKeyboard}
+              onPointerDown={startResize}
+              onPointerMove={continueResize}
+              onPointerUp={stopResize}
+              onPointerCancel={stopResize}
+            />
+          )}
+          <header className="workspace-inspector-header">
+            <div>
+              <span className="skill-eyebrow">详细信息</span>
+              <h2>{state.descriptor?.title || '当前任务'}</h2>
+              {state.descriptor?.description && (
+                <p>{state.descriptor.description}</p>
               )}
-            </button>
-            <button
-              className="skill-icon-button"
-              type="button"
-              onClick={requestClose}
-              aria-label="收起右侧栏"
-              title="收起右侧栏"
-            >
-              <PanelRightClose size={17} aria-hidden="true" />
-            </button>
-          </div>
-        </header>
-        <div
-          ref={setOutlet}
-          className="workspace-inspector-outlet"
-          data-workspace-inspector-outlet
+            </div>
+            <div className="workspace-inspector-actions">
+              <button
+                className="skill-icon-button"
+                type="button"
+                onClick={toggleInspectorFullscreen}
+                aria-label={state.fullscreen ? '退出全屏' : '全屏查看右侧栏'}
+                title={state.fullscreen ? '退出全屏' : '全屏查看右侧栏'}
+              >
+                {state.fullscreen ? (
+                  <Minimize2 size={16} aria-hidden="true" />
+                ) : (
+                  <Maximize2 size={16} aria-hidden="true" />
+                )}
+              </button>
+              <button
+                className="skill-icon-button"
+                type="button"
+                onClick={requestClose}
+                aria-label="收起右侧栏"
+                title="收起右侧栏"
+              >
+                <PanelRightClose size={17} aria-hidden="true" />
+              </button>
+            </div>
+          </header>
+          <div
+            ref={setOutlet}
+            className="workspace-inspector-outlet"
+            data-workspace-inspector-outlet
+          />
+        </div>
+      </aside>
+      {confirmCloseOpen ? (
+        <DiscardInspectorChangesDialog
+          onCancel={() => setConfirmCloseOpen(false)}
+          onConfirm={() => {
+            setConfirmCloseOpen(false);
+            closeInspector({ force: true });
+          }}
         />
-      </div>
-    </aside>
-    {confirmCloseOpen ? (
-      <DiscardInspectorChangesDialog
-        onCancel={() => setConfirmCloseOpen(false)}
-        onConfirm={() => {
-          setConfirmCloseOpen(false);
-          closeInspector({ force: true });
-        }}
-      />
-    ) : null}
+      ) : null}
     </>
   );
 }

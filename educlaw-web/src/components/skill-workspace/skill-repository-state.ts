@@ -14,17 +14,11 @@ export function filterRepositorySkills(
 }
 
 export function clampRepositoryPage(page: number, itemCount: number) {
-  const pageCount = Math.max(
-    1,
-    Math.ceil(itemCount / REPOSITORY_PAGE_SIZE),
-  );
+  const pageCount = Math.max(1, Math.ceil(itemCount / REPOSITORY_PAGE_SIZE));
   return Math.min(Math.max(1, page), pageCount);
 }
 
-export function repositoryPageItems(
-  skills: RepositorySkill[],
-  page: number,
-) {
+export function repositoryPageItems(skills: RepositorySkill[], page: number) {
   const safePage = clampRepositoryPage(page, skills.length);
   const start = (safePage - 1) * REPOSITORY_PAGE_SIZE;
   return skills.slice(start, start + REPOSITORY_PAGE_SIZE);

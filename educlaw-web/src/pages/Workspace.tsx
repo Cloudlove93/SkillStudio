@@ -9,11 +9,19 @@ import { useHomeChatStore } from '../stores/home-chat';
 
 const ChatPanel = lazy(() => import('../components/chat/ChatPanel'));
 const ProfileGallery = lazy(() => import('../components/agent/ProfileGallery'));
-const BuildAgentPanel = lazy(() => import('../components/agent/BuildAgentPanel'));
-const SkillLibraryPanel = lazy(() => import('../components/skill/SkillLibraryPanel'));
-const ToolLibraryPanel = lazy(() => import('../components/tool/ToolLibraryPanel'));
+const BuildAgentPanel = lazy(
+  () => import('../components/agent/BuildAgentPanel'),
+);
+const SkillLibraryPanel = lazy(
+  () => import('../components/skill/SkillLibraryPanel'),
+);
+const ToolLibraryPanel = lazy(
+  () => import('../components/tool/ToolLibraryPanel'),
+);
 const DiaryPanel = lazy(() => import('../components/diary/DiaryPanel'));
-const DeepStudyPanel = lazy(() => import('../components/deep-study/DeepStudyPanel'));
+const DeepStudyPanel = lazy(
+  () => import('../components/deep-study/DeepStudyPanel'),
+);
 const HomeChat = lazy(() => import('../components/home/HomeChat'));
 
 function WorkspacePanelFallback() {
@@ -38,7 +46,9 @@ export default function Workspace() {
   const activeTab = activeTabId ? tabs.get(activeTabId) : undefined;
 
   useEffect(() => {
-    reconcileChatAgents(agents.map((agent) => ({ id: agent.id, name: agent.name })));
+    reconcileChatAgents(
+      agents.map((agent) => ({ id: agent.id, name: agent.name })),
+    );
   }, [agents, reconcileChatAgents]);
 
   function renderMainContent() {
@@ -49,7 +59,8 @@ export default function Workspace() {
     if (mainView === 'tools') return withLazyBoundary(<ToolLibraryPanel />);
     if (mainView === 'diary') return withLazyBoundary(<DiaryPanel />);
     if (activeTab) return withLazyBoundary(<ChatPanel tab={activeTab} />);
-    if (activeSessionId) return withLazyBoundary(<HomeChat sessionId={activeSessionId} />);
+    if (activeSessionId)
+      return withLazyBoundary(<HomeChat sessionId={activeSessionId} />);
 
     // Default: go to Arena
     return withLazyBoundary(<DeepStudyPanel />);

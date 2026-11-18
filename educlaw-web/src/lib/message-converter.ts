@@ -34,7 +34,10 @@ export function convertRuntimeMessage(raw: unknown): Message {
 
 export function convertRuntimePart(raw: unknown): MessagePart {
   const p = raw as Record<string, unknown>;
-  const base = { id: p.id as string | undefined, messageID: p.messageID as string | undefined };
+  const base = {
+    id: p.id as string | undefined,
+    messageID: p.messageID as string | undefined,
+  };
   const state = p.state as Record<string, unknown> | undefined;
 
   switch (p.type) {
@@ -46,10 +49,14 @@ export function convertRuntimePart(raw: unknown): MessagePart {
         toolName: (p.tool as string) ?? 'unknown',
         toolInput: state?.input,
         toolOutput: state?.output,
-        state: state?.status === 'completed' ? 'completed'
-          : state?.status === 'error' ? 'error'
-          : state?.status === 'running' ? 'running'
-          : 'pending',
+        state:
+          state?.status === 'completed'
+            ? 'completed'
+            : state?.status === 'error'
+              ? 'error'
+              : state?.status === 'running'
+                ? 'running'
+                : 'pending',
         ...base,
       };
     case 'reasoning':
@@ -61,7 +68,9 @@ export function convertRuntimePart(raw: unknown): MessagePart {
       return {
         type: 'step-finish',
         finishReason: p.reason as string | undefined,
-        tokens: stepTokens ? { input: stepTokens.input ?? 0, output: stepTokens.output ?? 0 } : undefined,
+        tokens: stepTokens
+          ? { input: stepTokens.input ?? 0, output: stepTokens.output ?? 0 }
+          : undefined,
         ...base,
       };
     }
@@ -74,8 +83,15 @@ export function convertRuntimePart(raw: unknown): MessagePart {
         ...base,
       };
     case 'patch': {
-      const files = p.files as { path: string; additions: number; deletions: number }[] | undefined;
-      return { type: 'patch', patchHash: p.hash as string | undefined, patchFiles: files, ...base };
+      const files = p.files as
+        | { path: string; additions: number; deletions: number }[]
+        | undefined;
+      return {
+        type: 'patch',
+        patchHash: p.hash as string | undefined,
+        patchFiles: files,
+        ...base,
+      };
     }
     case 'snapshot':
       return { type: 'snapshot', snapshot: p.snapshot, ...base };
@@ -95,7 +111,11 @@ export function convertRuntimePart(raw: unknown): MessagePart {
         ...base,
       };
     case 'compaction':
-      return { type: 'compaction', compactionAuto: p.auto as boolean | undefined, ...base };
+      return {
+        type: 'compaction',
+        compactionAuto: p.auto as boolean | undefined,
+        ...base,
+      };
     case 'retry':
       return {
         type: 'retry',
@@ -104,6 +124,10 @@ export function convertRuntimePart(raw: unknown): MessagePart {
         ...base,
       };
     default:
-      return { type: 'text', text: ((p.text ?? p.content) as string) ?? '', ...base };
+      return {
+        type: 'text',
+        text: ((p.text ?? p.content) as string) ?? '',
+        ...base,
+      };
   }
 }

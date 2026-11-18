@@ -5,7 +5,10 @@
  * then updates the same stores that SSE events would.
  */
 import { useChatStore } from '../stores/chat';
-import { useInteractionQueueStore, type QuestionRequest } from '../stores/interaction-queue';
+import {
+  useInteractionQueueStore,
+  type QuestionRequest,
+} from '../stores/interaction-queue';
 import { useTodoStore } from '../stores/todo';
 import { useUIStore } from '../stores/ui';
 import { agentRuntimeApi } from '../api/runtime';
@@ -29,13 +32,24 @@ const knownQuestionIds = new Set<string>();
 
 // ── Scheduling helper ───────────────────────────────────────
 
-function schedule(key: string, fn: () => Promise<void>, getInterval: () => number) {
+function schedule(
+  key: string,
+  fn: () => Promise<void>,
+  getInterval: () => number,
+) {
   if (!active) return;
-  timers.set(key, setTimeout(async () => {
-    if (!active) return;
-    try { await fn(); } catch { /* ignore, retry next tick */ }
-    schedule(key, fn, getInterval);
-  }, getInterval()));
+  timers.set(
+    key,
+    setTimeout(async () => {
+      if (!active) return;
+      try {
+        await fn();
+      } catch {
+        /* ignore, retry next tick */
+      }
+      schedule(key, fn, getInterval);
+    }, getInterval()),
+  );
 }
 
 function clearAll() {
@@ -45,12 +59,21 @@ function clearAll() {
 
 // ── Resolve active tabs ─────────────────────────────────────
 
-function getActiveTabs(): { agentId: string; sessionId: string; isStreaming: boolean }[] {
+function getActiveTabs(): {
+  agentId: string;
+  sessionId: string;
+  isStreaming: boolean;
+}[] {
   const { tabs } = useChatStore.getState();
-  const result: { agentId: string; sessionId: string; isStreaming: boolean }[] = [];
+  const result: { agentId: string; sessionId: string; isStreaming: boolean }[] =
+    [];
   for (const [agentId, tab] of tabs) {
     if (tab.sessionId) {
-      result.push({ agentId, sessionId: tab.sessionId, isStreaming: tab.isStreaming });
+      result.push({
+        agentId,
+        sessionId: tab.sessionId,
+        isStreaming: tab.isStreaming,
+      });
     }
   }
   return result;
@@ -64,8 +87,18 @@ async function pollQuestions() {
 
   for (const { agentId } of tabs) {
     try {
-      const questions = await agentRuntimeApi(agentId).listQuestions() as unknown;
-      const list = (Array.isArray(questions) ? questions : (typeof questions === 'object' && questions !== null && 'data' in questions ? (questions as { data?: unknown }).data : [])) as QuestionRequest[];
+      const questions = (await agentRuntimeApi(
+        agentId,
+      ).listQuestions()) as unknown;
+      const list = (
+        Array.isArray(questions)
+          ? questions
+          : typeof questions === 'object' &&
+              questions !== null &&
+              'data' in questions
+            ? (questions as { data?: unknown }).data
+            : []
+      ) as QuestionRequest[];
       const currentIds = new Set<string>();
 
       for (const q of list) {
@@ -84,7 +117,9 @@ async function pollQuestions() {
           store.removeQuestion(id);
         }
       }
-    } catch { /* agent may not be running */ }
+    } catch {
+      /* agent may not be running */
+    }
   }
 }
 
@@ -99,22 +134,32 @@ async function pollMessages() {
     if (!tab) continue;
 
     try {
-      const rawMessages = await agentRuntimeApi(agentId).listMessages(sessionId) as unknown;
+      const rawMessages = (await agentRuntimeApi(agentId).listMessages(
+        sessionId,
+      )) as unknown;
       if (!Array.isArray(rawMessages)) continue;
 
-      const converted = rawMessages.map((message) => convertRuntimeMessage(message as Record<string, unknown>));
+      const converted = rawMessages.map((message) =>
+        convertRuntimeMessage(message as Record<string, unknown>),
+      );
       const key = `${agentId}:${sessionId}`;
 
       // If there's a temp optimistic message, replace it with the real user message
       // from the server if available, otherwise keep it
-      const hasTempMsg = tab.messages.some((m) => m.id.startsWith('temp-user-'));
+      const hasTempMsg = tab.messages.some((m) =>
+        m.id.startsWith('temp-user-'),
+      );
       if (hasTempMsg && converted.length === 0) continue; // server hasn't processed yet
 
       const newIds = converted.map((m) => m.id);
       const prevIds = lastMessageIds.get(key);
 
       // Only update if messages actually changed
-      if (!prevIds || newIds.length !== prevIds.length || newIds.some((id, i) => id !== prevIds[i])) {
+      if (
+        !prevIds ||
+        newIds.length !== prevIds.length ||
+        newIds.some((id, i) => id !== prevIds[i])
+      ) {
         lastMessageIds.set(key, newIds);
         chat.setMessages(agentId, converted);
 
@@ -123,7 +168,9 @@ async function pollMessages() {
           useUIStore.getState().triggerFileRefresh(agentId);
         }
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 }
 
@@ -135,18 +182,23 @@ async function pollSessionStatus() {
 
   for (const { agentId, sessionId } of tabs) {
     try {
-      const session = await agentRuntimeApi(agentId).getSession(sessionId) as Record<string, unknown> | null;
+      const session = (await agentRuntimeApi(agentId).getSession(
+        sessionId,
+      )) as Record<string, unknown> | null;
       if (!session) continue;
 
       chat.handleSessionUpdate(agentId, session);
 
-      const status = ((session.status as { type?: string } | undefined)
-        ?? ((session.info as { status?: { type?: string } } | undefined)?.status));
+      const status =
+        (session.status as { type?: string } | undefined) ??
+        (session.info as { status?: { type?: string } } | undefined)?.status;
       if (status) {
         const isBusy = status.type === 'busy' || status.type === 'running';
         chat.setStreaming(agentId, isBusy);
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 }
 
@@ -157,10 +209,16 @@ async function pollTodos() {
 
   for (const { agentId, sessionId } of tabs) {
     try {
-      const data = await agentRuntimeApi(agentId).listTodos(sessionId) as unknown;
+      const data = (await agentRuntimeApi(agentId).listTodos(
+        sessionId,
+      )) as unknown;
       const todos = Array.isArray(data) ? data : [];
-      useTodoStore.getState().handleTodoUpdate(agentId, { sessionID: sessionId, todos });
-    } catch { /* ignore */ }
+      useTodoStore
+        .getState()
+        .handleTodoUpdate(agentId, { sessionID: sessionId, todos });
+    } catch {
+      /* ignore */
+    }
   }
 }
 

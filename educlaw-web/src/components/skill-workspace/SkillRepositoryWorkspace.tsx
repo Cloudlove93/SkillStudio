@@ -278,207 +278,211 @@ export function SkillRepositoryWorkspace({
       ) : (
         <>
           <p className="repository-hint">
-            点开 Skill 会连同它的 Agent 一起打开；版本、导出与重命名在卡片右上角。
+            点开 Skill 会连同它的 Agent
+            一起打开；版本、导出与重命名在卡片右上角。
           </p>
-      <div
-        className="skill-repository-tabs"
-        role="tablist"
-        aria-label="Skill 仓库内容"
-      >
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeTab === 'created'}
-          className={activeTab === 'created' ? 'is-active' : ''}
-          onClick={() => {
-            setActiveTab('created');
-            setPage(1);
-          }}
-        >
-          已创建 <span>{created.length}</span>
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeTab === 'drafts'}
-          className={activeTab === 'drafts' ? 'is-active' : ''}
-          onClick={() => {
-            setActiveTab('drafts');
-            stopManaging();
-          }}
-        >
-          未完成草稿 <span>{drafts.length}</span>
-        </button>
-      </div>
-
-      <div className="skill-repository-toolbar">
-        <label className="skill-repository-search">
-          <Search size={16} aria-hidden="true" />
-          <input
-            name="skill-repository-search"
-            type="search"
-            autoComplete="off"
-            value={search}
-            onChange={(event) => {
-              onSearch(event.target.value);
-              setPage(1);
-            }}
-            placeholder="搜索 Skill…"
-          />
-        </label>
-        {activeTab === 'created' && !managing ? (
-          <button
-            type="button"
-            className="skill-repository-manage"
-            onClick={startManaging}
+          <div
+            className="skill-repository-tabs"
+            role="tablist"
+            aria-label="Skill 仓库内容"
           >
-            <CheckSquare2 size={15} aria-hidden="true" />
-            批量管理
-          </button>
-        ) : null}
-      </div>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'created'}
+              className={activeTab === 'created' ? 'is-active' : ''}
+              onClick={() => {
+                setActiveTab('created');
+                setPage(1);
+              }}
+            >
+              已创建 <span>{created.length}</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'drafts'}
+              className={activeTab === 'drafts' ? 'is-active' : ''}
+              onClick={() => {
+                setActiveTab('drafts');
+                stopManaging();
+              }}
+            >
+              未完成草稿 <span>{drafts.length}</span>
+            </button>
+          </div>
 
-      {activeTab === 'created' && managing ? (
-        <div className="skill-repository-bulkbar">
-          <button
-            type="button"
-            onClick={() =>
-              setSelectedSkillIds(
-                allFilteredSelected
-                  ? new Set()
-                  : selectionForFilteredSkills(created, selectedSkillIds),
-              )
-            }
-          >
-            {allFilteredSelected ? '取消全选' : '全选当前搜索结果'}
-          </button>
-          <span>已选择 {selectedSkills.length} 个 Skill</span>
-          <button type="button" onClick={stopManaging}>
-            <X size={14} aria-hidden="true" />
-            取消
-          </button>
-          <button
-            type="button"
-            className="is-destructive"
-            disabled={selectedSkills.length === 0}
-            onClick={() => {
-              setDeleteReturnFocusSkillId(null);
-              setDeleteError('');
-              setPendingDeletion(selectedSkills);
-            }}
-          >
-            <Trash2 size={14} aria-hidden="true" />
-            删除
-          </button>
-        </div>
-      ) : null}
+          <div className="skill-repository-toolbar">
+            <label className="skill-repository-search">
+              <Search size={16} aria-hidden="true" />
+              <input
+                name="skill-repository-search"
+                type="search"
+                autoComplete="off"
+                value={search}
+                onChange={(event) => {
+                  onSearch(event.target.value);
+                  setPage(1);
+                }}
+                placeholder="搜索 Skill…"
+              />
+            </label>
+            {activeTab === 'created' && !managing ? (
+              <button
+                type="button"
+                className="skill-repository-manage"
+                onClick={startManaging}
+              >
+                <CheckSquare2 size={15} aria-hidden="true" />
+                批量管理
+              </button>
+            ) : null}
+          </div>
 
-      {activeTab === 'created' ? (
-        <section
-          className="skill-repository-section"
-          aria-label="已创建的 Skill"
-        >
-          {created.length === 0 ? (
-            <div className="skill-repository-empty">
-              <Sparkles size={18} />
-              <span>还没有已创建的 Skill</span>
+          {activeTab === 'created' && managing ? (
+            <div className="skill-repository-bulkbar">
+              <button
+                type="button"
+                onClick={() =>
+                  setSelectedSkillIds(
+                    allFilteredSelected
+                      ? new Set()
+                      : selectionForFilteredSkills(created, selectedSkillIds),
+                  )
+                }
+              >
+                {allFilteredSelected ? '取消全选' : '全选当前搜索结果'}
+              </button>
+              <span>已选择 {selectedSkills.length} 个 Skill</span>
+              <button type="button" onClick={stopManaging}>
+                <X size={14} aria-hidden="true" />
+                取消
+              </button>
+              <button
+                type="button"
+                className="is-destructive"
+                disabled={selectedSkills.length === 0}
+                onClick={() => {
+                  setDeleteReturnFocusSkillId(null);
+                  setDeleteError('');
+                  setPendingDeletion(selectedSkills);
+                }}
+              >
+                <Trash2 size={14} aria-hidden="true" />
+                删除
+              </button>
             </div>
-          ) : (
-            <div
-              className="skill-repository-card-grid"
-              role="list"
+          ) : null}
+
+          {activeTab === 'created' ? (
+            <section
+              className="skill-repository-section"
               aria-label="已创建的 Skill"
             >
-              {pageItems.map((skill, index) => (
-                <RepositorySkillCard
-                  key={skill.key}
-                  skill={skill}
-                  index={(safePage - 1) * REPOSITORY_PAGE_SIZE + index}
-                  managing={managing}
-                  selected={selectedSkillIds.has(skill.skillId)}
-                  menuOpen={menuSkillId === skill.skillId}
-                  onPreview={() => previewRepositorySkill(skill)}
-                  onOpen={() => onSelectSkill(skill)}
-                  onVersionManagement={() => {
-                    setMenuSkillId(null);
-                    onVersionManagement(skill);
-                  }}
-                  onExport={() => {
-                    setMenuSkillId(null);
-                    onExportSkill(skill);
-                  }}
-                  onToggleSelection={() => toggleSelection(skill.skillId)}
-                  onToggleMenu={() =>
-                    setMenuSkillId((current) =>
-                      current === skill.skillId ? null : skill.skillId,
-                    )
-                  }
-                  onRequestRename={() => {
-                    setMenuSkillId(null);
-                    setPendingRename(skill);
-                  }}
-                  onRequestDelete={() => {
-                    setDeleteReturnFocusSkillId(skill.skillId);
-                    setMenuSkillId(null);
-                    setDeleteError('');
-                    setPendingDeletion([skill]);
-                  }}
-                />
-              ))}
-            </div>
-          )}
-          {created.length > 0 ? (
-            <nav
-              className="skill-repository-pagination"
-              aria-label="Skill 仓库分页"
-            >
-              <button
-                type="button"
-                disabled={safePage <= 1}
-                onClick={() => setPage((current) => current - 1)}
-                aria-label="上一页"
-              >
-                <ChevronLeft size={15} aria-hidden="true" />
-              </button>
-              <span>
-                {safePage} / {pageCount}
-              </span>
-              <button
-                type="button"
-                disabled={safePage >= pageCount}
-                onClick={() => setPage((current) => current + 1)}
-                aria-label="下一页"
-              >
-                <ChevronRight size={15} aria-hidden="true" />
-              </button>
-            </nav>
-          ) : null}
-        </section>
-      ) : (
-        <section className="skill-repository-section" aria-label="未完成草稿">
-          {drafts.length === 0 ? (
-            <div className="skill-repository-empty">
-              <Clock3 size={18} />
-              <span>没有未完成草稿</span>
-            </div>
+              {created.length === 0 ? (
+                <div className="skill-repository-empty">
+                  <Sparkles size={18} />
+                  <span>还没有已创建的 Skill</span>
+                </div>
+              ) : (
+                <div
+                  className="skill-repository-card-grid"
+                  role="list"
+                  aria-label="已创建的 Skill"
+                >
+                  {pageItems.map((skill, index) => (
+                    <RepositorySkillCard
+                      key={skill.key}
+                      skill={skill}
+                      index={(safePage - 1) * REPOSITORY_PAGE_SIZE + index}
+                      managing={managing}
+                      selected={selectedSkillIds.has(skill.skillId)}
+                      menuOpen={menuSkillId === skill.skillId}
+                      onPreview={() => previewRepositorySkill(skill)}
+                      onOpen={() => onSelectSkill(skill)}
+                      onVersionManagement={() => {
+                        setMenuSkillId(null);
+                        onVersionManagement(skill);
+                      }}
+                      onExport={() => {
+                        setMenuSkillId(null);
+                        onExportSkill(skill);
+                      }}
+                      onToggleSelection={() => toggleSelection(skill.skillId)}
+                      onToggleMenu={() =>
+                        setMenuSkillId((current) =>
+                          current === skill.skillId ? null : skill.skillId,
+                        )
+                      }
+                      onRequestRename={() => {
+                        setMenuSkillId(null);
+                        setPendingRename(skill);
+                      }}
+                      onRequestDelete={() => {
+                        setDeleteReturnFocusSkillId(skill.skillId);
+                        setMenuSkillId(null);
+                        setDeleteError('');
+                        setPendingDeletion([skill]);
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+              {created.length > 0 ? (
+                <nav
+                  className="skill-repository-pagination"
+                  aria-label="Skill 仓库分页"
+                >
+                  <button
+                    type="button"
+                    disabled={safePage <= 1}
+                    onClick={() => setPage((current) => current - 1)}
+                    aria-label="上一页"
+                  >
+                    <ChevronLeft size={15} aria-hidden="true" />
+                  </button>
+                  <span>
+                    {safePage} / {pageCount}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={safePage >= pageCount}
+                    onClick={() => setPage((current) => current + 1)}
+                    aria-label="下一页"
+                  >
+                    <ChevronRight size={15} aria-hidden="true" />
+                  </button>
+                </nav>
+              ) : null}
+            </section>
           ) : (
-            <div
-              className="skill-repository-card-grid"
-              role="list"
+            <section
+              className="skill-repository-section"
               aria-label="未完成草稿"
             >
-              {drafts.map((item, index) => (
-                <RepositoryDraftCard
-                  key={item.id}
-                  session={item}
-                  index={index}
-                  onOpen={() => onSelectDraft(item)}
-                />
-              ))}
-            </div>
+              {drafts.length === 0 ? (
+                <div className="skill-repository-empty">
+                  <Clock3 size={18} />
+                  <span>没有未完成草稿</span>
+                </div>
+              ) : (
+                <div
+                  className="skill-repository-card-grid"
+                  role="list"
+                  aria-label="未完成草稿"
+                >
+                  {drafts.map((item, index) => (
+                    <RepositoryDraftCard
+                      key={item.id}
+                      session={item}
+                      index={index}
+                      onOpen={() => onSelectDraft(item)}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
           )}
-        </section>
-      )}
         </>
       )}
 

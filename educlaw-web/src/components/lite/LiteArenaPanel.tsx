@@ -20,10 +20,7 @@ import type {
   PackageVersion,
   SkillVersionDetail,
 } from '@educlaw/shared';
-import {
-  LiteApiError,
-  computeLineDiff,
-} from '../../api/lite-api';
+import { LiteApiError, computeLineDiff } from '../../api/lite-api';
 import type {
   DiagnosisIssue,
   AdoptedChange,
@@ -78,9 +75,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import {
-  ArenaThreadCreatorDialog,
-} from '../arena/ArenaThreadCreatorDialog';
+import { ArenaThreadCreatorDialog } from '../arena/ArenaThreadCreatorDialog';
 import { useArenaThreadList } from '../arena/useArenaThreadList';
 import {
   Sparkles,
@@ -291,10 +286,17 @@ function getArenaSideLabels(
   if (currentReport?.labels) {
     return currentReport.labels;
   }
-  if (currentThread?.arenaKind === 'skill_arena' && currentThread.skillArenaConfig) {
+  if (
+    currentThread?.arenaKind === 'skill_arena' &&
+    currentThread.skillArenaConfig
+  ) {
     return {
-      baseline: formatSkillArenaVariantLabel(currentThread.skillArenaConfig.left),
-      enhanced: formatSkillArenaVariantLabel(currentThread.skillArenaConfig.right),
+      baseline: formatSkillArenaVariantLabel(
+        currentThread.skillArenaConfig.left,
+      ),
+      enhanced: formatSkillArenaVariantLabel(
+        currentThread.skillArenaConfig.right,
+      ),
     };
   }
   return {
@@ -438,7 +440,8 @@ export default function LiteArenaPanel() {
     packageSkills.find((skill) => skill.skillUid === selectedSkillId) ||
     (selectedSkill
       ? packageSkills.find(
-          (skill) => skill.skillUid === (selectedSkill.id || selectedSkill.dirName),
+          (skill) =>
+            skill.skillUid === (selectedSkill.id || selectedSkill.dirName),
         )
       : null) ||
     packageSkills[0] ||
@@ -450,11 +453,11 @@ export default function LiteArenaPanel() {
     null;
   // 计算"被回退跳过"的版本 id：skillVersions 已按 versionNumber 降序返回，
   // 取第一个 status === 'active' 且非当前的版本——它比当前版本更新，却被回退操作跳过
-  const rolledBackSkippedSkillVersionId = skillVersions.find(
-    (version) =>
-      version.status === 'active' &&
-      version.id !== skillVersionsCurrentId,
-  )?.id || '';
+  const rolledBackSkippedSkillVersionId =
+    skillVersions.find(
+      (version) =>
+        version.status === 'active' && version.id !== skillVersionsCurrentId,
+    )?.id || '';
   const currentPackageVersionId =
     versions.find(
       (version) => version.versionNumber === selectedPackage?.versionNumber,
@@ -491,7 +494,7 @@ export default function LiteArenaPanel() {
   const isSkillArenaThread = thread?.arenaKind === 'skill_arena';
   // Skill Arena 线程的版本绑定信息：用于显示绑定版本号
   const skillVersionInfo = isSkillArenaThread
-    ? threadDetail?.skillVersionInfo ?? null
+    ? (threadDetail?.skillVersionInfo ?? null)
     : null;
   const rubricText = selectedPackage?.snapshot.rubricMd || '';
   const rubricDisplayText = extractDisplayRubricContent(rubricText);
@@ -508,10 +511,7 @@ export default function LiteArenaPanel() {
     replyGenerating,
   );
   const canGenerateReport = reportReadiness.canGenerateReport;
-  const canOpenReport = canOpenReportAction(
-    Boolean(thread),
-    canGenerateReport,
-  );
+  const canOpenReport = canOpenReportAction(Boolean(thread), canGenerateReport);
   const reportHintMessage = rubricNeedsRepair
     ? '当前 rubric 还缺少完整评分结构。请先在右侧 Rubric 中补充维度、权重或等级说明。'
     : '当前还没有配置 rubric。请先在右侧 Rubric 中手动填写评分规则。';
@@ -522,8 +522,8 @@ export default function LiteArenaPanel() {
     reportReadiness.reason === 'generating_reply'
       ? '回复还在保存，请等当前回答完全结束后再生成评估报告。'
       : reportReadiness.reason === 'missing_messages'
-      ? '\u5f53\u524d\u8fd8\u6ca1\u6709\u53ef\u7528\u4e8e\u8bc4\u5206\u7684 Arena \u5bf9\u8bdd\u3002\u5148\u5b8c\u6210\u4e00\u8f6e\u5bf9\u8bdd\uff0c\u518d\u6765\u751f\u6210\u8bc4\u4f30\u62a5\u544a\u3002'
-      : rubricRequiredMessage;
+        ? '\u5f53\u524d\u8fd8\u6ca1\u6709\u53ef\u7528\u4e8e\u8bc4\u5206\u7684 Arena \u5bf9\u8bdd\u3002\u5148\u5b8c\u6210\u4e00\u8f6e\u5bf9\u8bdd\uff0c\u518d\u6765\u751f\u6210\u8bc4\u4f30\u62a5\u544a\u3002'
+        : rubricRequiredMessage;
   const interactiveRequiredMessage = replyGenerating
     ? '回复还在保存，请等当前回答完全结束后再使用交互式优化。'
     : rubricRequiredMessage;
@@ -1128,9 +1128,7 @@ export default function LiteArenaPanel() {
           : null,
       feedback: '',
       optimizationId:
-        input.summary.action === 'resume'
-          ? input.summary.optimizationId
-          : null,
+        input.summary.action === 'resume' ? input.summary.optimizationId : null,
       completedVersionNumber: input.summary.versionNumber,
       questionContent: input.question.content,
       answerContent: input.enhanced.content,
@@ -1402,7 +1400,9 @@ export default function LiteArenaPanel() {
       );
       if (nextReport) {
         if (!isArenaReport(nextReport)) {
-          throw new Error('\u62a5\u544a\u6570\u636e\u7ed3\u6784\u5f02\u5e38\uff0c\u8bf7\u91cd\u8bd5');
+          throw new Error(
+            '\u62a5\u544a\u6570\u636e\u7ed3\u6784\u5f02\u5e38\uff0c\u8bf7\u91cd\u8bd5',
+          );
         }
         localStorage.setItem(
           reportStorageKey(currentThreadId),
@@ -1751,7 +1751,13 @@ export default function LiteArenaPanel() {
       startProgress('导入 rubric', `正在保存 ${parsed.name}...`);
       setDetailTab('rubric');
       setCenterPreview(null);
-      setManualEdit({target:'rubric',expectedPackageVersionId,title:`导入 ${parsed.name}`,content:parsed.content,preview:false});
+      setManualEdit({
+        target: 'rubric',
+        expectedPackageVersionId,
+        title: `导入 ${parsed.name}`,
+        content: parsed.content,
+        preview: false,
+      });
       const imported = await liteApi.saveManualMarkdownEdit(
         token,
         selectedPackageId,
@@ -1776,8 +1782,10 @@ export default function LiteArenaPanel() {
       const message = `${file.name} 读取失败：${
         error instanceof Error ? error.message : '不支持的文档格式'
       }`;
-      const failure = error instanceof LiteApiError && error.status === 409
-        ? '版本已变化，导入草稿已保留；请刷新并比较版本后再保存。' : message;
+      const failure =
+        error instanceof LiteApiError && error.status === 409
+          ? '版本已变化，导入草稿已保留；请刷新并比较版本后再保存。'
+          : message;
       failProgress(failure);
       setStatus(failure);
     }
@@ -1877,7 +1885,9 @@ export default function LiteArenaPanel() {
       const message =
         error instanceof LiteApiError && error.status === 409
           ? '版本已变化，编辑草稿已保留；请刷新并比较版本后再保存。'
-          : error instanceof Error ? error.message : '\u4fdd\u5b58\u5931\u8d25';
+          : error instanceof Error
+            ? error.message
+            : '\u4fdd\u5b58\u5931\u8d25';
       failProgress(message);
       setStatus(message);
       toast.error(message);
@@ -2264,18 +2274,16 @@ export default function LiteArenaPanel() {
     setPackageVersionActionPendingId(actionId);
     startProgress('回退智能体版本', '正在创建新的智能体版本...');
     try {
-      const result = await liteApi.rollbackPackageVersion(
-        token,
-        currentPkgId,
-        {
-          versionId: String(version.id),
-          expectedPackageVersionId: currentPackageVersionId,
-          idempotencyKey,
-          note: note.trim() || undefined,
-        },
-      );
+      const result = await liteApi.rollbackPackageVersion(token, currentPkgId, {
+        versionId: String(version.id),
+        expectedPackageVersionId: currentPackageVersionId,
+        idempotencyKey,
+        note: note.trim() || undefined,
+      });
       await refreshPackages(currentPkgId);
-      finishProgress(`已回退到 v${result.rolledBackFromVersionNumber} 并创建新版本 v${result.versionNumber}`);
+      finishProgress(
+        `已回退到 v${result.rolledBackFromVersionNumber} 并创建新版本 v${result.versionNumber}`,
+      );
       setStatus(
         `已回退到 v${result.rolledBackFromVersionNumber} 并创建新版本 v${result.versionNumber}`,
       );
@@ -2457,15 +2465,22 @@ export default function LiteArenaPanel() {
         </div>
         <div className="rounded-xl border border-border/80 bg-card overflow-hidden">
           <div className="border-b border-border/60 px-4 py-2.5">
-            <span className="text-sm font-medium text-foreground">修改痕迹</span>
+            <span className="text-sm font-medium text-foreground">
+              修改痕迹
+            </span>
           </div>
           <div className="py-2">
             {rows.map((row, index) => {
               if (row.type === 'gap') {
                 return (
-                  <div key={`gap-${index}`} className="flex items-center gap-2 py-2 px-3">
+                  <div
+                    key={`gap-${index}`}
+                    className="flex items-center gap-2 py-2 px-3"
+                  >
                     <div className="h-px flex-1 bg-border/60" />
-                    <span className="text-[10px] text-muted-foreground/40 select-none">省略</span>
+                    <span className="text-[10px] text-muted-foreground/40 select-none">
+                      省略
+                    </span>
                     <div className="h-px flex-1 bg-border/60" />
                   </div>
                 );
@@ -2966,17 +2981,17 @@ export default function LiteArenaPanel() {
         !manualEdit &&
         !interactiveMode &&
         (sidebarOpen || rightSidebarOpen) && (
-        <button
-          type="button"
-          aria-label="关闭面板"
-          className="absolute inset-0 z-20 bg-background/60 backdrop-blur-sm lg:hidden"
-          onClick={() => {
-            setSidebarOpen(false);
-            setRightSidebarOpen(false);
-            setRightExpanded(false);
-          }}
-        />
-      )}
+          <button
+            type="button"
+            aria-label="关闭面板"
+            className="absolute inset-0 z-20 bg-background/60 backdrop-blur-sm lg:hidden"
+            onClick={() => {
+              setSidebarOpen(false);
+              setRightSidebarOpen(false);
+              setRightExpanded(false);
+            }}
+          />
+        )}
       {/* Sidebar */}
       {sidebarOpen ? (
         <>
@@ -3097,7 +3112,7 @@ export default function LiteArenaPanel() {
                                 >
                                   {`生成结果：${item.packageName}`}
                                 </div>
-                            )}
+                              )}
                             {item.error && (
                               <div className="break-words text-[11px] text-destructive">
                                 {item.error}
@@ -3193,11 +3208,15 @@ export default function LiteArenaPanel() {
                           onClick={() => void openPackage(pkg.id)}
                           className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
                         >
-                          <div className={`flex size-8 shrink-0 items-center justify-center rounded-[10px] font-bold text-xs transition-colors ${pkg.id === selectedPackageId ? 'bg-primary text-primary-foreground' : 'bg-primary/10 text-primary'}`}>
+                          <div
+                            className={`flex size-8 shrink-0 items-center justify-center rounded-[10px] font-bold text-xs transition-colors ${pkg.id === selectedPackageId ? 'bg-primary text-primary-foreground' : 'bg-primary/10 text-primary'}`}
+                          >
                             {pkg.name.charAt(0).toUpperCase()}
                           </div>
                           <div className="min-w-0">
-                            <div className={`truncate text-sm font-medium ${pkg.id === selectedPackageId ? 'text-primary' : ''}`}>
+                            <div
+                              className={`truncate text-sm font-medium ${pkg.id === selectedPackageId ? 'text-primary' : ''}`}
+                            >
                               {pkg.name}
                             </div>
                             <div className="truncate text-[11px] text-muted-foreground">
@@ -3208,7 +3227,7 @@ export default function LiteArenaPanel() {
                         <button
                           onClick={() =>
                             void handleRenamePackage(pkg.id, pkg.name)
-                        }
+                          }
                           className="flex size-7 shrink-0 items-center justify-center rounded-[10px] text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
                           title="\u91cd\u547d\u540d"
                         >
@@ -3244,7 +3263,9 @@ export default function LiteArenaPanel() {
       )}
 
       {/* Main Arena */}
-      <main className={`flex min-w-0 flex-1 flex-col bg-card/20 ${manualEdit || interactiveMode ? 'relative z-40' : ''} ${rightExpanded && !manualEdit && !interactiveMode ? 'hidden lg:hidden' : ''}`}>
+      <main
+        className={`flex min-w-0 flex-1 flex-col bg-card/20 ${manualEdit || interactiveMode ? 'relative z-40' : ''} ${rightExpanded && !manualEdit && !interactiveMode ? 'hidden lg:hidden' : ''}`}
+      >
         {manualEdit ? (
           <>
             <div className="relative z-50 flex min-h-12 shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border/70 bg-card/40 px-14 py-2 lg:px-5">
@@ -3743,16 +3764,22 @@ export default function LiteArenaPanel() {
                   </button>
                 )}
                 {/* Skill Arena 线程：显示绑定的 Skill 版本号 */}
-                {isSkillArenaThread && skillVersionInfo && (skillVersionInfo.left || skillVersionInfo.right) && (
-                  <div className="flex flex-wrap items-center gap-1.5 pl-1 text-xs text-muted-foreground">
-                    <span>
-                      绑定版本：
-                      {skillVersionInfo.left ? `v${skillVersionInfo.left.boundSkillVersionNumber}` : '不使用 Skill'}
-                      {' / '}
-                      {skillVersionInfo.right ? `v${skillVersionInfo.right.boundSkillVersionNumber}` : '不使用 Skill'}
-                    </span>
-                  </div>
-                )}
+                {isSkillArenaThread &&
+                  skillVersionInfo &&
+                  (skillVersionInfo.left || skillVersionInfo.right) && (
+                    <div className="flex flex-wrap items-center gap-1.5 pl-1 text-xs text-muted-foreground">
+                      <span>
+                        绑定版本：
+                        {skillVersionInfo.left
+                          ? `v${skillVersionInfo.left.boundSkillVersionNumber}`
+                          : '不使用 Skill'}
+                        {' / '}
+                        {skillVersionInfo.right
+                          ? `v${skillVersionInfo.right.boundSkillVersionNumber}`
+                          : '不使用 Skill'}
+                      </span>
+                    </div>
+                  )}
               </div>
               <div className="flex flex-wrap items-center justify-end gap-2">
                 <div className="inline-flex rounded-[12px] border border-border/70 bg-muted/40 p-0.5">
@@ -3760,11 +3787,15 @@ export default function LiteArenaPanel() {
                     { key: 'compare' as const, label: '\u5bf9\u6bd4' },
                     {
                       key: 'agent' as const,
-                      label: isSkillArenaThread ? '\u53f3\u4fa7' : '\u667a\u80fd\u4f53',
+                      label: isSkillArenaThread
+                        ? '\u53f3\u4fa7'
+                        : '\u667a\u80fd\u4f53',
                     },
                     {
                       key: 'baseline' as const,
-                      label: isSkillArenaThread ? '\u5de6\u4fa7' : '\u57fa\u7840',
+                      label: isSkillArenaThread
+                        ? '\u5de6\u4fa7'
+                        : '\u57fa\u7840',
                     },
                   ].map((mode) => (
                     <button
@@ -4115,7 +4146,11 @@ export default function LiteArenaPanel() {
                   label: '版本',
                   icon: GitCompare,
                 },
-                { key: 'report' as DetailTab, label: '评估报告', icon: BarChart3 },
+                {
+                  key: 'report' as DetailTab,
+                  label: '评估报告',
+                  icon: BarChart3,
+                },
               ].map((tab) => (
                 <button
                   key={tab.key}
@@ -4191,9 +4226,7 @@ export default function LiteArenaPanel() {
                           评分规则
                         </h3>
                         <div className="ec-meta">
-                          {rubricHasContent
-                            ? '已配置'
-                            : '尚未配置'}
+                          {rubricHasContent ? '已配置' : '尚未配置'}
                         </div>
                       </div>
                       <div className="ec-actions">
@@ -4326,7 +4359,9 @@ export default function LiteArenaPanel() {
                               {packageSkills.map((skill) => (
                                 <button
                                   key={skill.id}
-                                  onClick={() => setSelectedSkillId(skill.skillUid)}
+                                  onClick={() =>
+                                    setSelectedSkillId(skill.skillUid)
+                                  }
                                   title={skill.name}
                                   className={`inline-flex shrink-0 items-center gap-1.5 rounded-[10px] px-2.5 py-1 text-xs font-medium whitespace-nowrap transition-colors ${selectedSkillId === skill.skillUid ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'}`}
                                 >
@@ -4366,7 +4401,8 @@ export default function LiteArenaPanel() {
                                   当前 Skill 已不在最新智能体快照中
                                 </div>
                                 <div className="mt-1 leading-5">
-                                  这个 Skill 仍然保留历史版本，可以继续查看、恢复到包内，或做历史审计。
+                                  这个 Skill
+                                  仍然保留历史版本，可以继续查看、恢复到包内，或做历史审计。
                                 </div>
                               </div>
                             )}
@@ -4385,10 +4421,10 @@ export default function LiteArenaPanel() {
                   <div className="space-y-5">
                     {/* 子标签切换：智能体版本 / Skill 版本 */}
                     <div className="inline-flex rounded-[12px] border border-border/70 bg-muted/40 p-0.5">
-                      {([
+                      {[
                         { key: 'package' as const, label: '智能体版本' },
                         { key: 'skill' as const, label: 'Skill 版本' },
-                      ]).map((tab) => (
+                      ].map((tab) => (
                         <button
                           key={tab.key}
                           onClick={() => setVersionSubTab(tab.key)}
@@ -4400,264 +4436,279 @@ export default function LiteArenaPanel() {
                     </div>
 
                     {versionSubTab === 'package' && (
-                    <>
-                    {/* 卡 1: 版本对比 */}
-                    {versions.length >= 2 && (
-                      <div className="overflow-hidden rounded-[14px] border border-border/70 bg-card shadow-sm">
-                        <div className="flex items-start justify-between gap-3 border-b border-border/70 px-4 py-3">
-                          <div className="min-w-0 flex-1">
-                            <div className="ec-eyebrow">COMPARE</div>
-                            <h3 className="font-serif-display text-[15.5px] font-semibold leading-tight text-foreground">
-                              版本对比
-                            </h3>
-                            <div className="ec-meta">
-                              {compareResult
-                                ? `v${compareResult.baseVersion.versionNumber} → v${compareResult.targetVersion.versionNumber}`
-                                : '选择两个版本生成差异报告'}
-                            </div>
-                          </div>
-                          {compareResult && (
-                            <div className="ec-actions">
-                              <button
-                                onClick={() => {
-                                  setCompareResult(null);
-                                  setCompareBaseId('');
-                                  setCompareTargetId('');
-                                }}
-                                className="ec-action"
-                              >
-                                清除对比
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                        <div className="space-y-3 p-4">
-                          {!compareResult ? (
-                            <div className="flex flex-wrap items-center gap-2">
-                              <select
-                                className="min-w-0 flex-1 rounded-[10px] border border-border/70 bg-card px-2.5 py-1.5 text-xs"
-                                value={compareBaseId}
-                                onChange={(e) =>
-                                  setCompareBaseId(e.target.value)
-                                }
-                              >
-                                <option value="">选择基准版本</option>
-                                {versions.map((v) => (
-                                  <option key={v.id} value={v.id}>
-                                    v{v.versionNumber} ({v.source})
-                                  </option>
-                                ))}
-                              </select>
-                              <span className="text-muted-foreground">
-                                {'->'}
-                              </span>
-                              <select
-                                className="min-w-0 flex-1 rounded-[10px] border border-border/70 bg-card px-2.5 py-1.5 text-xs"
-                                value={compareTargetId}
-                                onChange={(e) =>
-                                  setCompareTargetId(e.target.value)
-                                }
-                              >
-                                <option value="">选择目标版本</option>
-                                {versions.map((v) => (
-                                  <option key={v.id} value={v.id}>
-                                    v{v.versionNumber} ({v.source})
-                                  </option>
-                                ))}
-                              </select>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-8 shrink-0 text-[11px] rounded-[10px]"
-                                disabled={
-                                  !compareBaseId ||
-                                  !compareTargetId ||
-                                  compareBaseId === compareTargetId ||
-                                  compareLoading
-                                }
-                                onClick={() => {
-                                  if (
-                                    !token ||
-                                    !selectedPackageId ||
-                                    !compareBaseId ||
-                                    !compareTargetId
-                                  )
-                                    return;
-                                  setCompareLoading(true);
-                                  const currentPkgId = selectedPackageId;
-                                  liteApi
-                                    .compareVersions(
-                                      token,
-                                      currentPkgId,
-                                      compareBaseId,
-                                      compareTargetId,
-                                    )
-                                    .then((res) => {
-                                      saveCompareState(
-                                        currentPkgId,
-                                        res,
-                                        compareBaseId,
-                                        compareTargetId,
-                                      );
-                                      if (
-                                        selectedPackageIdRef.current ===
-                                        currentPkgId
-                                      ) {
-                                        setCompareResult(res);
-                                      }
-                                    })
-                                    .catch((err) => {
-                                      alert(err.message || '对比失败');
-                                    })
-                                    .finally(() => {
-                                      if (
-                                        selectedPackageIdRef.current ===
-                                        currentPkgId
-                                      ) {
-                                        setCompareLoading(false);
-                                      }
-                                    });
-                                }}
-                              >
-                                {compareLoading ? '比较中...' : '比较'}
-                              </Button>
-                            </div>
-                          ) : (
-                            <div className="space-y-2">
-                              <div className="flex items-center justify-between rounded-[10px] border border-primary/20 bg-primary/5 px-3 py-2 text-xs">
-                                <div>
-                                  <div className="font-medium">比较结果</div>
-                                  <div className="text-muted-foreground">
-                                    v{compareResult.baseVersion.versionNumber}{' '}
-                                    {'->'}{' '}
-                                    v{compareResult.targetVersion.versionNumber}
-                                  </div>
+                      <>
+                        {/* 卡 1: 版本对比 */}
+                        {versions.length >= 2 && (
+                          <div className="overflow-hidden rounded-[14px] border border-border/70 bg-card shadow-sm">
+                            <div className="flex items-start justify-between gap-3 border-b border-border/70 px-4 py-3">
+                              <div className="min-w-0 flex-1">
+                                <div className="ec-eyebrow">COMPARE</div>
+                                <h3 className="font-serif-display text-[15.5px] font-semibold leading-tight text-foreground">
+                                  版本对比
+                                </h3>
+                                <div className="ec-meta">
+                                  {compareResult
+                                    ? `v${compareResult.baseVersion.versionNumber} → v${compareResult.targetVersion.versionNumber}`
+                                    : '选择两个版本生成差异报告'}
                                 </div>
                               </div>
-                              <div className="rounded-[10px] border border-primary/15 bg-primary/5 px-3 py-2.5 text-xs">
-                                <div className="mb-2 flex items-center gap-1.5 font-medium text-primary">
-                                  <span className="inline-flex size-5 items-center justify-center rounded-md bg-primary/10 text-[10px]">
-                                    AI
-                                  </span>
-                                  AI 总结
-                                </div>
-                                <div className="text-muted-foreground leading-relaxed">
-                                  <MarkdownContent
-                                    content={compareResult.summary || '暂无总结'}
-                                  />
-                                </div>
-                              </div>
-                              <VersionDiffView result={compareResult} />
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* 卡 2: 版本列表 */}
-                    {!compareResult && (
-                      <div className="overflow-hidden rounded-[14px] border border-border/70 bg-card shadow-sm">
-                        <div className="flex items-start justify-between gap-3 border-b border-border/70 px-4 py-3">
-                          <div className="min-w-0 flex-1">
-                            <div className="ec-eyebrow">VERSIONS</div>
-                            <h3 className="font-serif-display text-[15.5px] font-semibold leading-tight text-foreground">
-                              版本记录
-                            </h3>
-                            <div className="ec-meta">
-                              共 {versions.length} 个版本
-                            </div>
-                          </div>
-                        </div>
-                        <div className="space-y-1.5 p-3">
-                          {versions.map((v) => {
-                            const isCurrentVersion =
-                              String(v.id) === currentPackageVersionId;
-                            const rollbackPkgActionId = `pkg-rollback:${v.id}`;
-                            const isPkgRollbackPending =
-                              packageVersionActionPendingId ===
-                              rollbackPkgActionId;
-                            return (
-                            <div
-                              key={v.id}
-                              className={`rounded-[12px] border px-3 py-2 text-xs transition-colors ${compareBaseId === v.id || compareTargetId === v.id ? 'border-primary/30 bg-primary/10' : 'border-border/70 bg-muted hover:border-primary/20 hover:bg-primary/5'}`}
-                            >
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="font-medium">
-                                  v{v.versionNumber}
-                                </span>
-                                {isCurrentVersion && (
-                                  <Badge
-                                    variant="outline"
-                                    className="h-5 rounded-full border-primary/30 bg-primary/10 px-2 text-[10px] text-primary"
-                                  >
-                                    当前
-                                  </Badge>
-                                )}
-                                {v.source === 'rollback' && (
-                                  <Badge
-                                    variant="outline"
-                                    className="h-5 rounded-full px-2 text-[10px]"
-                                  >
-                                    回退创建
-                                  </Badge>
-                                )}
-                                <span className="text-muted-foreground">
-                                  {v.source}
-                                </span>
-                                <span className="text-muted-foreground">
-                                  {new Date(v.createdAt).toLocaleString()}
-                                </span>
-                              </div>
-                              <div className="mt-1.5">
-                                {v.note ? (
+                              {compareResult && (
+                                <div className="ec-actions">
                                   <button
-                                    onClick={() =>
-                                      handleUpdateNote(v.id, v.note || '')
-                                    }
-                                    className="text-left text-[11px] text-muted-foreground hover:text-foreground transition-colors"
-                                    title="点击编辑备注"
-                                  >
-                                    {`备注：${v.note}`}
-                                  </button>
-                                ) : (
-                                  <button
-                                    onClick={() => handleUpdateNote(v.id, '')}
-                                    className="text-[11px] text-muted-foreground/60 hover:text-muted-foreground transition-colors"
-                                    title="点击添加备注"
-                                  >
-                                    + 添加备注
-                                  </button>
-                                )}
-                              </div>
-                              {!isCurrentVersion && (
-                                <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px]">
-                                  <button
-                                    type="button"
-                                    disabled={isPkgRollbackPending}
-                                    onClick={(event) => {
-                                      event.stopPropagation();
-                                      void handleRollbackPackageVersion(v);
+                                    onClick={() => {
+                                      setCompareResult(null);
+                                      setCompareBaseId('');
+                                      setCompareTargetId('');
                                     }}
-                                    className="text-primary hover:underline disabled:pointer-events-none disabled:opacity-60"
+                                    className="ec-action"
                                   >
-                                    {isPkgRollbackPending
-                                      ? '处理中...'
-                                      : '回退到此版本'}
+                                    清除对比
                                   </button>
                                 </div>
                               )}
                             </div>
-                            );
-                          })}
-                          {versions.length === 0 && (
-                            <div className="rounded-[12px] border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
-                              暂无版本记录
+                            <div className="space-y-3 p-4">
+                              {!compareResult ? (
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <select
+                                    className="min-w-0 flex-1 rounded-[10px] border border-border/70 bg-card px-2.5 py-1.5 text-xs"
+                                    value={compareBaseId}
+                                    onChange={(e) =>
+                                      setCompareBaseId(e.target.value)
+                                    }
+                                  >
+                                    <option value="">选择基准版本</option>
+                                    {versions.map((v) => (
+                                      <option key={v.id} value={v.id}>
+                                        v{v.versionNumber} ({v.source})
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <span className="text-muted-foreground">
+                                    {'->'}
+                                  </span>
+                                  <select
+                                    className="min-w-0 flex-1 rounded-[10px] border border-border/70 bg-card px-2.5 py-1.5 text-xs"
+                                    value={compareTargetId}
+                                    onChange={(e) =>
+                                      setCompareTargetId(e.target.value)
+                                    }
+                                  >
+                                    <option value="">选择目标版本</option>
+                                    {versions.map((v) => (
+                                      <option key={v.id} value={v.id}>
+                                        v{v.versionNumber} ({v.source})
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-8 shrink-0 text-[11px] rounded-[10px]"
+                                    disabled={
+                                      !compareBaseId ||
+                                      !compareTargetId ||
+                                      compareBaseId === compareTargetId ||
+                                      compareLoading
+                                    }
+                                    onClick={() => {
+                                      if (
+                                        !token ||
+                                        !selectedPackageId ||
+                                        !compareBaseId ||
+                                        !compareTargetId
+                                      )
+                                        return;
+                                      setCompareLoading(true);
+                                      const currentPkgId = selectedPackageId;
+                                      liteApi
+                                        .compareVersions(
+                                          token,
+                                          currentPkgId,
+                                          compareBaseId,
+                                          compareTargetId,
+                                        )
+                                        .then((res) => {
+                                          saveCompareState(
+                                            currentPkgId,
+                                            res,
+                                            compareBaseId,
+                                            compareTargetId,
+                                          );
+                                          if (
+                                            selectedPackageIdRef.current ===
+                                            currentPkgId
+                                          ) {
+                                            setCompareResult(res);
+                                          }
+                                        })
+                                        .catch((err) => {
+                                          alert(err.message || '对比失败');
+                                        })
+                                        .finally(() => {
+                                          if (
+                                            selectedPackageIdRef.current ===
+                                            currentPkgId
+                                          ) {
+                                            setCompareLoading(false);
+                                          }
+                                        });
+                                    }}
+                                  >
+                                    {compareLoading ? '比较中...' : '比较'}
+                                  </Button>
+                                </div>
+                              ) : (
+                                <div className="space-y-2">
+                                  <div className="flex items-center justify-between rounded-[10px] border border-primary/20 bg-primary/5 px-3 py-2 text-xs">
+                                    <div>
+                                      <div className="font-medium">
+                                        比较结果
+                                      </div>
+                                      <div className="text-muted-foreground">
+                                        v
+                                        {
+                                          compareResult.baseVersion
+                                            .versionNumber
+                                        }{' '}
+                                        {'->'} v
+                                        {
+                                          compareResult.targetVersion
+                                            .versionNumber
+                                        }
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="rounded-[10px] border border-primary/15 bg-primary/5 px-3 py-2.5 text-xs">
+                                    <div className="mb-2 flex items-center gap-1.5 font-medium text-primary">
+                                      <span className="inline-flex size-5 items-center justify-center rounded-md bg-primary/10 text-[10px]">
+                                        AI
+                                      </span>
+                                      AI 总结
+                                    </div>
+                                    <div className="text-muted-foreground leading-relaxed">
+                                      <MarkdownContent
+                                        content={
+                                          compareResult.summary || '暂无总结'
+                                        }
+                                      />
+                                    </div>
+                                  </div>
+                                  <VersionDiffView result={compareResult} />
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                    </>
+                          </div>
+                        )}
+
+                        {/* 卡 2: 版本列表 */}
+                        {!compareResult && (
+                          <div className="overflow-hidden rounded-[14px] border border-border/70 bg-card shadow-sm">
+                            <div className="flex items-start justify-between gap-3 border-b border-border/70 px-4 py-3">
+                              <div className="min-w-0 flex-1">
+                                <div className="ec-eyebrow">VERSIONS</div>
+                                <h3 className="font-serif-display text-[15.5px] font-semibold leading-tight text-foreground">
+                                  版本记录
+                                </h3>
+                                <div className="ec-meta">
+                                  共 {versions.length} 个版本
+                                </div>
+                              </div>
+                            </div>
+                            <div className="space-y-1.5 p-3">
+                              {versions.map((v) => {
+                                const isCurrentVersion =
+                                  String(v.id) === currentPackageVersionId;
+                                const rollbackPkgActionId = `pkg-rollback:${v.id}`;
+                                const isPkgRollbackPending =
+                                  packageVersionActionPendingId ===
+                                  rollbackPkgActionId;
+                                return (
+                                  <div
+                                    key={v.id}
+                                    className={`rounded-[12px] border px-3 py-2 text-xs transition-colors ${compareBaseId === v.id || compareTargetId === v.id ? 'border-primary/30 bg-primary/10' : 'border-border/70 bg-muted hover:border-primary/20 hover:bg-primary/5'}`}
+                                  >
+                                    <div className="flex items-center justify-between gap-2">
+                                      <span className="font-medium">
+                                        v{v.versionNumber}
+                                      </span>
+                                      {isCurrentVersion && (
+                                        <Badge
+                                          variant="outline"
+                                          className="h-5 rounded-full border-primary/30 bg-primary/10 px-2 text-[10px] text-primary"
+                                        >
+                                          当前
+                                        </Badge>
+                                      )}
+                                      {v.source === 'rollback' && (
+                                        <Badge
+                                          variant="outline"
+                                          className="h-5 rounded-full px-2 text-[10px]"
+                                        >
+                                          回退创建
+                                        </Badge>
+                                      )}
+                                      <span className="text-muted-foreground">
+                                        {v.source}
+                                      </span>
+                                      <span className="text-muted-foreground">
+                                        {new Date(v.createdAt).toLocaleString()}
+                                      </span>
+                                    </div>
+                                    <div className="mt-1.5">
+                                      {v.note ? (
+                                        <button
+                                          onClick={() =>
+                                            handleUpdateNote(v.id, v.note || '')
+                                          }
+                                          className="text-left text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                                          title="点击编辑备注"
+                                        >
+                                          {`备注：${v.note}`}
+                                        </button>
+                                      ) : (
+                                        <button
+                                          onClick={() =>
+                                            handleUpdateNote(v.id, '')
+                                          }
+                                          className="text-[11px] text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+                                          title="点击添加备注"
+                                        >
+                                          + 添加备注
+                                        </button>
+                                      )}
+                                    </div>
+                                    {!isCurrentVersion && (
+                                      <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px]">
+                                        <button
+                                          type="button"
+                                          disabled={isPkgRollbackPending}
+                                          onClick={(event) => {
+                                            event.stopPropagation();
+                                            void handleRollbackPackageVersion(
+                                              v,
+                                            );
+                                          }}
+                                          className="text-primary hover:underline disabled:pointer-events-none disabled:opacity-60"
+                                        >
+                                          {isPkgRollbackPending
+                                            ? '处理中...'
+                                            : '回退到此版本'}
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                              {versions.length === 0 && (
+                                <div className="rounded-[12px] border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
+                                  暂无版本记录
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </>
                     )}
 
                     {versionSubTab === 'skill' && (
@@ -4933,7 +4984,9 @@ export default function LiteArenaPanel() {
                                             }}
                                             className="text-primary hover:underline disabled:pointer-events-none disabled:opacity-60"
                                           >
-                                            {isPending ? '处理中...' : '恢复可用'}
+                                            {isPending
+                                              ? '处理中...'
+                                              : '恢复可用'}
                                           </button>
                                         )}
                                       </div>
@@ -4946,7 +4999,8 @@ export default function LiteArenaPanel() {
                                   <div className="flex items-center justify-between gap-2">
                                     <div className="min-w-0">
                                       <div className="text-xs font-medium">
-                                        版本预览 v{selectedSkillVersion.versionNumber}
+                                        版本预览 v
+                                        {selectedSkillVersion.versionNumber}
                                       </div>
                                       <div className="mt-1 text-[11px] text-muted-foreground">
                                         {selectedSkillVersion.basedOnVersionId
@@ -4957,7 +5011,9 @@ export default function LiteArenaPanel() {
                                   </div>
                                   <div className="max-h-[60vh] overflow-auto rounded-[14px] border border-border/70 bg-card/70 p-3">
                                     <SkillMarkdownContent
-                                      content={selectedSkillVersion.skill.skillMd}
+                                      content={
+                                        selectedSkillVersion.skill.skillMd
+                                      }
                                     />
                                   </div>
                                 </div>
@@ -5125,7 +5181,9 @@ export default function LiteArenaPanel() {
                                   </span>
                                   <span className="font-mono-meta text-[10.5px] text-muted-foreground">
                                     → {formatTarget(issue.target)}
-                                    {issue.targetId ? ` / ${issue.targetId}` : ''}
+                                    {issue.targetId
+                                      ? ` / ${issue.targetId}`
+                                      : ''}
                                   </span>
                                 </div>
                                 <div className="font-medium text-foreground">

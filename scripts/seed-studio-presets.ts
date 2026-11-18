@@ -33,7 +33,10 @@ const maintenanceLog =
   path.join(root, 'docs', 'reports', 'lesson-assets-maintenance-log.md');
 
 const lessonIndex = JSON.parse(
-  fs.readFileSync(path.join(root, 'educlaw-web/public/lessons/index.json'), 'utf8'),
+  fs.readFileSync(
+    path.join(root, 'educlaw-web/public/lessons/index.json'),
+    'utf8',
+  ),
 ) as LessonIndexItem[];
 
 const lessonPackages = [
@@ -124,21 +127,25 @@ function lessonCatalog(pack: (typeof LESSON_PACK_PRESETS)[number]) {
   return buildLessonPackDocument(pack, lessons);
 }
 
-function snapshotForLessonPacks(stage: string, name: string): AgentPackageSnapshot {
+function snapshotForLessonPacks(
+  stage: string,
+  name: string,
+): AgentPackageSnapshot {
   const packs = LESSON_PACK_PRESETS.filter((pack) => pack.stage === stage);
   return {
     name,
     description: `${stage}语文、数学、英语共 ${packs.length} 个课例包 Skill，覆盖 ${stage}各年级课堂 ASR 课例。`,
     versionLabel: 'v1',
-    agentMd:
-      `你是一位${stage}教研助手。根据用户选择的课例包，帮助教师定位课例、还原教学环节、分析提问链与师生话语，并给出基于原文证据的改进建议。`,
+    agentMd: `你是一位${stage}教研助手。根据用户选择的课例包，帮助教师定位课例、还原教学环节、分析提问链与师生话语，并给出基于原文证据的改进建议。`,
     rubricMd: '',
     skills: packs.map((pack) => ({
       id: pack.id,
       dirName: pack.id,
       name: pack.name,
       description: pack.description,
-      skillMd: [pack.prompt, '', '## 课例目录', '', lessonCatalog(pack)].join('\n'),
+      skillMd: [pack.prompt, '', '## 课例目录', '', lessonCatalog(pack)].join(
+        '\n',
+      ),
     })),
   };
 }
@@ -197,7 +204,9 @@ const SUBJECT_AGENT_ANALYSIS_SKILL_IDS = [
 function agentSeeds(): AgentSeed[] {
   const subjectAgentAnalysisSkillNames = SUBJECT_AGENT_ANALYSIS_SKILL_IDS.map(
     (presetId) => {
-      const preset = ANALYSIS_SKILL_PRESETS.find((item) => item.id === presetId);
+      const preset = ANALYSIS_SKILL_PRESETS.find(
+        (item) => item.id === presetId,
+      );
       if (!preset) throw new Error(`找不到方法 Skill：${presetId}`);
       return preset.name;
     },
@@ -208,7 +217,9 @@ function agentSeeds(): AgentSeed[] {
       description: preset.description,
       instructions: preset.prompt,
       skillNames: (preset.skillPresetIds ?? [])
-        .map((presetId) => ANALYSIS_SKILL_PRESETS.find((item) => item.id === presetId))
+        .map((presetId) =>
+          ANALYSIS_SKILL_PRESETS.find((item) => item.id === presetId),
+        )
         .map((item) => item?.name)
         .filter((name): name is string => Boolean(name)),
     })),
@@ -349,10 +360,18 @@ function diffSnapshot(
   current: AgentPackageSnapshot,
   desired: AgentPackageSnapshot,
 ) {
-  const currentByDir = new Map(current.skills.map((skill) => [skill.dirName, skill]));
-  const desiredByDir = new Map(desired.skills.map((skill) => [skill.dirName, skill]));
-  const added = [...desiredByDir.keys()].filter((key) => !currentByDir.has(key));
-  const removed = [...currentByDir.keys()].filter((key) => !desiredByDir.has(key));
+  const currentByDir = new Map(
+    current.skills.map((skill) => [skill.dirName, skill]),
+  );
+  const desiredByDir = new Map(
+    desired.skills.map((skill) => [skill.dirName, skill]),
+  );
+  const added = [...desiredByDir.keys()].filter(
+    (key) => !currentByDir.has(key),
+  );
+  const removed = [...currentByDir.keys()].filter(
+    (key) => !desiredByDir.has(key),
+  );
   const updated = [...desiredByDir.keys()].filter((key) => {
     const before = currentByDir.get(key);
     const after = desiredByDir.get(key);
@@ -399,7 +418,8 @@ function appendMaintenanceLog(rows: string[][]) {
   }
   fs.appendFileSync(
     maintenanceLog,
-    rows.map((row) => `| ${row.map(escapeCell).join(' | ')} |`).join('\n') + '\n',
+    rows.map((row) => `| ${row.map(escapeCell).join(' | ')} |`).join('\n') +
+      '\n',
     'utf8',
   );
 }
@@ -444,13 +464,16 @@ function resolveRepositorySkill(
     skillId: chosen.id,
     skillVersionId: versionId,
     enabled: true,
-    versionNumber: chosen.currentVersionNumber ?? chosen.latestVersionNumber ?? 0,
+    versionNumber:
+      chosen.currentVersionNumber ?? chosen.latestVersionNumber ?? 0,
     pending: false,
   };
 }
 
 async function createAgent(seed: AgentSeed, repository: RepositorySkill[]) {
-  const bindings = seed.skillNames.map((name) => resolveRepositorySkill(repository, name));
+  const bindings = seed.skillNames.map((name) =>
+    resolveRepositorySkill(repository, name),
+  );
   const response = await fetch(`${apiBase}/api/agent-workspaces`, {
     method: 'POST',
     headers: {
@@ -470,7 +493,9 @@ async function createAgent(seed: AgentSeed, repository: RepositorySkill[]) {
     }),
   });
   if (!response.ok) {
-    throw new Error(`创建 Agent 失败：${seed.name} ${response.status} ${await response.text()}`);
+    throw new Error(
+      `创建 Agent 失败：${seed.name} ${response.status} ${await response.text()}`,
+    );
   }
   const created = (await response.json()) as AgentDetail;
   console.log(`created agent: ${seed.name} (${bindings.length} skills)`);
@@ -484,8 +509,12 @@ function buildAgentBindings(
   allowMissing = false,
 ) {
   const presetNames = new Set(seed.skillNames);
-  const userSkills = detail.skills.filter((skill) => !presetNames.has(skill.name));
-  const unavailable = userSkills.filter((skill) => skill.enabled && !skill.available);
+  const userSkills = detail.skills.filter(
+    (skill) => !presetNames.has(skill.name),
+  );
+  const unavailable = userSkills.filter(
+    (skill) => skill.enabled && !skill.available,
+  );
   if (unavailable.length > 0) {
     throw new Error(
       `用户自建 Skill 不可用，未重绑定：${unavailable.map((skill) => skill.name).join('、')}`,
@@ -556,7 +585,11 @@ async function rebindAgents(
       (skill) => !seed.skillNames.includes(skill.name),
     );
     const versionChanged = currentPreset.filter((skill) => {
-      const resolved = resolveRepositorySkill(repository, skill.name, options.dryRun);
+      const resolved = resolveRepositorySkill(
+        repository,
+        skill.name,
+        options.dryRun,
+      );
       return skill.versionNumber !== resolved.versionNumber;
     });
 
@@ -607,7 +640,9 @@ async function rebindAgents(
         break;
       }
       const body = await response.text();
-      lastError = new Error(`重绑定失败：${seed.name} ${response.status} ${body}`);
+      lastError = new Error(
+        `重绑定失败：${seed.name} ${response.status} ${body}`,
+      );
       if (response.status !== 409) break;
       // 409 说明有人同时在编辑：重新读取最新配置后再合并，不盲写。
       detail = await getAgent(existing.id);
@@ -647,7 +682,9 @@ async function seedPackages(options: {
     const snapshot = desired.snapshot;
     const existing = byName.get(snapshot.name);
     if (!existing) {
-      console.log(`package 将创建: ${snapshot.name} (${snapshot.skills.length} skills)`);
+      console.log(
+        `package 将创建: ${snapshot.name} (${snapshot.skills.length} skills)`,
+      );
       if (options.dryRun) continue;
       const created = await withTransaction((client) =>
         createPackageWithSnapshotTx(client, userId, snapshot, 'imported'),
@@ -668,7 +705,9 @@ async function seedPackages(options: {
 
     const detail = await getPackageDetail(existing.id);
     if (snapshotHash(detail.snapshot) === snapshotHash(snapshot)) {
-      console.log(`package 无变化: ${snapshot.name} (v${detail.versionNumber})`);
+      console.log(
+        `package 无变化: ${snapshot.name} (v${detail.versionNumber})`,
+      );
       continue;
     }
 
@@ -685,8 +724,10 @@ async function seedPackages(options: {
       ].join(' '),
     );
     if (diff.added.length) console.log(`  added: ${diff.added.join(', ')}`);
-    if (diff.updated.length) console.log(`  updated: ${diff.updated.join(', ')}`);
-    if (diff.removed.length) console.log(`  removed: ${diff.removed.join(', ')}`);
+    if (diff.updated.length)
+      console.log(`  updated: ${diff.updated.join(', ')}`);
+    if (diff.removed.length)
+      console.log(`  removed: ${diff.removed.join(', ')}`);
 
     if (!options.update) {
       console.log('  内容有变化，但未传 --update，跳过写库');

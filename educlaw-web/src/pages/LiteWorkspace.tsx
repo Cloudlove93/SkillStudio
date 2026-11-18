@@ -1,4 +1,4 @@
-import LiteArenaPanel from "../components/lite/LiteArenaPanel";
+import LiteArenaPanel from '../components/lite/LiteArenaPanel';
 
 export default function LiteWorkspace() {
   return <LiteArenaPanel />;

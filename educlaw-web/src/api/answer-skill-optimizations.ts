@@ -272,10 +272,7 @@ export class AnswerOptimizationApiError extends Error {
   }
 }
 
-function optimizationPath(
-  template: string,
-  optimizationId: number,
-): string {
+function optimizationPath(template: string, optimizationId: number): string {
   return template.replace(':optimizationId', String(optimizationId));
 }
 
@@ -344,10 +341,7 @@ export const answerSkillOptimizationApi = {
       },
     );
   },
-  suggestions(
-    token: string,
-    input: AnswerOptimizationSuggestionsRequest,
-  ) {
+  suggestions(token: string, input: AnswerOptimizationSuggestionsRequest) {
     return request<AnswerOptimizationSuggestionsResult>(
       token,
       ANSWER_SKILL_OPTIMIZATION_ROUTES.SUGGESTIONS,
@@ -373,10 +367,7 @@ export const answerSkillOptimizationApi = {
   get(token: string, optimizationId: number) {
     return request<AnswerSkillOptimizationDetail>(
       token,
-      optimizationPath(
-        ANSWER_SKILL_OPTIMIZATION_ROUTES.DETAIL,
-        optimizationId,
-      ),
+      optimizationPath(ANSWER_SKILL_OPTIMIZATION_ROUTES.DETAIL, optimizationId),
     );
   },
   revise(
@@ -407,10 +398,7 @@ export const answerSkillOptimizationApi = {
   ) {
     return post<ReviseAnswerOptimizationResult>(
       token,
-      optimizationPath(
-        ANSWER_SKILL_OPTIMIZATION_ROUTES.REVISE,
-        optimizationId,
-      ),
+      optimizationPath(ANSWER_SKILL_OPTIMIZATION_ROUTES.REVISE, optimizationId),
       input,
       idempotencyKey,
     );
@@ -429,25 +417,15 @@ export const answerSkillOptimizationApi = {
       updatedAt: string;
     }>(
       token,
-      optimizationPath(
-        ANSWER_SKILL_OPTIMIZATION_ROUTES.TEST,
-        optimizationId,
-      ),
+      optimizationPath(ANSWER_SKILL_OPTIMIZATION_ROUTES.TEST, optimizationId),
       { expectedRevision },
       idempotencyKey,
     );
   },
-  rebase(
-    token: string,
-    optimizationId: number,
-    expectedRevision: number,
-  ) {
+  rebase(token: string, optimizationId: number, expectedRevision: number) {
     return request<AnswerSkillOptimizationDetail>(
       token,
-      optimizationPath(
-        ANSWER_SKILL_OPTIMIZATION_ROUTES.REBASE,
-        optimizationId,
-      ),
+      optimizationPath(ANSWER_SKILL_OPTIMIZATION_ROUTES.REBASE, optimizationId),
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -482,10 +460,7 @@ export const answerSkillOptimizationApi = {
   ) {
     return post<CancelAnswerOptimizationResult>(
       token,
-      optimizationPath(
-        ANSWER_SKILL_OPTIMIZATION_ROUTES.CANCEL,
-        optimizationId,
-      ),
+      optimizationPath(ANSWER_SKILL_OPTIMIZATION_ROUTES.CANCEL, optimizationId),
       input,
       idempotencyKey,
     );

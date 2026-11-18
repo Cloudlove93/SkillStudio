@@ -88,7 +88,11 @@ export function SkillInspectorContent(props: Props) {
   if (props.descriptor?.view === 'optimization' && props.answerOptimization) {
     return (
       <Suspense
-        fallback={<div className="skill-workspace-loading" role="status">正在打开优化建议…</div>}
+        fallback={
+          <div className="skill-workspace-loading" role="status">
+            正在打开优化建议…
+          </div>
+        }
       >
         <SkillAnswerOptimizationPanel
           token={props.token}
@@ -312,7 +316,9 @@ function GuidedRequirementSummary({
           <section
             key={step.key}
             className={`skill-guided-summary-group is-${step.status}`}
-            aria-current={progress.currentStep === step.key ? 'step' : undefined}
+            aria-current={
+              progress.currentStep === step.key ? 'step' : undefined
+            }
           >
             <header>
               <span className="skill-guided-summary-step-icon">

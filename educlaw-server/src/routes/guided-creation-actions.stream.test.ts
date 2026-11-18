@@ -47,14 +47,31 @@ describe('guided creation SSE actions', () => {
 
   it('streams one assistant turn, confirmation, done and stream_end for Start', async () => {
     const assistant = {
-      id: '2', session_id: '1', message_no: 2, client_message_id: null,
-      role: 'assistant', content: '请确认内容。', metadata: {}, created_at: new Date().toISOString(),
+      id: '2',
+      session_id: '1',
+      message_no: 2,
+      client_message_id: null,
+      role: 'assistant',
+      content: '请确认内容。',
+      metadata: {},
+      created_at: new Date().toISOString(),
     };
     const detail = {
-      id: '1', status: 'ready_for_confirmation', model: null, documents: [], draft: {},
-      field_states: {}, confirmation: { title: 'Skill', sections: [] }, revision_no: 1,
-      package_id: null, skill_id: null, skill_version_id: null, error: null,
-      created_at: new Date().toISOString(), updated_at: new Date().toISOString(), completed_at: null,
+      id: '1',
+      status: 'ready_for_confirmation',
+      model: null,
+      documents: [],
+      draft: {},
+      field_states: {},
+      confirmation: { title: 'Skill', sections: [] },
+      revision_no: 1,
+      package_id: null,
+      skill_id: null,
+      skill_version_id: null,
+      error: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      completed_at: null,
       messages: [assistant],
     };
     mocks.startGuidedCreation.mockResolvedValueOnce(detail);
@@ -72,11 +89,17 @@ describe('guided creation SSE actions', () => {
       response,
     });
 
-    expect(mocks.startGuidedCreation).toHaveBeenCalledWith(expect.objectContaining({
-      auth_user_id: 'gateway-user',
-    }));
+    expect(mocks.startGuidedCreation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        auth_user_id: 'gateway-user',
+      }),
+    );
     expect(mocks.events.map((item) => item.event)).toEqual([
-      'phase', 'message', 'confirmation', 'done', 'stream_end',
+      'phase',
+      'message',
+      'confirmation',
+      'done',
+      'stream_end',
     ]);
     expect(response.end).toHaveBeenCalledOnce();
   });
@@ -94,9 +117,14 @@ describe('guided creation SSE actions', () => {
       response,
     });
 
-    expect(mocks.events.map((item) => item.event)).toEqual(['phase', 'error', 'stream_end']);
+    expect(mocks.events.map((item) => item.event)).toEqual([
+      'phase',
+      'error',
+      'stream_end',
+    ]);
     expect(mocks.events[1]?.data).toMatchObject({
-      code: 'GUIDED_REQUEST_FAILED', retryable: true,
+      code: 'GUIDED_REQUEST_FAILED',
+      retryable: true,
     });
     expect(response.end).toHaveBeenCalledOnce();
   });

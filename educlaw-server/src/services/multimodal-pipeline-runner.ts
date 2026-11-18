@@ -53,9 +53,16 @@ interface MultimodalPipelineRunnerDependencies {
   clearTimeoutFn?: typeof clearTimeout;
 }
 
-const STALE_WORK_CODES = new Set(['SESSION_REVISION_CONFLICT', 'INVALID_MEDIA_STAGE']);
+const STALE_WORK_CODES = new Set([
+  'SESSION_REVISION_CONFLICT',
+  'INVALID_MEDIA_STAGE',
+]);
 
-function positiveInteger(value: number, fieldName: string, maximum: number): number {
+function positiveInteger(
+  value: number,
+  fieldName: string,
+  maximum: number,
+): number {
   if (!Number.isInteger(value) || value < 1 || value > maximum) {
     throw new Error(`${fieldName} must be an integer between 1 and ${maximum}`);
   }
@@ -73,14 +80,22 @@ function returnedMediaStage(value: unknown): string | null {
     return null;
   }
   const mediaStage = (value as Record<string, unknown>).mediaStage;
-  return typeof mediaStage === 'string' && mediaStage.length > 0 ? mediaStage : null;
+  return typeof mediaStage === 'string' && mediaStage.length > 0
+    ? mediaStage
+    : null;
 }
 
 export function createMultimodalPipelineRunner(
   deps: MultimodalPipelineRunnerDependencies,
 ): MultimodalPipelineRunner {
-  const logger = deps.logger.child?.({ component: 'multimodal-pipeline-runner' }) ?? deps.logger;
-  const pollIntervalMs = positiveInteger(deps.pollIntervalMs, 'pollIntervalMs', 300_000);
+  const logger =
+    deps.logger.child?.({ component: 'multimodal-pipeline-runner' }) ??
+    deps.logger;
+  const pollIntervalMs = positiveInteger(
+    deps.pollIntervalMs,
+    'pollIntervalMs',
+    300_000,
+  );
   const batchLimit = positiveInteger(deps.batchLimit, 'batchLimit', 64);
   const concurrency = positiveInteger(deps.concurrency, 'concurrency', 16);
   const nowMs = deps.nowMs ?? Date.now;
@@ -257,11 +272,12 @@ export function createMultimodalPipelineRunner(
               // A failed stage is excluded from automatic scans. The user may
               // explicitly resume it after fixing configuration or input.
               retryable: true,
-              message: diagnostic.reason === 'truncated'
-                ? '模型输出被截断，输出额度已耗尽；请缩短材料或调整模型后重新处理'
-                : diagnostic.retryable
-                  ? '处理多次未完成，请检查后明确重试'
-                  : '模型配置或输入契约不可用，请修正后重新处理',
+              message:
+                diagnostic.reason === 'truncated'
+                  ? '模型输出被截断，输出额度已耗尽；请缩短材料或调整模型后重新处理'
+                  : diagnostic.retryable
+                    ? '处理多次未完成，请检查后明确重试'
+                    : '模型配置或输入契约不可用，请修正后重新处理',
             },
           });
         } catch (persistError) {
@@ -336,7 +352,9 @@ export function createMultimodalPipelineRunner(
 
     activeRun = (async () => {
       try {
-        const sessions = await deps.store.scanRunnableSessions({ limit: batchLimit });
+        const sessions = await deps.store.scanRunnableSessions({
+          limit: batchLimit,
+        });
         await processBatch(sessions);
       } catch (error) {
         logger.error(

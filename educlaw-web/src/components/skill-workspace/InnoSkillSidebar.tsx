@@ -27,7 +27,11 @@ import {
   type SkillMenuAction,
 } from './SkillWorkspaceSidebar';
 
-export type InnoSkillNavSection = 'home' | 'my-skills' | 'workflow-library' | 'create';
+export type InnoSkillNavSection =
+  | 'home'
+  | 'my-skills'
+  | 'workflow-library'
+  | 'create';
 
 type Props = {
   sessions: GuidedCreationSession[];
@@ -47,9 +51,7 @@ type Props = {
   conversationLabel?: string;
   conversationSurfaceBadge?: boolean;
   onToggle: () => void;
-  onNavigate: (
-    section: Exclude<InnoSkillNavSection, 'create'>,
-  ) => void;
+  onNavigate: (section: Exclude<InnoSkillNavSection, 'create'>) => void;
   onCreateMode: (mode: SkillCreateAction) => void;
   onSelectDraft: (session: GuidedCreationSession) => void;
   onRenameDraft: (

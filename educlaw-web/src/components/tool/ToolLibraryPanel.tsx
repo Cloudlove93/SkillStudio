@@ -1,13 +1,33 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
-import { Search, ArrowLeft, Loader2, Wrench, FileText, ChevronRight, Trash2, Lock, User, X, Globe, Settings, CheckSquare, Square, FolderUp, Info } from 'lucide-react';
+import {
+  Search,
+  ArrowLeft,
+  Loader2,
+  Wrench,
+  FileText,
+  ChevronRight,
+  Trash2,
+  Lock,
+  User,
+  X,
+  Globe,
+  Settings,
+  CheckSquare,
+  Square,
+  FolderUp,
+  Info,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import {
-  deleteUserTool, uploadUserTool,
-  listToolFiles, readToolFile,
-  publishTool, unpublishTool,
+  deleteUserTool,
+  uploadUserTool,
+  listToolFiles,
+  readToolFile,
+  publishTool,
+  unpublishTool,
   type ToolSummary,
 } from '../../api/manager';
 import { useT } from '../../i18n';
@@ -34,7 +54,10 @@ function ToolDetailView({
   // Publish state
   const [publishingTool, setPublishingTool] = useState(false);
   const allTools = useLibraryStore((s) => s.tools);
-  const publicTools = useMemo(() => allTools.filter((t) => t.source === 'public'), [allTools]);
+  const publicTools = useMemo(
+    () => allTools.filter((t) => t.source === 'public'),
+    [allTools],
+  );
   const isToolPublished = useMemo(
     () => isUser && publicTools.some((t) => t.dirName === tool.dirName),
     [isUser, publicTools, tool.dirName],
@@ -50,26 +73,38 @@ function ToolDetailView({
       }
       useLibraryStore.getState().fetchTools(true);
       onUpdated?.();
-      toast.success(isToolPublished ? t('shared.unpublish') : t('shared.published'));
+      toast.success(
+        isToolPublished ? t('shared.unpublish') : t('shared.published'),
+      );
     } catch (err) {
-      toast.error(isToolPublished ? t('shared.unpublish') : t('shared.publish'), { description: err instanceof Error ? err.message : undefined });
+      toast.error(
+        isToolPublished ? t('shared.unpublish') : t('shared.publish'),
+        { description: err instanceof Error ? err.message : undefined },
+      );
+    } finally {
+      setPublishingTool(false);
     }
-    finally { setPublishingTool(false); }
   };
 
   // File content preview state
-  const [openFile, setOpenFile] = useState<{ path: string; content: string } | null>(null);
+  const [openFile, setOpenFile] = useState<{
+    path: string;
+    content: string;
+  } | null>(null);
   const [openFileLoading, setOpenFileLoading] = useState(false);
 
   // Build FileOps for tool files (read-only)
-  const toolFileOps: FileOps = useMemo(() => ({
-    listFiles: (dirPath) => listToolFiles(source, tool.dirName, dirPath),
-    createFile: async () => {},
-    createDir: async () => {},
-    renamePath: async () => {},
-    deletePath: async () => {},
-    uploadFiles: async () => {},
-  }), [source, tool.dirName]);
+  const toolFileOps: FileOps = useMemo(
+    () => ({
+      listFiles: (dirPath) => listToolFiles(source, tool.dirName, dirPath),
+      createFile: async () => {},
+      createDir: async () => {},
+      renamePath: async () => {},
+      deletePath: async () => {},
+      uploadFiles: async () => {},
+    }),
+    [source, tool.dirName],
+  );
 
   const openFileContent = async (filePath: string) => {
     setOpenFileLoading(true);
@@ -96,7 +131,12 @@ function ToolDetailView({
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-3 border-b border-border/70 px-6 py-4">
-        <Button variant="outline" size="sm" onClick={onBack} className="gap-1.5 rounded-full">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onBack}
+          className="gap-1.5 rounded-full"
+        >
           <ArrowLeft className="size-4" />
           {t('toolLib.back')}
         </Button>
@@ -111,9 +151,12 @@ function ToolDetailView({
           >
             <Globe className="size-3.5" />
             {publishingTool
-              ? (isToolPublished ? t('shared.unpublishing') : t('shared.publishing'))
-              : (isToolPublished ? t('shared.unpublish') : t('shared.publish'))
-            }
+              ? isToolPublished
+                ? t('shared.unpublishing')
+                : t('shared.publishing')
+              : isToolPublished
+                ? t('shared.unpublish')
+                : t('shared.publish')}
           </Button>
         )}
       </div>
@@ -129,14 +172,22 @@ function ToolDetailView({
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 mb-1.5">
                   {tool.source && (
-                    <span className={`inline-flex items-center gap-1 rounded-full border border-border/70 px-3 py-1 text-[10px] font-medium shadow-sm ${
-                      tool.source === 'user'
-                        ? 'bg-primary/8 text-primary/80'
-                        : tool.source === 'public'
-                          ? 'bg-blue-500/8 text-blue-600 dark:text-blue-400'
-                          : 'bg-muted/60 text-muted-foreground'
-                    }`}>
-                      {tool.source === 'preset' ? <Lock className="size-2.5" /> : tool.source === 'public' ? <Globe className="size-2.5" /> : <User className="size-2.5" />}
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-full border border-border/70 px-3 py-1 text-[10px] font-medium shadow-sm ${
+                        tool.source === 'user'
+                          ? 'bg-primary/8 text-primary/80'
+                          : tool.source === 'public'
+                            ? 'bg-blue-500/8 text-blue-600 dark:text-blue-400'
+                            : 'bg-muted/60 text-muted-foreground'
+                      }`}
+                    >
+                      {tool.source === 'preset' ? (
+                        <Lock className="size-2.5" />
+                      ) : tool.source === 'public' ? (
+                        <Globe className="size-2.5" />
+                      ) : (
+                        <User className="size-2.5" />
+                      )}
                       {t(`toolLib.${tool.source}`)}
                     </span>
                   )}
@@ -147,16 +198,20 @@ function ToolDetailView({
                     </span>
                   )}
                 </div>
-                <h1 className="text-3xl font-semibold tracking-[-0.04em] text-foreground">{tool.name}</h1>
+                <h1 className="text-3xl font-semibold tracking-[-0.04em] text-foreground">
+                  {tool.name}
+                </h1>
                 {tool.description && (
-                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{tool.description}</p>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                    {tool.description}
+                  </p>
                 )}
               </div>
             </div>
           </div>
 
           {/* File Browser */}
-            <section className="mb-6 overflow-hidden rounded-[24px] border border-border bg-card shadow-sm dark:bg-card">
+          <section className="mb-6 overflow-hidden rounded-[24px] border border-border bg-card shadow-sm dark:bg-card">
             <FileExplorer
               fileOps={toolFileOps}
               onFileSelect={openFileContent}
@@ -169,7 +224,9 @@ function ToolDetailView({
             <section className="mb-6">
               <div className="flex items-center justify-center rounded-[24px] border border-border bg-card py-8 shadow-sm dark:bg-card">
                 <Loader2 className="size-4 animate-spin text-sky-500 mr-2" />
-                <span className="text-xs text-muted-foreground">{t('skill.loading')}</span>
+                <span className="text-xs text-muted-foreground">
+                  {t('skill.loading')}
+                </span>
               </div>
             </section>
           )}
@@ -179,8 +236,15 @@ function ToolDetailView({
               {/* File header */}
               <div className="flex items-center gap-2 mb-2">
                 <FileText className="size-4 text-muted-foreground" />
-                <span className="text-sm font-medium text-foreground flex-1 truncate">{openFile.path}</span>
-                <Button variant="ghost" size="sm" onClick={() => setOpenFile(null)} className="h-8 gap-1 rounded-full px-3 text-xs">
+                <span className="text-sm font-medium text-foreground flex-1 truncate">
+                  {openFile.path}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setOpenFile(null)}
+                  className="h-8 gap-1 rounded-full px-3 text-xs"
+                >
                   <X className="size-3" />
                 </Button>
               </div>
@@ -189,7 +253,17 @@ function ToolDetailView({
               <div className="overflow-hidden rounded-[24px] border border-border bg-card shadow-sm dark:bg-card">
                 {openFileIsJson ? (
                   <pre className="p-4 text-sm font-mono text-foreground/80 overflow-x-auto whitespace-pre-wrap break-words">
-                    {(() => { try { return JSON.stringify(JSON.parse(openFile.content), null, 2); } catch { return openFile.content; } })()}
+                    {(() => {
+                      try {
+                        return JSON.stringify(
+                          JSON.parse(openFile.content),
+                          null,
+                          2,
+                        );
+                      } catch {
+                        return openFile.content;
+                      }
+                    })()}
                   </pre>
                 ) : (
                   <pre className="p-4 text-sm font-mono text-foreground/80 overflow-x-auto whitespace-pre-wrap break-words">
@@ -203,7 +277,9 @@ function ToolDetailView({
           {/* Used by profiles */}
           {(() => {
             const profiles = useAgentStore.getState().profiles;
-            const usedBy = profiles.filter((p) => p.tools?.includes(tool.dirName));
+            const usedBy = profiles.filter((p) =>
+              p.tools?.includes(tool.dirName),
+            );
             if (usedBy.length === 0) return null;
             return (
               <section className="mb-6">
@@ -213,7 +289,10 @@ function ToolDetailView({
                 </h2>
                 <div className="flex flex-wrap gap-2">
                   {usedBy.map((p) => (
-                    <span key={p.fileName} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground/80 shadow-sm dark:bg-card">
+                    <span
+                      key={p.fileName}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground/80 shadow-sm dark:bg-card"
+                    >
                       {p.name}
                     </span>
                   ))}
@@ -269,7 +348,10 @@ function ToolCard({
       {/* Delete button for user tools */}
       {!batchMode && onDelete && (
         <button
-          onClick={(e) => { e.stopPropagation(); onDelete(e); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(e);
+          }}
           className="absolute right-3 top-3 z-10 flex size-7 items-center justify-center rounded-full border border-red-500/15 bg-red-500/10 text-red-500 opacity-0 transition-all duration-200 group-hover:opacity-100 hover:bg-red-500/20"
         >
           <Trash2 className="size-3" />
@@ -279,7 +361,10 @@ function ToolCard({
       {/* Published badge 閳?clickable to unpublish */}
       {!batchMode && published && (
         <button
-          onClick={(e) => { e.stopPropagation(); onUnpublish?.(e); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onUnpublish?.(e);
+          }}
           className="absolute top-3 left-3 z-10 inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400 transition-colors hover:border-red-500/20 hover:bg-red-500/10 hover:text-red-500"
           title={t('shared.unpublish')}
         >
@@ -314,7 +399,11 @@ function ToolCard({
 /* 閳光偓閳光偓閳光偓 Source Tab 閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓 */
 
 type SourceTab = 'preset' | 'public' | 'user';
-type FileWithWebkitPath = File & { webkitRelativePath?: string; directory?: string; webkitdirectory?: string };
+type FileWithWebkitPath = File & {
+  webkitRelativePath?: string;
+  directory?: string;
+  webkitdirectory?: string;
+};
 
 /* 閳光偓閳光偓閳光偓 Main Panel 閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓 */
 
@@ -331,7 +420,9 @@ export default function ToolLibraryPanel() {
   const [uploading, setUploading] = useState(false);
   const folderInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { fetchSummaries(); }, [fetchSummaries]);
+  useEffect(() => {
+    fetchSummaries();
+  }, [fetchSummaries]);
 
   // Handle pending navigation from profile detail
   const pendingToolDirName = useUIStore((s) => s.pendingToolDirName);
@@ -349,13 +440,30 @@ export default function ToolLibraryPanel() {
   }, [pendingToolDirName, summaries, setPendingToolDirName]);
 
   // Split by source
-  const presetTools = useMemo(() => summaries.filter((s) => s.source === 'preset' || (!s.source)), [summaries]);
-  const publicTools = useMemo(() => summaries.filter((s) => s.source === 'public'), [summaries]);
-  const userTools = useMemo(() => summaries.filter((s) => s.source === 'user'), [summaries]);
-  const currentTools = sourceTab === 'preset' ? presetTools : sourceTab === 'public' ? publicTools : userTools;
+  const presetTools = useMemo(
+    () => summaries.filter((s) => s.source === 'preset' || !s.source),
+    [summaries],
+  );
+  const publicTools = useMemo(
+    () => summaries.filter((s) => s.source === 'public'),
+    [summaries],
+  );
+  const userTools = useMemo(
+    () => summaries.filter((s) => s.source === 'user'),
+    [summaries],
+  );
+  const currentTools =
+    sourceTab === 'preset'
+      ? presetTools
+      : sourceTab === 'public'
+        ? publicTools
+        : userTools;
 
   // Published tool lookup (user tools that also exist in public)
-  const publishedToolDirNames = useMemo(() => new Set(publicTools.map((t) => t.dirName)), [publicTools]);
+  const publishedToolDirNames = useMemo(
+    () => new Set(publicTools.map((t) => t.dirName)),
+    [publicTools],
+  );
 
   const filtered = useMemo(() => {
     if (!search) return currentTools;
@@ -367,13 +475,16 @@ export default function ToolLibraryPanel() {
   }, [currentTools, search]);
 
   const handleDelete = async (tool: ToolSummary) => {
-    if (!confirm(t('toolLib.confirmDelete').replace('{name}', tool.name))) return;
+    if (!confirm(t('toolLib.confirmDelete').replace('{name}', tool.name)))
+      return;
     try {
       await deleteUserTool(tool.dirName);
       toast.success(t('file.delete'));
       fetchSummaries(true);
     } catch (err) {
-      toast.error(t('file.delete'), { description: err instanceof Error ? err.message : undefined });
+      toast.error(t('file.delete'), {
+        description: err instanceof Error ? err.message : undefined,
+      });
     }
   };
 
@@ -383,19 +494,31 @@ export default function ToolLibraryPanel() {
       toast.success(t('shared.unpublish'));
       fetchSummaries(true);
     } catch (err) {
-      toast.error(t('shared.unpublish'), { description: err instanceof Error ? err.message : undefined });
+      toast.error(t('shared.unpublish'), {
+        description: err instanceof Error ? err.message : undefined,
+      });
     }
   };
 
   const handleBatchDelete = async () => {
     if (batchSelected.size === 0) return;
-    if (!confirm(t('toolLib.confirmBatchDelete').replace('{n}', String(batchSelected.size)))) return;
+    if (
+      !confirm(
+        t('toolLib.confirmBatchDelete').replace(
+          '{n}',
+          String(batchSelected.size),
+        ),
+      )
+    )
+      return;
     const items = Array.from(batchSelected);
     try {
       await Promise.all(items.map((dirName) => deleteUserTool(dirName)));
       toast.success(t('toolLib.batchDelete'));
     } catch (err) {
-      toast.error(t('toolLib.batchDelete'), { description: err instanceof Error ? err.message : undefined });
+      toast.error(t('toolLib.batchDelete'), {
+        description: err instanceof Error ? err.message : undefined,
+      });
     }
     setBatchMode(false);
     setBatchSelected(new Set());
@@ -421,13 +544,15 @@ export default function ToolLibraryPanel() {
     if (!files || files.length === 0) return;
 
     // Derive tool name from the common top-level folder
-    const firstPath = (files[0] as FileWithWebkitPath).webkitRelativePath || files[0].name;
+    const firstPath =
+      (files[0] as FileWithWebkitPath).webkitRelativePath || files[0].name;
     const dirName = firstPath.split('/')[0] || `tool_${Date.now()}`;
 
     const items: { file: globalThis.File; relativePath: string }[] = [];
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      const relPath = ((file as FileWithWebkitPath).webkitRelativePath) || file.name;
+      const relPath =
+        (file as FileWithWebkitPath).webkitRelativePath || file.name;
       // Strip the top-level folder from the relative path since dirName already is that folder
       const parts = relPath.split('/');
       const innerPath = parts.slice(1).join('/');
@@ -449,7 +574,9 @@ export default function ToolLibraryPanel() {
       setSourceTab('user');
       fetchSummaries(true);
     } catch (err) {
-      toast.error(t('toolLib.uploading'), { description: err instanceof Error ? err.message : undefined });
+      toast.error(t('toolLib.uploading'), {
+        description: err instanceof Error ? err.message : undefined,
+      });
     } finally {
       setUploading(false);
       e.target.value = '';
@@ -458,7 +585,13 @@ export default function ToolLibraryPanel() {
 
   // Detail view
   if (selected) {
-    return <ToolDetailView tool={selected} onBack={() => setSelected(null)} onUpdated={() => fetchSummaries(true)} />;
+    return (
+      <ToolDetailView
+        tool={selected}
+        onBack={() => setSelected(null)}
+        onUpdated={() => fetchSummaries(true)}
+      />
+    );
   }
 
   // List view
@@ -470,7 +603,10 @@ export default function ToolLibraryPanel() {
         type="file"
         className="hidden"
         onChange={handleFolderUpload}
-        {...({ webkitdirectory: '', directory: '' } as Record<'webkitdirectory' | 'directory', string>)}
+        {...({ webkitdirectory: '', directory: '' } as Record<
+          'webkitdirectory' | 'directory',
+          string
+        >)}
       />
 
       <div className="px-6 pb-3 pt-5">
@@ -479,29 +615,45 @@ export default function ToolLibraryPanel() {
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex items-center gap-2">
                 <div className="flex items-center gap-0.5 rounded-full border border-border/70 bg-card p-1 shadow-sm dark:bg-card">
-            {(['preset', 'public', 'user'] as const).map((tab) => {
-              const icon = tab === 'preset' ? Lock : tab === 'public' ? Globe : User;
-              const Icon = icon;
-              const count = tab === 'preset' ? presetTools.length : tab === 'public' ? publicTools.length : userTools.length;
-              return (
-                <button
-                  key={tab}
-                  onClick={() => { setSourceTab(tab); if (tab !== 'user') exitBatchMode(); }}
+                  {(['preset', 'public', 'user'] as const).map((tab) => {
+                    const icon =
+                      tab === 'preset' ? Lock : tab === 'public' ? Globe : User;
+                    const Icon = icon;
+                    const count =
+                      tab === 'preset'
+                        ? presetTools.length
+                        : tab === 'public'
+                          ? publicTools.length
+                          : userTools.length;
+                    return (
+                      <button
+                        key={tab}
+                        onClick={() => {
+                          setSourceTab(tab);
+                          if (tab !== 'user') exitBatchMode();
+                        }}
                         className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-medium transition-all duration-200 ${
-                    sourceTab === tab
+                          sourceTab === tab
                             ? 'bg-primary text-primary-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  <Icon className="size-3" />
-                  {t(`toolLib.${tab}`)}
-                  <span className="text-[10px] tabular-nums text-muted-foreground/50">{count}</span>
-                </button>
-              );
-            })}
+                            : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        <Icon className="size-3" />
+                        {t(`toolLib.${tab}`)}
+                        <span className="text-[10px] tabular-nums text-muted-foreground/50">
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
                 {sourceTab === 'user' && !batchMode && userTools.length > 0 && (
-                  <Button variant="outline" size="sm" onClick={() => setBatchMode(true)} className="h-9 gap-1.5 rounded-full text-xs">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setBatchMode(true)}
+                    className="h-9 gap-1.5 rounded-full text-xs"
+                  >
                     <Settings className="size-3" />
                     {t('toolLib.manage')}
                   </Button>
@@ -549,7 +701,9 @@ export default function ToolLibraryPanel() {
               }}
               className="text-xs text-primary hover:text-primary/80 transition-colors shrink-0"
             >
-              {batchSelected.size === filtered.length && filtered.length > 0 ? t('toolLib.deselectAll') : t('toolLib.selectAll')}
+              {batchSelected.size === filtered.length && filtered.length > 0
+                ? t('toolLib.deselectAll')
+                : t('toolLib.selectAll')}
             </button>
             <span className="text-xs text-muted-foreground">
               {t('toolLib.selected').replace('{n}', String(batchSelected.size))}
@@ -565,7 +719,12 @@ export default function ToolLibraryPanel() {
               <Trash2 className="size-3" />
               {t('toolLib.batchDelete')}
             </Button>
-            <Button variant="ghost" size="sm" onClick={exitBatchMode} className="h-7 text-xs">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={exitBatchMode}
+              className="h-7 text-xs"
+            >
               {t('toolLib.cancelManage')}
             </Button>
           </div>
@@ -577,15 +736,25 @@ export default function ToolLibraryPanel() {
         {loading ? (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="size-5 animate-spin text-sky-500 mr-2" />
-            <span className="text-sm text-muted-foreground">{t('skill.loading')}</span>
+            <span className="text-sm text-muted-foreground">
+              {t('skill.loading')}
+            </span>
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16">
             <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-2xl bg-card shadow-sm dark:bg-card">
-              {sourceTab === 'user' ? <User className="size-5 text-muted-foreground/30" /> : <Search className="size-5 text-muted-foreground/30" />}
+              {sourceTab === 'user' ? (
+                <User className="size-5 text-muted-foreground/30" />
+              ) : (
+                <Search className="size-5 text-muted-foreground/30" />
+              )}
             </div>
             <p className="text-sm text-muted-foreground/60">
-              {sourceTab === 'user' && !search ? t('toolLib.noUserTools') : search ? t('toolLib.noMatch') : t('toolLib.emptyHint')}
+              {sourceTab === 'user' && !search
+                ? t('toolLib.noUserTools')
+                : search
+                  ? t('toolLib.noMatch')
+                  : t('toolLib.emptyHint')}
             </p>
           </div>
         ) : (
@@ -601,11 +770,21 @@ export default function ToolLibraryPanel() {
                     setSelected(tool);
                   }
                 }}
-                onDelete={tool.source === 'user' ? () => handleDelete(tool) : undefined}
+                onDelete={
+                  tool.source === 'user' ? () => handleDelete(tool) : undefined
+                }
                 batchMode={batchMode && tool.source === 'user'}
                 selected={batchSelected.has(tool.dirName)}
-                published={tool.source === 'user' && publishedToolDirNames.has(tool.dirName)}
-                onUnpublish={tool.source === 'user' && publishedToolDirNames.has(tool.dirName) ? () => handleUnpublishTool(tool) : undefined}
+                published={
+                  tool.source === 'user' &&
+                  publishedToolDirNames.has(tool.dirName)
+                }
+                onUnpublish={
+                  tool.source === 'user' &&
+                  publishedToolDirNames.has(tool.dirName)
+                    ? () => handleUnpublishTool(tool)
+                    : undefined
+                }
               />
             ))}
           </div>

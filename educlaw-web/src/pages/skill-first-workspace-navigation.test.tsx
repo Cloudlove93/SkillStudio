@@ -811,8 +811,8 @@ it.each(['rollback', 'discard', 'restore'] as const)(
       expect(container.querySelector('.skill-version-confirm')).toBeNull();
     });
     await act(async () =>
-    container.querySelector<HTMLButtonElement>('[data-go-repo]')!.click(),
-  );
+      container.querySelector<HTMLButtonElement>('[data-go-repo]')!.click(),
+    );
     await vi.waitFor(async () => {
       await act(async () => {});
       expect(

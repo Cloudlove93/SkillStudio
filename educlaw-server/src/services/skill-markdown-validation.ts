@@ -81,7 +81,9 @@ export function validateSkillMdStandard(
   const triggerPattern =
     /(当|如果|用于|适合|场景|触发|调用|需要|情况|针对|遇到|面对|出现|用户|输入|请求|问题|任务|例如|\bwhen\b|\bwhenever\b|\bif\b|\bfor\b|\buse(?:d|s|ing)?\b|\buser\b|\brequest\b|\binput\b|\btask\b|\bworkflow\b|\bscenario\b|\btrigger\b)/i;
   if (fmDescription && !triggerPattern.test(fmDescription)) {
-    errors.push('frontmatter description 应说明 skill 的触发场景（什么时候使用）');
+    errors.push(
+      'frontmatter description 应说明 skill 的触发场景（什么时候使用）',
+    );
   }
 
   const body = skillMd.replace(/^---\s*\n[\s\S]*?\n---\s*\n?/, '').trim();

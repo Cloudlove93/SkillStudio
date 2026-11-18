@@ -2,7 +2,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { X, ImageIcon } from 'lucide-react';
 import type { ImageAttachment } from '../PromptInput';
 
-const ACCEPTED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+const ACCEPTED_IMAGE_TYPES = [
+  'image/png',
+  'image/jpeg',
+  'image/gif',
+  'image/webp',
+];
 
 export { ACCEPTED_IMAGE_TYPES };
 
