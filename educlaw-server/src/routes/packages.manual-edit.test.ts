@@ -103,6 +103,7 @@ it('passes the document single-Skill requirement to generation', async () => {
       expect.any(Function),
       expect.any(Function),
       1,
+      undefined,
     );
   } finally {
     await close(server);

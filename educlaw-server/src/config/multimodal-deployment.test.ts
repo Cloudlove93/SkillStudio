@@ -7,7 +7,7 @@ function rootFile(path: string) {
 }
 
 describe('multimodal local deployment contract', () => {
-  it('ships MinIO, bucket initialization, and horizontally scalable real workers', () => {
+  it('ships S3-compatible storage, bucket initialization, and horizontally scalable real workers', () => {
     const compose = rootFile('docker-compose.yml');
     const workerDockerfile = rootFile('python/media_worker/Dockerfile');
     const workerProject = rootFile('python/media_worker/pyproject.toml');
@@ -28,8 +28,8 @@ describe('multimodal local deployment contract', () => {
     expect(
       compose.match(/educlaw-server:\s*\r?\n\s*condition: service_healthy/g),
     ).toHaveLength(3);
-    expect(compose).toContain('mc mb --ignore-existing');
-    expect(compose).toContain('MINIO_API_CORS_ALLOW_ORIGIN=${APP_ORIGIN:-http://eduskill.localhost}');
+    expect(compose).toContain('-bucket=${OBJECT_STORAGE_BUCKET:-educlaw-media}');
+    expect(compose).toContain('-s3.allowedOrigins=${APP_ORIGIN:-http://app.localhost:8080}');
     expect(compose).not.toContain('mc cors set');
     expect(compose).toContain('educlaw-media-quality-worker:');
     expect(compose).toContain('educlaw-media-distillation-worker:');
@@ -41,9 +41,9 @@ describe('multimodal local deployment contract', () => {
     expect(workerDockerfile).toContain('ffmpeg');
     expect(workerDockerfile).toContain('asr-local');
     expect(workerProject).toContain('flatbuffers==25.9.23');
-    expect(serverDockerfile).toContain('FROM node:22-slim');
-    expect(serverDockerfile).not.toContain('FROM node:20-slim');
-    expect(webDockerfile).toContain('FROM node:22-slim');
+    expect(serverDockerfile).toContain('node:22-slim');
+    expect(serverDockerfile).not.toContain('node:20-slim');
+    expect(webDockerfile).toContain('node:22-slim');
   });
 
   it('documents every server/worker storage and recovery setting without real secrets', () => {

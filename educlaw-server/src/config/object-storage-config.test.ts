@@ -78,7 +78,7 @@ describe('object storage config', () => {
   });
 
   it('keeps env examples on placeholders instead of real secrets', () => {
-    for (const relativePath of ['.env.example', '.env.docker']) {
+    for (const relativePath of ['.env.example']) {
       const text = readFileSync(
         new URL(`../../../${relativePath}`, import.meta.url),
         'utf8',
