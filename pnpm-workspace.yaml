@@ -12,3 +12,12 @@ allowBuilds:
 overrides:
   nanoid: 3.3.18
   postcss: 8.5.18
+  # 依赖审计修复：锁定到已修复版本，避免传递依赖回退到漏洞版本。
+  qs: 6.16.1
+  '@xmldom/xmldom': 0.8.15
+  '@ai-sdk/provider-utils': 4.0.33
+  proxy-addr: 2.0.8
+  body-parser: 2.4.0
+  postcss-selector-parser: 6.1.5
+  zod: 4.6.6
+  katex: 0.18.2

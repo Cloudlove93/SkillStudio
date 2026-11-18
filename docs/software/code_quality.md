@@ -19,7 +19,7 @@
 | 静态检查 | ESLint（web/server）+ TypeScript 类型检查通过 |
 | 构建 | `educlaw-web`、`educlaw-server` 生产构建通过 |
 | CI | 已新增 `.github/workflows/ci.yml`，覆盖 web/server 与依赖审计 |
-| 依赖审计 | 27 个已知漏洞：1 critical、15 high、9 moderate、2 low |
+| 依赖审计 | 0 个已知漏洞（2026-11-18 修复） |
 | 覆盖率 | 尚未形成仓库级基线 |
 | E2E | 尚无稳定套件 |
 | Python Worker 测试 | 已有测试脚本，尚未纳入 CI |
@@ -58,7 +58,7 @@ pnpm build
 | --- | --- | --- |
 | `web` | 类型检查、lint、单测、契约测试、生产构建 | 是 |
 | `server` | lint、后端测试、生产构建 | 是 |
-| `dependency-audit` | `pnpm audit --prod` | 否（informational，待漏洞修复后转为阻断） |
+| `dependency-audit` | `pnpm audit --prod` | 是 |
 
 ### 3.4 合并与发布
 
@@ -78,7 +78,7 @@ pnpm build
 
 | 工具 | 用途 | 优先级 |
 | --- | --- | --- |
-| `pnpm audit` | 依赖漏洞 | P0（已接入 informational） |
+| `pnpm audit` | 依赖漏洞 | P0（已接入并阻断） |
 | Semgrep / CodeQL | SAST，发现注入、越权、敏感信息等问题 | P1 |
 | Trivy | 容器镜像漏洞 | P1 |
 | gitleaks | 密钥扫描 | P0 |
@@ -135,26 +135,28 @@ pnpm build
 
 ## 7. 已知风险
 
-### 7.1 依赖漏洞
+### 7.1 依赖漏洞（已修复）
 
-当前 `pnpm audit --prod` 结果：
+2026-11-18 修复前：`pnpm audit --prod` 报告 27 个漏洞（1 critical、15 high、9 moderate、2 low）。
+
+修复后结果：
 
 ```text
-27 vulnerabilities found
-Severity: 2 low | 9 moderate | 15 high | 1 critical
+No known vulnerabilities found
 ```
 
-已知示例：
+处理方式：
 
-- `proxy-addr`（critical）：IP 欺骗风险，路径 `express > proxy-addr`。
-- `qs`（moderate）：数组元素 `toString` 非可调用时抛异常，存在 DoS 风险。
-- `adm-zip`、`postcss-selector-parser` 等存在不同等级漏洞。
+- **直接升级**：`adm-zip` 0.6.0 → 0.6.1、`compression` 1.8.0 → 1.8.2、`katex` 0.16.45 → 0.18.2。
+- **传递依赖**：在 `pnpm-workspace.yaml` 的 `overrides` 中锁定 `qs` 6.16.1、`@xmldom/xmldom` 0.8.15、`@ai-sdk/provider-utils` 4.0.33、`proxy-addr` 2.0.8、`body-parser` 2.4.0、`postcss-selector-parser` 6.1.5、`zod` 4.6.6、`katex` 0.18.2。
+- **验证**：web 439 项单测、117 项契约测试、server 1328 项测试、lint、类型检查、生产构建、`pnpm install --frozen-lockfile` 全部通过。
+- **门禁**：CI 的 `dependency-audit` 已从 informational 改为阻断。
 
-处理计划：
+后续要求：
 
-1. 先升级可直接升级的传递依赖，验证测试。
-2. 对 `express` 主版本相关依赖做兼容性评估，必要时使用 overrides 锁定修复版本。
-3. 修复前保持 `dependency-audit` 为 informational，不阻断开发；修复后改为阻断门禁。
+- 每次依赖升级后重新运行 `pnpm security:audit`。
+- 关注 `express`、`@earendil-works/pi-ai` 等上游依赖的安全公告，避免 override 长期滞后。
+- 上游发布兼容修复版本后，优先升级并清理不再需要的 override。
 
 ### 7.2 其他风险
 

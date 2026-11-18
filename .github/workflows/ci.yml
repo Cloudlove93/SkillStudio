@@ -98,11 +98,8 @@ jobs:
         run: pnpm --filter educlaw-server run build
 
   dependency-audit:
-    name: Dependency audit (informational)
+    name: Dependency audit
     runs-on: ubuntu-latest
-    # 当前依赖审计仍有已知漏洞（1 critical / 15 high / 9 moderate / 2 low）。
-    # 先以 informational 方式接入，修复依赖后再改为阻断门禁。
-    continue-on-error: true
     steps:
       - name: Checkout
         uses: actions/checkout@v4

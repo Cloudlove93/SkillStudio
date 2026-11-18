@@ -32,7 +32,7 @@
 | 3. 本地验证 | 单元测试、必要的集成测试、本地构建、静态检查 | `pnpm lint`、`pnpm check:types`、`pnpm test`、`pnpm build` |
 | 4. 代码提交 | 小步、独立、可理解；提交信息说明「做了什么」 | Conventional Commits：`feat/fix/refactor/test/docs/chore` |
 | 5. 代码评审 | 正确性、架构边界、安全、异常边界、测试、复杂度、性能与可维护性 | 每个 PR 至少 1 人评审；使用 `code_review.md` 清单 |
-| 6. CI 验证 | 编译、格式、静态分析、单测、集成测试、构件、反馈 | 当前缺失；需要补 `.github/workflows/ci.yml` |
+| 6. CI 验证 | 编译、格式、静态分析、单测、集成测试、构件、反馈 | 已新增 `.github/workflows/ci.yml`，覆盖 web/server/依赖审计 |
 | 7. 重构改进 | 先有测试保护、小步修改、重构不与大功能混合、记录技术债 | 单独 `refactor/*` 分支与 PR；在 `code_quality.md` 记录技术债 |
 
 ## 2. 编码规范与技术原则
@@ -205,16 +205,21 @@ chore: 升级项目依赖
 - 不允许失败代码进入主干
 - Pipeline 配置也纳入版本控制
 
-### 6.4 本项目缺口
+### 6.4 本项目 CI 现状
 
-当前 `.github/workflows` 只有 README 占位，没有实际 CI。建议补 `ci.yml`，至少包含：
+已新增 `.github/workflows/ci.yml`，包含 web、server 和依赖审计三个 job。当前执行内容：
 
 ```text
 pnpm install --frozen-lockfile
-pnpm lint
-pnpm check:types
-pnpm test
-pnpm build
+pnpm run build:shared
+pnpm run check:types
+pnpm --filter educlaw-web run lint
+pnpm --filter educlaw-web run test:unit
+pnpm --filter educlaw-web run test:contracts
+pnpm --filter educlaw-web run build
+pnpm --filter educlaw-server run lint
+pnpm --filter educlaw-server run test
+pnpm --filter educlaw-server run build
 pnpm security:audit
 ```
 
@@ -407,12 +412,12 @@ Code Review        APPROVED
 | 事项 | 现状 | 动作 | 产出 |
 | --- | --- | --- | --- |
 | 架构文档 | `docs/software/architecture.md` 已有 | 评审并确认与本轮开发一致 | 架构评审结论 |
-| 代码质量文档 | 缺失 | 新建 `code_quality.md`，记录指标、门禁、静态分析、技术债 | 文档 + 基线数据 |
-| 代码评审文档 | 缺失 | 新建 `code_review.md`，定义 PR 模板与检查清单 | 模板 + 评审流程 |
-| CI | 只有 `.github/workflows/README.md` 占位 | 新建 `ci.yml`，跑 lint/typecheck/test/build/audit | 可运行的 CI |
-| 静态分析 | ESLint + TypeScript 已有 | 增加 Prettier 检查、依赖审计；可选 Semgrep/CodeQL | 静态检查报告 |
+| 代码质量文档 | 已新增 `code_quality.md` | 按周维护指标、门禁与技术债 | 文档 + 基线数据 |
+| 代码评审文档 | 已新增 `code_review.md` | 按模板执行 PR 评审 | 模板 + 评审流程 |
+| CI | 已新增 `.github/workflows/ci.yml` | 保持 web/server/audit 全绿 | 可运行的 CI |
+| 静态分析 | ESLint + TypeScript + 依赖审计已接入 | 补 Prettier 检查、Semgrep/CodeQL/Trivy | 静态检查报告 |
 | 测试覆盖 | 单测/契约测试已有 | 补覆盖率报告与关键链路 E2E | 覆盖率 + E2E 套件 |
-| 密钥管理 | `.preview.env` 未提交但未忽略 | 加入 `.gitignore`，检查历史提交，必要时轮换 | 安全基线 |
+| 密钥管理 | `.preview.env` 已加入 `.gitignore` | 保持忽略，检查历史提交，必要时轮换 | 安全基线 |
 | 分支与提交 | README 有约定 | 每个任务独立分支，PR + Conventional Commits | 提交规范 |
 | 任务拆分 | 以对话/临时记录为主 | 建 GitHub Issues / Milestone，写清完成标准 | 迭代任务板 |
 | 工程度量 | 暂无 | 每周记录构建/测试失败率、PR 周期、回滚次数 | 周报 |
