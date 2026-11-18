@@ -26,6 +26,9 @@ auth-service/.env
 __pycache__/
 *.pyc
 
+# Test coverage
+coverage/
+
 # IDE
 .vscode/
 .idea/

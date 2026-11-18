@@ -1,5 +1,5 @@
 import path from 'path'
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
@@ -56,6 +56,21 @@ export default defineConfig({
       '/llm': { target: 'http://127.0.0.1:3001', changeOrigin: true },
       '/events': { target: 'http://127.0.0.1:3001', changeOrigin: true },
       '/admin': { target: 'http://127.0.0.1:3001', changeOrigin: true },
+    },
+  },
+  test: {
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json-summary', 'html'],
+      reportsDirectory: './coverage',
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: [
+        'src/**/*.test.{ts,tsx}',
+        'src/**/*.d.ts',
+        'src/main.tsx',
+        'src/vite-env.d.ts',
+        'src/components/lite/**',
+      ],
     },
   },
 })

@@ -9,5 +9,12 @@ export default defineConfig({
     // failures by giving hooks and tests a wider budget.
     testTimeout: 20_000,
     hookTimeout: 20_000,
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json-summary', 'html'],
+      reportsDirectory: './coverage',
+      include: ['src/**/*.ts'],
+      exclude: ['src/**/*.test.ts', 'src/scripts/**'],
+    },
   },
 });

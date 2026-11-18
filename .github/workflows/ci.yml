@@ -55,8 +55,16 @@ jobs:
       - name: Lint
         run: pnpm --filter educlaw-web run lint
 
-      - name: Unit tests
-        run: pnpm --filter educlaw-web run test:unit
+      - name: Unit tests + coverage
+        run: pnpm --filter educlaw-web run test:coverage
+
+      - name: Upload web coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-coverage
+          path: educlaw-web/coverage
+          if-no-files-found: ignore
 
       - name: Contract tests
         run: pnpm --filter educlaw-web run test:contracts
@@ -91,8 +99,16 @@ jobs:
       - name: Lint
         run: pnpm --filter educlaw-server run lint
 
-      - name: Tests
-        run: pnpm --filter educlaw-server run test
+      - name: Tests + coverage
+        run: pnpm --filter educlaw-server run test:coverage
+
+      - name: Upload server coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-coverage
+          path: educlaw-server/coverage
+          if-no-files-found: ignore
 
       - name: Production build
         run: pnpm --filter educlaw-server run build

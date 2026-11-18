@@ -214,11 +214,11 @@ pnpm install --frozen-lockfile
 pnpm run build:shared
 pnpm run check:types
 pnpm --filter educlaw-web run lint
-pnpm --filter educlaw-web run test:unit
+pnpm --filter educlaw-web run test:coverage
 pnpm --filter educlaw-web run test:contracts
 pnpm --filter educlaw-web run build
 pnpm --filter educlaw-server run lint
-pnpm --filter educlaw-server run test
+pnpm --filter educlaw-server run test:coverage
 pnpm --filter educlaw-server run build
 pnpm security:audit
 ```
@@ -416,7 +416,7 @@ Code Review        APPROVED
 | 代码评审文档 | 已新增 `code_review.md` | 按模板执行 PR 评审 | 模板 + 评审流程 |
 | CI | 已新增 `.github/workflows/ci.yml` | 保持 web/server/audit 全绿 | 可运行的 CI |
 | 静态分析 | ESLint + TypeScript + 依赖审计已接入 | 补 Prettier 检查、Semgrep/CodeQL/Trivy | 静态检查报告 |
-| 测试覆盖 | 单测/契约测试已有 | 补覆盖率报告与关键链路 E2E | 覆盖率 + E2E 套件 |
+| 测试覆盖 | 覆盖率基线已记录（web 27.34% / server 74.66%），有 `smoke:preview` | 补核心模块测试与浏览器 E2E | 覆盖率提升 + E2E 套件 |
 | 密钥管理 | `.preview.env` 已加入 `.gitignore` | 保持忽略，检查历史提交，必要时轮换 | 安全基线 |
 | 分支与提交 | README 有约定 | 每个任务独立分支，PR + Conventional Commits | 提交规范 |
 | 任务拆分 | 以对话/临时记录为主 | 建 GitHub Issues / Milestone，写清完成标准 | 迭代任务板 |

@@ -20,11 +20,13 @@
 | 构建 | `educlaw-web`、`educlaw-server` 生产构建通过 |
 | CI | 已新增 `.github/workflows/ci.yml`，覆盖 web/server 与依赖审计 |
 | 依赖审计 | 0 个已知漏洞（2026-11-18 修复） |
-| 覆盖率 | 尚未形成仓库级基线 |
-| E2E | 尚无稳定套件 |
+| 覆盖率（web） | Statements 27.34%、Branches 28.06%、Functions 22.45%、Lines 29.06% |
+| 覆盖率（server） | Statements 74.66%、Branches 66.80%、Functions 81.43%、Lines 75.87% |
+| 关键链路冒烟 | 已新增 `pnpm smoke:preview`，覆盖首页、健康检查、课例索引、仓库 Skill、Agent、预置包 |
+| 浏览器 E2E | 尚无稳定套件 |
 | Python Worker 测试 | 已有测试脚本，尚未纳入 CI |
 
-依赖审计是当前最大的质量风险，详见第 7 节。
+依赖审计已清零，详见第 7.1 节；当前主要质量缺口是前端覆盖率偏低和浏览器 E2E 尚未建立，详见第 5.3、5.4 节。
 
 ## 3. 质量门禁
 
@@ -56,9 +58,11 @@ pnpm build
 
 | Job | 内容 | 是否阻断 |
 | --- | --- | --- |
-| `web` | 类型检查、lint、单测、契约测试、生产构建 | 是 |
-| `server` | lint、后端测试、生产构建 | 是 |
+| `web` | 类型检查、lint、单测 + 覆盖率、契约测试、生产构建 | 是 |
+| `server` | lint、后端测试 + 覆盖率、生产构建 | 是 |
 | `dependency-audit` | `pnpm audit --prod` | 是 |
+
+web/server job 会上传 `web-coverage`、`server-coverage` 报告；覆盖率暂不作为阈值门禁，先积累基线。
 
 ### 3.4 合并与发布
 
@@ -112,9 +116,42 @@ pnpm build
 
 ### 5.3 覆盖率
 
-- 覆盖率是辅助指标，不等于质量。
-- 先统计核心模块（Agent、Skill 版本、工作流、鉴权）的基线，再设定改进目标。
-- 不以「为覆盖率写测试」为目标，重点覆盖行为、边界和失败场景。
+当前基线（2026-11-18，`pnpm --filter <workspace> run test:coverage`）：
+
+| 范围 | Statements | Branches | Functions | Lines |
+| --- | --- | --- | --- | --- |
+| `educlaw-web` | 27.34% | 28.06% | 22.45% | 29.06% |
+| `educlaw-server` | 74.66% | 66.80% | 81.43% | 75.87% |
+
+解读：
+
+- server 覆盖率尚可，但仍需关注 Agent 版本、工作流、鉴权等核心分支。
+- web 覆盖率偏低，主要因为页面、store 和交互组件缺少测试；这是下一阶段的主要补测方向。
+- 覆盖率是辅助指标，不等于质量；不以「为覆盖率写测试」为目标，重点覆盖行为、边界和失败场景。
+- 下一步目标：先把核心模块（Agent、Skill 版本、工作流、鉴权）提升到 60% 以上，再讨论全仓库阈值。
+
+### 5.4 关键链路冒烟
+
+已新增 `pnpm smoke:preview`（默认指向本地预览 `127.0.0.1:8081` / `127.0.0.1:18081`），检查：
+
+- 首页可访问。
+- `/livez`、`/readyz` 正常。
+- `/lessons/index.json` 为 1404 节。
+- 仓库 Skill 52 个、课例包 36 个、分析 Skill 14 个，课例包均为当前版本。
+- 9 个学科教研 Agent + 3 个跨场景 Agent + 4 个方法 Agent 存在。
+- 4 个预置包存在，课例容器版本已递增。
+
+运行方式：
+
+```bash
+EDUCLAW_WEB_BASE=http://127.0.0.1:8081 \
+EDUCLAW_API_BASE=http://127.0.0.1:18081 \
+pnpm smoke:preview
+```
+
+2026-11-18 预览环境实测：23 项检查全部 PASS。
+
+浏览器级 E2E 仍未建立；当前冒烟覆盖数据与 API 关键路径，UI 交互由单测、契约测试和人工验收覆盖。
 
 ## 6. 技术债务
 
@@ -160,7 +197,8 @@ No known vulnerabilities found
 
 ### 7.2 其他风险
 
-- 覆盖率与 E2E 尚未形成基线。
+- web 覆盖率基线 27.34%，核心模块仍需补测。
+- 浏览器 E2E 尚未建立，当前以 `smoke:preview`、单测和契约测试覆盖。
 - Python Worker 测试尚未纳入 CI。
 - 历史提交中可能存在密钥；需要一次全历史扫描，若发现则轮换。
 - 大文件重构尚未开始，修改成本会随功能增加而上升。
