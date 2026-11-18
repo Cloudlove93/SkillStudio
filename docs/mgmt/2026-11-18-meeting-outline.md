@@ -9,7 +9,7 @@
 ## 2. 开场 3 句话
 
 1. **实现阶段的核心是持续交付可信赖的软件变更，不是写出更多代码。**
-2. **我们已完成课例资产化、6 个方法 Skill + 3 个跨场景 Agent、CI/质量门禁和依赖漏洞清零；当前主要缺口是前端覆盖率和浏览器 E2E。**
+2. **我们已完成课例资产化、6 个方法 Skill + 3 个跨场景 Agent、CI/质量门禁、浏览器 E2E 和依赖漏洞清零；当前主要缺口是前端覆盖率和安全扫描。**
 3. **这次会议希望老师确认后续周次与评分要求，并评审我们的 Agent + Skill 技术路线。**
 
 ## 3. 六项信息速览
@@ -17,11 +17,11 @@
 | 项目 | 当前答案 |
 | --- | --- |
 | 项目是什么 | SkillStudio（EduClaw）是面向教育场景的 Agent + Skill 平台，把教师备课、教学设计、评价与研究中的方法沉淀为可运行、可测试、可版本治理的 Skill 资产。 |
-| 仓库 | https://github.com/Cloudlove93/SkillStudio（当前工作区 remote 为 `EduClaw-arena`） |
+| 仓库 | https://github.com/Cloudlove93/SkillStudio |
 | 技术栈 | React 19 + Vite + TypeScript；Express 5 + Node.js；PostgreSQL 17；SeaweedFS；Kong + ZITADEL；Python Media Worker；pnpm + Docker Compose。 |
-| CI | 已接入 GitHub Actions：web、server、依赖审计三个 job；依赖审计为阻断门禁。 |
+| CI | 已接入 GitHub Actions：web、e2e（按需）、server、worker、secret-scan、dependency-audit；依赖审计与密钥扫描为阻断门禁。 |
 | 技术路线 | AI Agent（Agent + Skill 版本快照 + 可视化工作流），不是 DDD。 |
-| 当前进度 | `architecture.md` 已有；代码已跑通；web 439 单测、117 契约测试、server 1328 测试通过；lint/typecheck/build 通过；依赖审计 0 漏洞。 |
+| 当前进度 | `architecture.md` 已有；代码已跑通；web 440 单测、117 契约测试、server 1328、worker 268、Playwright E2E 4 条通过；lint/typecheck/build 通过；依赖审计 0 漏洞。 |
 | 老师额外要求 | 仓库内只确认了第 1–3 周检查点；具体截止时间、提交方式、评分标准未在仓库中出现，需要会上确认；课程为 17 周，但第一周文档写的是 8 周计划，需要确认以哪个为准。 |
 
 ## 4. 会上要确认的 6 个问题
@@ -38,12 +38,12 @@
 | 交付物 | 现状 | 待办 | 建议负责人 | 完成节点 |
 | --- | --- | --- | --- | --- |
 | `docs/software/architecture.md` | 已有六层技术栈、核心链路、AI Agent 工作流模式、演进方向 | 会上评审；补充本轮课例资产与 6+3 Agent 的架构位置；确认与最终实现一致 | 架构负责人 | 会后 24 小时 |
-| `docs/software/code_quality.md` | 已有质量基线、门禁、覆盖率、技术债、依赖审计 | 每周更新指标；把 web 覆盖率从 27.34% 提升到核心模块 60%+；补浏览器 E2E | 质量负责人 | 下一次迭代 |
+| `docs/software/code_quality.md` | 已有质量基线、门禁、覆盖率、技术债、依赖审计 | 每周更新指标；把 web 覆盖率从 27.34% 提升到核心模块 60%+；接入 SAST/容器扫描 | 质量负责人 | 下一次迭代 |
 | `docs/software/code_review.md` | 已有 PR 模板、评审清单、意见分级、流程 | 下一个 PR 开始强制使用；补充 2 个真实评审示例；统计评审等待时间 | 评审负责人 | 下一个 PR |
 
 ## 6. 会前准备清单
 
-- [ ] 打开仓库与 PR：https://github.com/Cloudlove93/EduClaw-arena/pull/new/integrate/p1-asset-center
+- [ ] 打开仓库与 PR：https://github.com/Cloudlove93/SkillStudio/pull/new/codex/p1-asset-center
 - [ ] 准备一页架构图或直接打开 `docs/software/architecture.md`
 - [ ] 准备仓库页面截图：52 个 Skill、22 个 Agent、36 个课例包
 - [ ] 准备一次推荐演示：输入“初二数学课例的提问链分析”
@@ -65,7 +65,7 @@
 | 编码规范与技术原则 | ESLint、TypeScript、Prettier 脚本；原则写入开发规范 | `development-process.md` |
 | Git 分支与提交 | main/develop/feature/fix；Conventional Commits | README、提交历史 |
 | Code Review | 评审清单、意见分级、PR 模板 | `code_review.md`、`.github/pull_request_template.md` |
-| 自动化测试 | web 439 单测、117 契约、server 1328、worker 268 | CI 与测试报告 |
+| 自动化测试 | web 440 单测、117 契约、server 1328、worker 268、E2E 4 条 | CI 与测试报告 |
 | 构建与依赖 | pnpm lockfile、Docker、依赖审计 | `ci.yml`、`pnpm-lock.yaml` |
 | CI | web/server/worker/secret-scan/dependency-audit | `.github/workflows/ci.yml` |
 | 安全开发 | 依赖审计 0 漏洞、密钥扫描、`.preview.env` 忽略 | `secret:check`、`security:audit` |
