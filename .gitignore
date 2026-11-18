@@ -18,6 +18,14 @@ educlaw-server/public/
 .env.docker
 auth-service/.env
 
+# Local preview configuration and secrets
+.preview.env
+.preview/
+
+# Python cache
+__pycache__/
+*.pyc
+
 # IDE
 .vscode/
 .idea/
