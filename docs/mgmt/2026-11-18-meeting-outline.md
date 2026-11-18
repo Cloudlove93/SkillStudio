@@ -58,7 +58,23 @@
 4. 在 `code_quality.md` 记录本周基线：构建失败率、测试失败率、PR 周期、覆盖率。
 5. 给老师发一份会议纪要与下一步计划。
 
-## 8. 风险与备注
+## 8. PPT 要求对照
+
+| 课件要求 | 当前落地 | 证据 |
+| --- | --- | --- |
+| 编码规范与技术原则 | ESLint、TypeScript、Prettier 脚本；原则写入开发规范 | `development-process.md` |
+| Git 分支与提交 | main/develop/feature/fix；Conventional Commits | README、提交历史 |
+| Code Review | 评审清单、意见分级、PR 模板 | `code_review.md`、`.github/pull_request_template.md` |
+| 自动化测试 | web 439 单测、117 契约、server 1328、worker 268 | CI 与测试报告 |
+| 构建与依赖 | pnpm lockfile、Docker、依赖审计 | `ci.yml`、`pnpm-lock.yaml` |
+| CI | web/server/worker/secret-scan/dependency-audit | `.github/workflows/ci.yml` |
+| 安全开发 | 依赖审计 0 漏洞、密钥扫描、`.preview.env` 忽略 | `secret:check`、`security:audit` |
+| 重构与技术债 | 记录大文件与技术债候选 | `code_quality.md` 第 6 节 |
+| AI 辅助编码 | 适用任务、工程师责任、推荐流程 | `development-process.md` 第 9 节 |
+| 质量门禁 | 构建、lint、类型、测试、审计、评审 | `code_quality.md` 第 3 节 |
+| 工程度量 | 覆盖率基线、构建/测试失败率、PR 周期 | `code_quality.md` 第 8 节 |
+
+## 9. 风险与备注
 
 - **截止/评分未知**：不要在会上承诺具体日期，先确认老师要求。
 - **17 周 vs 8 周**：以课程 17 周安排为准，仓库第一周文档的 8 周计划需要注明“历史计划”。
