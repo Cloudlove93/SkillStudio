@@ -22,7 +22,9 @@ export function AgentAssetCard({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [retry, setRetry] = useState(0);
+  const [requested, setRequested] = useState(false);
   useEffect(() => {
+    if (!requested) return;
     let current = true;
     setLoading(true);
     setError(false);
@@ -40,7 +42,7 @@ export function AgentAssetCard({
     return () => {
       current = false;
     };
-  }, [token, agent.id, retry]);
+  }, [token, agent.id, retry, requested]);
   return (
     <AssetCard
       kind="agent"
@@ -48,6 +50,8 @@ export function AgentAssetCard({
       description={agent.description}
       onOpen={onOpen}
       index={index}
+      onMouseEnter={() => setRequested(true)}
+      onFocus={() => setRequested(true)}
       status={
         agentIsReady(agent)
           ? { label: '可使用', tone: 'ready' }
@@ -61,13 +65,15 @@ export function AgentAssetCard({
         },
         {
           label: '当前版本',
-          value: agent.currentVersion
-            ? `#${agent.currentVersion}`
+          value: agent.currentVersionNumber
+            ? `v${agent.currentVersionNumber}`
             : '暂无版本信息',
         },
         {
           label: '最近对话',
-          value: loading ? (
+          value: !requested ? (
+            '悬停查看'
+          ) : loading ? (
             '加载中…'
           ) : error ? (
             <button type="button" onClick={() => setRetry((n) => n + 1)}>

@@ -34,6 +34,7 @@ type PackageRow = {
   description: string;
   model: string | null;
   current_version_id: string;
+  current_version_number?: number | null;
   created_at: Date | string;
   updated_at: Date | string;
   source_session_id?: string | null;
@@ -124,7 +125,11 @@ async function ownedPackage(
 ): Promise<PackageRow> {
   if (!isId(id)) throw new AgentWorkspaceError('Agent 标识无效');
   const result = await db.query<PackageRow>(
-    `select * from agent_packages where id = $1 and user_id = $2${lock ? ' for update' : ''}`,
+    `select p.*, v.version_number as current_version_number
+       from agent_packages p
+       left join agent_package_versions v
+         on v.id = p.current_version_id and v.package_id = p.id
+      where p.id = $1 and p.user_id = $2${lock ? ' for update of p' : ''}`,
     [id, userId],
   );
   if (!result.rows[0])
@@ -230,6 +235,11 @@ async function toAgent(
     createdAt: timestamp(pkg.created_at),
     updatedAt: timestamp(pkg.updated_at),
     currentVersion: String(pkg.current_version_id),
+    currentVersionNumber:
+      pkg.current_version_number === null ||
+      pkg.current_version_number === undefined
+        ? undefined
+        : Number(pkg.current_version_number),
     sourceSessionId: pkg.source_session_id
       ? String(pkg.source_session_id)
       : snapshot.sourceSessionId || null,
@@ -238,7 +248,12 @@ async function toAgent(
 
 export async function listAgents(userId: string) {
   const rows = await query<PackageRow>(
-    'select * from agent_packages where user_id = $1 order by updated_at desc, id desc',
+    `select p.*, v.version_number as current_version_number
+       from agent_packages p
+       left join agent_package_versions v
+         on v.id = p.current_version_id and v.package_id = p.id
+      where p.user_id = $1
+      order by p.updated_at desc, p.id desc`,
     [userId],
   );
   return Promise.all(rows.rows.map((row) => toAgent({ query }, row)));

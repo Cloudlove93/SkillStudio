@@ -34,7 +34,7 @@ type WorkspaceInspectorController = {
   width: number;
   setOutlet: (outlet: HTMLElement | null) => void;
   setWidth: (width: number) => void;
-  openInspector: (descriptor: InspectorDescriptor) => void;
+  openInspector: (descriptor: InspectorDescriptor, baseSearch?: string) => void;
   closeInspector: (options?: CloseInspectorOptions) => boolean;
   setInspectorDirty: (dirty: boolean) => void;
   toggleInspectorFullscreen: () => void;
@@ -91,12 +91,15 @@ export function WorkspaceInspectorProvider({
   }, [state]);
 
   const replaceInspectorSearch = useCallback(
-    (descriptor: InspectorDescriptor | null) => {
+    (descriptor: InspectorDescriptor | null, baseSearch?: string) => {
       const currentLocation = locationRef.current;
       navigate(
         {
           pathname: currentLocation.pathname,
-          search: writeInspectorSearch(currentLocation.search, descriptor),
+          search: writeInspectorSearch(
+            baseSearch ?? currentLocation.search,
+            descriptor,
+          ),
           hash: currentLocation.hash,
         },
         { replace: true },
@@ -121,10 +124,10 @@ export function WorkspaceInspectorProvider({
   }, []);
 
   const openInspector = useCallback(
-    (descriptor: InspectorDescriptor) => {
+    (descriptor: InspectorDescriptor, baseSearch?: string) => {
       if (descriptor.preferredWidth) setWidth(descriptor.preferredWidth);
       dispatch({ type: 'open', descriptor });
-      replaceInspectorSearch(descriptor);
+      replaceInspectorSearch(descriptor, baseSearch);
     },
     [replaceInspectorSearch, setWidth],
   );

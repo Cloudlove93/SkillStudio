@@ -370,7 +370,7 @@ function SkillFirstWorkspaceContent() {
       view: SkillWorkspaceView,
       skillKey: string | null,
       clearInspector = false,
-    ) => {
+    ): string => {
       let baseSearch = location.search;
       {
         const params = new URLSearchParams(baseSearch);
@@ -392,7 +392,7 @@ function SkillFirstWorkspaceContent() {
         skillKey,
         repositoryQuery: search,
       });
-      if (nextSearch === location.search) return;
+      if (nextSearch === location.search) return nextSearch;
       navigate(
         {
           pathname: location.pathname,
@@ -401,6 +401,7 @@ function SkillFirstWorkspaceContent() {
         },
         { replace: true },
       );
+      return nextSearch;
     },
     [location.hash, location.pathname, location.search, navigate, search],
   );
@@ -410,10 +411,10 @@ function SkillFirstWorkspaceContent() {
       view: SkillWorkspaceView,
       skillKey: string | null = activeSkillKey,
       clearInspector = false,
-    ) => {
+    ): string => {
       const normalizedView = view === 'test' ? 'run' : view;
       dispatchWorkspace({ type: 'navigate', view: normalizedView });
-      replaceWorkspaceRoute(normalizedView, skillKey, clearInspector);
+      return replaceWorkspaceRoute(normalizedView, skillKey, clearInspector);
     },
     [activeSkillKey, replaceWorkspaceRoute],
   );
@@ -970,9 +971,13 @@ function SkillFirstWorkspaceContent() {
   const start = (
     content: string,
     structured_fields?: StructuredGuidedInput,
+    baseSearch?: string,
   ) => {
     setPresetSeed(null);
-    openInspector({ owner: 'guided', view: 'summary', title: '需求摘要' });
+    openInspector(
+      { owner: 'guided', view: 'summary', title: '需求摘要' },
+      baseSearch,
+    );
     const clientMessageId = createRequestId('message');
     setPendingGuidedMessage(
       createPendingGuidedMessage(content, clientMessageId, null),
@@ -998,11 +1003,16 @@ function SkillFirstWorkspaceContent() {
   };
 
   const send = (content: string) => {
+    // 首页输入框发送后必须进入共创视图，否则用户停留在首页看不到回复。
+    const nextSearch = navigateWorkspaceView('create', null, true);
     if (!session) {
-      start(content);
+      start(content, undefined, nextSearch);
       return;
     }
-    openInspector({ owner: 'guided', view: 'summary', title: '需求摘要' });
+    openInspector(
+      { owner: 'guided', view: 'summary', title: '需求摘要' },
+      nextSearch,
+    );
     const sessionId = session.id;
     const clientMessageId = createRequestId('message');
     setPendingGuidedMessage(

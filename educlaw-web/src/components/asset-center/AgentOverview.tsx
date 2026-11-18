@@ -42,8 +42,8 @@ export function AgentOverview({
           { label: '模型', value: agent.model || '服务端默认模型' },
           {
             label: '当前版本',
-            value: agent.currentVersion
-              ? `#${agent.currentVersion}`
+            value: agent.currentVersionNumber
+              ? `v${agent.currentVersionNumber}`
               : '暂无版本信息',
           },
           {

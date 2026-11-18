@@ -1557,9 +1557,14 @@
   color: var(--workspace-warning, #b7652e);
 }
 
-.wf-runner-submit {
-  width: 100%;
+.wf-runner-actions {
+  display: flex;
+  gap: 8px;
   margin-top: 9px;
+}
+
+.wf-runner-actions .wf-button {
+  flex: 1;
 }
 
 .wf-runner-result {

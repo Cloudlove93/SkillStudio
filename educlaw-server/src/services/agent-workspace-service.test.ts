@@ -197,6 +197,8 @@ const encodePackage = (row: Pkg) => ({
   description: row.description,
   model: row.model,
   current_version_id: row.currentVersionId,
+  current_version_number:
+    versions.get(row.currentVersionId)?.versionNumber ?? null,
   created_at: row.createdAt,
   updated_at: row.updatedAt,
 });
@@ -244,22 +246,26 @@ beforeEach(async () => {
     .mockReset()
     .mockImplementation(async (text: string, args: unknown[] = []) => {
       const sql = text.replace(/\s+/g, ' ').trim();
-      if (sql.startsWith('select * from agent_packages where id')) {
+      if (
+        sql.startsWith(
+          'select p.*, v.version_number as current_version_number from agent_packages p left join',
+        )
+      ) {
+        if (sql.includes('where p.user_id = $1')) {
+          return result(
+            [...packages.values()]
+              .filter((row) => row.userId === args[0])
+              .sort(
+                (a, b) =>
+                  b.updatedAt.localeCompare(a.updatedAt) ||
+                  Number(b.id) - Number(a.id),
+              )
+              .map(encodePackage),
+          );
+        }
         const row = packages.get(String(args[0]));
         return result(
           row && row.userId === args[1] ? [encodePackage(row)] : [],
-        );
-      }
-      if (sql.startsWith('select * from agent_packages where user_id')) {
-        return result(
-          [...packages.values()]
-            .filter((row) => row.userId === args[0])
-            .sort(
-              (a, b) =>
-                b.updatedAt.localeCompare(a.updatedAt) ||
-                Number(b.id) - Number(a.id),
-            )
-            .map(encodePackage),
         );
       }
       if (sql.startsWith('select snapshot_json from agent_package_versions')) {
@@ -550,6 +556,13 @@ describe('Package-backed Agents', () => {
       instructions: 'Use the mounted procedures.',
       model: 'fixed-model',
     });
+    const listedSecond = (await service.listAgents('owner')).find(
+      (agent) => agent.id === second.id,
+    );
+    expect(listedSecond?.currentVersionNumber).toBe(1);
+    expect(
+      (await service.getAgent('owner', second.id)).currentVersionNumber,
+    ).toBe(1);
     for (const operation of [
       () => service.getAgent('other', first.id),
       () =>

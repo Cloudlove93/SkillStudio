@@ -484,6 +484,8 @@ export interface AgentWorkspace {
   updatedAt: string;
   /** 当前 Agent package version 的数据库 ID。 */
   currentVersion?: string;
+  /** 当前 Agent package version 的展示版本号。 */
+  currentVersionNumber?: number;
   sourceSessionId?: string | null;
 }
 export type AgentSummary = AgentWorkspace;

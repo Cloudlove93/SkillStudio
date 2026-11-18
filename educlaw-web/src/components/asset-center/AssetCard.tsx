@@ -12,6 +12,8 @@ export function AssetCard({
   detail = false,
   index,
   status,
+  onMouseEnter,
+  onFocus,
 }: {
   kind: 'agent' | 'skill';
   name: string;
@@ -22,11 +24,17 @@ export function AssetCard({
   detail?: boolean;
   index?: number;
   status?: { label: string; tone: 'ready' | 'attention' };
+  onMouseEnter?: () => void;
+  onFocus?: () => void;
 }) {
   const Icon = kind === 'agent' ? Bot : BookOpen;
   const Heading = detail ? 'h1' : 'h2';
   return (
-    <article className={`asset-card${detail ? ' asset-card-detail' : ''}`}>
+    <article
+      className={`asset-card${detail ? ' asset-card-detail' : ''}`}
+      onMouseEnter={onMouseEnter}
+      onFocus={onFocus}
+    >
       {!detail && (
         <div className="asset-card-topline">
           <span className="asset-index" aria-hidden="true">

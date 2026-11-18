@@ -1320,30 +1320,41 @@ export default function WorkflowDemo({
       resourceMatches.length >
     0;
 
+  async function persistWorkflow(
+    notify = true,
+  ): Promise<{ packageId: string; versionId: string } | null> {
+    if (!token) return null;
+    if (!workflowPackageId) {
+      const detail = await liteApi.createWorkflow(token, workflow);
+      const newPackageId = String(detail.id);
+      const versions = await liteApi.listVersions(token, newPackageId);
+      const newVersionId = String(versions[0]?.id || '');
+      setCreatedPackageId(newPackageId);
+      setPkg(detail);
+      setVersionId(newVersionId);
+      if (notify) toast.success('工作流草稿已创建');
+      return newVersionId
+        ? { packageId: newPackageId, versionId: newVersionId }
+        : null;
+    }
+    if (!versionId) return null;
+    await liteApi.validateWorkflow(token, workflowPackageId, workflow);
+    const detail = await liteApi.saveWorkflow(token, workflowPackageId, {
+      expectedPackageVersionId: versionId,
+      definition: workflow,
+    });
+    const versions = await liteApi.listVersions(token, workflowPackageId);
+    const newVersionId = String(versions[0]?.id || versionId);
+    setPkg(detail);
+    setVersionId(newVersionId);
+    if (notify) toast.success('工作流已保存为新版本');
+    return { packageId: workflowPackageId, versionId: newVersionId };
+  }
   async function save() {
     if (!token) return;
     setBusy(true);
     try {
-      if (!workflowPackageId) {
-        const detail = await liteApi.createWorkflow(token, workflow);
-        const newPackageId = String(detail.id);
-        const versions = await liteApi.listVersions(token, newPackageId);
-        setCreatedPackageId(newPackageId);
-        setPkg(detail);
-        setVersionId(String(versions[0]?.id || ''));
-        toast.success('工作流草稿已创建');
-      } else {
-        if (!versionId) return;
-        await liteApi.validateWorkflow(token, workflowPackageId, workflow);
-        const detail = await liteApi.saveWorkflow(token, workflowPackageId, {
-          expectedPackageVersionId: versionId,
-          definition: workflow,
-        });
-        const versions = await liteApi.listVersions(token, workflowPackageId);
-        setPkg(detail);
-        setVersionId(String(versions[0]?.id || versionId));
-        toast.success('工作流已保存为新版本');
-      }
+      await persistWorkflow();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '保存工作流失败');
     } finally {
@@ -1371,6 +1382,36 @@ export default function WorkflowDemo({
       else toast.error(report.error?.message || '试跑失败');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '启动试跑失败');
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function saveAndRun() {
+    if (!token) {
+      toast.error('请先登录');
+      return;
+    }
+    if (!input.trim()) {
+      toast.error('请先填写试跑输入');
+      return;
+    }
+    setBusy(true);
+    try {
+      const saved = await persistWorkflow(false);
+      if (!saved) {
+        toast.error('请先保存工作流');
+        return;
+      }
+      const report = await liteApi.runWorkflow(token, saved.packageId, {
+        packageVersionId: saved.versionId,
+        requestId: id('run'),
+        content: input,
+      });
+      setRun(report);
+      if (report.status === 'succeeded') toast.success('试跑完成');
+      else toast.error(report.error?.message || '试跑失败');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '保存并试跑失败');
     } finally {
       setBusy(false);
     }
@@ -1953,7 +1994,9 @@ export default function WorkflowDemo({
                   placeholder="输入一项教学任务，例如：为初二物理《浮力》设计一节探究课"
                 />
                 {!workflowPackageId || !versionId ? (
-                  <p className="wf-runner-hint">首次试跑前，请先保存工作流。</p>
+                  <p className="wf-runner-hint">
+                    尚未保存；点「保存并试跑」会自动保存后再运行。
+                  </p>
                 ) : null}
                 {unboundSkillNodes.length ? (
                   <p className="wf-runner-hint is-warning">
@@ -1961,20 +2004,31 @@ export default function WorkflowDemo({
                     节点未绑定，绑定后才能试跑。
                   </p>
                 ) : null}
-                <button
-                  type="button"
-                  className="wf-button is-primary wf-runner-submit"
-                  onClick={() => void execute()}
-                  disabled={
-                    busy ||
-                    unboundSkillNodes.length > 0 ||
-                    !workflowPackageId ||
-                    !versionId
-                  }
-                >
-                  <Play size={13} aria-hidden="true" />
-                  {busy ? '正在运行…' : '开始试跑'}
-                </button>
+                <div className="wf-runner-actions">
+                  <button
+                    type="button"
+                    className="wf-button"
+                    onClick={() => void saveAndRun()}
+                    disabled={busy || unboundSkillNodes.length > 0}
+                  >
+                    <Save size={13} aria-hidden="true" />
+                    保存并试跑
+                  </button>
+                  <button
+                    type="button"
+                    className="wf-button is-primary"
+                    onClick={() => void execute()}
+                    disabled={
+                      busy ||
+                      unboundSkillNodes.length > 0 ||
+                      !workflowPackageId ||
+                      !versionId
+                    }
+                  >
+                    <Play size={13} aria-hidden="true" />
+                    {busy ? '正在运行…' : '开始试跑'}
+                  </button>
+                </div>
                 {run ? (
                   <div className="wf-runner-result">
                     <div className="wf-runner-output">

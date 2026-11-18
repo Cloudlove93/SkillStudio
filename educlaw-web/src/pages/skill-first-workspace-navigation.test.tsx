@@ -20,6 +20,7 @@ const api = vi.hoisted(() => ({
   renameArenaThread: vi.fn(),
   chatOptimize: vi.fn(),
   applyInteractiveChanges: vi.fn(),
+  startGuidedCreationStream: vi.fn(),
 }));
 vi.mock('../api/lite-api', () => ({ liteApi: api }));
 const agents = vi.hoisted(() => ({
@@ -174,6 +175,7 @@ beforeEach(() => {
     title: '新对话',
   });
   api.getGuidedCreationDetail.mockResolvedValue(unfinishedGuidedDraft);
+  api.startGuidedCreationStream.mockResolvedValue(undefined);
   api.listThreadPage.mockResolvedValue({ items: threads, nextCursor: null });
   api.listSkillVersions.mockResolvedValue({
     items: [version],
@@ -871,5 +873,57 @@ it('restores a completed generation result after refreshing its URL', async () =
     expect(params.get('previewSkill')).toBe('11');
     expect(params.get('skillVersion')).toBe('1');
     expect(params.has('resultSession')).toBe(false);
+  });
+});
+
+it('opens the guided creation view when sending from the home composer', async () => {
+  await act(async () =>
+    root.render(
+      <MemoryRouter initialEntries={['/']}>
+        <SkillFirstWorkspace />
+        <RouteEvidence />
+      </MemoryRouter>,
+    ),
+  );
+
+  const textarea = await vi.waitFor(() => {
+    const element = container.querySelector<HTMLTextAreaElement>(
+      'textarea[aria-label="描述你的教学需求"]',
+    );
+    expect(element).not.toBeNull();
+    return element!;
+  });
+
+  await act(async () => {
+    const setValue = Object.getOwnPropertyDescriptor(
+      HTMLTextAreaElement.prototype,
+      'value',
+    )!.set!;
+    setValue.call(textarea, '为什么不能用');
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+
+  const sendButton = await vi.waitFor(() => {
+    const element = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="开始创建 Agent"]',
+    );
+    expect(element?.disabled).toBe(false);
+    return element!;
+  });
+
+  await act(async () => sendButton.click());
+
+  await vi.waitFor(async () => {
+    await act(async () => {});
+    expect(api.startGuidedCreationStream).toHaveBeenCalledWith(
+      'test-token',
+      expect.objectContaining({ content: '为什么不能用' }),
+      expect.any(Function),
+    );
+    expect(
+      new URLSearchParams(
+        container.querySelector('[data-route]')!.textContent!,
+      ).get('view'),
+    ).toBe('create');
   });
 });
