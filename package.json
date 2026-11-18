@@ -19,7 +19,8 @@
     "test:web": "pnpm --filter educlaw-web test",
     "test:worker": "node scripts/run-media-worker-tests.mjs",
     "seed:studio-presets": "pnpm --filter educlaw-server exec tsx ../scripts/seed-studio-presets.ts",
-    "smoke:preview": "node scripts/smoke-preview.mjs"
+    "smoke:preview": "node scripts/smoke-preview.mjs",
+    "secret:check": "node scripts/check-secrets.mjs"
   },
   "packageManager": "pnpm@10.33.0+sha512.10568bb4a6afb58c9eb3630da90cc9516417abebd3fabbe6739f0ae795728da1491e9db5a544c76ad8eb7570f5c4bb3d6c637b2cb41bfdcdb47fa823c8649319"
 }

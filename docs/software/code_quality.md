@@ -24,7 +24,7 @@
 | 覆盖率（server） | Statements 74.66%、Branches 66.80%、Functions 81.43%、Lines 75.87% |
 | 关键链路冒烟 | 已新增 `pnpm smoke:preview`，覆盖首页、健康检查、课例索引、仓库 Skill、Agent、预置包 |
 | 浏览器 E2E | 尚无稳定套件 |
-| Python Worker 测试 | 已有测试脚本，尚未纳入 CI |
+| Python Worker 测试 | 268 项通过、3 项跳过，已纳入 CI |
 
 依赖审计已清零，详见第 7.1 节；当前主要质量缺口是前端覆盖率偏低和浏览器 E2E 尚未建立，详见第 5.3、5.4 节。
 
@@ -35,8 +35,10 @@
 ```bash
 pnpm lint
 pnpm check:types
-pnpm --filter educlaw-web run test:unit
-pnpm --filter educlaw-server run test
+pnpm --filter educlaw-web run test:coverage
+pnpm --filter educlaw-server run test:coverage
+pnpm run test:worker
+pnpm secret:check
 pnpm build
 ```
 
@@ -60,6 +62,8 @@ pnpm build
 | --- | --- | --- |
 | `web` | 类型检查、lint、单测 + 覆盖率、契约测试、生产构建 | 是 |
 | `server` | lint、后端测试 + 覆盖率、生产构建 | 是 |
+| `worker` | Python Worker pytest | 是 |
+| `secret-scan` | 已跟踪文件密钥扫描 | 是 |
 | `dependency-audit` | `pnpm audit --prod` | 是 |
 
 web/server job 会上传 `web-coverage`、`server-coverage` 报告；覆盖率暂不作为阈值门禁，先积累基线。
@@ -76,6 +80,7 @@ web/server job 会上传 `web-coverage`、`server-coverage` 报告；覆盖率�
 
 - **ESLint**：`educlaw-web` 与 `educlaw-server`。
 - **TypeScript**：`tsc` / `pnpm run check:types`。
+- **轻量密钥扫描**：`scripts/check-secrets.mjs`，扫描已跟踪文件中的常见密钥模式。
 - **Prettier**：已有格式化脚本，尚未在 CI 中强制检查格式。
 
 ### 4.2 待接入
@@ -83,10 +88,11 @@ web/server job 会上传 `web-coverage`、`server-coverage` 报告；覆盖率�
 | 工具 | 用途 | 优先级 |
 | --- | --- | --- |
 | `pnpm audit` | 依赖漏洞 | P0（已接入并阻断） |
+| 轻量密钥扫描 | 常见密钥模式 | P0（已接入并阻断） |
 | Semgrep / CodeQL | SAST，发现注入、越权、敏感信息等问题 | P1 |
 | Trivy | 容器镜像漏洞 | P1 |
-| gitleaks | 密钥扫描 | P0 |
-| Prettier `--check` | 格式门禁 | P1 |
+| gitleaks | 全历史、规则更完整的密钥扫描 | P1 |
+| Prettier `--check` | 格式门禁 | P1（当前全仓库尚未统一格式化，先不阻断） |
 
 ### 4.3 静态分析原则
 
@@ -103,7 +109,9 @@ web/server job 会上传 `web-coverage`、`server-coverage` 报告；覆盖率�
 | 单元测试 | 独立函数/模块，快速定位 | 前端 439 项、后端覆盖主要 service/route |
 | 契约测试 | API 输入输出与前端调用约定 | 117 项通过 |
 | 集成测试 | 数据库、对象存储、跨模块协作 | 已有，部分需显式开启 |
-| E2E | 完整业务流程 | 待补：Agent 创建→对话、工作流保存→试跑、版本回滚 |
+| Worker 测试 | Python 媒体 Worker 契约与适配器 | 268 项通过、3 项跳过，已纳入 CI |
+| 关键链路冒烟 | 预览环境数据与 API 关键路径 | `smoke:preview`，23 项通过 |
+| 浏览器 E2E | 完整 UI 业务流程 | 待补：Agent 创建→对话、工作流保存→试跑、版本回滚 |
 
 ### 5.2 必测场景
 
@@ -199,8 +207,7 @@ No known vulnerabilities found
 
 - web 覆盖率基线 27.34%，核心模块仍需补测。
 - 浏览器 E2E 尚未建立，当前以 `smoke:preview`、单测和契约测试覆盖。
-- Python Worker 测试尚未纳入 CI。
-- 历史提交中可能存在密钥；需要一次全历史扫描，若发现则轮换。
+- 已做常见密钥模式的历史扫描，未发现明显密钥；完整 gitleaks/Semgrep 仍未接入。
 - 大文件重构尚未开始，修改成本会随功能增加而上升。
 
 ## 8. 工程度量

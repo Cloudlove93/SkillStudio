@@ -13,6 +13,8 @@
 
 ## 2. PR 要求
 
+仓库已提供 `.github/pull_request_template.md`，创建 PR 时会自动带出模板。
+
 ### 2.1 规模
 
 - 一个 PR 只做一个主要变化。

@@ -220,6 +220,8 @@ pnpm --filter educlaw-web run build
 pnpm --filter educlaw-server run lint
 pnpm --filter educlaw-server run test:coverage
 pnpm --filter educlaw-server run build
+pnpm run test:worker
+pnpm secret:check
 pnpm security:audit
 ```
 
@@ -414,9 +416,9 @@ Code Review        APPROVED
 | 架构文档 | `docs/software/architecture.md` 已有 | 评审并确认与本轮开发一致 | 架构评审结论 |
 | 代码质量文档 | 已新增 `code_quality.md` | 按周维护指标、门禁与技术债 | 文档 + 基线数据 |
 | 代码评审文档 | 已新增 `code_review.md` | 按模板执行 PR 评审 | 模板 + 评审流程 |
-| CI | 已新增 `.github/workflows/ci.yml` | 保持 web/server/audit 全绿 | 可运行的 CI |
-| 静态分析 | ESLint + TypeScript + 依赖审计已接入 | 补 Prettier 检查、Semgrep/CodeQL/Trivy | 静态检查报告 |
-| 测试覆盖 | 覆盖率基线已记录（web 27.34% / server 74.66%），有 `smoke:preview` | 补核心模块测试与浏览器 E2E | 覆盖率提升 + E2E 套件 |
+| CI | 已新增 `.github/workflows/ci.yml` | 保持 web/server/worker/security 全绿 | 可运行的 CI |
+| 静态分析 | ESLint + TypeScript + 依赖审计 + 密钥扫描已接入 | 补 Prettier 检查、Semgrep/CodeQL/Trivy | 静态检查报告 |
+| 测试覆盖 | 覆盖率基线已记录（web 27.34% / server 74.66%），有 `smoke:preview` 与 Worker 测试 | 补核心模块测试与浏览器 E2E | 覆盖率提升 + E2E 套件 |
 | 密钥管理 | `.preview.env` 已加入 `.gitignore` | 保持忽略，检查历史提交，必要时轮换 | 安全基线 |
 | 分支与提交 | README 有约定 | 每个任务独立分支，PR + Conventional Commits | 提交规范 |
 | 任务拆分 | 以对话/临时记录为主 | 建 GitHub Issues / Milestone，写清完成标准 | 迭代任务板 |
