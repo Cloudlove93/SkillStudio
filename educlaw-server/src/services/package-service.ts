@@ -380,6 +380,22 @@ function scoreRubricCandidate(headingLine: string, extracted: string): number {
   return score;
 }
 
+function isRubricBlockBoundary(
+  line: string,
+  headingLevel: number | null,
+  rubricSignalCount: number,
+  rubricBodyLine: boolean,
+): boolean {
+  if (isLikelyRubricBoundaryLine(line)) return true;
+  if (/^(?:#{1,6}\s*)?分级描述(?:（.*?）|\(.*?\))?(?:[:：\s]|$)/i.test(line.trim())) return true;
+  if (rubricBodyLine) return false;
+  const currentHeadingLevel = getMarkdownHeadingLevel(line);
+  // Numbered section headings have no Markdown level; h4+ remains inside them.
+  if (currentHeadingLevel !== null && currentHeadingLevel <= (headingLevel ?? 3)) return true;
+  return headingLevel === null && rubricSignalCount > 0 &&
+    isLikelyNumberedSectionHeading(line) && !isLikelyRubricContinuationHeading(line);
+}
+
 function collectRubricBlock(lines: string[], startIndex: number): string {
   const headingLevel = getMarkdownHeadingLevel(lines[startIndex] ?? '');
   const sectionLines: string[] = [];
@@ -387,47 +403,8 @@ function collectRubricBlock(lines: string[], startIndex: number): string {
 
   for (let cursor = startIndex; cursor < lines.length; cursor += 1) {
     const currentLine = lines[cursor] ?? '';
-    const currentHeadingLevel = getMarkdownHeadingLevel(currentLine);
     const rubricBodyLine = isLikelyRubricBodyLine(currentLine);
-    const rubricExampleHeading =
-      /^(?:#{1,6}\s*)?分级描述(?:（.*?）|\(.*?\))?(?:[:：\s]|$)/i.test(
-        currentLine.trim(),
-      );
-
-    if (cursor > startIndex) {
-      if (isLikelyRubricBoundaryLine(currentLine) || rubricExampleHeading)
-        break;
-
-      if (
-        headingLevel !== null &&
-        currentHeadingLevel !== null &&
-        currentHeadingLevel <= headingLevel &&
-        !rubricBodyLine
-      ) {
-        break;
-      }
-
-      if (headingLevel === null) {
-        // 起始行不是 markdown 标题（如编号标题 "1. 评分标准"）。
-        // 遇到 markdown 子标题时，只有当它级别较浅（h1-h3）且不是 rubric body 时才 break；
-        // h4+ 视为 rubric 内部子章节（如 "#### 评分细则"），继续收集。
-        if (
-          currentHeadingLevel !== null &&
-          currentHeadingLevel <= 3 &&
-          !rubricBodyLine
-        ) {
-          break;
-        }
-        if (
-          rubricSignalCount > 0 &&
-          isLikelyNumberedSectionHeading(currentLine) &&
-          !rubricBodyLine &&
-          !isLikelyRubricContinuationHeading(currentLine)
-        ) {
-          break;
-        }
-      }
-    }
+    if (cursor > startIndex && isRubricBlockBoundary(currentLine, headingLevel, rubricSignalCount, rubricBodyLine)) break;
 
     if (rubricBodyLine) rubricSignalCount += 1;
     sectionLines.push(currentLine);

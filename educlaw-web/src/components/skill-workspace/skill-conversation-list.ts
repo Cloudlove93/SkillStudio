@@ -55,11 +55,13 @@ export function isSkillConversationThread(
   if (surface !== 'run' && surface !== 'test') return false;
   const left = config.left;
   const right = config.right;
-  return (
-    !!(left || right) &&
-    (!left || left.skillId === skillId) &&
-    (!right || right.skillId === skillId) &&
-    (!left || !right || left.skillVersionId === right.skillVersionId)
+  const bindings = [left, right].filter(
+    (binding): binding is NonNullable<typeof binding> => Boolean(binding),
+  );
+  if (bindings.length === 0) return false;
+  const versionId = bindings[0].skillVersionId;
+  return bindings.every(
+    (binding) => binding.skillId === skillId && binding.skillVersionId === versionId,
   );
 }
 

@@ -210,7 +210,17 @@ export default function WorkflowDemo({ embedded = false, token, packageId, packa
     if (!workflowPackageId || !versionId) { toast.error('请先保存工作流'); return; }
     if (!input.trim()) { toast.error('请先填写试跑输入'); return; }
     setBusy(true);
-    try { const report = await liteApi.runWorkflow(token!, workflowPackageId, { packageVersionId: versionId, requestId: id('run'), content: input }); setRun(report); report.status === 'succeeded' ? toast.success('试跑完成') : toast.error(report.error?.message || '试跑失败'); }
+    try {
+      const report = await liteApi.runWorkflow(token!, workflowPackageId, {
+        packageVersionId: versionId, requestId: id('run'), content: input,
+      });
+      setRun(report);
+      if (report.status === 'succeeded') {
+        toast.success('试跑完成');
+      } else {
+        toast.error(report.error?.message || '试跑失败');
+      }
+    }
     catch (error) { toast.error(error instanceof Error ? error.message : '启动试跑失败'); } finally { setBusy(false); }
   }
   const onConnect = (connection: Connection) => {

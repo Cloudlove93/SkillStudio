@@ -295,6 +295,16 @@ export function parseEducationExtractionResult(
   };
 }
 
+/** Model options share one boundary: text only, trimmed, non-empty, at most four. */
+function normalizeSuggestedOptions(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((option): option is string => typeof option === 'string')
+    .map((option) => option.trim())
+    .filter(Boolean)
+    .slice(0, 4);
+}
+
 function parsePhrasing(
   phrasing: GuidedQuestionPhrasing | null,
   field: GuidedDraftField,
@@ -308,13 +318,7 @@ function parsePhrasing(
       ? candidate.replace(/\?$/, '？')
       : fallbackQuestion;
 
-  const candidateOptions = Array.isArray(phrasing?.suggested_options)
-    ? phrasing.suggested_options
-        .filter((option): option is string => typeof option === 'string')
-        .map((option) => option.trim())
-        .filter(Boolean)
-        .slice(0, 4)
-    : [];
+  const candidateOptions = normalizeSuggestedOptions(phrasing?.suggested_options);
   const suggested_options =
     candidateOptions.length >= 2
       ? candidateOptions
@@ -416,13 +420,7 @@ function parseStagePhrasing(
   const question = candidateIsUsable
     ? firstQuestion.replace(/\?$/, '？')
     : fallbackQuestion;
-  const candidateOptions = Array.isArray(phrasing?.suggested_options)
-    ? phrasing.suggested_options
-        .filter((option): option is string => typeof option === 'string')
-        .map((option) => option.trim())
-        .filter(Boolean)
-        .slice(0, 4)
-    : [];
+  const candidateOptions = normalizeSuggestedOptions(phrasing?.suggested_options);
   return {
     question,
     suggested_options:
@@ -720,13 +718,7 @@ function parseEducationPhrasing(
       ? firstQuestion.replace(/\?$/, '？')
       : intentFallback;
 
-  const candidateOptions = Array.isArray(phrasing?.suggested_options)
-    ? phrasing.suggested_options
-        .filter((option): option is string => typeof option === 'string')
-        .map((option) => option.trim())
-        .filter(Boolean)
-        .slice(0, 4)
-    : [];
+  const candidateOptions = normalizeSuggestedOptions(phrasing?.suggested_options);
   return {
     question,
     suggested_options:

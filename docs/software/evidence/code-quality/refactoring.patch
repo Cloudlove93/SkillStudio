@@ -1,0 +1,313 @@
+diff --git a/educlaw-server/src/services/guided-creation-service.ts b/educlaw-server/src/services/guided-creation-service.ts
+index 1c95327..80aeedb 100644
+--- a/educlaw-server/src/services/guided-creation-service.ts
++++ b/educlaw-server/src/services/guided-creation-service.ts
+@@ -295,6 +295,16 @@ export function parseEducationExtractionResult(
+   };
+ }
+ 
++/** Model options share one boundary: text only, trimmed, non-empty, at most four. */
++function normalizeSuggestedOptions(value: unknown): string[] {
++  if (!Array.isArray(value)) return [];
++  return value
++    .filter((option): option is string => typeof option === 'string')
++    .map((option) => option.trim())
++    .filter(Boolean)
++    .slice(0, 4);
++}
++
+ function parsePhrasing(
+   phrasing: GuidedQuestionPhrasing | null,
+   field: GuidedDraftField,
+@@ -308,13 +318,7 @@ function parsePhrasing(
+       ? candidate.replace(/\?$/, '？')
+       : fallbackQuestion;
+ 
+-  const candidateOptions = Array.isArray(phrasing?.suggested_options)
+-    ? phrasing.suggested_options
+-        .filter((option): option is string => typeof option === 'string')
+-        .map((option) => option.trim())
+-        .filter(Boolean)
+-        .slice(0, 4)
+-    : [];
++  const candidateOptions = normalizeSuggestedOptions(phrasing?.suggested_options);
+   const suggested_options =
+     candidateOptions.length >= 2
+       ? candidateOptions
+@@ -416,13 +420,7 @@ function parseStagePhrasing(
+   const question = candidateIsUsable
+     ? firstQuestion.replace(/\?$/, '？')
+     : fallbackQuestion;
+-  const candidateOptions = Array.isArray(phrasing?.suggested_options)
+-    ? phrasing.suggested_options
+-        .filter((option): option is string => typeof option === 'string')
+-        .map((option) => option.trim())
+-        .filter(Boolean)
+-        .slice(0, 4)
+-    : [];
++  const candidateOptions = normalizeSuggestedOptions(phrasing?.suggested_options);
+   return {
+     question,
+     suggested_options:
+@@ -720,13 +718,7 @@ function parseEducationPhrasing(
+       ? firstQuestion.replace(/\?$/, '？')
+       : intentFallback;
+ 
+-  const candidateOptions = Array.isArray(phrasing?.suggested_options)
+-    ? phrasing.suggested_options
+-        .filter((option): option is string => typeof option === 'string')
+-        .map((option) => option.trim())
+-        .filter(Boolean)
+-        .slice(0, 4)
+-    : [];
++  const candidateOptions = normalizeSuggestedOptions(phrasing?.suggested_options);
+   return {
+     question,
+     suggested_options:
+diff --git a/educlaw-server/src/services/package-service.ts b/educlaw-server/src/services/package-service.ts
+index 8a000ee..14d6938 100644
+--- a/educlaw-server/src/services/package-service.ts
++++ b/educlaw-server/src/services/package-service.ts
+@@ -380,6 +380,22 @@ function scoreRubricCandidate(headingLine: string, extracted: string): number {
+   return score;
+ }
+ 
++function isRubricBlockBoundary(
++  line: string,
++  headingLevel: number | null,
++  rubricSignalCount: number,
++  rubricBodyLine: boolean,
++): boolean {
++  if (isLikelyRubricBoundaryLine(line)) return true;
++  if (/^(?:#{1,6}\s*)?分级描述(?:（.*?）|\(.*?\))?(?:[:：\s]|$)/i.test(line.trim())) return true;
++  if (rubricBodyLine) return false;
++  const currentHeadingLevel = getMarkdownHeadingLevel(line);
++  // Numbered section headings have no Markdown level; h4+ remains inside them.
++  if (currentHeadingLevel !== null && currentHeadingLevel <= (headingLevel ?? 3)) return true;
++  return headingLevel === null && rubricSignalCount > 0 &&
++    isLikelyNumberedSectionHeading(line) && !isLikelyRubricContinuationHeading(line);
++}
++
+ function collectRubricBlock(lines: string[], startIndex: number): string {
+   const headingLevel = getMarkdownHeadingLevel(lines[startIndex] ?? '');
+   const sectionLines: string[] = [];
+@@ -387,47 +403,8 @@ function collectRubricBlock(lines: string[], startIndex: number): string {
+ 
+   for (let cursor = startIndex; cursor < lines.length; cursor += 1) {
+     const currentLine = lines[cursor] ?? '';
+-    const currentHeadingLevel = getMarkdownHeadingLevel(currentLine);
+     const rubricBodyLine = isLikelyRubricBodyLine(currentLine);
+-    const rubricExampleHeading =
+-      /^(?:#{1,6}\s*)?分级描述(?:（.*?）|\(.*?\))?(?:[:：\s]|$)/i.test(
+-        currentLine.trim(),
+-      );
+-
+-    if (cursor > startIndex) {
+-      if (isLikelyRubricBoundaryLine(currentLine) || rubricExampleHeading)
+-        break;
+-
+-      if (
+-        headingLevel !== null &&
+-        currentHeadingLevel !== null &&
+-        currentHeadingLevel <= headingLevel &&
+-        !rubricBodyLine
+-      ) {
+-        break;
+-      }
+-
+-      if (headingLevel === null) {
+-        // 起始行不是 markdown 标题（如编号标题 "1. 评分标准"）。
+-        // 遇到 markdown 子标题时，只有当它级别较浅（h1-h3）且不是 rubric body 时才 break；
+-        // h4+ 视为 rubric 内部子章节（如 "#### 评分细则"），继续收集。
+-        if (
+-          currentHeadingLevel !== null &&
+-          currentHeadingLevel <= 3 &&
+-          !rubricBodyLine
+-        ) {
+-          break;
+-        }
+-        if (
+-          rubricSignalCount > 0 &&
+-          isLikelyNumberedSectionHeading(currentLine) &&
+-          !rubricBodyLine &&
+-          !isLikelyRubricContinuationHeading(currentLine)
+-        ) {
+-          break;
+-        }
+-      }
+-    }
++    if (cursor > startIndex && isRubricBlockBoundary(currentLine, headingLevel, rubricSignalCount, rubricBodyLine)) break;
+ 
+     if (rubricBodyLine) rubricSignalCount += 1;
+     sectionLines.push(currentLine);
+diff --git a/educlaw-server/src/services/workflow-service.ts b/educlaw-server/src/services/workflow-service.ts
+index bb5ebb7..bf7131d 100644
+--- a/educlaw-server/src/services/workflow-service.ts
++++ b/educlaw-server/src/services/workflow-service.ts
+@@ -168,6 +168,63 @@ export async function createWorkflow(
+   return getPackage(userId, created.packageId);
+ }
+ 
++interface WorkflowExecutionContext {
++  input: { content: string; model?: string };
++  snapshot: AgentPackageDetail['snapshot'];
++  results: Map<string, unknown>;
++}
++
++async function executeLoopNode(node: WorkflowNode, context: WorkflowExecutionContext) {
++  const { input, snapshot, results } = context;
++  const iterations = Number(node.params.iterations);
++  const instruction = renderTemplate(node.params.promptTemplate, input.content, results);
++  let previous = '';
++  for (let index = 0; index < iterations; index += 1) {
++    previous = await generateText({
++      model: typeof node.params.model === 'string' ? node.params.model : input.model,
++      systemPrompt: snapshot.agentMd,
++      userPrompt: [
++        `循环任务：${instruction}`,
++        `工作流输入：${input.content}`,
++        previous ? `上一轮结果：${previous}` : '这是第一轮处理，请直接开始。',
++        `当前为第 ${index + 1} / ${iterations} 轮，请输出可供下一轮继续使用的结果。`,
++      ].join('\n\n'),
++      maxTokens: 2_000,
++      hidePromptContentInLogs: true,
++    });
++  }
++  return { text: previous, iterations };
++}
++
++async function executeWorkflowNode(node: WorkflowNode, context: WorkflowExecutionContext): Promise<unknown> {
++  const { input, snapshot, results } = context;
++  switch (node.type) {
++    case 'start': return { text: input.content };
++    case 'condition': return { passed: conditionPassed(node, input.content, results) };
++    case 'loop': return executeLoopNode(node, context);
++    case 'end': return { text: renderTemplate(node.params.outputTemplate, input.content, results) };
++  }
++  const template = node.type === 'skill' ? node.params.inputTemplate : node.params.promptTemplate;
++  const prompt = renderTemplate(template, input.content, results);
++  let systemPrompt = snapshot.agentMd;
++  if (node.type === 'skill') {
++    const skill = snapshot.skills.find(item => item.id === node.params.skillId);
++    if (!skill) {
++      throw new WorkflowServiceError('试跑时找不到固定版本的 Skill。', 'WORKFLOW_SKILL_UNAVAILABLE');
++    }
++    systemPrompt = `${snapshot.agentMd}\n\n[Skill: ${skill.name}]\n${skill.skillMd}`;
++  }
++  return {
++    text: await generateText({
++      model: typeof node.params.model === 'string' ? node.params.model : input.model,
++      systemPrompt,
++      userPrompt: prompt,
++      maxTokens: 2_000,
++      hidePromptContentInLogs: true,
++    }),
++  };
++}
++
+ export async function runWorkflow(
+   userId: string,
+   packageId: string,
+@@ -219,53 +276,9 @@ export async function runWorkflow(
+       const currentTrace = trace(current.id);
+       currentTrace.status = 'running';
+       currentTrace.startedAt = new Date().toISOString();
+-      let output: unknown;
+-      if (current.type === 'start') output = { text: input.content };
+-      else if (current.type === 'condition') output = { passed: conditionPassed(current, input.content, nodeResults) };
+-      else if (current.type === 'loop') {
+-        const iterations = Number(current.params.iterations);
+-        const instruction = renderTemplate(current.params.promptTemplate, input.content, nodeResults);
+-        let previous = '';
+-        for (let index = 0; index < iterations; index += 1) {
+-          previous = await generateText({
+-            model: typeof current.params.model === 'string' ? current.params.model : input.model,
+-            systemPrompt: version.snapshot.agentMd,
+-            userPrompt: [
+-              `循环任务：${instruction}`,
+-              `工作流输入：${input.content}`,
+-              previous ? `上一轮结果：${previous}` : '这是第一轮处理，请直接开始。',
+-              `当前为第 ${index + 1} / ${iterations} 轮，请输出可供下一轮继续使用的结果。`,
+-            ].join('\n\n'),
+-            maxTokens: 2_000,
+-            hidePromptContentInLogs: true,
+-          });
+-        }
+-        output = { text: previous, iterations };
+-      }
+-      else if (current.type === 'end') output = { text: renderTemplate(current.params.outputTemplate, input.content, nodeResults) };
+-      else {
+-        const template = current.type === 'skill'
+-          ? current.params.inputTemplate
+-          : current.params.promptTemplate;
+-        const prompt = renderTemplate(template, input.content, nodeResults);
+-        const skill = current.type === 'skill'
+-          ? version.snapshot.skills.find(item => item.id === current.params.skillId)
+-          : undefined;
+-        if (current.type === 'skill' && !skill) {
+-          throw new WorkflowServiceError('试跑时找不到固定版本的 Skill。', 'WORKFLOW_SKILL_UNAVAILABLE');
+-        }
+-        output = {
+-          text: await generateText({
+-            model: typeof current.params.model === 'string' ? current.params.model : input.model,
+-            systemPrompt: current.type === 'skill'
+-              ? `${version.snapshot.agentMd}\n\n[Skill: ${skill!.name}]\n${skill!.skillMd}`
+-              : version.snapshot.agentMd,
+-            userPrompt: prompt,
+-            maxTokens: 2_000,
+-            hidePromptContentInLogs: true,
+-          }),
+-        };
+-      }
++      const output = await executeWorkflowNode(current, {
++        input, snapshot: version.snapshot, results: nodeResults,
++      });
+       nodeResults.set(current.id, output);
+       currentTrace.input = current.type === 'start' ? undefined : clip(current.params);
+       currentTrace.output = clip(output);
+diff --git a/educlaw-web/src/components/skill-workspace/skill-conversation-list.ts b/educlaw-web/src/components/skill-workspace/skill-conversation-list.ts
+index 7ee72a1..a99f6af 100644
+--- a/educlaw-web/src/components/skill-workspace/skill-conversation-list.ts
++++ b/educlaw-web/src/components/skill-workspace/skill-conversation-list.ts
+@@ -55,11 +55,13 @@ export function isSkillConversationThread(
+   if (surface !== 'run' && surface !== 'test') return false;
+   const left = config.left;
+   const right = config.right;
+-  return (
+-    !!(left || right) &&
+-    (!left || left.skillId === skillId) &&
+-    (!right || right.skillId === skillId) &&
+-    (!left || !right || left.skillVersionId === right.skillVersionId)
++  const bindings = [left, right].filter(
++    (binding): binding is NonNullable<typeof binding> => Boolean(binding),
++  );
++  if (bindings.length === 0) return false;
++  const versionId = bindings[0].skillVersionId;
++  return bindings.every(
++    (binding) => binding.skillId === skillId && binding.skillVersionId === versionId,
+   );
+ }
+ 
+diff --git a/educlaw-web/src/pages/WorkflowDemo.tsx b/educlaw-web/src/pages/WorkflowDemo.tsx
+index 01c335f..1f3418b 100644
+--- a/educlaw-web/src/pages/WorkflowDemo.tsx
++++ b/educlaw-web/src/pages/WorkflowDemo.tsx
+@@ -210,7 +210,17 @@ export default function WorkflowDemo({ embedded = false, token, packageId, packa
+     if (!workflowPackageId || !versionId) { toast.error('请先保存工作流'); return; }
+     if (!input.trim()) { toast.error('请先填写试跑输入'); return; }
+     setBusy(true);
+-    try { const report = await liteApi.runWorkflow(token!, workflowPackageId, { packageVersionId: versionId, requestId: id('run'), content: input }); setRun(report); report.status === 'succeeded' ? toast.success('试跑完成') : toast.error(report.error?.message || '试跑失败'); }
++    try {
++      const report = await liteApi.runWorkflow(token!, workflowPackageId, {
++        packageVersionId: versionId, requestId: id('run'), content: input,
++      });
++      setRun(report);
++      if (report.status === 'succeeded') {
++        toast.success('试跑完成');
++      } else {
++        toast.error(report.error?.message || '试跑失败');
++      }
++    }
+     catch (error) { toast.error(error instanceof Error ? error.message : '启动试跑失败'); } finally { setBusy(false); }
+   }
+   const onConnect = (connection: Connection) => {

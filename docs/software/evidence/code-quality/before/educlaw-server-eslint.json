@@ -1,0 +1,2079 @@
+{
+  "results": [
+    {
+      "filePath": "educlaw-server/src/config.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/config/internal-worker-config.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/config/object-storage-config.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/global.d.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/harness/contracts.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/harness/pi-core-adapter.smoke.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/harness/pi-core-adapter.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'validateRequest' has a complexity of 27. Maximum allowed is 15.",
+          "line": 131,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 131,
+          "endColumn": 25
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'classifyFinalMessage' has a complexity of 19. Maximum allowed is 15.",
+          "line": 390,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 390,
+          "endColumn": 30
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 2,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/harness/pi-provider-runtime.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/harness/pi-run-coordinator.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/index.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/lib/llm-model-capabilities.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/lib/logger.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/lib/request-context.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/middleware/auth.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/middleware/internal-worker-auth.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/middleware/request-context.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/prompts/answer-skill-optimization.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/prompts/answer-skill-test-evaluation.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/prompts/package-generation.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/routes/actions.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async arrow function has a complexity of 18. Maximum allowed is 15.",
+          "line": 505,
+          "column": 26,
+          "messageId": "complex",
+          "endLine": 505,
+          "endColumn": 28
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/routes/agent-workspaces.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/routes/answer-skill-optimizations.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'parseReviseBody' has a complexity of 26. Maximum allowed is 15.",
+          "line": 186,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 186,
+          "endColumn": 25
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/routes/arena.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'streamArenaMessage' has a complexity of 23. Maximum allowed is 15.",
+          "line": 249,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 249,
+          "endColumn": 34
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/routes/compat.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async arrow function has a complexity of 17. Maximum allowed is 15.",
+          "line": 284,
+          "column": 113,
+          "messageId": "complex",
+          "endLine": 284,
+          "endColumn": 115
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/routes/guided-creation-actions.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'parseGuidedCreationRequest' has a complexity of 75. Maximum allowed is 15.",
+          "line": 282,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 282,
+          "endColumn": 43
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'handleGuidedCreationJsonAction' has a complexity of 65. Maximum allowed is 15.",
+          "line": 871,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 871,
+          "endColumn": 53
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'handleGuidedCreationStreamAction' has a complexity of 20. Maximum allowed is 15.",
+          "line": 1088,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 1088,
+          "endColumn": 55
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 3,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/routes/health.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/routes/index.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/routes/media-job-actions.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/routes/packages.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async arrow function has a complexity of 34. Maximum allowed is 15.",
+          "line": 99,
+          "column": 39,
+          "messageId": "complex",
+          "endLine": 99,
+          "endColumn": 41
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async arrow function has a complexity of 22. Maximum allowed is 15.",
+          "line": 313,
+          "column": 20,
+          "messageId": "complex",
+          "endLine": 313,
+          "endColumn": 22
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async arrow function has a complexity of 20. Maximum allowed is 15.",
+          "line": 539,
+          "column": 20,
+          "messageId": "complex",
+          "endLine": 539,
+          "endColumn": 22
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 3,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/routes/skills.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/routes/workflow.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/scripts/init-db.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/agent-workspace-service.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'buildSnapshotSkills' has a complexity of 21. Maximum allowed is 15.",
+          "line": 257,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 257,
+          "endColumn": 35
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'provisionAgent' has a complexity of 19. Maximum allowed is 15.",
+          "line": 404,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 404,
+          "endColumn": 37
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 2,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/answer-optimization-suggestion-service.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/answer-optimization-suggestions.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/answer-skill-optimization-contract.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'parseTestResult' has a complexity of 19. Maximum allowed is 15.",
+          "line": 597,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 597,
+          "endColumn": 25
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'parseRefinementTurn' has a complexity of 39. Maximum allowed is 15.",
+          "line": 1197,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 1197,
+          "endColumn": 29
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'parseIdempotencyRecord' has a complexity of 54. Maximum allowed is 15.",
+          "line": 1346,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 1346,
+          "endColumn": 32
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'parseAnswerSkillOptimizationResult' has a complexity of 26. Maximum allowed is 15.",
+          "line": 1549,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 1549,
+          "endColumn": 51
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'parseAnswerOptimizationModelOutput' has a complexity of 29. Maximum allowed is 15.",
+          "line": 1668,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 1668,
+          "endColumn": 51
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 5,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/answer-skill-optimization-policy.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'getAnswerSkillConfirmIssue' has a complexity of 18. Maximum allowed is 15.",
+          "line": 29,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 29,
+          "endColumn": 43
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/answer-skill-optimization-service.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'createAnswerSkillOptimizationRunWithOutcome' has a complexity of 31. Maximum allowed is 15.",
+          "line": 973,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 973,
+          "endColumn": 66
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'analyzeAnswerSkillOptimization' has a complexity of 16. Maximum allowed is 15.",
+          "line": 2168,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 2168,
+          "endColumn": 46
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'resolveAnswerSkillOptimizationReference' has a complexity of 16. Maximum allowed is 15.",
+          "line": 2502,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 2502,
+          "endColumn": 62
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'analyzeAnswerSkillRefinement' has a complexity of 16. Maximum allowed is 15.",
+          "line": 3404,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 3404,
+          "endColumn": 44
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'refineAnswerSkillOptimization' has a complexity of 16. Maximum allowed is 15.",
+          "line": 3930,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 3930,
+          "endColumn": 45
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'loadRecordedAnswerReplayContext' has a complexity of 17. Maximum allowed is 15.",
+          "line": 4276,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 4276,
+          "endColumn": 47
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'confirmAnswerSkillOptimizationTransaction' has a complexity of 20. Maximum allowed is 15.",
+          "line": 5430,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 5430,
+          "endColumn": 57
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 7,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/answer-skill-patch-service.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/arena-run-service.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async method 'start' has a complexity of 26. Maximum allowed is 15.",
+          "line": 118,
+          "column": 3,
+          "messageId": "complex",
+          "endLine": 118,
+          "endColumn": 14
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async method 'execute' has a complexity of 36. Maximum allowed is 15.",
+          "line": 232,
+          "column": 3,
+          "messageId": "complex",
+          "endLine": 232,
+          "endColumn": 24
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 2,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/arena-service.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'evaluateMultimodalSkillPackDraft' has a complexity of 18. Maximum allowed is 15.",
+          "line": 854,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 854,
+          "endColumn": 55
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'resolveThreadRuntime' has a complexity of 19. Maximum allowed is 15.",
+          "line": 1275,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 1275,
+          "endColumn": 36
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'createArenaThread' has a complexity of 16. Maximum allowed is 15.",
+          "line": 1556,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 1556,
+          "endColumn": 40
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async arrow function has a complexity of 22. Maximum allowed is 15.",
+          "line": 1613,
+          "column": 41,
+          "messageId": "complex",
+          "endLine": 1613,
+          "endColumn": 43
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async generator function 'streamMessage' has a complexity of 102. Maximum allowed is 15.",
+          "line": 1868,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 1868,
+          "endColumn": 37
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async arrow function has a complexity of 45. Maximum allowed is 15.",
+          "line": 2055,
+          "column": 111,
+          "messageId": "complex",
+          "endLine": 2055,
+          "endColumn": 113
+        },
+        {
+          "ruleId": "max-depth",
+          "severity": 1,
+          "message": "Blocks are nested too deeply (5). Maximum allowed is 4.",
+          "line": 2138,
+          "column": 13,
+          "messageId": "tooDeeply",
+          "endLine": 2138,
+          "endColumn": 15
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async arrow function has a complexity of 38. Maximum allowed is 15.",
+          "line": 2261,
+          "column": 62,
+          "messageId": "complex",
+          "endLine": 2261,
+          "endColumn": 64
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 8,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/arena-thread-lifecycle.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/db-schema.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/db.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/generation-failure.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'classifyGenerationFailure' has a complexity of 34. Maximum allowed is 15.",
+          "line": 20,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 20,
+          "endColumn": 42
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/guided-creation-policy.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'sanitizeDraftOperations' has a complexity of 18. Maximum allowed is 15.",
+          "line": 156,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 156,
+          "endColumn": 40
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/guided-creation-service.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'parseStagePhrasing' has a complexity of 27. Maximum allowed is 15.",
+          "line": 381,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 381,
+          "endColumn": 28
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'parseEducationPhrasing' has a complexity of 30. Maximum allowed is 15.",
+          "line": 680,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 680,
+          "endColumn": 32
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'buildGuidedAssistantTurnV3' has a complexity of 16. Maximum allowed is 15.",
+          "line": 760,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 760,
+          "endColumn": 43
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'mapSession' has a complexity of 26. Maximum allowed is 15.",
+          "line": 929,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 929,
+          "endColumn": 20
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'generateAssistantTurn' has a complexity of 39. Maximum allowed is 15.",
+          "line": 1462,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 1462,
+          "endColumn": 37
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'processGuidedCreationMessage' has a complexity of 18. Maximum allowed is 15.",
+          "line": 1751,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 1751,
+          "endColumn": 51
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'confirmGuidedCreation' has a complexity of 22. Maximum allowed is 15.",
+          "line": 2342,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 2342,
+          "endColumn": 44
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 7,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/guided-education-policy.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'sanitizeEducationOperations' has a complexity of 31. Maximum allowed is 15.",
+          "line": 123,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 123,
+          "endColumn": 44
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'applyEducationOperations' has a complexity of 27. Maximum allowed is 15.",
+          "line": 205,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 205,
+          "endColumn": 41
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 2,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/guided-experience-library.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/health-service.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/http-drain.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/interactive-optimization-service.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'parseMarkers' has a complexity of 24. Maximum allowed is 15.",
+          "line": 499,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 499,
+          "endColumn": 22
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'chatOptimize' has a complexity of 29. Maximum allowed is 15.",
+          "line": 741,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 741,
+          "endColumn": 35
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'computeFeedbackLineDiff' has a complexity of 17. Maximum allowed is 15.",
+          "line": 1038,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 1038,
+          "endColumn": 33
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'resolveFeedbackTurnContext' has a complexity of 21. Maximum allowed is 15.",
+          "line": 1158,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 1158,
+          "endColumn": 42
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Arrow function has a complexity of 18. Maximum allowed is 15.",
+          "line": 1372,
+          "column": 39,
+          "messageId": "complex",
+          "endLine": 1372,
+          "endColumn": 41
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'createFeedbackOptimization' has a complexity of 18. Maximum allowed is 15.",
+          "line": 1419,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 1419,
+          "endColumn": 49
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 6,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/llm-service.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'readChatParts' has a complexity of 19. Maximum allowed is 15.",
+          "line": 384,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 384,
+          "endColumn": 29
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async generator function 'streamTextParts' has a complexity of 28. Maximum allowed is 15.",
+          "line": 444,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 444,
+          "endColumn": 39
+        },
+        {
+          "ruleId": "max-depth",
+          "severity": 1,
+          "message": "Blocks are nested too deeply (5). Maximum allowed is 4.",
+          "line": 499,
+          "column": 11,
+          "messageId": "tooDeeply",
+          "endLine": 499,
+          "endColumn": 13
+        },
+        {
+          "ruleId": "max-depth",
+          "severity": 1,
+          "message": "Blocks are nested too deeply (5). Maximum allowed is 4.",
+          "line": 505,
+          "column": 11,
+          "messageId": "tooDeeply",
+          "endLine": 505,
+          "endColumn": 13
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async generator function 'streamChat' has a complexity of 22. Maximum allowed is 15.",
+          "line": 537,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 537,
+          "endColumn": 34
+        },
+        {
+          "ruleId": "max-depth",
+          "severity": 1,
+          "message": "Blocks are nested too deeply (5). Maximum allowed is 4.",
+          "line": 574,
+          "column": 11,
+          "messageId": "tooDeeply",
+          "endLine": 574,
+          "endColumn": 13
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'generateJson' has a complexity of 17. Maximum allowed is 15.",
+          "line": 588,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 588,
+          "endColumn": 38
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 7,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/media-distillation-contract.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'parseMediaPrepareOutputManifest' has a complexity of 16. Maximum allowed is 15.",
+          "line": 186,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 186,
+          "endColumn": 48
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/media-evidence-runtime.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'createProductionMediaEvidenceService' has a complexity of 23. Maximum allowed is 15.",
+          "line": 269,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 269,
+          "endColumn": 53
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/media-evidence.service.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Method 'planFrameCandidates' has a complexity of 17. Maximum allowed is 15.",
+          "line": 712,
+          "column": 3,
+          "messageId": "complex",
+          "endLine": 712,
+          "endColumn": 22
+        },
+        {
+          "ruleId": "max-depth",
+          "severity": 1,
+          "message": "Blocks are nested too deeply (5). Maximum allowed is 4.",
+          "line": 839,
+          "column": 13,
+          "messageId": "tooDeeply",
+          "endLine": 839,
+          "endColumn": 15
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async method 'rankVisualCandidates' has a complexity of 21. Maximum allowed is 15.",
+          "line": 878,
+          "column": 3,
+          "messageId": "complex",
+          "endLine": 878,
+          "endColumn": 29
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Method 'buildEvidenceTimeline' has a complexity of 50. Maximum allowed is 15.",
+          "line": 1016,
+          "column": 3,
+          "messageId": "complex",
+          "endLine": 1016,
+          "endColumn": 24
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 4,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/media-job-state-machine.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/media-quality-check-contract.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'validateProbeSemantics' has a complexity of 19. Maximum allowed is 15.",
+          "line": 262,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 262,
+          "endColumn": 32
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/media-session-state-machine.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/media-url-import.service.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'parseAndValidateUrl' has a complexity of 16. Maximum allowed is 15.",
+          "line": 465,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 465,
+          "endColumn": 29
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/multimodal-distillation-pipeline-orchestrator.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'runSemantic' has a complexity of 18. Maximum allowed is 15.",
+          "line": 125,
+          "column": 3,
+          "messageId": "complex",
+          "endLine": 125,
+          "endColumn": 29
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'runEvidence' has a complexity of 17. Maximum allowed is 15.",
+          "line": 232,
+          "column": 3,
+          "messageId": "complex",
+          "endLine": 232,
+          "endColumn": 29
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 2,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/multimodal-distillation-pipeline-store.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/multimodal-guided-creation-service.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'normalizeTranscriptSegmentUpdate' has a complexity of 23. Maximum allowed is 15.",
+          "line": 742,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 742,
+          "endColumn": 42
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async arrow function has a complexity of 33. Maximum allowed is 15.",
+          "line": 1769,
+          "column": 72,
+          "messageId": "complex",
+          "endLine": 1769,
+          "endColumn": 74
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async arrow function has a complexity of 17. Maximum allowed is 15.",
+          "line": 2954,
+          "column": 54,
+          "messageId": "complex",
+          "endLine": 2954,
+          "endColumn": 56
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async method 'createUploadConfirm' has a complexity of 20. Maximum allowed is 15.",
+          "line": 3121,
+          "column": 5,
+          "messageId": "complex",
+          "endLine": 3121,
+          "endColumn": 30
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async arrow function has a complexity of 17. Maximum allowed is 15.",
+          "line": 3141,
+          "column": 84,
+          "messageId": "complex",
+          "endLine": 3141,
+          "endColumn": 86
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async arrow function has a complexity of 25. Maximum allowed is 15.",
+          "line": 3548,
+          "column": 54,
+          "messageId": "complex",
+          "endLine": 3548,
+          "endColumn": 56
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async arrow function has a complexity of 26. Maximum allowed is 15.",
+          "line": 3817,
+          "column": 54,
+          "messageId": "complex",
+          "endLine": 3817,
+          "endColumn": 56
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 7,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/multimodal-job-service.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'createRuntimeGrants' has a complexity of 17. Maximum allowed is 15.",
+          "line": 941,
+          "column": 3,
+          "messageId": "complex",
+          "endLine": 941,
+          "endColumn": 37
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async arrow function has a complexity of 88. Maximum allowed is 15.",
+          "line": 1285,
+          "column": 46,
+          "messageId": "complex",
+          "endLine": 1285,
+          "endColumn": 48
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 2,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/multimodal-job-store.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/multimodal-model-adapters.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Arrow function has a complexity of 22. Maximum allowed is 15.",
+          "line": 570,
+          "column": 41,
+          "messageId": "complex",
+          "endLine": 570,
+          "endColumn": 43
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'createProductionMultimodalModelAdapters' has a complexity of 19. Maximum allowed is 15.",
+          "line": 938,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 938,
+          "endColumn": 56
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async arrow function has a complexity of 19. Maximum allowed is 15.",
+          "line": 1163,
+          "column": 41,
+          "messageId": "complex",
+          "endLine": 1163,
+          "endColumn": 43
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 3,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/multimodal-pipeline-orchestrator.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/multimodal-pipeline-runner.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'runSession' has a complexity of 27. Maximum allowed is 15.",
+          "line": 120,
+          "column": 3,
+          "messageId": "complex",
+          "endLine": 120,
+          "endColumn": 28
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async arrow function has a complexity of 17. Maximum allowed is 15.",
+          "line": 144,
+          "column": 60,
+          "messageId": "complex",
+          "endLine": 144,
+          "endColumn": 62
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 2,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/multimodal-pipeline-runtime.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/multimodal-pipeline-store.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'normalizeFailureInput' has a complexity of 16. Maximum allowed is 15.",
+          "line": 455,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 455,
+          "endColumn": 31
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/multimodal-progress-stream-service.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async method 'streamProgress' has a complexity of 17. Maximum allowed is 15.",
+          "line": 133,
+          "column": 5,
+          "messageId": "complex",
+          "endLine": 133,
+          "endColumn": 25
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/multimodal-release-service.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'parseArenaEvaluation' has a complexity of 23. Maximum allowed is 15.",
+          "line": 359,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 359,
+          "endColumn": 30
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'parsePublishReceipt' has a complexity of 17. Maximum allowed is 15.",
+          "line": 425,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 425,
+          "endColumn": 29
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 2,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/multimodal-session-service.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/object-storage/object-storage.service.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/optimization-service.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'optimizePackage' has a complexity of 18. Maximum allowed is 15.",
+          "line": 12,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 12,
+          "endColumn": 38
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/package-import-security.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/package-service.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'collectRubricBlock' has a complexity of 20. Maximum allowed is 15.",
+          "line": 383,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 383,
+          "endColumn": 28
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'extractRubricSectionFromText' has a complexity of 23. Maximum allowed is 15.",
+          "line": 457,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 457,
+          "endColumn": 38
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'aiLocateRubricSection' has a complexity of 18. Maximum allowed is 15.",
+          "line": 967,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 967,
+          "endColumn": 37
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'generateRubricWithRepair' has a complexity of 19. Maximum allowed is 15.",
+          "line": 1556,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 1556,
+          "endColumn": 40
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'normalizeBaseMetadataJson' has a complexity of 16. Maximum allowed is 15.",
+          "line": 1890,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 1890,
+          "endColumn": 35
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'validateGenerationResult' has a complexity of 22. Maximum allowed is 15.",
+          "line": 2021,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 2021,
+          "endColumn": 34
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'buildGeneratedPackageSnapshot' has a complexity of 29. Maximum allowed is 15.",
+          "line": 2427,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 2427,
+          "endColumn": 52
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'importPackageZip' has a complexity of 25. Maximum allowed is 15.",
+          "line": 2826,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 2826,
+          "endColumn": 39
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'applyManualMarkdownEdit' has a complexity of 20. Maximum allowed is 15.",
+          "line": 3142,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 3142,
+          "endColumn": 46
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'computeDiff' has a complexity of 17. Maximum allowed is 15.",
+          "line": 3288,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 3288,
+          "endColumn": 21
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'compareVersions' has a complexity of 21. Maximum allowed is 15.",
+          "line": 3420,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 3420,
+          "endColumn": 38
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 11,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/ria-skill-markdown.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/server-shutdown.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async arrow function has a complexity of 16. Maximum allowed is 15.",
+          "line": 29,
+          "column": 38,
+          "messageId": "complex",
+          "endLine": 29,
+          "endColumn": 40
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/skill-markdown-validation.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/skill-version-service.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'syncPackageVersionSkillsFromSnapshot' has a complexity of 18. Maximum allowed is 15.",
+          "line": 553,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 553,
+          "endColumn": 59
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/structured-guided-input.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/upload-security.service.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'detectContainerFamily' has a complexity of 21. Maximum allowed is 15.",
+          "line": 574,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 574,
+          "endColumn": 31
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/services/workflow-service.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'runWorkflow' has a complexity of 32. Maximum allowed is 15.",
+          "line": 171,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 171,
+          "endColumn": 34
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/types.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/utils/agent-conversation-policy.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/utils/arena-run-sse.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/utils/http.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/utils/json.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-server/src/utils/sse.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    }
+  ],
+  "metadata": {
+    "cwd": "/Users/hobzhao/Desktop/project/SkillStudio/educlaw-server",
+    "rulesMeta": {
+      "complexity": {
+        "type": "suggestion",
+        "defaultOptions": [
+          20
+        ],
+        "docs": {
+          "description": "Enforce a maximum cyclomatic complexity allowed in a program",
+          "recommended": false,
+          "url": "https://eslint.org/docs/latest/rules/complexity"
+        },
+        "schema": [
+          {
+            "oneOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "maximum": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "max": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "variant": {
+                    "enum": [
+                      "classic",
+                      "modified"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            ]
+          }
+        ],
+        "messages": {
+          "complex": "{{name}} has a complexity of {{complexity}}. Maximum allowed is {{max}}."
+        }
+      },
+      "max-depth": {
+        "type": "suggestion",
+        "docs": {
+          "description": "Enforce a maximum depth that blocks can be nested",
+          "recommended": false,
+          "url": "https://eslint.org/docs/latest/rules/max-depth"
+        },
+        "schema": [
+          {
+            "oneOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "maximum": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "max": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "additionalProperties": false
+              }
+            ]
+          }
+        ],
+        "defaultOptions": [
+          4
+        ],
+        "messages": {
+          "tooDeeply": "Blocks are nested too deeply ({{depth}}). Maximum allowed is {{maxDepth}}."
+        }
+      }
+    }
+  }
+}
