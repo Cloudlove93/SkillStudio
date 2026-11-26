@@ -20,6 +20,7 @@ interface SeedState {
     user_id: string;
     name: string;
     description: string;
+    model?: string | null;
     current_version_id: string | number;
     created_at: string;
     updated_at: string;
@@ -177,15 +178,16 @@ async function loadService(state: SeedState) {
 
         if (
           sql.startsWith(
-            'update agent_packages set name = $1, description = $2, current_version_id = $3, updated_at = $4 where id = $5 and user_id = $6',
+            'update agent_packages set name = $1, description = $2, model = $3, current_version_id = $4, updated_at = $5 where id = $6 and user_id = $7',
           )
         ) {
           state.packageRow = {
             ...state.packageRow,
             name: String(args[0]),
             description: String(args[1]),
-            current_version_id: args[2],
-            updated_at: String(args[3]),
+            model: typeof args[2] === 'string' ? args[2] : null,
+            current_version_id: Number(args[3]),
+            updated_at: String(args[4]),
           };
           return { rows: [], rowCount: 1 };
         }

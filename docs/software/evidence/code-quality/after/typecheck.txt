@@ -1,0 +1,10 @@
+
+> educlaw@ check:types /Users/hobzhao/Desktop/project/SkillStudio
+> node scripts/check-web-types.mjs
+
+{
+  "baselineDiagnostics": 257,
+  "currentDiagnostics": 249,
+  "addedDiagnostics": 0,
+  "added": []
+}

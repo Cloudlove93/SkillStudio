@@ -1,0 +1,11 @@
+(node:60234) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+ RUN  v4.1.7 /Users/hobzhao/Desktop/project/SkillStudio/educlaw-web
+
+
+ Test Files  2 passed (2)
+      Tests  10 passed (10)
+   Start at  17:11:28
+   Duration  479ms (transform 67ms, setup 0ms, import 136ms, tests 47ms, environment 224ms)
+

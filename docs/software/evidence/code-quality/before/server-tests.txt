@@ -1,0 +1,9 @@
+
+ RUN  v4.1.7 /Users/hobzhao/Desktop/project/SkillStudio/educlaw-server
+
+
+ Test Files  3 passed (3)
+      Tests  53 passed (53)
+   Start at  17:09:52
+   Duration  280ms (transform 299ms, setup 0ms, import 439ms, tests 19ms, environment 0ms)
+

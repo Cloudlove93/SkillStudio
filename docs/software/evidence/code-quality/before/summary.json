@@ -1,0 +1,1972 @@
+{
+  "phase": "before",
+  "scannedAt": "2026-11-25T09:06:43.327Z",
+  "baseCommit": "57d8705542850cd6d259a5ae560b218920c5f702",
+  "tools": {
+    "eslint": "v10.5.0",
+    "jscpd": "4.0.5"
+  },
+  "scope": "educlaw-server/src + educlaw-web/src; exclude *.test.*; duplication scans TypeScript/TSX only",
+  "fileCount": 315,
+  "lintErrors": 1,
+  "bugIndicators": 0,
+  "codeSmells": 199,
+  "complexityOver15": 188,
+  "maxDepthOver4": 8,
+  "duplication": {
+    "lines": 69049,
+    "tokens": 641564,
+    "sources": 409,
+    "clones": 37,
+    "duplicatedLines": 822,
+    "duplicatedTokens": 8909,
+    "percentage": 1.19,
+    "percentageTokens": 1.39,
+    "newDuplicatedLines": 0,
+    "newClones": 0
+  },
+  "targetComplexity": [
+    {
+      "file": "educlaw-server/src/services/guided-creation-service.ts",
+      "function": "parseStagePhrasing",
+      "complexity": 27
+    },
+    {
+      "file": "educlaw-server/src/services/guided-creation-service.ts",
+      "function": "parseEducationPhrasing",
+      "complexity": 30
+    },
+    {
+      "file": "educlaw-server/src/services/package-service.ts",
+      "function": "collectRubricBlock",
+      "complexity": 20
+    },
+    {
+      "file": "educlaw-server/src/services/workflow-service.ts",
+      "function": "runWorkflow",
+      "complexity": 32
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/skill-conversation-list.ts",
+      "function": "isSkillConversationThread",
+      "complexity": 18
+    },
+    {
+      "file": "educlaw-web/src/pages/WorkflowDemo.tsx",
+      "function": "execute",
+      "complexity": 9
+    }
+  ],
+  "findings": [
+    {
+      "file": "educlaw-server/src/harness/pi-core-adapter.ts",
+      "line": 131,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'validateRequest' has a complexity of 27. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/harness/pi-core-adapter.ts",
+      "line": 390,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'classifyFinalMessage' has a complexity of 19. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/routes/actions.ts",
+      "line": 505,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async arrow function has a complexity of 18. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/routes/answer-skill-optimizations.ts",
+      "line": 186,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'parseReviseBody' has a complexity of 26. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/routes/arena.ts",
+      "line": 249,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'streamArenaMessage' has a complexity of 23. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/routes/compat.ts",
+      "line": 284,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async arrow function has a complexity of 17. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/routes/guided-creation-actions.ts",
+      "line": 282,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'parseGuidedCreationRequest' has a complexity of 75. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/routes/guided-creation-actions.ts",
+      "line": 871,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'handleGuidedCreationJsonAction' has a complexity of 65. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/routes/guided-creation-actions.ts",
+      "line": 1088,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'handleGuidedCreationStreamAction' has a complexity of 20. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/routes/packages.ts",
+      "line": 99,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async arrow function has a complexity of 34. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/routes/packages.ts",
+      "line": 313,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async arrow function has a complexity of 22. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/routes/packages.ts",
+      "line": 539,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async arrow function has a complexity of 20. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/agent-workspace-service.ts",
+      "line": 257,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'buildSnapshotSkills' has a complexity of 21. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/agent-workspace-service.ts",
+      "line": 404,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'provisionAgent' has a complexity of 19. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/answer-skill-optimization-contract.ts",
+      "line": 597,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'parseTestResult' has a complexity of 19. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/answer-skill-optimization-contract.ts",
+      "line": 1197,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'parseRefinementTurn' has a complexity of 39. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/answer-skill-optimization-contract.ts",
+      "line": 1346,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'parseIdempotencyRecord' has a complexity of 54. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/answer-skill-optimization-contract.ts",
+      "line": 1549,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'parseAnswerSkillOptimizationResult' has a complexity of 26. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/answer-skill-optimization-contract.ts",
+      "line": 1668,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'parseAnswerOptimizationModelOutput' has a complexity of 29. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/answer-skill-optimization-policy.ts",
+      "line": 29,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'getAnswerSkillConfirmIssue' has a complexity of 18. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/answer-skill-optimization-service.ts",
+      "line": 973,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'createAnswerSkillOptimizationRunWithOutcome' has a complexity of 31. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/answer-skill-optimization-service.ts",
+      "line": 2168,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'analyzeAnswerSkillOptimization' has a complexity of 16. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/answer-skill-optimization-service.ts",
+      "line": 2502,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'resolveAnswerSkillOptimizationReference' has a complexity of 16. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/answer-skill-optimization-service.ts",
+      "line": 3404,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'analyzeAnswerSkillRefinement' has a complexity of 16. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/answer-skill-optimization-service.ts",
+      "line": 3930,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'refineAnswerSkillOptimization' has a complexity of 16. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/answer-skill-optimization-service.ts",
+      "line": 4276,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'loadRecordedAnswerReplayContext' has a complexity of 17. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/answer-skill-optimization-service.ts",
+      "line": 5430,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'confirmAnswerSkillOptimizationTransaction' has a complexity of 20. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/arena-run-service.ts",
+      "line": 118,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async method 'start' has a complexity of 26. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/arena-run-service.ts",
+      "line": 232,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async method 'execute' has a complexity of 36. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/arena-service.ts",
+      "line": 854,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'evaluateMultimodalSkillPackDraft' has a complexity of 18. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/arena-service.ts",
+      "line": 1275,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'resolveThreadRuntime' has a complexity of 19. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/arena-service.ts",
+      "line": 1556,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'createArenaThread' has a complexity of 16. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/arena-service.ts",
+      "line": 1613,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async arrow function has a complexity of 22. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/arena-service.ts",
+      "line": 1868,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async generator function 'streamMessage' has a complexity of 102. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/arena-service.ts",
+      "line": 2055,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async arrow function has a complexity of 45. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/arena-service.ts",
+      "line": 2138,
+      "rule": "max-depth",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Blocks are nested too deeply (5). Maximum allowed is 4."
+    },
+    {
+      "file": "educlaw-server/src/services/arena-service.ts",
+      "line": 2261,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async arrow function has a complexity of 38. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/generation-failure.ts",
+      "line": 20,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'classifyGenerationFailure' has a complexity of 34. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/guided-creation-policy.ts",
+      "line": 156,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'sanitizeDraftOperations' has a complexity of 18. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/guided-creation-service.ts",
+      "line": 381,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'parseStagePhrasing' has a complexity of 27. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/guided-creation-service.ts",
+      "line": 680,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'parseEducationPhrasing' has a complexity of 30. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/guided-creation-service.ts",
+      "line": 760,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'buildGuidedAssistantTurnV3' has a complexity of 16. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/guided-creation-service.ts",
+      "line": 929,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'mapSession' has a complexity of 26. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/guided-creation-service.ts",
+      "line": 1462,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'generateAssistantTurn' has a complexity of 39. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/guided-creation-service.ts",
+      "line": 1751,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'processGuidedCreationMessage' has a complexity of 18. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/guided-creation-service.ts",
+      "line": 2342,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'confirmGuidedCreation' has a complexity of 22. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/guided-education-policy.ts",
+      "line": 123,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'sanitizeEducationOperations' has a complexity of 31. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/guided-education-policy.ts",
+      "line": 205,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'applyEducationOperations' has a complexity of 27. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/interactive-optimization-service.ts",
+      "line": 499,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'parseMarkers' has a complexity of 24. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/interactive-optimization-service.ts",
+      "line": 741,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'chatOptimize' has a complexity of 29. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/interactive-optimization-service.ts",
+      "line": 1038,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'computeFeedbackLineDiff' has a complexity of 17. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/interactive-optimization-service.ts",
+      "line": 1158,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'resolveFeedbackTurnContext' has a complexity of 21. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/interactive-optimization-service.ts",
+      "line": 1372,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Arrow function has a complexity of 18. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/interactive-optimization-service.ts",
+      "line": 1419,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'createFeedbackOptimization' has a complexity of 18. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/llm-service.ts",
+      "line": 384,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'readChatParts' has a complexity of 19. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/llm-service.ts",
+      "line": 444,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async generator function 'streamTextParts' has a complexity of 28. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/llm-service.ts",
+      "line": 499,
+      "rule": "max-depth",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Blocks are nested too deeply (5). Maximum allowed is 4."
+    },
+    {
+      "file": "educlaw-server/src/services/llm-service.ts",
+      "line": 505,
+      "rule": "max-depth",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Blocks are nested too deeply (5). Maximum allowed is 4."
+    },
+    {
+      "file": "educlaw-server/src/services/llm-service.ts",
+      "line": 537,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async generator function 'streamChat' has a complexity of 22. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/llm-service.ts",
+      "line": 574,
+      "rule": "max-depth",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Blocks are nested too deeply (5). Maximum allowed is 4."
+    },
+    {
+      "file": "educlaw-server/src/services/llm-service.ts",
+      "line": 588,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'generateJson' has a complexity of 17. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/media-distillation-contract.ts",
+      "line": 186,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'parseMediaPrepareOutputManifest' has a complexity of 16. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/media-evidence-runtime.ts",
+      "line": 269,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'createProductionMediaEvidenceService' has a complexity of 23. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/media-evidence.service.ts",
+      "line": 712,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Method 'planFrameCandidates' has a complexity of 17. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/media-evidence.service.ts",
+      "line": 839,
+      "rule": "max-depth",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Blocks are nested too deeply (5). Maximum allowed is 4."
+    },
+    {
+      "file": "educlaw-server/src/services/media-evidence.service.ts",
+      "line": 878,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async method 'rankVisualCandidates' has a complexity of 21. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/media-evidence.service.ts",
+      "line": 1016,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Method 'buildEvidenceTimeline' has a complexity of 50. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/media-quality-check-contract.ts",
+      "line": 262,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'validateProbeSemantics' has a complexity of 19. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/media-url-import.service.ts",
+      "line": 465,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'parseAndValidateUrl' has a complexity of 16. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/multimodal-distillation-pipeline-orchestrator.ts",
+      "line": 125,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'runSemantic' has a complexity of 18. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/multimodal-distillation-pipeline-orchestrator.ts",
+      "line": 232,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'runEvidence' has a complexity of 17. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/multimodal-guided-creation-service.ts",
+      "line": 742,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'normalizeTranscriptSegmentUpdate' has a complexity of 23. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/multimodal-guided-creation-service.ts",
+      "line": 1769,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async arrow function has a complexity of 33. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/multimodal-guided-creation-service.ts",
+      "line": 2954,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async arrow function has a complexity of 17. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/multimodal-guided-creation-service.ts",
+      "line": 3121,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async method 'createUploadConfirm' has a complexity of 20. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/multimodal-guided-creation-service.ts",
+      "line": 3141,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async arrow function has a complexity of 17. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/multimodal-guided-creation-service.ts",
+      "line": 3548,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async arrow function has a complexity of 25. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/multimodal-guided-creation-service.ts",
+      "line": 3817,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async arrow function has a complexity of 26. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/multimodal-job-service.ts",
+      "line": 941,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'createRuntimeGrants' has a complexity of 17. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/multimodal-job-service.ts",
+      "line": 1285,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async arrow function has a complexity of 88. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/multimodal-model-adapters.ts",
+      "line": 570,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Arrow function has a complexity of 22. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/multimodal-model-adapters.ts",
+      "line": 938,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'createProductionMultimodalModelAdapters' has a complexity of 19. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/multimodal-model-adapters.ts",
+      "line": 1163,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async arrow function has a complexity of 19. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/multimodal-pipeline-runner.ts",
+      "line": 120,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'runSession' has a complexity of 27. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/multimodal-pipeline-runner.ts",
+      "line": 144,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async arrow function has a complexity of 17. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/multimodal-pipeline-store.ts",
+      "line": 455,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'normalizeFailureInput' has a complexity of 16. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/multimodal-progress-stream-service.ts",
+      "line": 133,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async method 'streamProgress' has a complexity of 17. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/multimodal-release-service.ts",
+      "line": 359,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'parseArenaEvaluation' has a complexity of 23. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/multimodal-release-service.ts",
+      "line": 425,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'parsePublishReceipt' has a complexity of 17. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/optimization-service.ts",
+      "line": 12,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'optimizePackage' has a complexity of 18. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/package-service.ts",
+      "line": 383,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'collectRubricBlock' has a complexity of 20. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/package-service.ts",
+      "line": 457,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'extractRubricSectionFromText' has a complexity of 23. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/package-service.ts",
+      "line": 967,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'aiLocateRubricSection' has a complexity of 18. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/package-service.ts",
+      "line": 1556,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'generateRubricWithRepair' has a complexity of 19. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/package-service.ts",
+      "line": 1890,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'normalizeBaseMetadataJson' has a complexity of 16. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/package-service.ts",
+      "line": 2021,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'validateGenerationResult' has a complexity of 22. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/package-service.ts",
+      "line": 2427,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'buildGeneratedPackageSnapshot' has a complexity of 29. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/package-service.ts",
+      "line": 2826,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'importPackageZip' has a complexity of 25. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/package-service.ts",
+      "line": 3142,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'applyManualMarkdownEdit' has a complexity of 20. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/package-service.ts",
+      "line": 3288,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'computeDiff' has a complexity of 17. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/package-service.ts",
+      "line": 3420,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'compareVersions' has a complexity of 21. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/server-shutdown.ts",
+      "line": 29,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async arrow function has a complexity of 16. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/skill-version-service.ts",
+      "line": 553,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'syncPackageVersionSkillsFromSnapshot' has a complexity of 18. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/upload-security.service.ts",
+      "line": 574,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'detectContainerFamily' has a complexity of 21. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-server/src/services/workflow-service.ts",
+      "line": 171,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'runWorkflow' has a complexity of 32. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/api/events.ts",
+      "line": 67,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'dispatch' has a complexity of 35. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/api/lite-api.ts",
+      "line": 115,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'computeLineDiff' has a complexity of 17. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/api/lite-api.ts",
+      "line": 675,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'mediaActionRequest' has a complexity of 17. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/api/lite-api.ts",
+      "line": 739,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'streamRequest' has a complexity of 16. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/api/manager.ts",
+      "line": 408,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'generateProfileFromFile' has a complexity of 17. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/agent-workspace/AgentConversation.tsx",
+      "line": 7,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'AgentConversation' has a complexity of 39. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/agent-workspace/AgentSkillPicker.tsx",
+      "line": 213,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'AttachedSkill' has a complexity of 21. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/agent-workspace/AgentWorkspacePanel.tsx",
+      "line": 106,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'AgentWorkspaceSession' has a complexity of 62. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/agent-workspace/AgentWorkspacePanel.tsx",
+      "line": 461,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'save' has a complexity of 24. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/agent/AgentCard.tsx",
+      "line": 10,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'AgentCard' has a complexity of 20. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/agent/BatchBuildProgress.tsx",
+      "line": 11,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'BatchBuildProgress' has a complexity of 27. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/agent/BuildAgentPanel.tsx",
+      "line": 16,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'BuildAgentPanel' has a complexity of 46. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/agent/ProfileGallery.tsx",
+      "line": 435,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'ProfileDetail' has a complexity of 48. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/agent/ProfileGallery.tsx",
+      "line": 1042,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'ProfileCard' has a complexity of 16. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/agent/ProfileGallery.tsx",
+      "line": 1192,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'ProfileGallery' has a complexity of 19. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/agent/build-components.tsx",
+      "line": 97,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'LogItem' has a complexity of 23. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/arena/ArenaThreadCreatorDialog.tsx",
+      "line": 217,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async arrow function has a complexity of 16. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/chat/PartRenderer.tsx",
+      "line": 8,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'PartRenderer' has a complexity of 16. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/chat/PromptInput.tsx",
+      "line": 151,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'handleKeyDown' has a complexity of 21. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/chat/QuestionDock.tsx",
+      "line": 25,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'QuestionDock' has a complexity of 37. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/chat/TextPartView.tsx",
+      "line": 52,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Method 'pre' has a complexity of 16. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/chat/ToolCallView.tsx",
+      "line": 73,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'ToolCallView' has a complexity of 44. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/chat/hooks/useChatMessages.ts",
+      "line": 45,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async arrow function has a complexity of 16. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/chat/hooks/useChatMessages.ts",
+      "line": 92,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'handleSend' has a complexity of 18. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/deep-study/ArenaPanel.tsx",
+      "line": 247,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'ArenaPanel' has a complexity of 45. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/deep-study/OptimizePanel.tsx",
+      "line": 74,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'OptimizePanel' has a complexity of 20. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/editor/FileViewer.tsx",
+      "line": 46,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'FileViewer' has a complexity of 44. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/lite/AnswerSkillOptimizationDialog.tsx",
+      "line": 113,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'AnswerSkillOptimizationDialog' has a complexity of 114. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/lite/AnswerSkillOptimizationDialog.tsx",
+      "line": 369,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'handleRefineDraft' has a complexity of 17. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/lite/AnswerSkillOptimizationDialog.tsx",
+      "line": 907,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Arrow function has a complexity of 21. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/lite/LiteArenaPanel.tsx",
+      "line": 306,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'LiteArenaPanel' has a complexity of 211. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/lite/LiteArenaPanel.tsx",
+      "line": 1205,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'handleGeneratePackages' has a complexity of 16. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/lite/LiteArenaPanel.tsx",
+      "line": 1514,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Arrow function has a complexity of 17. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/lite/LiteArenaPanel.tsx",
+      "line": 1815,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'saveManualEdit' has a complexity of 16. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/lite/LiteArenaPanel.tsx",
+      "line": 1889,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'startInteractive' has a complexity of 19. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/lite/LiteArenaPanel.tsx",
+      "line": 1988,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'sendInteractiveMessage' has a complexity of 23. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/lite/LiteArenaPanel.tsx",
+      "line": 2180,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'handleRollbackSkillVersion' has a complexity of 16. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/lite/LiteArenaPanel.tsx",
+      "line": 2512,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'renderArenaReportView' has a complexity of 16. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/lite/LiteArenaPanel.tsx",
+      "line": 2739,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Arrow function has a complexity of 16. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/lite/LiteArenaPanel.tsx",
+      "line": 2826,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Arrow function has a complexity of 16. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/lite/LiteArenaPanel.tsx",
+      "line": 4705,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Arrow function has a complexity of 19. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/lite/arena-report.ts",
+      "line": 66,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Arrow function has a complexity of 21. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/lite/lite-rendering.tsx",
+      "line": 532,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Arrow function has a complexity of 31. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/sidebar/FileExplorer.tsx",
+      "line": 114,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'fileIconFor' has a complexity of 42. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/sidebar/FileExplorer.tsx",
+      "line": 402,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'FileTreeNode' has a complexity of 26. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/sidebar/FileExplorer.tsx",
+      "line": 603,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'FileExplorer' has a complexity of 40. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/sidebar/SessionList.tsx",
+      "line": 142,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'renderMenu' has a complexity of 17. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/GuidedSkillCreationPanel.tsx",
+      "line": 69,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'GuidedSkillCreationPanel' has a complexity of 71. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/InnoSkillSidebar.tsx",
+      "line": 91,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'InnoSkillSidebar' has a complexity of 24. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/MultimodalSkillCreationPanel.tsx",
+      "line": 146,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'MultimodalSkillCreationPanel' has a complexity of 71. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/SkillAnswerOptimizationPanel.tsx",
+      "line": 54,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'SkillAnswerOptimizationPanel' has a complexity of 62. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/SkillAnswerOptimizationPanel.tsx",
+      "line": 152,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async arrow function has a complexity of 23. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/SkillArenaWorkspace.tsx",
+      "line": 40,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'SkillArenaWorkspace' has a complexity of 20. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/SkillConversationList.tsx",
+      "line": 57,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Arrow function has a complexity of 17. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/SkillDetailWorkspace.tsx",
+      "line": 87,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'SkillDetailWorkspace' has a complexity of 48. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/SkillOptimizeWorkspace.tsx",
+      "line": 56,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'SkillOptimizeWorkspace' has a complexity of 26. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/SkillOptimizeWorkspace.tsx",
+      "line": 158,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async function 'initialize' has a complexity of 16. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/SkillOptimizeWorkspace.tsx",
+      "line": 242,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async arrow function has a complexity of 19. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/SkillRunWorkspace.tsx",
+      "line": 70,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'SkillRunWorkspace' has a complexity of 46. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/SkillVersionWorkspace.tsx",
+      "line": 68,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'SkillVersionWorkspace' has a complexity of 19. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/SkillVersionWorkspace.tsx",
+      "line": 124,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async arrow function has a complexity of 18. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/SkillWorkspaceSidebar.tsx",
+      "line": 133,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'SkillWorkspaceSidebar' has a complexity of 35. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/WorkspaceInspector.tsx",
+      "line": 24,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'WorkspaceInspector' has a complexity of 20. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/multimodal-guided-creation-state.ts",
+      "line": 191,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'applyMultimodalEvent' has a complexity of 37. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/multimodal/MultimodalDataDrawers.tsx",
+      "line": 264,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'MultimodalInspectorContent' has a complexity of 36. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/multimodal/MultimodalProgressStep.tsx",
+      "line": 104,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'MultimodalProgressStep' has a complexity of 34. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/multimodal/MultimodalProgressStep.tsx",
+      "line": 241,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Arrow function has a complexity of 21. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/multimodal/multimodal-wizard-model.ts",
+      "line": 262,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'deriveMultimodalWizardStep' has a complexity of 20. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/skill-conversation-list.ts",
+      "line": 43,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'isSkillConversationThread' has a complexity of 18. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/skill-run-recovery.ts",
+      "line": 13,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'reconcileSkillRun' has a complexity of 21. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/skill-run-state.ts",
+      "line": 75,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'skillRunReducer' has a complexity of 25. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/use-skill-run.ts",
+      "line": 84,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'applySnapshot' has a complexity of 24. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/use-skill-run.ts",
+      "line": 193,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async arrow function has a complexity of 26. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/use-skill-run.ts",
+      "line": 234,
+      "rule": "max-depth",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Blocks are nested too deeply (5). Maximum allowed is 4."
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/use-skill-run.ts",
+      "line": 237,
+      "rule": "max-depth",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Blocks are nested too deeply (5). Maximum allowed is 4."
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/use-skill-run.ts",
+      "line": 239,
+      "rule": "max-depth",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Blocks are nested too deeply (6). Maximum allowed is 4."
+    },
+    {
+      "file": "educlaw-web/src/components/skill-workspace/use-skill-run.ts",
+      "line": 382,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Async arrow function has a complexity of 30. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/skill/SkillLibraryPanel.tsx",
+      "line": 80,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'SkillMdRenderer' has a complexity of 20. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/skill/SkillLibraryPanel.tsx",
+      "line": 175,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'SkillDetailView' has a complexity of 37. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/skill/SkillLibraryPanel.tsx",
+      "line": 630,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'SkillLibraryPanel' has a complexity of 17. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/tool/ToolLibraryPanel.tsx",
+      "line": 21,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'ToolDetailView' has a complexity of 19. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/components/tool/ToolLibraryPanel.tsx",
+      "line": 321,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'ToolLibraryPanel' has a complexity of 19. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/lib/message-converter.ts",
+      "line": 4,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'convertRuntimeMessage' has a complexity of 16. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/lib/message-converter.ts",
+      "line": 35,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'convertRuntimePart' has a complexity of 30. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/pages/LoginPage.tsx",
+      "line": 12,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'LoginPage' has a complexity of 17. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/pages/SkillFirstWorkspace.tsx",
+      "line": 154,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'SkillFirstWorkspaceContent' has a complexity of 82. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/pages/SkillFirstWorkspace.tsx",
+      "line": 686,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Arrow function has a complexity of 20. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/pages/WorkflowDemo.tsx",
+      "line": 103,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'NodeConfigPanel' has a complexity of 25. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/pages/WorkflowDemo.tsx",
+      "line": 143,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Function 'WorkflowDemo' has a complexity of 27. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/pages/WorkflowDemo.tsx",
+      "line": 187,
+      "rule": "react-hooks/exhaustive-deps",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "React Hook useMemo has a missing dependency: 'traceByNode'. Either include it or remove the dependency array."
+    },
+    {
+      "file": "educlaw-web/src/pages/WorkflowDemo.tsx",
+      "line": 213,
+      "rule": "@typescript-eslint/no-unused-expressions",
+      "severity": 2,
+      "type": "suggestion",
+      "message": "Expected an assignment or function call and instead saw an expression."
+    },
+    {
+      "file": "educlaw-web/src/pages/WorkflowLibrary.tsx",
+      "line": 35,
+      "rule": "react-hooks/exhaustive-deps",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "React Hook useEffect has a missing dependency: 'load'. Either include it or remove the dependency array."
+    },
+    {
+      "file": "educlaw-web/src/stores/chat.ts",
+      "line": 377,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Method 'handleMessageUpdate' has a complexity of 16. Maximum allowed is 15."
+    },
+    {
+      "file": "educlaw-web/src/stores/chat.ts",
+      "line": 574,
+      "rule": "complexity",
+      "severity": 1,
+      "type": "suggestion",
+      "message": "Arrow function has a complexity of 18. Maximum allowed is 15."
+    }
+  ],
+  "sourceHashes": {
+    "educlaw-server/src/config.ts": "5a86b95f0a937153a4dd6a80f99c803ac5a96366db26ec6ebb7caf8147331c37",
+    "educlaw-server/src/config/internal-worker-config.ts": "edb09c4f315b5838bf03c8606e07fc14452917083d0b84b29ade6587009694c8",
+    "educlaw-server/src/config/object-storage-config.ts": "c67a30a689208b160881adaaca8810c919ba03cad7e14cc632656a8df7e9ba21",
+    "educlaw-server/src/global.d.ts": "fbfdbbe5fafdf3b7299dbb1571bad392e069d5f07938a75ff5f999fb3cf0b6d6",
+    "educlaw-server/src/harness/contracts.ts": "0ede9af18078a5a445c3541f38a1c45d72f1c1c8422b31c6654bd986171c28a5",
+    "educlaw-server/src/harness/pi-core-adapter.smoke.ts": "50f0e79e4a2456a0bec84489fba40cbd3478f4e2487301e0aad6378768414f34",
+    "educlaw-server/src/harness/pi-core-adapter.ts": "b5e7b2dbaa4df2e52ba8d267ceaaf3becba282ea957395ed3cb02be81eecfba0",
+    "educlaw-server/src/harness/pi-provider-runtime.ts": "1be78f19304b04a48012b5a85db2b5481838986150f5283b678c77855a7a72b1",
+    "educlaw-server/src/harness/pi-run-coordinator.ts": "e16dbc491130f40936deac61c72da0b228ee18fd1d8207d6e133aa84ec9f5fa5",
+    "educlaw-server/src/index.ts": "1c17dbd4ac7c8ea04a3d14fd29ea6fa528382cc704ea6e750b74b182049ad302",
+    "educlaw-server/src/lib/llm-model-capabilities.ts": "b4e6a7410e158d172a528729d749c62196c1599ff58bb334b59834bd7f6aaf2e",
+    "educlaw-server/src/lib/logger.ts": "931a039f9d762d6f395851f61d0085b165cf81ba75d39f95a76ad50ebef26b5f",
+    "educlaw-server/src/lib/request-context.ts": "7f7edd3edded65d3f76a73653a2330077fbb96e433c5786a9110a49ba3e7402a",
+    "educlaw-server/src/middleware/auth.ts": "dac9df61bfc5b7e50a74a457e2424fd595b137a52b4b44b43616a3043e4f380b",
+    "educlaw-server/src/middleware/internal-worker-auth.ts": "010088c1fa724f86c09bef720fb1ed38b0f1808e0921f279d94c79c5fbf4e64c",
+    "educlaw-server/src/middleware/request-context.ts": "fa1fd81cdc48973c8e5c4aae619c3fc68050eb3896a63faf255ab4dd29352620",
+    "educlaw-server/src/prompts/answer-skill-optimization.ts": "7d857954eb9fee6eab0eb535ac433ecd461b89773d035bdc576bfa630ccae044",
+    "educlaw-server/src/prompts/answer-skill-test-evaluation.ts": "92f2da587b5d5417627426939b11428d0cfee32858f4899d79da3fb3d17be7fd",
+    "educlaw-server/src/prompts/package-generation.ts": "111e1ea2ddd1863a0899a70d754e03655e9e1a99b0f9aa95d7532c760d38a48e",
+    "educlaw-server/src/routes/actions.ts": "6f5e55e5930740f6d47ef5c98ac739b134f9ede4a8dcc18b583f438c18975dfe",
+    "educlaw-server/src/routes/agent-workspaces.ts": "6ab9cae0da9eb4f2dee7a94f6c6ddef9216a18081f9b1ea8e4142b146f5b4449",
+    "educlaw-server/src/routes/answer-skill-optimizations.ts": "16c10d2455d19bee9edadf8487abe071f0ce4b5b143fa5eac6af57c369a3ba49",
+    "educlaw-server/src/routes/arena.ts": "4ae930d9e3db0e3ce04ad7a343056f413a4f209a17c3a447099eb7e709e4d450",
+    "educlaw-server/src/routes/compat.ts": "71e715c7e820d9bc6de5cd92623451fb143fef712747d39d9851fab37ab61dd8",
+    "educlaw-server/src/routes/guided-creation-actions.ts": "98d46f249881af5f7c212bea66b7ad97640bff76840fcae84f1d37ea90a95b63",
+    "educlaw-server/src/routes/health.ts": "c21faba129bbb44ae0ed638637067875189211578c61e91cdd6256fbd49541c5",
+    "educlaw-server/src/routes/index.ts": "24f6ab373621a3d3f1c7b070d6d36e9fae142a7096d1bf5081800e1a2d9bf9d8",
+    "educlaw-server/src/routes/media-job-actions.ts": "1e8738b86a33fb1071373be35cf977ee1e8b0e747a65ce4c68a92cce34d69a79",
+    "educlaw-server/src/routes/packages.ts": "1069afc137bf2e9038d8ceb76f783cf60c0a085585947cc19efabcb604c66257",
+    "educlaw-server/src/routes/skills.ts": "fce4d4aefae06a4b94fe316df76ffe33877f562184a509c0fef1396259550a50",
+    "educlaw-server/src/routes/workflow.ts": "1f99d6b496870b1f1a2e99533b613404b38ba0e0420cd961b9947549f839bb2b",
+    "educlaw-server/src/scripts/init-db.ts": "3c01c482f1ac588c81bed3ab79e99882e363f288379cd7a447197c583c4e88de",
+    "educlaw-server/src/services/agent-workspace-service.ts": "8be1d7c480d42234f02f21b3793e8a3ef513e3882e422fe8491058deae9e6b1a",
+    "educlaw-server/src/services/answer-optimization-suggestion-service.ts": "92cab20060eba0146b9ead2468d92679ecd24e62a42e240060518f5f025e95cd",
+    "educlaw-server/src/services/answer-optimization-suggestions.ts": "1c6bf7d0456ce2dd06cc8200e714ca9dd5cdc01997aa9519773afb2942ec9acd",
+    "educlaw-server/src/services/answer-skill-optimization-contract.ts": "9886443cab7f406f2835781d493022ca626d269d188e64d15c299cd9ba61fefd",
+    "educlaw-server/src/services/answer-skill-optimization-policy.ts": "ebcdebfd2a817aea2a9dcb07b21d718f4c41ac9fa5765fe3c15d12b78c56e0cd",
+    "educlaw-server/src/services/answer-skill-optimization-service.ts": "7d4c8c2195efbe3e32482a2f4f9b7136970ffbf642d7d2b171c67f85b73ad69c",
+    "educlaw-server/src/services/answer-skill-patch-service.ts": "f0209c308a2aca1e3852523717e1f104b791f5206884e6e19b7133937dc05a71",
+    "educlaw-server/src/services/arena-run-service.ts": "7527f9b30554812fd0440849a176f3a27e453150b8d7e5aa3ec228c49342292a",
+    "educlaw-server/src/services/arena-service.ts": "256f7bfcacf9fe1c6f9c24234cc271b52ee2da09bff9a23dc4b10035c2cf1780",
+    "educlaw-server/src/services/arena-thread-lifecycle.ts": "703175a367d5c6fe5ac06fb5ef8457968bcf00a83858ec4a843c4c6306d0a13b",
+    "educlaw-server/src/services/db-schema.ts": "ac8178500758da9bbcb77d3f23f8bd6eb41732798e0e0559723a0d563a1f8b03",
+    "educlaw-server/src/services/db.ts": "af5f208587ab2fd8df13587f267eaee2034201d219bddd3aa495384e1241950c",
+    "educlaw-server/src/services/generation-failure.ts": "8bff462463b0d0bccbd6f7151f95a16ff09affbab4fc1f236c69ef1477e862fb",
+    "educlaw-server/src/services/guided-creation-policy.ts": "a33e0c917b5f4555412ad797ca0f91089a4cdefe300799f2d9fa9386a7ca7268",
+    "educlaw-server/src/services/guided-creation-service.ts": "d81fc372b4daf96900e1a6cbe0de0adec99263133f8ebab45517d682e54c1007",
+    "educlaw-server/src/services/guided-education-policy.ts": "0dbaefc1b7440d4f15a06115555653877be9134dc587ddc522cf102abae11c3d",
+    "educlaw-server/src/services/guided-experience-library.ts": "e9d9f089cbb848b9048e8fb17495d2e88fb63ace2dd019ea517f2f2a9802519d",
+    "educlaw-server/src/services/health-service.ts": "cf369b985457403db373cb12f47d513906700ebaa29dbcaf9e671bca9b1a905a",
+    "educlaw-server/src/services/http-drain.ts": "885807af707dd65b85787c40ac7101acdb9cf81c264d8d873cfa04742c7772a2",
+    "educlaw-server/src/services/interactive-optimization-service.ts": "a05a34831ed43b0eb7d4f168433124f30d9ae0c8360c6c9e4092b999a2554b4b",
+    "educlaw-server/src/services/llm-service.ts": "f57f2a96ab2ffdd53286cd0cfc4ed202b09cedac4e3518b779affc0c78f8b526",
+    "educlaw-server/src/services/media-distillation-contract.ts": "224378c12e5658c4c62a4bf8c577a7cb53a5efbe4b6565f8d64c71cb32370e80",
+    "educlaw-server/src/services/media-evidence-runtime.ts": "75c3a82980cab65c2d892881fc47f37ffc4e222823c8336042cb9bcb7f7da6f0",
+    "educlaw-server/src/services/media-evidence.service.ts": "ccc39026edc672dfab09ebe63eed02bc9eb819477ef1dd7f997c6948dc51ed90",
+    "educlaw-server/src/services/media-job-state-machine.ts": "7268ca08dadbcfc38de2f7c7769b7a8233d68da8d5bbecc954f07c6c2069ae97",
+    "educlaw-server/src/services/media-quality-check-contract.ts": "7ea98edddd811506dc00852d0b4c2272bf622bff6c0b5772aa3871a47a9a5e1f",
+    "educlaw-server/src/services/media-session-state-machine.ts": "7949f7882dfb88fbc5edf929439bfc2bf6959c0ea4231fd89ea96b24706d441b",
+    "educlaw-server/src/services/media-url-import.service.ts": "6710835c50a38a1dcc944ab0d23474a59a24ffc130b8974677814918eed9d7a1",
+    "educlaw-server/src/services/multimodal-distillation-pipeline-orchestrator.ts": "c4485d593c242a1a4199d0349362b58c363c96bc32f4c72c14b927c3374d5f53",
+    "educlaw-server/src/services/multimodal-distillation-pipeline-store.ts": "ddbee4e955ca11eae101226681d79424dd0cb1b4d33daaf7cd4a75a36df78926",
+    "educlaw-server/src/services/multimodal-guided-creation-service.ts": "cdfa2dbd7d634b278d5ff090dc3b0d8a4ad38acc209b9f0d7f9c9156eb6cbe8b",
+    "educlaw-server/src/services/multimodal-job-service.ts": "5b0b79056e7beae393b37103c99e69230293821b55a002a3a2997c0f9b2a5b6b",
+    "educlaw-server/src/services/multimodal-job-store.ts": "c29eaa5e0ed6114ff8fb8721a3f0886b5ec3639809671ceab8a603a3de845bc1",
+    "educlaw-server/src/services/multimodal-model-adapters.ts": "f2cc3bfc0bb63c4d6b904018050059536c3f371bac6d4df9ea41deff8b0cd95b",
+    "educlaw-server/src/services/multimodal-pipeline-orchestrator.ts": "6a0675b29abe4c844a6c6416b47cfe4fbd9b143455da41fc4e6577a8414b2fe0",
+    "educlaw-server/src/services/multimodal-pipeline-runner.ts": "975cb3d83a4c96f69b167a477209fd47558db1404844cab30f205eaaf7e3cb19",
+    "educlaw-server/src/services/multimodal-pipeline-runtime.ts": "02559beca4a75d7289560320aba8ec0ec0c5e54bcd1f62cbdd14a50c1bb2861b",
+    "educlaw-server/src/services/multimodal-pipeline-store.ts": "d68adf8ec235e571dc14cc0cc5711d79022a38d2c8daa39a3badb78bce16f89f",
+    "educlaw-server/src/services/multimodal-progress-stream-service.ts": "73a7084f1b918a09fbab3c9f375a574e748906c035eb8f0bf0c0dcae2d81b08b",
+    "educlaw-server/src/services/multimodal-release-service.ts": "119844451bcae7defc56d5afb568f5eee561a97b5a5c864d34086d1109939e0f",
+    "educlaw-server/src/services/multimodal-session-service.ts": "04cace78baeb6d518929c0bd43e241d001d8e667989f4450c6ab86ad61e7f9c9",
+    "educlaw-server/src/services/object-storage/object-storage.service.ts": "406b0ee0ce5e28a234316e52216b4221106e90014c23e6c1fd104f1150b1af33",
+    "educlaw-server/src/services/optimization-service.ts": "6bdac20ff77735eb1f27d13fd941fc907a3cb9e2f1a3040b5ac150aa833ca034",
+    "educlaw-server/src/services/package-import-security.ts": "8a128add023c894e3662e1b12d23a7d59af26ddbc463292edc4a4f783df67294",
+    "educlaw-server/src/services/package-service.ts": "dcdae688b9202e2c5c2c45f16a15871007ba03f3e9c49ebb065236776c17720e",
+    "educlaw-server/src/services/ria-skill-markdown.ts": "eca581a9b9c7b45f9106961df2272250677857f4d1316b7f7a6c809621a15729",
+    "educlaw-server/src/services/server-shutdown.ts": "e377d772d81bc84119a0e0cef9078365e4df6f76b53a6ab37a457f69b48ac759",
+    "educlaw-server/src/services/skill-markdown-validation.ts": "47aade632409f583319f328574e839cf950752f1a0b2fe00fcf0cf13b71ba042",
+    "educlaw-server/src/services/skill-version-service.ts": "50f44833992d393fc6ecc8febe5669d56472c257508677170c32e3c0c2bcd7e1",
+    "educlaw-server/src/services/structured-guided-input.ts": "1d47ad2f22650a800f183bfd8b14bcc88b4c80e77b688d73d01c6d8ac1a2a8e3",
+    "educlaw-server/src/services/upload-security.service.ts": "89a81430fbea30cdb181c0aa4ce3bfbc4539ddf2242d3ebef65267df774f9956",
+    "educlaw-server/src/services/workflow-service.ts": "a6fe3147b545734f2b133728289eba01307ffe87b7bf780e39e9a63db4d95d6f",
+    "educlaw-server/src/types.ts": "0c0b9d0fc3f717a3aa692539dd0ad7f420525e5d580d7976d56ddb4ccb566482",
+    "educlaw-server/src/utils/agent-conversation-policy.ts": "1105b9979513326a690ef8fbbc07b24abe94b2b6c0638119c5ea7066aae2c769",
+    "educlaw-server/src/utils/arena-run-sse.ts": "1a04b1c8397b212545b5930a8187515ca0eacddbe65b963c3daf63b928db6fff",
+    "educlaw-server/src/utils/http.ts": "b02977f0d6e15c66f0a6bc56df777bebab703111e1a90b2585345d49b581dfab",
+    "educlaw-server/src/utils/json.ts": "5a7676c607996a97d7c4c20764afcc330f2fb5430f0797caee3580fa107f2c19",
+    "educlaw-server/src/utils/sse.ts": "33169cfed42b8f5b774dc6470bff3bef63fed2f25ec99da318be365fdd2ea165",
+    "educlaw-web/src/App.tsx": "ce3384508afe6c85b6670b07278775cd1ccb3f7fb897cffdee9db6744e8485c5",
+    "educlaw-web/src/api/admin.ts": "00094cf8a0e6b1e355876d8ef9e5efab4afdcc1b5f9b7867644295416dca86f5",
+    "educlaw-web/src/api/agents.ts": "573123355de80b920e06e77f04c86c4149fe4d3f1ca3c79e569cefbf58c6d2f8",
+    "educlaw-web/src/api/answer-skill-optimizations.ts": "a0628175846017727ae887cf22bab7084da645af77aa0c2538b0941c91c09298",
+    "educlaw-web/src/api/auth-gateway.ts": "171f58a3959531240ce0c4eba392e08bd72430a169f108da18e203dbeb0f72c1",
+    "educlaw-web/src/api/auth.ts": "dd4ec5d61518422f8986e3d84e31558a32ff47c778b7ea1fcc77fe7176d2d01d",
+    "educlaw-web/src/api/chat.ts": "3f894c9bd6c6e3afce41f9d1683ea14d78fc04ee193525744918d50ebc0eb69f",
+    "educlaw-web/src/api/client.ts": "b17a1c8264f5a3abd67cb5fa974f89d9e3ca86d7ef0e836ae948d489cb69b48e",
+    "educlaw-web/src/api/diary.ts": "c470d46119f3415f89da2454fbe629d810d229c0f7d6c9ccc4791d97390c53ad",
+    "educlaw-web/src/api/events.ts": "4bc115d13093fee7f3078f750ce39804c1b9c1f73d3db398db5d90abc1c1405d",
+    "educlaw-web/src/api/lite-api.ts": "80c90e54ec82d773e6764455a343f09772a8a4bfa034964f656d3887a291e9d5",
+    "educlaw-web/src/api/manager.ts": "0ce8af38a1e7cbbcf6c7c5799706ba9dcc74b8b7d769b63547ef0b8199f3303e",
+    "educlaw-web/src/api/media-upload.ts": "334de2454f9c7ef39ceefbe24e74b646619b8fefb99592ff23bba5f5c34df8e1",
+    "educlaw-web/src/api/runtime.ts": "ce8bfe1f5cdb3923619f4183d9754e541e844e3284d397520cd7a2d887856940",
+    "educlaw-web/src/api/sidebar-groups.ts": "e01c5f8f35e813f2d9aa3a6fc5bf5fa91ccfc0d4012fba4d2426f8041f2d22d2",
+    "educlaw-web/src/api/token-storage.ts": "b1b8093d0318ed81f69aeedfefa03bf4158be69c47d4622cf305620af0ea3067",
+    "educlaw-web/src/components/agent-workspace/AgentConversation.tsx": "7f3a78e04f970017162a6bda5f8dbccf5057cc1453dcb36320a1a7806f893d7d",
+    "educlaw-web/src/components/agent-workspace/AgentSkillPicker.tsx": "660d1a554760623795bc28b3782eda2655d76f32b68cc1ac098ee4807d75a2f3",
+    "educlaw-web/src/components/agent-workspace/AgentWorkspacePanel.tsx": "9b3b4cba0f0515efeb1e5b1a888554af16579d3404eaf440797c636c8463a4d7",
+    "educlaw-web/src/components/agent/AgentCard.tsx": "6e22b18e0c938e91a5db97a71e992bdb39912ba88284125681d91ec7101146c2",
+    "educlaw-web/src/components/agent/AgentSettingsDialog.tsx": "9305d03f9e10d6d0718c1167eb58e4a0175a0ebfe592a4d409717c349cf68b7f",
+    "educlaw-web/src/components/agent/BatchBuildProgress.tsx": "6ba86ee407256436610c09d20d85890812767d5290915e1867e8578e56f5f133",
+    "educlaw-web/src/components/agent/BatchBuildView.tsx": "7aeb97d0607fd9f019f3e9b0939cf2847f215419b0a48651ed6e7a7f3e5a0b79",
+    "educlaw-web/src/components/agent/BatchFileSidebar.tsx": "88c8c8b0e2cc58b514ff2ade78634d51b2759301d5e0b22317834b6137b248bd",
+    "educlaw-web/src/components/agent/BuildAgentPanel.tsx": "1e5039bbf4b17e2b5316497723ae80bfe26d0a6a8b845d41e4f032da5fc8308a",
+    "educlaw-web/src/components/agent/ProfileGallery.tsx": "0f10af59f238861442077a80595ec8ce4fa5d6f811c7a47ab5adc5eec1f238c0",
+    "educlaw-web/src/components/agent/build-components.tsx": "a1c2d17469b7744bfda5c5f8d563f204706eeedffa6bba4e0c3e1dac024bba86",
+    "educlaw-web/src/components/arena/ArenaThreadCreatorDialog.tsx": "459add3fd4879fbad274d4b996e687ff53b1d5457d1a53a99737db354b94f3d9",
+    "educlaw-web/src/components/arena/useArenaThreadList.ts": "54aa1eebba8e784ed60dc80045dce383566e1e6449b0d536c54a00339803933b",
+    "educlaw-web/src/components/chat/AgentControls.tsx": "497748128d45a414214240406728a4c3ed67f653ea5953e811be66cee5c287ef",
+    "educlaw-web/src/components/chat/ChatPanel.tsx": "6278ad9afd76e7e629ff374495899646761affe417ea5f2697c62d11e17d1d99",
+    "educlaw-web/src/components/chat/MessageItem.tsx": "6228dbbad01a30e2ecc8c0d6b94e8b2a3213960113b3dc708fa1bdd1bdcb17ac",
+    "educlaw-web/src/components/chat/MessageList.tsx": "9365c24f879c3cdc90f8fed7b5563fbbfcdeabcaabe939c4412aa9e0ad5f93cf",
+    "educlaw-web/src/components/chat/PartRenderer.tsx": "6d1c29dec1326ebaf540afd1d014face5b1b57c621b13138870a7defd7c1a1c6",
+    "educlaw-web/src/components/chat/PromptInput.tsx": "8dbeebd5b62045c94beeffbeb95ab3e235a6d11c55155fcce71d5297e234e1ce",
+    "educlaw-web/src/components/chat/QuestionDock.tsx": "08ab7dd0fdb3e2402b5e2184b49b9b463b88d2c82f743cb7ea63671e0546b729",
+    "educlaw-web/src/components/chat/ReasoningPartView.tsx": "192b7c5bad676209fa253d4d4bff8fd19eb968f7144d4f14a1342af373ef8b35",
+    "educlaw-web/src/components/chat/ShareDialog.tsx": "4331de4c80bb6154f0336a3276de89096fdc0ede0b40e3ad51be09f3ae1db1c5",
+    "educlaw-web/src/components/chat/SlashPopover.tsx": "33475dca8d06dd7cb407ab8f51a430e8999e04bf77498c0807f2166a5739df1d",
+    "educlaw-web/src/components/chat/StepIndicator.tsx": "8d4c672fb13a3243f1dad7811dcbb7b07223b71219c5cf6c05c4a316a7863e3a",
+    "educlaw-web/src/components/chat/TextPartView.tsx": "703637a96eb81fc475bf49265d85cd01dabf9423398aa5af53d15dee45405f4a",
+    "educlaw-web/src/components/chat/TodoDock.tsx": "699a017783078a5fabd8735c07442cdf51d3807ece795250ed4fdb285d7ec79b",
+    "educlaw-web/src/components/chat/ToolCallView.tsx": "4b2df8735fd1bae3ddc90f6446dea3777ca7c680876ac132f7972813d9dd4238",
+    "educlaw-web/src/components/chat/hooks/useChatMessages.ts": "975da251b3a7b1df0e9da744c62a67d1c21acce9e48f2628c5d048fe9b164c55",
+    "educlaw-web/src/components/chat/hooks/useChatSessions.ts": "b6c0a4f7b94e7049aaf32e1ed5864f1262b44bcb2ede52114767ca4cf2c437e9",
+    "educlaw-web/src/components/chat/hooks/useSlashCommands.ts": "5dbcda269057b20dca324179ca6a94e1f80952d72e849d931ed76a3969a7c405",
+    "educlaw-web/src/components/chat/prompt/ActionBar.tsx": "56374b6c0bdc4fcb9cf393eca8bc06c139574c5e6de21a193a9aa917670dedf0",
+    "educlaw-web/src/components/chat/prompt/AgentSelector.tsx": "6b069e3a9c822f7c82583adad02711855731452c4c33ac5a7164dc8286b3f393",
+    "educlaw-web/src/components/chat/prompt/ImageAttachments.tsx": "b313d4434e8b26b2659946349a54ae43ab966a6a42d316414b9bbe4d046b5d6c",
+    "educlaw-web/src/components/chat/prompt/PromptHistory.ts": "314691dbe07f6352344df2ff2e7af23af92196d63e1add8706595c46a90ea90e",
+    "educlaw-web/src/components/deep-study/ArenaPanel.tsx": "0558fccbdd4495f5ddd941bc983685f34ba21db3668898f8d6dafb1feb8cbe9a",
+    "educlaw-web/src/components/deep-study/DeepStudyPanel.tsx": "b9c684df84ef1e5897d9fe1e3e7f74364b74fde4be1c7d912c8fac97c8d5da00",
+    "educlaw-web/src/components/deep-study/OptimizePanel.tsx": "977e573ea81bb16c7b9de6389d0c3f9c429a83b7ea6039537dada58bf530cbd8",
+    "educlaw-web/src/components/diary/DiaryCalendar.tsx": "038e3fd70eb6c079efa6b1163b23e93cafd0d6d886fe629eeefe63c74d76995a",
+    "educlaw-web/src/components/diary/DiaryPanel.tsx": "c842b6918661a2c8352f68f8276a8303378d74bc05a274e8484974f0878a4fa9",
+    "educlaw-web/src/components/editor/CodeBlock.tsx": "5df5a1429c6b1e590865b88dbe7bbebbe1ca8b877149b3cac08ea0003b7ce245",
+    "educlaw-web/src/components/editor/DiffView.tsx": "3bc4e721fef82b2f6cdedf12664d0b0571ea7033ac85ebddf5478e254d73c2ad",
+    "educlaw-web/src/components/editor/FileViewer.tsx": "d3bd1636cc03745ac3f429b92d30d8cbeb45672a75f1355f6e32936548442b0b",
+    "educlaw-web/src/components/home/ChatHistory.tsx": "03b335f7ee516403762329462e9b2226e29faf83627b024c4acd29a82f5899c8",
+    "educlaw-web/src/components/home/DeepStudyMatchDialog.tsx": "dc5201511d64571a562b7b7251ac467debe12695b7b19f060b507320ba2d4060",
+    "educlaw-web/src/components/home/HomeChat.tsx": "7e8586f7557c5d201baa257ce40a4541b538f4290e08d7a06848429bccba01f7",
+    "educlaw-web/src/components/home/HomeChatActions.tsx": "6f926ed629dd2bc8401af452e9f1ed9578fb714236f10c00c8d86f0e3c983358",
+    "educlaw-web/src/components/home/HomeChatConversation.tsx": "3aa960aa4ae64c073c24e44d43ea0d827fa905e7a3dbd1d280db4a951d66ae67",
+    "educlaw-web/src/components/home/HomeChatHeader.tsx": "dfc7aca17376e46f3a8522255e4a0daeda280b66b1e3b2a03b63f32fdd4720d2",
+    "educlaw-web/src/components/home/HomeChatInput.tsx": "c5d64f0f8f4d6ea40470cdb83a7f87f466d41c419b654982c1daa7e9f869048b",
+    "educlaw-web/src/components/home/HomeChatMessages.tsx": "5021ac6486f955eb53185650732c14f548a7ce1cc06ffb4d8df36e66dd24df88",
+    "educlaw-web/src/components/layout/AppLayout.tsx": "1be72537f7ca7af424d84a55567f8ac03bebe764a0f1bd099a90ebaa12e1ae28",
+    "educlaw-web/src/components/layout/Header.tsx": "2ca31bcea9db575179b128e408cd92fd7cc5235469489a6b37dec676fc8a9c79",
+    "educlaw-web/src/components/lite/AnswerSkillOptimizationDialog.tsx": "59da0c2d14416b851c601dca7529fb8af527615d43ce45704b6cbe087f03bc3f",
+    "educlaw-web/src/components/lite/LiteArenaPanel.tsx": "70359ddb3c9d9517428ea6927d13b2081224f30e688dc7575f5ab2ac1311271c",
+    "educlaw-web/src/components/lite/answer-skill-optimization-state.ts": "63372ce605429205087c255e964dc3a113e8c5d0c986cb5660238a7bd75e7ce8",
+    "educlaw-web/src/components/lite/arena-report.ts": "3a4e55d5d547a912c2619bcec2a542cd4e8c38ee39f1b6358589e99796b4068d",
+    "educlaw-web/src/components/lite/detail-tab.ts": "bef32a8743a8583071d31fb033a7d7fa661f05fc781e82ef7b819df6493b0529",
+    "educlaw-web/src/components/lite/lite-rendering.tsx": "8bf7589d603c79f549f644f471316aed0b1a6d2cb2587e4f1b0ff0590e95c783",
+    "educlaw-web/src/components/lite/progress-state.ts": "12be87f1e7c64693107c7d4f8e11d1f4e9832bad6931f4f20b28650dbfbceec7",
+    "educlaw-web/src/components/lite/report-compat.ts": "9f363d199eba380b5e02db64366d4681a86498796c3683e5dd817cad7240a335",
+    "educlaw-web/src/components/lite/report-preview-state.ts": "339eb94a4c842db5ee2648271b4223856dcef2517a42b81441474f56931e6270",
+    "educlaw-web/src/components/lite/report-status.ts": "62c1d03ab059e73f9f72f3662f0cc6896b81ad61c5b88ad28bd7b3c6b37b9f11",
+    "educlaw-web/src/components/lite/rubric-display.ts": "602d8dcff7db1732e07cf259bb9b54d7ecbcf8e79da859d7a62220df602e7a99",
+    "educlaw-web/src/components/lite/rubric-edit-state.ts": "32f776a0d0bb38dff7b38198508bd69b2c525d86332b9e66e0f93295709b34b7",
+    "educlaw-web/src/components/lite/rubric-presentation.ts": "1b340acfeb848d277d6a38830b412c4e0a203a4cc772b1e4833f01e2f86d2965",
+    "educlaw-web/src/components/lite/rubric-status.ts": "abfa07930dea8c24cede96b7b8981a888db6328dd023dea4f2c4b49bcc5b4eb6",
+    "educlaw-web/src/components/lite/rubric-structured-view.tsx": "b5ea7a0932edb595a022a0a8aca5e9c17eba23b4419939880043aca2ccead2b8",
+    "educlaw-web/src/components/lite/workspace-switch-state.ts": "edefc4321a7ffa21d6a03e786b0d4415001f670a63c96356cf9951ed9bb2b8d4",
+    "educlaw-web/src/components/notification/NotificationBell.tsx": "b669a30f2da398ade7d48a32da7baa92618e9c20a0aacd1493b2225b9c089909",
+    "educlaw-web/src/components/permission/PermissionDialog.tsx": "3326bb71c0cbd222d004e0016bae977cc5924c3db552f638d30b4799d59cb454",
+    "educlaw-web/src/components/search/GlobalSearch.tsx": "0270dd6404957c0555b91add39b776c858c96a4028bb2a46fd1a0e42498b2212",
+    "educlaw-web/src/components/settings/SettingsDialog.tsx": "9d6a46f89ada74d3632d5792b63c996ce323b351fcd87704b877ba0ca52ea8cc",
+    "educlaw-web/src/components/sidebar/AgentDetailSections.tsx": "e6d8c630fd6409c6c0029cb3bc48f7d086783ea3f0aa738f451d602612945a4e",
+    "educlaw-web/src/components/sidebar/AgentList.tsx": "e572ca5c1f488838f21b7c708fa047bbe4a953c78f054227d9ab54e1e6bc658b",
+    "educlaw-web/src/components/sidebar/FileExplorer.tsx": "81ed85179fee7cbe92cba42a213624a0e5b733c7d6352d09d13a3adb6d8cac71",
+    "educlaw-web/src/components/sidebar/GroupDialog.tsx": "628f7bb979ac39877f8db4cace79f01384059162885fe74fe66f112fb7894e6b",
+    "educlaw-web/src/components/sidebar/IconPicker.tsx": "244eb2c66172422cc7542c66e5f0b1acefb0fc4c27f24c2db4c6765307ab8376",
+    "educlaw-web/src/components/sidebar/SessionList.tsx": "e5761cc63e7171674cd4d57f8c33e6f9402df4104fecb9ad43798c9e751dafff",
+    "educlaw-web/src/components/skill-workspace/ConversationTurnNavigation.tsx": "a8838be4d9dd06ac6ffcd00582c45046ba6c193f54072ef74dd49e95680d6ba7",
+    "educlaw-web/src/components/skill-workspace/DiscardInspectorChangesDialog.tsx": "8e777643b69b07a0bc19b81720b930160393e4f4a0292e163c50a6fda51ee00b",
+    "educlaw-web/src/components/skill-workspace/DocumentInspectorContent.tsx": "5654c4213484a1267a6d99bfc268926c515d6c78f682eb3eab6581b9b02cbb0c",
+    "educlaw-web/src/components/skill-workspace/DocumentSkillCreationPanel.tsx": "6b02d90204100dcbc97e5b72472054135c1626705dd22e344449f0534a01ca85",
+    "educlaw-web/src/components/skill-workspace/GeneratedAgentResult.tsx": "5427e78a6fd35aa54ae6bca3d17df11d7c1f59c8d545f840ccb1e7e129103312",
+    "educlaw-web/src/components/skill-workspace/GuidedSkillCreationPanel.tsx": "2f9c6aad6c444bebdae6b5f59216eee983ebcfe884d3aa2b37e66634ef6019b1",
+    "educlaw-web/src/components/skill-workspace/InnoSkillSidebar.tsx": "82cdd0c1a917dd77d8ba1219c7750cf355b3f42a48fefd3ca91f3c8c2c6cdbce",
+    "educlaw-web/src/components/skill-workspace/InspectorPortal.tsx": "9df6f067a823b0cf5ef4b4e6ff4961b5314ed68ae1fa5922362840fe7a2bfc19",
+    "educlaw-web/src/components/skill-workspace/LegacyArenaHistory.tsx": "cb3e669eb740f59fb94e08db32647f7e70372eedb130b6c44181bc3fe2d1e29e",
+    "educlaw-web/src/components/skill-workspace/MultimodalSkillCreationPanel.tsx": "5b4df1640d36c2d5fb812f0cce2a8e1982d5dc95cf0822156ae9c7e63e310542",
+    "educlaw-web/src/components/skill-workspace/OptimizeAlongButton.tsx": "80a5f61700ab93de312d5e061f0afe2fce72310d94310133fe121c871ecf105b",
+    "educlaw-web/src/components/skill-workspace/RepositoryCards.tsx": "68f0d58b28e51423454696fe88791f1c18ac29b36b9a8702975dc2a4174f875f",
+    "educlaw-web/src/components/skill-workspace/RepositoryInspectorContent.tsx": "4b9224054f5636a8ed5ff40bc4a7901302e80fcebc68424e21bd1258e6b3d7f2",
+    "educlaw-web/src/components/skill-workspace/SkillAnswerOptimizationPanel.tsx": "1b941d876e73ab8b215e57811aebe04cb105c2d5a0704559f2f2d55e0d59726b",
+    "educlaw-web/src/components/skill-workspace/SkillArenaWorkspace.tsx": "8725e6f04f4cc490b48cf711be8069df9ab7caee454831f99b18e9c542395dfd",
+    "educlaw-web/src/components/skill-workspace/SkillContextMenu.tsx": "6bbea6508db7cc0496c7d8a750c4fe5422f0d2e271ab83a1aea86f3f79fa27ff",
+    "educlaw-web/src/components/skill-workspace/SkillConversationList.tsx": "1e0136316d043fbf0c486b1776c09be3c736cd59b99ca46cd476d9afe3107d8e",
+    "educlaw-web/src/components/skill-workspace/SkillCreationHome.tsx": "db1e81eeece4c08cfdd48afe7d3c4cce24350d85dd751d6100fd714148ab2bf7",
+    "educlaw-web/src/components/skill-workspace/SkillDeleteConfirmDialog.tsx": "7aba78bf5c23b4f66d9e383a65f043475d3fd46c810decfdaa5e48dbd4bb2236",
+    "educlaw-web/src/components/skill-workspace/SkillDetailWorkspace.tsx": "aebf45144db68a4573c571d4c8265a72e5464d7391e24a5d34edabdff882cba9",
+    "educlaw-web/src/components/skill-workspace/SkillExportDialog.tsx": "5bef547fbf84ef80d5d2c927dab2c04c87973016ad490901786d12c1e74df6f0",
+    "educlaw-web/src/components/skill-workspace/SkillFunctionLauncher.tsx": "2783d2b378787c5db7be3705d8217d9ad484efa689a65aab1d008e0e54eab8a5",
+    "educlaw-web/src/components/skill-workspace/SkillImportDialog.tsx": "fe45010e1761710812caec770750af9f2fda30ff260e7a7cd9bb5288662ae8e0",
+    "educlaw-web/src/components/skill-workspace/SkillInspectorContent.tsx": "b048bfbc470d59a673fe246f55e6262eb2659683a84f4056247390b848377629",
+    "educlaw-web/src/components/skill-workspace/SkillOptimizeWorkspace.tsx": "4eb8e2845de0f4719b8d4e9a950e0804e20a34f470a8343f842f40c9471bc9d9",
+    "educlaw-web/src/components/skill-workspace/SkillPinnedUpdate.tsx": "7fa5f2f9d1fe1fd9434aea4d90e24cab8985ccbf46bc7daf5b4bc2de9fa1246f",
+    "educlaw-web/src/components/skill-workspace/SkillReasoningBlock.tsx": "17d0a284110be5adda1813019ab791f9552c97959c731f07057d6d64bffbc659",
+    "educlaw-web/src/components/skill-workspace/SkillRenameDialog.tsx": "504b38a4e417fe6c80af26fb0d09530934fedc4def575a206e36b180e15c18e3",
+    "educlaw-web/src/components/skill-workspace/SkillRepositoryWorkspace.tsx": "c4ce09c35f561859f3496a9d19b20b69246fa158f5941ca9bd1d057d96540e53",
+    "educlaw-web/src/components/skill-workspace/SkillRunWorkspace.tsx": "0ea00a3da2ba2592092892e78588e2619aaa9bbe661870ec7769f4f699a6a951",
+    "educlaw-web/src/components/skill-workspace/SkillThinkingToggle.tsx": "f10f228c3262dbb835a74ca9e90af9aa1fbd2a138213fb0aca20b5afba8b619c",
+    "educlaw-web/src/components/skill-workspace/SkillVersionContentDialog.tsx": "7f28fef4b76338864697da26998ef5307aa91fd7125a15d15774100bba5bd170",
+    "educlaw-web/src/components/skill-workspace/SkillVersionWorkspace.tsx": "e4aee0b47c02d51881ecb9407c7a6da4f4d10f830e66eeb794d17f117b4b763b",
+    "educlaw-web/src/components/skill-workspace/SkillWorkspaceSidebar.tsx": "a44aae51c743d59ab45882b912000327a5fe05da11463f496a08f48ae30f08ce",
+    "educlaw-web/src/components/skill-workspace/StructuredInspectorContent.tsx": "afc433861e267fd5316d81c08e7430fd84c597e09848923981a776834ec7da57",
+    "educlaw-web/src/components/skill-workspace/StructuredSkillCreationPanel.tsx": "80b0518823c4030047192dfca532eda2c71c662552dc3069d4291dfe687ddf63",
+    "educlaw-web/src/components/skill-workspace/WorkspaceInspector.tsx": "a6fb12165f60928870f2f8ab3e006354ffef5a7c54fb12d5e9909958a2f1dad5",
+    "educlaw-web/src/components/skill-workspace/WorkspaceInspectorProvider.tsx": "07d654d21197d7a8b5130f1d93043f105b1aa8a020fbd47a51509092ff4b65c1",
+    "educlaw-web/src/components/skill-workspace/answer-optimization-panel-layout.ts": "740c28bc6258a980ff59a9e65db4a9f9e377dfdd9a8beed9705233dcf7959459",
+    "educlaw-web/src/components/skill-workspace/answer-optimization-review.ts": "d0d35d2aa1f5e0be118d629196da870115e1caacd096b7ae2d285c305b839c34",
+    "educlaw-web/src/components/skill-workspace/answer-optimization-selection.ts": "db8d1d7d9b3a2d330e21ad77b222f38448f1d81adc8ccc15a8a581fd133f45fc",
+    "educlaw-web/src/components/skill-workspace/conversation-turn-navigation.ts": "cfcb09ba0976bdba7d582d22e060d6d96aab3644ec1ffd332d388727089c0554",
+    "educlaw-web/src/components/skill-workspace/discover-skill-runs.ts": "e482363a038c1906e6e62b7fdfa9468ff04c2da21d983dba504c1e9c0f1b8799",
+    "educlaw-web/src/components/skill-workspace/document-skill-creation-state.ts": "c88ac7e8547bc1874fccf6e8b042d4622bb9815d59114a36287b7ab5375478cf",
+    "educlaw-web/src/components/skill-workspace/education-scenarios.ts": "72c52d026a0aba01ce83bde5c7dcca885596439a9c06d30fac1033b7499352fb",
+    "educlaw-web/src/components/skill-workspace/guided-creation-progress.ts": "e4496ce4f5419f9f78302cae35d3076433f4e749d4c7447dc91b7b77e30e3a78",
+    "educlaw-web/src/components/skill-workspace/guided-creation-state.ts": "0762fa6433fc3bf3be3977e4b68bc2cac7d9c18d9d78e52e3a1f81c2fad8c417",
+    "educlaw-web/src/components/skill-workspace/guided-optimistic-message.ts": "10fc2e109a860e2bbf6b0dbc9426c83d32e77460f13140abd0c57205b8810945",
+    "educlaw-web/src/components/skill-workspace/multimodal-guided-creation-state.ts": "fae463cac1ff55f9370578629bfc9b1b2cdb43a669b2cdc73b11d79ff498fd03",
+    "educlaw-web/src/components/skill-workspace/multimodal/MediaReviewPane.tsx": "e5983b3e0ca757d54c11c1596886e9d801eb6d0e3cbcc8d8f1b4585068199129",
+    "educlaw-web/src/components/skill-workspace/multimodal/MultimodalCandidateStep.tsx": "c8ddbbd79a3ce262a4bb1182c31e9970c279af0d55e80df7b23e3a4cc18248fe",
+    "educlaw-web/src/components/skill-workspace/multimodal/MultimodalDataDrawers.tsx": "b2fb4dfb483ba57d050e9c78965d6c5d9567aaa0304fcfc6ff796484ea21b54e",
+    "educlaw-web/src/components/skill-workspace/multimodal/MultimodalOverviewStep.tsx": "9c2b70f6840d7243a95d5d6c8ed0265679b2287be2aac3143c87f1662b4a5088",
+    "educlaw-web/src/components/skill-workspace/multimodal/MultimodalProgressStep.tsx": "d28f36b547bf402a0cd01fad1dd88494543d81840f609a01ec81006937d4d29c",
+    "educlaw-web/src/components/skill-workspace/multimodal/MultimodalReleaseStep.tsx": "a2bb4b48393fee615ad1e7fedc15fd2bc52d0f6fcbc3af960721f9044d8be5ea",
+    "educlaw-web/src/components/skill-workspace/multimodal/MultimodalWizardShell.tsx": "686120865ce0c2026c66d99c5e9ac20640be24486cf2ad4e7b5b14b5830aa1fe",
+    "educlaw-web/src/components/skill-workspace/multimodal/multimodal-wizard-model.ts": "1f45a17f1ff15556f3642d2c7e152f1f8b875b629bd3c5a3406071aaf1af7249",
+    "educlaw-web/src/components/skill-workspace/skill-arena-state.ts": "2f655b1d60d19b8aaf6b84855ffc3cbde0236bf2d336015da01288740974dd99",
+    "educlaw-web/src/components/skill-workspace/skill-conversation-list.ts": "a5cf9f0ee9ee8a0550a0d5250dd495bbde32306ac5471c172c2ace20178d43fe",
+    "educlaw-web/src/components/skill-workspace/skill-optimize-state.ts": "8e3579f94dee253b48c60fa6733e23f5be13958f10ef332fb1d7502b0570d440",
+    "educlaw-web/src/components/skill-workspace/skill-repository-state.ts": "859e9e086b1110a5d121269318b2c48e62bb2713fbc2cf00c55f25bae65f5a5b",
+    "educlaw-web/src/components/skill-workspace/skill-run-recovery.ts": "451908bc753955b7bb6d37cabe3c757f875011b94c6539366004ae62b66d9fe7",
+    "educlaw-web/src/components/skill-workspace/skill-run-state.ts": "dc4f8cf08d3de22f33f517735ea6e0f01a1ea567e99bbba5b58d5659566db914",
+    "educlaw-web/src/components/skill-workspace/skill-stream-buffer.ts": "67c2f4858e7240c3d08afb986afb39ba9c30c181f9ed97d51d797a7197796feb",
+    "educlaw-web/src/components/skill-workspace/skill-thinking-preference.ts": "be27672a92259da9bf81d35c569ec47ffd2a8e7eb977c5a1a5f5de2f8c9c479b",
+    "educlaw-web/src/components/skill-workspace/skill-transient-notification.ts": "561a67f4546575390bde5da2a6b53266f25ca761a63970dc4f51534c893aefba",
+    "educlaw-web/src/components/skill-workspace/skill-version-state.ts": "f05b373dbd4dcf6242a62df8c1d28a0c7c6e49ea7a246f70bcef6018b618736a",
+    "educlaw-web/src/components/skill-workspace/skill-workspace-state.ts": "a240f25e59ea451ea14ed22cca9108e31e97df9c516bafa145d00b7ea6fa533e",
+    "educlaw-web/src/components/skill-workspace/skill-workspace-url-state.ts": "f8b1f38b3c9f1437f85cd6ed097c2a5e63be812526d39eb23bfad4a2d1917386",
+    "educlaw-web/src/components/skill-workspace/structured-skill-creation-state.ts": "18e16f497532411ab579d2eebf67032e7da842150c81b26bcdd7f2407fdf602a",
+    "educlaw-web/src/components/skill-workspace/use-conversation-auto-scroll.ts": "4703dec0113ed205eeb6fcaddbf2bb1e0095409df5450bfde17d1e0609069be9",
+    "educlaw-web/src/components/skill-workspace/use-skill-answer-rerun.ts": "483433e914b6aad8ff1d81239ea1eb185a73315d4f9c9d691b2879f7d72ed472",
+    "educlaw-web/src/components/skill-workspace/use-skill-run.ts": "f70ee734578b1e8f5632a1fb3c382e5a176e8f65ea96fd16448d8ee0b1a47f6c",
+    "educlaw-web/src/components/skill-workspace/use-skill-versions.ts": "8eeb0719cb75f3554d511645122e45ed7fcd0cf6b2dfa78a288f1c2eb1e6cc56",
+    "educlaw-web/src/components/skill-workspace/workspace-inspector-state.ts": "3b99e58d5741fe11790e81b21c33cfe4951b890ea031b075c001e546ec741546",
+    "educlaw-web/src/components/skill/SkillLibraryPanel.tsx": "bdffef789a70c4518cdabd6b1726b7dab7357a1d4f7a4d3b2a3692a939b6112f",
+    "educlaw-web/src/components/tabs/TabBar.tsx": "17af48c4ad237a607e6011d0fdb7937cdcf1887385d65cfba421c5f9935645c7",
+    "educlaw-web/src/components/theme-provider.tsx": "afe617a88f066121c49f6c737b3a6d70db6ae5bf7c3efc299feff53fe4039ff4",
+    "educlaw-web/src/components/theme-toggle.tsx": "12e445642691fea3f6df6d118f8bc3778dab08c7c28049639d57609fb2a49ee4",
+    "educlaw-web/src/components/tool/ToolLibraryPanel.tsx": "c12d5d35cce70b0257b4daad5ace05e642669772c3db5eda06e40356bb7ee886",
+    "educlaw-web/src/components/ui/badge.tsx": "d52e3d4f444643ea7db42950d0373cedf0726f8eca671389beb7bb8ee2ba2c4d",
+    "educlaw-web/src/components/ui/button.tsx": "1b782e3fc7b615556c8410c17ff391bf673682e0a53101c4efe2bd59f91346b9",
+    "educlaw-web/src/components/ui/card.tsx": "3fb6a4653c7a85ee3951242774b89cf02cf8d1214def0e676658936cfca27ef9",
+    "educlaw-web/src/components/ui/checkbox.tsx": "53546a85bfa291af5d126f6520996827cf8d8301812e4fcd5479635bec41e216",
+    "educlaw-web/src/components/ui/dialog.tsx": "2b5d4f0c04386f5dbd6f151814f7bc3c2da7903458c46b30e3ef93193a7f3e10",
+    "educlaw-web/src/components/ui/input.tsx": "6cf435fd3d914f455afbffdda01937c3aac2f6d8f64b2df1993726159a934f03",
+    "educlaw-web/src/components/ui/premium.tsx": "ebd45a3e3f862c0a670272af0927bab57e1ff13cc6c767d8b4d2fa4728de932e",
+    "educlaw-web/src/components/ui/scroll-area.tsx": "8bd9d986b2844c9a87de825c6de4787b6739b36c3dc9a05ccf3eb107160e4043",
+    "educlaw-web/src/components/ui/separator.tsx": "6da346505c8629a4668420d2a5ca48891383bbe0b0ceb14163537c671879427e",
+    "educlaw-web/src/components/ui/switch.tsx": "fd84be8a652b18c57a12cb90f0bf7a3d0f7e2f8170f7cb85e039007518a5e22d",
+    "educlaw-web/src/components/ui/textarea.tsx": "98d8827eb8480a18a660c80d3a0b05271fa7534321feff226f8acaab3ade0247",
+    "educlaw-web/src/components/ui/tooltip.tsx": "bdabbb2ea5a5d2d2c34573d7698fae93257bc86e15ef0a101968b3149f8c67f1",
+    "educlaw-web/src/hooks/useEduclawAgentChat.ts": "c2b2c86df0f5d411adae8cd2f9577547b047e7fd7c2f5f8a57a468444baa7982",
+    "educlaw-web/src/hooks/useHomeChatModels.ts": "5b3ecae9bd50e59a8c3de1c1742d0e73f98ab942d00b45f4738a76a65d2f5cf5",
+    "educlaw-web/src/hooks/useHomeChatSessionChat.ts": "f66faa0ea9b983d7fe004cfa12ab2c1703b6738aae5d40eb2762cbc9415a9cf9",
+    "educlaw-web/src/hooks/useHomeChatSessionLifecycle.ts": "1b2d87ed8e2840498bf2a31de03131930ed08e1355fb23e5a2388d6ce3d0776f",
+    "educlaw-web/src/i18n/en.ts": "8ecf98f64476f347e24f053a30c5a7275e88f400410028907432b8a945c083f8",
+    "educlaw-web/src/i18n/index.ts": "dde7f25066bf978cfa8b6021e765e7b9459c716f9a9b1ed7866b3162dcf5c89c",
+    "educlaw-web/src/i18n/zh.ts": "96098d0a190cc81b5ea269743faed421ffe6c30ce8997b9499ab83025c0eb210",
+    "educlaw-web/src/lib/agent-icons.ts": "2c2c0106ba3d38fcd995b046d69d2754f87059a6887358d1e710bc83bc940cfe",
+    "educlaw-web/src/lib/brand.ts": "e7503d07521ff9cea11bf0effe378d776d634fcefcc0c781a3eb1cc3bd6b840c",
+    "educlaw-web/src/lib/message-converter.ts": "6ce6caa5b472e29dc9cfe6dbc26714cbd126c635f4df3c9bdccc1d584df34dca",
+    "educlaw-web/src/lib/utils.ts": "4aeb0cec0948abf3dd9269b486d15bbc7041dcc0e05fb17e106620d062083601",
+    "educlaw-web/src/main.tsx": "6e9e5807fcbd48b75a96db5cbef36c996262196be42e6d4760dc86babbe61ad2",
+    "educlaw-web/src/pages/AdminPage.tsx": "22f50b9e3b6d68f7643522376eb473d33eb020e809b28f79262d7101e12a79cc",
+    "educlaw-web/src/pages/AgentProfileWorkflow.tsx": "3f9f602b210c6aa21d158e1c9968b6d7cc62ee6cd6770cddd85c9f72731867a5",
+    "educlaw-web/src/pages/AgentWorkspacePage.tsx": "758cc017ba7f80b103ecca585833dbfacd0804f2b6618231ccc40508b0988dc9",
+    "educlaw-web/src/pages/LiteWorkspace.tsx": "32f8c9ea79b78799ed257554eca15c0a8e6657b782214686153638ff9dc38199",
+    "educlaw-web/src/pages/LoginPage.tsx": "d9170c82461d642c67c3e062f156b7e7719ea4cb7ef51e6d9c2e2dc6b7339440",
+    "educlaw-web/src/pages/SkillFirstWorkspace.tsx": "a1a7357fc5d57cd6756a9e5b9a6f041ef16b47a8e4f78d0fb7df8a8f2ff4def7",
+    "educlaw-web/src/pages/WorkflowDemo.tsx": "77ca7c0deff79edb8508b2bb395b819ca6ca1e119a8de88de826f4df7d268a3b",
+    "educlaw-web/src/pages/WorkflowLibrary.tsx": "aca217806f5fec265ac96284577328db78f82073c2a7c4b3b8d07ac36a27fb52",
+    "educlaw-web/src/pages/Workspace.tsx": "18233b3e3b3adfab1ce93c16bdf6f46be87d0923ddc5c208f8a400655b9309ce",
+    "educlaw-web/src/services/agent-polling.ts": "9eb6ab1094f6a712e9344a69d3bc1146318cc8da9a23df70e137f52ef3ced245",
+    "educlaw-web/src/services/polling-transport.ts": "fbc61e95e5cfc1169d7b8dabca12bf3aa3b2932df00f05bd4bcc3c0cdbae566a",
+    "educlaw-web/src/stores/agent.ts": "3cc615f259cac613009cbefabd9a0148c550addf3f9ee7305578bb1fe9266762",
+    "educlaw-web/src/stores/arena.ts": "22d778b149b6e88c87452835fa0497a2ab9312de340b4507199aaf2176f34d0e",
+    "educlaw-web/src/stores/auth.ts": "64280a8dcb032862c49fc6f082c942eab10d71a40d7f05a2afe009673c624f03",
+    "educlaw-web/src/stores/batch-build.ts": "788550cd8c1cdd23f707f7394247838ba916c5ddb154f599161f09fc946426ed",
+    "educlaw-web/src/stores/build.ts": "fe6dea0476327d32f6854f0173f73151f88d3ea0f9b662293e492b6f83d10005",
+    "educlaw-web/src/stores/chat.ts": "66263045c81b9f8d71910c597f9bb5279697a9994b3ca9f533063cdfc292ee01",
+    "educlaw-web/src/stores/diary.ts": "79a3ff8fee717a09813f2896f5c1a0c4fa3793f41e30fad7c6437b75a41b1f1e",
+    "educlaw-web/src/stores/home-chat.ts": "62ea4a9b1e07ca4af13360932e820860f7c0ab8a02331573ad7ed82c1d51f920",
+    "educlaw-web/src/stores/interaction-queue.ts": "eb647302dcdf2c26c9446f468d460292169dd2bbca97c2182c672dc145b642de",
+    "educlaw-web/src/stores/library.ts": "734f89d54ced56bfef4ec318e6dc463c56c13a7783379c2d0749d1a460cdd83f",
+    "educlaw-web/src/stores/notification.ts": "bf6fdaad2f5e38d0d6fb138dccf45802b588e1a2c97f74d683155dddc94bf821",
+    "educlaw-web/src/stores/optimize.ts": "f235ab8c20c54ece2b547063478165847180484a5402030348756c08b6ee9ac7",
+    "educlaw-web/src/stores/settings.ts": "abf683ba3025cfad0129f15ffcba8edf6f2c6e27be73219403319e5d989885c7",
+    "educlaw-web/src/stores/sidebar-groups.ts": "966184a69a8e263c1a934b54360124aac80adfc0e19b2abdce49d8a0b897345c",
+    "educlaw-web/src/stores/todo.ts": "f2f4b4ccce714c69971f284b083f51b310f66c48085d08d6d041432a7df3e103",
+    "educlaw-web/src/stores/ui.ts": "b706be83099b83e9fc1f320759ae447ecaaa8957044da470378afbf561d57844"
+  },
+  "sourceHashProvenance": "Hashes reconstructed from the base commit; production sources matched that commit when the before scan ran."
+}

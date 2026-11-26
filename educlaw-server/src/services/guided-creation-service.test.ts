@@ -15,6 +15,23 @@ import {
 } from './guided-creation-service.js';
 
 describe('guided creation conversation service', () => {
+  it('cleans and caps model options consistently for V2 and V3', () => {
+    const options = ['  教师  ', '', 42, '学生', '选项三', '选项四', '选项五'] as unknown as string[];
+    const v2 = buildGuidedAssistantTurnV2({
+      current_draft: {}, current_field_states: {}, confirmed_stages: [],
+      current_stage: null, user_message: '帮我设计一个 Skill',
+      extraction: { operations: [], stage_complete: false, acknowledgement: '好的' },
+      phrasing: { stage: 'positioning', mode: 'collect_field', field: 'roles', question: '谁来使用？', suggested_options: options },
+    });
+    const v3 = buildGuidedAssistantTurnV3({
+      current_draft: {}, completed_steps: [], current_step: null,
+      user_message: '帮我设计一个 Skill',
+      extraction: { operations: [], step_complete: false, acknowledgement: '好的' },
+      phrasing: { step: 'intent_context', question: '希望解决什么问题？', suggested_options: options },
+    });
+    expect(v2.suggested_options).toEqual(['教师', '学生', '选项三', '选项四']);
+    expect(v3.suggested_options).toEqual(v2.suggested_options);
+  });
   it('does not auto-complete later steps whose conclusions are already user-owned', () => {
     const draft = Object.fromEntries(
       [

@@ -168,6 +168,63 @@ export async function createWorkflow(
   return getPackage(userId, created.packageId);
 }
 
+interface WorkflowExecutionContext {
+  input: { content: string; model?: string };
+  snapshot: AgentPackageDetail['snapshot'];
+  results: Map<string, unknown>;
+}
+
+async function executeLoopNode(node: WorkflowNode, context: WorkflowExecutionContext) {
+  const { input, snapshot, results } = context;
+  const iterations = Number(node.params.iterations);
+  const instruction = renderTemplate(node.params.promptTemplate, input.content, results);
+  let previous = '';
+  for (let index = 0; index < iterations; index += 1) {
+    previous = await generateText({
+      model: typeof node.params.model === 'string' ? node.params.model : input.model,
+      systemPrompt: snapshot.agentMd,
+      userPrompt: [
+        `循环任务：${instruction}`,
+        `工作流输入：${input.content}`,
+        previous ? `上一轮结果：${previous}` : '这是第一轮处理，请直接开始。',
+        `当前为第 ${index + 1} / ${iterations} 轮，请输出可供下一轮继续使用的结果。`,
+      ].join('\n\n'),
+      maxTokens: 2_000,
+      hidePromptContentInLogs: true,
+    });
+  }
+  return { text: previous, iterations };
+}
+
+async function executeWorkflowNode(node: WorkflowNode, context: WorkflowExecutionContext): Promise<unknown> {
+  const { input, snapshot, results } = context;
+  switch (node.type) {
+    case 'start': return { text: input.content };
+    case 'condition': return { passed: conditionPassed(node, input.content, results) };
+    case 'loop': return executeLoopNode(node, context);
+    case 'end': return { text: renderTemplate(node.params.outputTemplate, input.content, results) };
+  }
+  const template = node.type === 'skill' ? node.params.inputTemplate : node.params.promptTemplate;
+  const prompt = renderTemplate(template, input.content, results);
+  let systemPrompt = snapshot.agentMd;
+  if (node.type === 'skill') {
+    const skill = snapshot.skills.find(item => item.id === node.params.skillId);
+    if (!skill) {
+      throw new WorkflowServiceError('试跑时找不到固定版本的 Skill。', 'WORKFLOW_SKILL_UNAVAILABLE');
+    }
+    systemPrompt = `${snapshot.agentMd}\n\n[Skill: ${skill.name}]\n${skill.skillMd}`;
+  }
+  return {
+    text: await generateText({
+      model: typeof node.params.model === 'string' ? node.params.model : input.model,
+      systemPrompt,
+      userPrompt: prompt,
+      maxTokens: 2_000,
+      hidePromptContentInLogs: true,
+    }),
+  };
+}
+
 export async function runWorkflow(
   userId: string,
   packageId: string,
@@ -219,53 +276,9 @@ export async function runWorkflow(
       const currentTrace = trace(current.id);
       currentTrace.status = 'running';
       currentTrace.startedAt = new Date().toISOString();
-      let output: unknown;
-      if (current.type === 'start') output = { text: input.content };
-      else if (current.type === 'condition') output = { passed: conditionPassed(current, input.content, nodeResults) };
-      else if (current.type === 'loop') {
-        const iterations = Number(current.params.iterations);
-        const instruction = renderTemplate(current.params.promptTemplate, input.content, nodeResults);
-        let previous = '';
-        for (let index = 0; index < iterations; index += 1) {
-          previous = await generateText({
-            model: typeof current.params.model === 'string' ? current.params.model : input.model,
-            systemPrompt: version.snapshot.agentMd,
-            userPrompt: [
-              `循环任务：${instruction}`,
-              `工作流输入：${input.content}`,
-              previous ? `上一轮结果：${previous}` : '这是第一轮处理，请直接开始。',
-              `当前为第 ${index + 1} / ${iterations} 轮，请输出可供下一轮继续使用的结果。`,
-            ].join('\n\n'),
-            maxTokens: 2_000,
-            hidePromptContentInLogs: true,
-          });
-        }
-        output = { text: previous, iterations };
-      }
-      else if (current.type === 'end') output = { text: renderTemplate(current.params.outputTemplate, input.content, nodeResults) };
-      else {
-        const template = current.type === 'skill'
-          ? current.params.inputTemplate
-          : current.params.promptTemplate;
-        const prompt = renderTemplate(template, input.content, nodeResults);
-        const skill = current.type === 'skill'
-          ? version.snapshot.skills.find(item => item.id === current.params.skillId)
-          : undefined;
-        if (current.type === 'skill' && !skill) {
-          throw new WorkflowServiceError('试跑时找不到固定版本的 Skill。', 'WORKFLOW_SKILL_UNAVAILABLE');
-        }
-        output = {
-          text: await generateText({
-            model: typeof current.params.model === 'string' ? current.params.model : input.model,
-            systemPrompt: current.type === 'skill'
-              ? `${version.snapshot.agentMd}\n\n[Skill: ${skill!.name}]\n${skill!.skillMd}`
-              : version.snapshot.agentMd,
-            userPrompt: prompt,
-            maxTokens: 2_000,
-            hidePromptContentInLogs: true,
-          }),
-        };
-      }
+      const output = await executeWorkflowNode(current, {
+        input, snapshot: version.snapshot, results: nodeResults,
+      });
       nodeResults.set(current.id, output);
       currentTrace.input = current.type === 'start' ? undefined : clip(current.params);
       currentTrace.output = clip(output);

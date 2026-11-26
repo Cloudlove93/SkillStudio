@@ -1,0 +1,3450 @@
+{
+  "results": [
+    {
+      "filePath": "educlaw-web/src/App.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/api/admin.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/api/agents.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/api/answer-skill-optimizations.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/api/auth-gateway.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/api/auth.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/api/chat.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/api/client.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/api/diary.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/api/events.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'dispatch' has a complexity of 35. Maximum allowed is 15.",
+          "line": 67,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 67,
+          "endColumn": 18
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/api/lite-api.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'computeLineDiff' has a complexity of 17. Maximum allowed is 15.",
+          "line": 115,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 115,
+          "endColumn": 32
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'mediaActionRequest' has a complexity of 17. Maximum allowed is 15.",
+          "line": 675,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 675,
+          "endColumn": 37
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'streamRequest' has a complexity of 16. Maximum allowed is 15.",
+          "line": 739,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 739,
+          "endColumn": 37
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 3,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/api/manager.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'generateProfileFromFile' has a complexity of 17. Maximum allowed is 15.",
+          "line": 408,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 408,
+          "endColumn": 46
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/api/media-upload.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/api/runtime.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/api/sidebar-groups.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/api/token-storage.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/agent-workspace/AgentConversation.tsx",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'AgentConversation' has a complexity of 39. Maximum allowed is 15.",
+          "line": 7,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 7,
+          "endColumn": 34
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/agent-workspace/AgentSkillPicker.tsx",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'AttachedSkill' has a complexity of 21. Maximum allowed is 15.",
+          "line": 213,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 213,
+          "endColumn": 23
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/agent-workspace/AgentWorkspacePanel.tsx",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'AgentWorkspaceSession' has a complexity of 62. Maximum allowed is 15.",
+          "line": 106,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 106,
+          "endColumn": 31
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'save' has a complexity of 24. Maximum allowed is 15.",
+          "line": 461,
+          "column": 3,
+          "messageId": "complex",
+          "endLine": 461,
+          "endColumn": 22
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 2,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/agent/AgentCard.tsx",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'AgentCard' has a complexity of 20. Maximum allowed is 15.",
+          "line": 10,
+          "column": 16,
+          "messageId": "complex",
+          "endLine": 10,
+          "endColumn": 34
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/agent/AgentSettingsDialog.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/agent/BatchBuildProgress.tsx",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'BatchBuildProgress' has a complexity of 27. Maximum allowed is 15.",
+          "line": 11,
+          "column": 16,
+          "messageId": "complex",
+          "endLine": 11,
+          "endColumn": 43
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/agent/BatchBuildView.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/agent/BatchFileSidebar.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/agent/BuildAgentPanel.tsx",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'BuildAgentPanel' has a complexity of 46. Maximum allowed is 15.",
+          "line": 16,
+          "column": 16,
+          "messageId": "complex",
+          "endLine": 16,
+          "endColumn": 40
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/agent/ProfileGallery.tsx",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'ProfileDetail' has a complexity of 48. Maximum allowed is 15.",
+          "line": 435,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 435,
+          "endColumn": 23
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'ProfileCard' has a complexity of 16. Maximum allowed is 15.",
+          "line": 1042,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 1042,
+          "endColumn": 21
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'ProfileGallery' has a complexity of 19. Maximum allowed is 15.",
+          "line": 1192,
+          "column": 16,
+          "messageId": "complex",
+          "endLine": 1192,
+          "endColumn": 39
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 3,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/agent/build-components.tsx",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'LogItem' has a complexity of 23. Maximum allowed is 15.",
+          "line": 97,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 97,
+          "endColumn": 24
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/arena/ArenaThreadCreatorDialog.tsx",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async arrow function has a complexity of 16. Maximum allowed is 15.",
+          "line": 217,
+          "column": 33,
+          "messageId": "complex",
+          "endLine": 217,
+          "endColumn": 35
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/arena/useArenaThreadList.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/chat/AgentControls.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/chat/ChatPanel.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/chat/MessageItem.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/chat/MessageList.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/chat/PartRenderer.tsx",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'PartRenderer' has a complexity of 16. Maximum allowed is 15.",
+          "line": 8,
+          "column": 16,
+          "messageId": "complex",
+          "endLine": 8,
+          "endColumn": 37
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/chat/PromptInput.tsx",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'handleKeyDown' has a complexity of 21. Maximum allowed is 15.",
+          "line": 151,
+          "column": 3,
+          "messageId": "complex",
+          "endLine": 151,
+          "endColumn": 25
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/chat/QuestionDock.tsx",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'QuestionDock' has a complexity of 37. Maximum allowed is 15.",
+          "line": 25,
+          "column": 16,
+          "messageId": "complex",
+          "endLine": 25,
+          "endColumn": 37
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/chat/ReasoningPartView.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/chat/ShareDialog.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/chat/SlashPopover.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/chat/StepIndicator.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/chat/TextPartView.tsx",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Method 'pre' has a complexity of 16. Maximum allowed is 15.",
+          "line": 52,
+          "column": 3,
+          "messageId": "complex",
+          "endLine": 52,
+          "endColumn": 6
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/chat/TodoDock.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/chat/ToolCallView.tsx",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'ToolCallView' has a complexity of 44. Maximum allowed is 15.",
+          "line": 73,
+          "column": 16,
+          "messageId": "complex",
+          "endLine": 73,
+          "endColumn": 37
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/chat/hooks/useChatMessages.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async arrow function has a complexity of 16. Maximum allowed is 15.",
+          "line": 45,
+          "column": 50,
+          "messageId": "complex",
+          "endLine": 45,
+          "endColumn": 52
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'handleSend' has a complexity of 18. Maximum allowed is 15.",
+          "line": 92,
+          "column": 3,
+          "messageId": "complex",
+          "endLine": 92,
+          "endColumn": 28
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 2,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/chat/hooks/useChatSessions.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/chat/hooks/useSlashCommands.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/chat/prompt/ActionBar.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/chat/prompt/AgentSelector.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/chat/prompt/ImageAttachments.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/chat/prompt/PromptHistory.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/deep-study/ArenaPanel.tsx",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'ArenaPanel' has a complexity of 45. Maximum allowed is 15.",
+          "line": 247,
+          "column": 16,
+          "messageId": "complex",
+          "endLine": 247,
+          "endColumn": 35
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/deep-study/DeepStudyPanel.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/deep-study/OptimizePanel.tsx",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'OptimizePanel' has a complexity of 20. Maximum allowed is 15.",
+          "line": 74,
+          "column": 16,
+          "messageId": "complex",
+          "endLine": 74,
+          "endColumn": 38
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/diary/DiaryCalendar.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/diary/DiaryPanel.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/editor/CodeBlock.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/editor/DiffView.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/editor/FileViewer.tsx",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'FileViewer' has a complexity of 44. Maximum allowed is 15.",
+          "line": 46,
+          "column": 16,
+          "messageId": "complex",
+          "endLine": 46,
+          "endColumn": 35
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/home/ChatHistory.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/home/DeepStudyMatchDialog.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/home/HomeChat.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/home/HomeChatActions.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/home/HomeChatConversation.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/home/HomeChatHeader.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/home/HomeChatInput.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/home/HomeChatMessages.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/layout/AppLayout.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/layout/Header.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/lite/AnswerSkillOptimizationDialog.tsx",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'AnswerSkillOptimizationDialog' has a complexity of 114. Maximum allowed is 15.",
+          "line": 113,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 113,
+          "endColumn": 46
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'handleRefineDraft' has a complexity of 17. Maximum allowed is 15.",
+          "line": 369,
+          "column": 3,
+          "messageId": "complex",
+          "endLine": 369,
+          "endColumn": 35
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Arrow function has a complexity of 21. Maximum allowed is 15.",
+          "line": 907,
+          "column": 54,
+          "messageId": "complex",
+          "endLine": 907,
+          "endColumn": 56
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 3,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/lite/LiteArenaPanel.tsx",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'LiteArenaPanel' has a complexity of 211. Maximum allowed is 15.",
+          "line": 306,
+          "column": 16,
+          "messageId": "complex",
+          "endLine": 306,
+          "endColumn": 39
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'handleGeneratePackages' has a complexity of 16. Maximum allowed is 15.",
+          "line": 1205,
+          "column": 3,
+          "messageId": "complex",
+          "endLine": 1205,
+          "endColumn": 40
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Arrow function has a complexity of 17. Maximum allowed is 15.",
+          "line": 1514,
+          "column": 17,
+          "messageId": "complex",
+          "endLine": 1514,
+          "endColumn": 19
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'saveManualEdit' has a complexity of 16. Maximum allowed is 15.",
+          "line": 1815,
+          "column": 3,
+          "messageId": "complex",
+          "endLine": 1815,
+          "endColumn": 32
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'startInteractive' has a complexity of 19. Maximum allowed is 15.",
+          "line": 1889,
+          "column": 3,
+          "messageId": "complex",
+          "endLine": 1889,
+          "endColumn": 34
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'sendInteractiveMessage' has a complexity of 23. Maximum allowed is 15.",
+          "line": 1988,
+          "column": 3,
+          "messageId": "complex",
+          "endLine": 1988,
+          "endColumn": 40
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'handleRollbackSkillVersion' has a complexity of 16. Maximum allowed is 15.",
+          "line": 2180,
+          "column": 3,
+          "messageId": "complex",
+          "endLine": 2180,
+          "endColumn": 44
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'renderArenaReportView' has a complexity of 16. Maximum allowed is 15.",
+          "line": 2512,
+          "column": 3,
+          "messageId": "complex",
+          "endLine": 2512,
+          "endColumn": 33
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Arrow function has a complexity of 16. Maximum allowed is 15.",
+          "line": 2739,
+          "column": 33,
+          "messageId": "complex",
+          "endLine": 2739,
+          "endColumn": 35
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Arrow function has a complexity of 16. Maximum allowed is 15.",
+          "line": 2826,
+          "column": 29,
+          "messageId": "complex",
+          "endLine": 2826,
+          "endColumn": 31
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Arrow function has a complexity of 19. Maximum allowed is 15.",
+          "line": 4705,
+          "column": 62,
+          "messageId": "complex",
+          "endLine": 4705,
+          "endColumn": 64
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 11,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/lite/answer-skill-optimization-state.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/lite/arena-report.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Arrow function has a complexity of 21. Maximum allowed is 15.",
+          "line": 66,
+          "column": 32,
+          "messageId": "complex",
+          "endLine": 66,
+          "endColumn": 34
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/lite/detail-tab.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/lite/lite-rendering.tsx",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Arrow function has a complexity of 31. Maximum allowed is 15.",
+          "line": 532,
+          "column": 73,
+          "messageId": "complex",
+          "endLine": 532,
+          "endColumn": 75
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/lite/progress-state.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/lite/report-compat.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/lite/report-preview-state.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/lite/report-status.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/lite/rubric-display.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/lite/rubric-edit-state.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/lite/rubric-presentation.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/lite/rubric-status.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/lite/rubric-structured-view.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/lite/workspace-switch-state.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/notification/NotificationBell.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/permission/PermissionDialog.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/search/GlobalSearch.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/settings/SettingsDialog.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/sidebar/AgentDetailSections.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/sidebar/AgentList.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/sidebar/FileExplorer.tsx",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'fileIconFor' has a complexity of 42. Maximum allowed is 15.",
+          "line": 114,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 114,
+          "endColumn": 21
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'FileTreeNode' has a complexity of 26. Maximum allowed is 15.",
+          "line": 402,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 402,
+          "endColumn": 22
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'FileExplorer' has a complexity of 40. Maximum allowed is 15.",
+          "line": 603,
+          "column": 16,
+          "messageId": "complex",
+          "endLine": 603,
+          "endColumn": 37
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 3,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/sidebar/GroupDialog.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/sidebar/IconPicker.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/sidebar/SessionList.tsx",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'renderMenu' has a complexity of 17. Maximum allowed is 15.",
+          "line": 142,
+          "column": 3,
+          "messageId": "complex",
+          "endLine": 142,
+          "endColumn": 22
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/ConversationTurnNavigation.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/DiscardInspectorChangesDialog.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/DocumentInspectorContent.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/DocumentSkillCreationPanel.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/GeneratedAgentResult.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/GuidedSkillCreationPanel.tsx",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'GuidedSkillCreationPanel' has a complexity of 71. Maximum allowed is 15.",
+          "line": 69,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 69,
+          "endColumn": 41
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/InnoSkillSidebar.tsx",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'InnoSkillSidebar' has a complexity of 24. Maximum allowed is 15.",
+          "line": 91,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 91,
+          "endColumn": 33
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/InspectorPortal.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/LegacyArenaHistory.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/MultimodalSkillCreationPanel.tsx",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'MultimodalSkillCreationPanel' has a complexity of 71. Maximum allowed is 15.",
+          "line": 146,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 146,
+          "endColumn": 45
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/OptimizeAlongButton.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/RepositoryCards.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/RepositoryInspectorContent.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/SkillAnswerOptimizationPanel.tsx",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'SkillAnswerOptimizationPanel' has a complexity of 62. Maximum allowed is 15.",
+          "line": 54,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 54,
+          "endColumn": 45
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async arrow function has a complexity of 23. Maximum allowed is 15.",
+          "line": 152,
+          "column": 38,
+          "messageId": "complex",
+          "endLine": 152,
+          "endColumn": 40
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 2,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/SkillArenaWorkspace.tsx",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'SkillArenaWorkspace' has a complexity of 20. Maximum allowed is 15.",
+          "line": 40,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 40,
+          "endColumn": 36
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/SkillContextMenu.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/SkillConversationList.tsx",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Arrow function has a complexity of 17. Maximum allowed is 15.",
+          "line": 57,
+          "column": 37,
+          "messageId": "complex",
+          "endLine": 57,
+          "endColumn": 39
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/SkillCreationHome.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/SkillDeleteConfirmDialog.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/SkillDetailWorkspace.tsx",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'SkillDetailWorkspace' has a complexity of 48. Maximum allowed is 15.",
+          "line": 87,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 87,
+          "endColumn": 37
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/SkillExportDialog.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/SkillFunctionLauncher.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/SkillImportDialog.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/SkillInspectorContent.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/SkillOptimizeWorkspace.tsx",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'SkillOptimizeWorkspace' has a complexity of 26. Maximum allowed is 15.",
+          "line": 56,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 56,
+          "endColumn": 39
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async function 'initialize' has a complexity of 16. Maximum allowed is 15.",
+          "line": 158,
+          "column": 5,
+          "messageId": "complex",
+          "endLine": 158,
+          "endColumn": 30
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async arrow function has a complexity of 19. Maximum allowed is 15.",
+          "line": 242,
+          "column": 25,
+          "messageId": "complex",
+          "endLine": 242,
+          "endColumn": 27
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 3,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/SkillPinnedUpdate.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/SkillReasoningBlock.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/SkillRenameDialog.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/SkillRepositoryWorkspace.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/SkillRunWorkspace.tsx",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'SkillRunWorkspace' has a complexity of 46. Maximum allowed is 15.",
+          "line": 70,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 70,
+          "endColumn": 34
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/SkillThinkingToggle.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/SkillVersionContentDialog.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/SkillVersionWorkspace.tsx",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'SkillVersionWorkspace' has a complexity of 19. Maximum allowed is 15.",
+          "line": 68,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 68,
+          "endColumn": 38
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async arrow function has a complexity of 18. Maximum allowed is 15.",
+          "line": 124,
+          "column": 27,
+          "messageId": "complex",
+          "endLine": 124,
+          "endColumn": 29
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 2,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/SkillWorkspaceSidebar.tsx",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'SkillWorkspaceSidebar' has a complexity of 35. Maximum allowed is 15.",
+          "line": 133,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 133,
+          "endColumn": 38
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/StructuredInspectorContent.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/StructuredSkillCreationPanel.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/WorkspaceInspector.tsx",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'WorkspaceInspector' has a complexity of 20. Maximum allowed is 15.",
+          "line": 24,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 24,
+          "endColumn": 35
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/WorkspaceInspectorProvider.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/answer-optimization-panel-layout.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/answer-optimization-review.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/answer-optimization-selection.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/conversation-turn-navigation.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/discover-skill-runs.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/document-skill-creation-state.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/education-scenarios.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/guided-creation-progress.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/guided-creation-state.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/guided-optimistic-message.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/multimodal-guided-creation-state.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'applyMultimodalEvent' has a complexity of 37. Maximum allowed is 15.",
+          "line": 191,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 191,
+          "endColumn": 37
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/multimodal/MediaReviewPane.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/multimodal/MultimodalCandidateStep.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/multimodal/MultimodalDataDrawers.tsx",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'MultimodalInspectorContent' has a complexity of 36. Maximum allowed is 15.",
+          "line": 264,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 264,
+          "endColumn": 43
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/multimodal/MultimodalOverviewStep.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/multimodal/MultimodalProgressStep.tsx",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'MultimodalProgressStep' has a complexity of 34. Maximum allowed is 15.",
+          "line": 104,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 104,
+          "endColumn": 39
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Arrow function has a complexity of 21. Maximum allowed is 15.",
+          "line": 241,
+          "column": 44,
+          "messageId": "complex",
+          "endLine": 241,
+          "endColumn": 46
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 2,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/multimodal/MultimodalReleaseStep.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/multimodal/MultimodalWizardShell.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/multimodal/multimodal-wizard-model.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'deriveMultimodalWizardStep' has a complexity of 20. Maximum allowed is 15.",
+          "line": 262,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 262,
+          "endColumn": 43
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/skill-arena-state.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/skill-conversation-list.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'isSkillConversationThread' has a complexity of 18. Maximum allowed is 15.",
+          "line": 43,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 43,
+          "endColumn": 42
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/skill-optimize-state.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/skill-repository-state.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/skill-run-recovery.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'reconcileSkillRun' has a complexity of 21. Maximum allowed is 15.",
+          "line": 13,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 13,
+          "endColumn": 34
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/skill-run-state.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'skillRunReducer' has a complexity of 25. Maximum allowed is 15.",
+          "line": 75,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 75,
+          "endColumn": 32
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/skill-stream-buffer.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/skill-thinking-preference.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/skill-transient-notification.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/skill-version-state.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/skill-workspace-state.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/skill-workspace-url-state.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/structured-skill-creation-state.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/use-conversation-auto-scroll.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/use-skill-answer-rerun.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/use-skill-run.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'applySnapshot' has a complexity of 24. Maximum allowed is 15.",
+          "line": 84,
+          "column": 5,
+          "messageId": "complex",
+          "endLine": 84,
+          "endColumn": 27
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async arrow function has a complexity of 26. Maximum allowed is 15.",
+          "line": 193,
+          "column": 30,
+          "messageId": "complex",
+          "endLine": 193,
+          "endColumn": 32
+        },
+        {
+          "ruleId": "max-depth",
+          "severity": 1,
+          "message": "Blocks are nested too deeply (5). Maximum allowed is 4.",
+          "line": 234,
+          "column": 15,
+          "messageId": "tooDeeply",
+          "endLine": 234,
+          "endColumn": 17
+        },
+        {
+          "ruleId": "max-depth",
+          "severity": 1,
+          "message": "Blocks are nested too deeply (5). Maximum allowed is 4.",
+          "line": 237,
+          "column": 15,
+          "messageId": "tooDeeply",
+          "endLine": 237,
+          "endColumn": 17
+        },
+        {
+          "ruleId": "max-depth",
+          "severity": 1,
+          "message": "Blocks are nested too deeply (6). Maximum allowed is 4.",
+          "line": 239,
+          "column": 17,
+          "messageId": "tooDeeply",
+          "endLine": 239,
+          "endColumn": 19
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Async arrow function has a complexity of 30. Maximum allowed is 15.",
+          "line": 382,
+          "column": 51,
+          "messageId": "complex",
+          "endLine": 382,
+          "endColumn": 53
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 6,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/use-skill-versions.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill-workspace/workspace-inspector-state.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/skill/SkillLibraryPanel.tsx",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'SkillMdRenderer' has a complexity of 20. Maximum allowed is 15.",
+          "line": 80,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 80,
+          "endColumn": 25
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'SkillDetailView' has a complexity of 37. Maximum allowed is 15.",
+          "line": 175,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 175,
+          "endColumn": 25
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'SkillLibraryPanel' has a complexity of 17. Maximum allowed is 15.",
+          "line": 630,
+          "column": 16,
+          "messageId": "complex",
+          "endLine": 630,
+          "endColumn": 42
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 3,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/tabs/TabBar.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/theme-provider.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/theme-toggle.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/tool/ToolLibraryPanel.tsx",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'ToolDetailView' has a complexity of 19. Maximum allowed is 15.",
+          "line": 21,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 21,
+          "endColumn": 24
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'ToolLibraryPanel' has a complexity of 19. Maximum allowed is 15.",
+          "line": 321,
+          "column": 16,
+          "messageId": "complex",
+          "endLine": 321,
+          "endColumn": 41
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 2,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/ui/badge.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/ui/button.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/ui/card.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/ui/checkbox.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/ui/dialog.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/ui/input.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/ui/premium.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/ui/scroll-area.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/ui/separator.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/ui/switch.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/ui/textarea.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/components/ui/tooltip.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/hooks/useEduclawAgentChat.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/hooks/useHomeChatModels.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/hooks/useHomeChatSessionChat.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/hooks/useHomeChatSessionLifecycle.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/i18n/en.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/i18n/index.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/i18n/zh.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/lib/agent-icons.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/lib/brand.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/lib/message-converter.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'convertRuntimeMessage' has a complexity of 16. Maximum allowed is 15.",
+          "line": 4,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 4,
+          "endColumn": 38
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'convertRuntimePart' has a complexity of 30. Maximum allowed is 15.",
+          "line": 35,
+          "column": 8,
+          "messageId": "complex",
+          "endLine": 35,
+          "endColumn": 35
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 2,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/lib/utils.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/main.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/pages/AdminPage.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/pages/AgentProfileWorkflow.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/pages/AgentWorkspacePage.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/pages/LiteWorkspace.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/pages/LoginPage.tsx",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'LoginPage' has a complexity of 17. Maximum allowed is 15.",
+          "line": 12,
+          "column": 16,
+          "messageId": "complex",
+          "endLine": 12,
+          "endColumn": 34
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/pages/SkillFirstWorkspace.tsx",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'SkillFirstWorkspaceContent' has a complexity of 82. Maximum allowed is 15.",
+          "line": 154,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 154,
+          "endColumn": 36
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Arrow function has a complexity of 20. Maximum allowed is 15.",
+          "line": 686,
+          "column": 5,
+          "messageId": "complex",
+          "endLine": 686,
+          "endColumn": 7
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 2,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/pages/WorkflowDemo.tsx",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'NodeConfigPanel' has a complexity of 25. Maximum allowed is 15.",
+          "line": 103,
+          "column": 1,
+          "messageId": "complex",
+          "endLine": 103,
+          "endColumn": 25
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Function 'WorkflowDemo' has a complexity of 27. Maximum allowed is 15.",
+          "line": 143,
+          "column": 16,
+          "messageId": "complex",
+          "endLine": 143,
+          "endColumn": 37
+        },
+        {
+          "ruleId": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "message": "React Hook useMemo has a missing dependency: 'traceByNode'. Either include it or remove the dependency array.",
+          "line": 187,
+          "column": 226,
+          "endLine": 187,
+          "endColumn": 259,
+          "suggestions": [
+            {
+              "desc": "Update the dependencies array to be: [workflow.nodes, selectedId, traceByNode]",
+              "fix": {
+                "range": [
+                  20047,
+                  20080
+                ],
+                "text": "[workflow.nodes, selectedId, traceByNode]"
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "@typescript-eslint/no-unused-expressions",
+          "severity": 2,
+          "message": "Expected an assignment or function call and instead saw an expression.",
+          "line": 213,
+          "column": 167,
+          "messageId": "unusedExpression",
+          "endLine": 213,
+          "endColumn": 268
+        }
+      ],
+      "errorCount": 1,
+      "fatalErrorCount": 0,
+      "warningCount": 3,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/pages/WorkflowLibrary.tsx",
+      "messages": [
+        {
+          "ruleId": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "message": "React Hook useEffect has a missing dependency: 'load'. Either include it or remove the dependency array.",
+          "line": 35,
+          "column": 37,
+          "endLine": 35,
+          "endColumn": 44,
+          "suggestions": [
+            {
+              "desc": "Update the dependencies array to be: [load, token]",
+              "fix": {
+                "range": [
+                  1032,
+                  1039
+                ],
+                "text": "[load, token]"
+              }
+            }
+          ]
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 1,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/pages/Workspace.tsx",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/services/agent-polling.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/services/polling-transport.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/stores/agent.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/stores/arena.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/stores/auth.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/stores/batch-build.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/stores/build.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/stores/chat.ts",
+      "messages": [
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Method 'handleMessageUpdate' has a complexity of 16. Maximum allowed is 15.",
+          "line": 377,
+          "column": 5,
+          "messageId": "complex",
+          "endLine": 377,
+          "endColumn": 24
+        },
+        {
+          "ruleId": "complexity",
+          "severity": 1,
+          "message": "Arrow function has a complexity of 18. Maximum allowed is 15.",
+          "line": 574,
+          "column": 25,
+          "messageId": "complex",
+          "endLine": 574,
+          "endColumn": 27
+        }
+      ],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 2,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/stores/diary.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/stores/home-chat.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/stores/interaction-queue.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/stores/library.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/stores/notification.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/stores/optimize.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/stores/settings.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/stores/sidebar-groups.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/stores/todo.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    },
+    {
+      "filePath": "educlaw-web/src/stores/ui.ts",
+      "messages": [],
+      "errorCount": 0,
+      "fatalErrorCount": 0,
+      "warningCount": 0,
+      "fixableErrorCount": 0,
+      "fixableWarningCount": 0,
+      "usedDeprecatedRules": []
+    }
+  ],
+  "metadata": {
+    "cwd": "/Users/hobzhao/Desktop/project/SkillStudio/educlaw-web",
+    "rulesMeta": {
+      "complexity": {
+        "type": "suggestion",
+        "defaultOptions": [
+          20
+        ],
+        "docs": {
+          "description": "Enforce a maximum cyclomatic complexity allowed in a program",
+          "recommended": false,
+          "url": "https://eslint.org/docs/latest/rules/complexity"
+        },
+        "schema": [
+          {
+            "oneOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "maximum": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "max": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "variant": {
+                    "enum": [
+                      "classic",
+                      "modified"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            ]
+          }
+        ],
+        "messages": {
+          "complex": "{{name}} has a complexity of {{complexity}}. Maximum allowed is {{max}}."
+        }
+      },
+      "react-hooks/exhaustive-deps": {
+        "type": "suggestion",
+        "docs": {
+          "description": "verifies the list of dependencies for Hooks like useEffect and similar",
+          "recommended": true,
+          "url": "https://github.com/facebook/react/issues/14920"
+        },
+        "fixable": "code",
+        "hasSuggestions": true,
+        "schema": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "enableDangerousAutofixThisMayCauseInfiniteLoops": false,
+            "properties": {
+              "additionalHooks": {
+                "type": "string"
+              },
+              "enableDangerousAutofixThisMayCauseInfiniteLoops": {
+                "type": "boolean"
+              },
+              "experimental_autoDependenciesHooks": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "requireExplicitEffectDeps": {
+                "type": "boolean"
+              }
+            }
+          }
+        ]
+      },
+      "react-hooks/incompatible-library": {
+        "type": "problem",
+        "docs": {
+          "description": "Validates against usage of libraries which are incompatible with memoization (manual or automatic)",
+          "recommended": true,
+          "url": "https://react.dev/reference/eslint-plugin-react-hooks/lints/incompatible-library"
+        },
+        "fixable": "code",
+        "hasSuggestions": true,
+        "schema": [
+          {
+            "type": "object",
+            "additionalProperties": true
+          }
+        ]
+      },
+      "max-depth": {
+        "type": "suggestion",
+        "docs": {
+          "description": "Enforce a maximum depth that blocks can be nested",
+          "recommended": false,
+          "url": "https://eslint.org/docs/latest/rules/max-depth"
+        },
+        "schema": [
+          {
+            "oneOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "maximum": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "max": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "additionalProperties": false
+              }
+            ]
+          }
+        ],
+        "defaultOptions": [
+          4
+        ],
+        "messages": {
+          "tooDeeply": "Blocks are nested too deeply ({{depth}}). Maximum allowed is {{maxDepth}}."
+        }
+      },
+      "@typescript-eslint/no-unused-expressions": {
+        "type": "suggestion",
+        "defaultOptions": [
+          {
+            "allowShortCircuit": false,
+            "allowTaggedTemplates": false,
+            "allowTernary": false
+          }
+        ],
+        "docs": {
+          "description": "Disallow unused expressions",
+          "extendsBaseRule": true,
+          "recommended": "recommended",
+          "url": "https://typescript-eslint.io/rules/no-unused-expressions"
+        },
+        "messages": {
+          "unusedExpression": "Expected an assignment or function call and instead saw an expression."
+        },
+        "schema": [
+          {
+            "type": "object",
+            "properties": {
+              "allowShortCircuit": {
+                "type": "boolean"
+              },
+              "allowTernary": {
+                "type": "boolean"
+              },
+              "allowTaggedTemplates": {
+                "type": "boolean"
+              },
+              "enforceForJSX": {
+                "type": "boolean"
+              },
+              "ignoreDirectives": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
+      }
+    }
+  }
+}

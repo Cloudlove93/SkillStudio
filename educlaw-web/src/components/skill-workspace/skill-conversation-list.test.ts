@@ -40,6 +40,22 @@ const thread = (overrides: Partial<ArenaThread>): ArenaThread => ({
 });
 
 describe('Skill conversation list helpers', () => {
+  it('rejects Agent executions, absent configs and mixed versions in run histories', () => {
+    const base = thread({});
+    expect(isSkillConversationThread(thread({ arenaKind: 'package_arena' }), 'physics')).toBe(false);
+    expect(isSkillConversationThread(thread({ skillArenaConfig: undefined }), 'physics')).toBe(false);
+    expect(isSkillConversationThread(thread({ skillArenaConfig: {
+      ...base.skillArenaConfig!, agentExecution: { agentId: '10', name: 'Agent', instructions: '', model: 'test', skills: [] },
+    } }), 'physics')).toBe(false);
+    expect(isSkillConversationThread(thread({ skillArenaConfig: {
+      ...base.skillArenaConfig!, surface: 'run',
+      right: { ...base.skillArenaConfig!.right!, skillVersionId: 'different' },
+    } }), 'physics')).toBe(false);
+    expect(isSkillConversationThread(thread({ skillArenaConfig: {
+      ...base.skillArenaConfig!, surface: 'arena',
+      left: { ...base.skillArenaConfig!.left!, skillId: 'chemistry' },
+    } }), 'physics')).toBe(true);
+  });
   it('keeps run/test and legacy comparison histories for the selected Skill', () => {
     const base = thread({});
     expect(isSkillConversationThread(thread({}), 'physics')).toBe(true);

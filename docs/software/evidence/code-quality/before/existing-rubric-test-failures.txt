@@ -1,0 +1,97 @@
+
+ RUN  v4.1.7 /Users/hobzhao/Desktop/project/SkillStudio/educlaw-server
+
+ ❯ src/services/package-service.rubric-actions.test.ts (4 tests | 4 failed) 96ms
+     × cleans rubric content before saving a manual rubric edit 89ms
+     × repairs polluted stored rubric by saving the cleaned body first 2ms
+     × cleans a polluted rubric during AI optimize before calling the model 2ms
+     × sends only the cleaned rubric body into AI optimize when the rubric is already clean 2ms
+ ❯ src/services/package-service.repair.test.ts (5 tests | 1 failed) 102ms
+     × optimizes an existing scorable rubric without entering interactive optimization 5ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/services/package-service.repair.test.ts > optimizePackageRubric > optimizes an existing scorable rubric without entering interactive optimization
+Error: Unexpected query: update agent_packages set name = $1, description = $2, model = $3, current_version_id = $4, updated_at = $5 where id = $6 and user_id = $7
+ ❯ Object.<anonymous> src/services/package-service.repair.test.ts:150:15
+    148|             state.packageRow.id === args[0] &&
+    149|             state.packageRow.user_id === args[1]
+    150|               ? state.packageRow
+       |               ^
+    151|               : null;
+    152|           return { rows: row ? [row] : [], rowCount: row ? 1 : 0 };
+ ❯ createPackageVersionWithSnapshotTx src/services/package-service.ts:1631:16
+ ❯ applyOptimizedSnapshot src/services/package-service.ts:2139:3
+ ❯ src/services/package-service.repair.test.ts:207:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  src/services/package-service.rubric-actions.test.ts > rubric actions > cleans rubric content before saving a manual rubric edit
+Error: Unexpected query: update agent_packages set name = $1, description = $2, model = $3, current_version_id = $4, updated_at = $5 where id = $6 and user_id = $7
+ ❯ Object.<anonymous> src/services/package-service.rubric-actions.test.ts:139:15
+    137|               ? state.packageRow
+    138|               : null;
+    139|           return { rows: row ? [row] : [], rowCount: row ? 1 : 0 };
+       |               ^
+    140|         }
+    141|
+ ❯ createPackageVersionWithSnapshotTx src/services/package-service.ts:1631:16
+ ❯ save src/services/package-service.ts:2254:5
+ ❯ src/services/package-service.rubric-actions.test.ts:167:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  src/services/package-service.rubric-actions.test.ts > rubric actions > repairs polluted stored rubric by saving the cleaned body first
+Error: Unexpected query: update agent_packages set name = $1, description = $2, model = $3, current_version_id = $4, updated_at = $5 where id = $6 and user_id = $7
+ ❯ Object.<anonymous> src/services/package-service.rubric-actions.test.ts:139:15
+    137|               ? state.packageRow
+    138|               : null;
+    139|           return { rows: row ? [row] : [], rowCount: row ? 1 : 0 };
+       |               ^
+    140|         }
+    141|
+ ❯ createPackageVersionWithSnapshotTx src/services/package-service.ts:1631:16
+ ❯ applyOptimizedSnapshot src/services/package-service.ts:2139:3
+ ❯ src/services/package-service.rubric-actions.test.ts:179:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  src/services/package-service.rubric-actions.test.ts > rubric actions > cleans a polluted rubric during AI optimize before calling the model
+Error: Unexpected query: update agent_packages set name = $1, description = $2, model = $3, current_version_id = $4, updated_at = $5 where id = $6 and user_id = $7
+ ❯ Object.<anonymous> src/services/package-service.rubric-actions.test.ts:139:15
+    137|               ? state.packageRow
+    138|               : null;
+    139|           return { rows: row ? [row] : [], rowCount: row ? 1 : 0 };
+       |               ^
+    140|         }
+    141|
+ ❯ createPackageVersionWithSnapshotTx src/services/package-service.ts:1631:16
+ ❯ applyOptimizedSnapshot src/services/package-service.ts:2139:3
+ ❯ src/services/package-service.rubric-actions.test.ts:187:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  src/services/package-service.rubric-actions.test.ts > rubric actions > sends only the cleaned rubric body into AI optimize when the rubric is already clean
+Error: Unexpected query: update agent_packages set name = $1, description = $2, model = $3, current_version_id = $4, updated_at = $5 where id = $6 and user_id = $7
+ ❯ Object.<anonymous> src/services/package-service.rubric-actions.test.ts:139:15
+    137|               ? state.packageRow
+    138|               : null;
+    139|           return { rows: row ? [row] : [], rowCount: row ? 1 : 0 };
+       |               ^
+    140|         }
+    141|
+ ❯ createPackageVersionWithSnapshotTx src/services/package-service.ts:1631:16
+ ❯ applyOptimizedSnapshot src/services/package-service.ts:2139:3
+ ❯ src/services/package-service.rubric-actions.test.ts:204:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  5 failed | 4 passed (9)
+   Start at  17:12:26
+   Duration  206ms (transform 158ms, setup 0ms, import 52ms, tests 198ms, environment 0ms)
+
+undefined
+/Users/hobzhao/Desktop/project/SkillStudio/educlaw-server:
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run src/services/package-service.rubric-actions.test.ts src/services/package-service.repair.test.ts

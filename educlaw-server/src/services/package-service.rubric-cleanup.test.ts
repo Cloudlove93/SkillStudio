@@ -2,10 +2,24 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildSourceRubricExcerpt,
+  extractRubricSectionFromContent,
   normalizeStoredRubricMarkdown,
 } from './package-service.js';
 
 describe('rubric cleanup', () => {
+  it.each([
+    ['## 评分标准', '## 下一章节'],
+    ['5、评分标准', '### 下一章节'],
+    ['5、评分标准', '6、案例对比'],
+  ])('keeps nested rubric details and stops at the next section: %s', (heading, boundary) => {
+    const excerpt = extractRubricSectionFromContent([
+      heading, '#### 评分细则', '维度一：正确性', '权重 50%，优秀：解释正确',
+      '维度二：完整性', '权重 50%，合格：覆盖主要步骤', boundary, '无关内容：课后安排',
+    ].join('\n'));
+    expect(excerpt).toContain('评分细则');
+    expect(excerpt).toContain('完整性');
+    expect(excerpt).not.toContain('无关内容');
+  });
   it('extracts only the main rubric section from user content', () => {
     const source = [
       '5、评价准则（基于智能体输出的评价维度）',

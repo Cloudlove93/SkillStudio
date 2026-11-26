@@ -1,0 +1,21 @@
+
+> educlaw@ lint /Users/hobzhao/Desktop/project/SkillStudio
+> pnpm --filter educlaw-server lint && pnpm --filter educlaw-web lint
+
+
+> educlaw-server@1.0.0 lint /Users/hobzhao/Desktop/project/SkillStudio/educlaw-server
+> eslint "src/**/*.ts"
+
+
+> educlaw-web@0.0.0 lint /Users/hobzhao/Desktop/project/SkillStudio/educlaw-web
+> eslint .
+
+
+/Users/hobzhao/Desktop/project/SkillStudio/educlaw-web/src/pages/WorkflowDemo.tsx
+  187:226  warning  React Hook useMemo has a missing dependency: 'traceByNode'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/hobzhao/Desktop/project/SkillStudio/educlaw-web/src/pages/WorkflowLibrary.tsx
+  35:37  warning  React Hook useEffect has a missing dependency: 'load'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+✖ 2 problems (0 errors, 2 warnings)
+
